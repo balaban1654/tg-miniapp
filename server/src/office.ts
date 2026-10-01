@@ -203,6 +203,14 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     }
   });
 
+  // Журнал постбеков для админа
+  app.get('/postbacks', { preHandler: need('admin') }, async () => {
+    const r = await db.query(
+      `SELECT id, event, query, tg_id, result, created_at FROM postback_log ORDER BY id DESC LIMIT 100`,
+    );
+    return r.rows;
+  });
+
   // Лиды
   app.get<{ Querystring: { status?: string } }>('/leads', { preHandler: auth }, async (req) => {
     const me = req.staff!;

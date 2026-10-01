@@ -54,3 +54,17 @@ CREATE TABLE IF NOT EXISTS sessions (
   expires_at TIMESTAMPTZ NOT NULL,
   created_at TIMESTAMPTZ DEFAULT now()
 );
+
+-- Журнал входящих постбеков для отладки. Секрет в журнал не попадает
+CREATE TABLE IF NOT EXISTS postback_log (
+  id         BIGSERIAL PRIMARY KEY,
+  event      TEXT,
+  query      JSONB,
+  tg_id      BIGINT,
+  result     TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- ID трейдера в Pocket Option: приходит с регистрацией, потом по нему находим лида
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS trader_id TEXT;
+CREATE INDEX IF NOT EXISTS leads_trader ON leads(trader_id);

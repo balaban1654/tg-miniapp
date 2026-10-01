@@ -120,6 +120,7 @@ function showApp(){
   $('#meName').textContent=me.name+' · '+ROLE[me.role];
   const items=[['home','Обзор'],['leads','Лиды'],['links','Ссылки']];
   if(me.role==='admin'||me.role==='teamlead')items.push(['staff',me.role==='admin'?'Люди':'Моя команда']);
+  if(me.role==='admin')items.push(['pb','Постбеки']);
   const nav=$('#nav');nav.replaceChildren(...items.map(([k,t])=>el('button',{type:'button','data-t':k,class:k===tab?'on':'',onclick:()=>{tab=k;showApp();render()}},t)));
   render();
 }
@@ -139,6 +140,7 @@ async function render(){
     else if(tab==='leads')m.replaceChildren(...await viewLeads());
     else if(tab==='links')m.replaceChildren(...await viewLinks());
     else if(tab==='staff')m.replaceChildren(...await viewStaff());
+    else if(tab==='pb')m.replaceChildren(...await viewPostbacks());
   }catch(x){if(x.message!=='auth')m.replaceChildren(el('div',{class:'err'},x.message))}
 }
 
@@ -194,6 +196,14 @@ async function viewStaff(){
   const toggle=r=>isAdmin&&r.id!==me.id?el('button',{class:'btn o s',type:'button',onclick:async()=>{await api('/staff/'+r.id,{method:'PATCH',body:{active:!r.active}});render()}},r.active?'Отключить':'Включить'):'';
   return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},isAdmin?'Люди':'Моя команда')),form,
     table(['Имя','Логин','Роль','Тимлидер','За FTD','Процент','Статус',''],rows.map(r=>[td(r.name),td(r.login),el('td',{},el('span',{class:'pill p-pur'},ROLE[r.role])),td(parentName(r.parent_id)),td(money(r.rate_ftd),'n'),td(Number(r.rate_percent)+'%','n'),el('td',{},el('span',{class:'pill '+(r.active?'p-ok':'p-bad')},r.active?'активен':'отключён')),el('td',{},toggle(r))]),'Пока никого нет.')];
+}
+
+async function viewPostbacks(){
+  const rows=await api('/postbacks');
+  const time=v=>new Date(v).toLocaleString('ru-RU',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Постбеки'),el('button',{class:'btn o s',type:'button',onclick:render},'Обновить')),
+    table(['Время','Событие','Лид (ID)','Сумма','Результат'],rows.map(r=>[td(time(r.created_at)),el('td',{},el('span',{class:'pill p-pur'},r.event)),td(r.tg_id||'—'),td(r.query&&(r.query.amount||r.query.sum||r.query.sumdep)||'—','n'),el('td',{},el('span',{class:'pill '+(r.result==='ok'?'p-ok':r.result.startsWith('дубль')?'p-warn':'p-bad')},r.result))]),
+      'Постбеков пока нет. Когда партнёрка отправит первый, он появится здесь.')];
 }
 
 (async()=>{try{me=await api('/me');showApp()}catch{showLogin()}})();

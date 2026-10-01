@@ -8,6 +8,7 @@ import { resolve } from 'node:path';
 import { migrate } from './migrate.js';
 import { ensureAdmin } from './auth.js';
 import { officeRoutes } from './office.js';
+import { postbackRoutes } from './postback.js';
 
 const app = Fastify({ logger: true, trustProxy: true });
 await app.register(cookie);
@@ -19,6 +20,7 @@ await ensureAdmin();
 const officeHtml = readFileSync(resolve(process.cwd(), 'public/office.html'), 'utf8');
 app.get('/office', async (_req, reply) => reply.type('text/html; charset=utf-8').header('Cache-Control', 'no-store').send(officeHtml));
 await app.register(officeRoutes, { prefix: '/api/office' });
+await app.register(postbackRoutes);
 
 app.get('/health', async () => {
   await db.query('SELECT 1');
