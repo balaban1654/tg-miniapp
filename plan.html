@@ -98,6 +98,16 @@ td.num,th.num{text-align:right;font-family:var(--f-m);font-variant-numeric:tabul
 .cols i{flex:1;background:linear-gradient(180deg,var(--acc2),var(--acc3));border-radius:4px 4px 0 0;min-width:0}
 @media(max-width:640px){.app{grid-template-columns:1fr}.side{grid-auto-flow:column;overflow-x:auto;border-right:0;border-bottom:1px solid var(--line)}.side .logo{display:none}.side div{white-space:nowrap}}
 @media(prefers-reduced-motion:no-preference){nav button{transition:background .15s}}
+
+.logo-c{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:50%;background:var(--acc);color:#fff;font:700 12px var(--f-d)}
+.ava{display:inline-grid;place-items:center;width:44px;height:44px;border-radius:50%;border:2px solid var(--acc);background:var(--card2);font:700 16px var(--f-d);color:var(--acc2)}
+.stats4{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}.stats4 .c{padding:8px}
+.hero{border-color:var(--acc);display:grid;gap:8px;background:linear-gradient(180deg,#2a1857,var(--card))}
+.tabs.t4{grid-template-columns:repeat(4,1fr)}
+.foot{flex:none;text-align:center;font-size:11px;color:var(--mut);padding:6px;background:#0b0616}
+.two2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.inp{height:40px;border-radius:10px;border:1px solid var(--line);background:var(--bg2)}
+.phone{height:640px}
 </style>
 
 <div class="wrap">
@@ -129,7 +139,7 @@ td.num,th.num{text-align:right;font-family:var(--f-m);font-variant-numeric:tabul
 
   <h2>Этапы</h2>
   <div class="stage"><div class="n">1</div><div><h3>Подготовка и доступы</h3><div class="t">1–2 дня · делаешь ты</div>
-    <ul><li>Бот в @BotFather, название, аватар, команда меню, домен Mini App.</li><li>Купить домен и добавить его в Cloudflare (DNS, SSL, защита от ботов).</li><li>GitHub: репозиторий уже есть, добавим ветки <code>main</code> и <code>dev</code>, секреты для деплоя.</li><li>Сервер: Ubuntu, Docker, доступ по SSH. Cloudflare Tunnel или проксирование на IP сервера.</li><li>Узнать у брокера формат постбеков и макросы (click_id, event, amount).</li></ul></div></div>
+    <ul><li>Бот в @BotFather, название, аватар, команда меню, домен Mini App.</li><li>Купить домен и добавить его в Cloudflare (DNS, SSL, защита от ботов).</li><li>GitHub: репозиторий уже есть, добавим ветки <code>main</code> и <code>dev</code>, секреты для деплоя.</li><li>Сервер: Ubuntu, Docker, доступ по SSH. Cloudflare Tunnel или проксирование на IP сервера.</li><li>В партнёрке Pocket Option настроить постбеки (регистрация, депозит, вывод) и получить макросы, например click_id и сумму.</li></ul></div></div>
   <div class="stage"><div class="n">2</div><div><h3>Ядро: база, роли, авторизация</h3><div class="t">4–5 дней</div>
     <ul><li>Вход через Telegram (проверка initData), без паролей для клиентов.</li><li>Логин и пароль плюс 2FA для админа, тимлидера, стримера, медиабайера.</li><li>Роли и права: админ, тимлидер, стример, медиабайер, клиент. Права гибко настраиваются на каждого.</li><li>Таблицы: пользователи, команды, лиды, события, платежи, планы, ссылки, сообщения, пуши.</li></ul></div></div>
   <div class="stage"><div class="n">3</div><div><h3>Реферальные ссылки и бот</h3><div class="t">3–4 дня</div>
@@ -137,7 +147,7 @@ td.num,th.num{text-align:right;font-family:var(--f-m);font-variant-numeric:tabul
   <div class="stage"><div class="n">4</div><div><h3>Постбеки и CRM</h3><div class="t">4–5 дней</div>
     <ul><li>Эндпоинт <code>/postback</code> с подписью и защитой от дублей: регистрация, FTD, повторный депозит, вывод.</li><li>Статусы лида: новый → зарегистрирован → FTD → активный → отвал.</li><li>Лента событий, фильтры, поиск, экспорт.</li></ul></div></div>
   <div class="stage"><div class="n">5</div><div><h3>Кабинет клиента (Mini App)</h3><div class="t">5–7 дней</div>
-    <ul><li>Главная, сигналы, история сделок, тренажёр, медиа, профиль.</li><li>Сигналы публикует админ или аналитик, клиенту приходит пуш.</li><li>Тренажёр: уроки, тесты, разбор входа по графику, прогресс.</li></ul></div></div>
+    <ul><li>Главная, сигналы, история сделок, тренажёр, медиа, профиль.</li><li>Четыре вкладки: Главная, Сделки, Тренажёр, Медиа, как на ваших скринах.</li><li>Анализ открывается после регистрации и депозита у Pocket Option (постбек), до этого показан экран с кнопкой «Зарегистрироваться».</li><li>Тренажёр из трёх уроков на учебном графике, медиа со списком трейдеров из админки.</li></ul></div></div>
   <div class="stage"><div class="n">6</div><div><h3>Кабинеты стримера и тимлидера, чат</h3><div class="t">6–8 дней</div>
     <ul><li>Стример видит только своих лидов, пишет им и отвечает через бота прямо из кабинета.</li><li>Тимлидер видит команду, результаты каждого и общий план.</li><li>Передача лида другому стримеру только через тимлидера или админа.</li></ul></div></div>
   <div class="stage"><div class="n">7</div><div><h3>Бухгалтерия, планы, медиабайеры</h3><div class="t">5–6 дней</div>
@@ -158,7 +168,7 @@ td.num,th.num{text-align:right;font-family:var(--f-m);font-variant-numeric:tabul
   <h2>Кто что видит</h2>
   <div class="tbl"><table>
     <tr><th>Раздел</th><th>Клиент</th><th>Стример</th><th>Тимлидер</th><th>Медиабайер</th><th>Админ</th></tr>
-    <tr><td>Сигналы, тренажёр, медиа</td><td>да</td><td>просмотр</td><td>просмотр</td><td>нет</td><td>управляет</td></tr>
+    <tr><td>Анализ, тренажёр, медиа</td><td>да</td><td>просмотр</td><td>просмотр</td><td>нет</td><td>управляет</td></tr>
     <tr><td>Лиды</td><td>нет</td><td>свои</td><td>команды</td><td>со своих ссылок</td><td>все</td></tr>
     <tr><td>Чат с лидами</td><td>свой</td><td>свои</td><td>команды</td><td>нет</td><td>все</td></tr>
     <tr><td>Депозиты и выводы</td><td>свои</td><td>своих лидов</td><td>команды</td><td>со своих ссылок</td><td>все</td></tr>
@@ -172,69 +182,110 @@ td.num,th.num{text-align:right;font-family:var(--f-m);font-variant-numeric:tabul
 <!-- ================= КЛИЕНТ ================= -->
 <section id="client">
   <h2>Кабинет клиента в Telegram</h2>
-  <p class="lead">Шесть экранов, нижнее меню из пяти вкладок. Открывается кнопкой в боте и на весь экран.</p>
+  <p class="lead">Собрано по вашим скринам: четыре вкладки (Главная, Сделки, Тренажёр, Медиа), шапка с поддержкой и статусом «ИИ онлайн», подпись с именем бота внизу. Доступ к анализу открывается после регистрации у Pocket Option по вашей ссылке и депозита.</p>
   <div class="row">
 
-    <figure class="fig"><div class="phone"><div class="tg"><span>Закрыть</span><b>Mini App</b><span>⋯</span></div>
+    <figure class="fig"><div class="phone"><div class="tg"><span>Закрыть</span><b>Brand AI</b><span>⋯</span></div>
       <div class="scr">
-        <div class="ln"><div><div class="sm">Добрый вечер</div><b>Алексей</b></div><span class="pill pur">Ваш менеджер: Иван</span></div>
-        <div class="c g"><div class="sm" style="color:#e6d8ff">Баланс на счёте</div><div class="big">$1 248.50</div><div class="ln sm" style="color:#e6d8ff"><span>за неделю</span><b class="up" style="color:#9bffd0">+$212.40</b></div></div>
-        <div class="ln"><b>Свежие сигналы</b><span class="sm">все →</span></div>
-        <div class="c"><div class="ln"><b>EUR/USD</b><span class="pill ok">BUY</span></div><div class="sm">Вход 1.0842 · TP 1.0890 · SL 1.0815</div><div class="bar"><i style="width:68%"></i></div><div class="sm">Точность разбора 68%</div></div>
-        <div class="c"><div class="ln"><b>BTC/USDT</b><span class="pill bad">SELL</span></div><div class="sm">Вход 67 420 · TP 66 800 · SL 67 900</div></div>
-        <div class="btn">Пополнить счёт</div>
+        <div class="ln"><div class="ln" style="gap:8px"><span class="logo-c">B</span><b style="font:700 15px var(--f-d)">Brand AI</b></div><div class="ln" style="gap:6px"><span class="pill pur" style="border:1px solid var(--line)">Поддержка</span><span class="sm up">● ИИ онлайн</span></div></div>
+        <div class="c ln" style="justify-content:flex-start;gap:12px"><span class="ava">Н</span><div><b style="font:700 15px var(--f-d)">Николай</b><div class="sm">В клубе с 1 октября 2026</div></div></div>
+        <div class="stats4"><div class="c"><b class="big" style="font-size:18px">0</b><div class="sm">сделок</div></div><div class="c"><b class="big up" style="font-size:18px">0</b><div class="sm">плюс</div></div><div class="c"><b class="big dn" style="font-size:18px">0</b><div class="sm">минус</div></div><div class="c"><b class="big" style="font-size:18px">—</b><div class="sm">успешных</div></div></div>
+        <div class="c hero"><svg viewBox="0 0 260 70" class="spark" style="height:64px"><g stroke="#c9a6ff" stroke-width="2"><line x1="20" y1="30" x2="20" y2="62"/><line x1="55" y1="38" x2="55" y2="60"/><line x1="90" y1="26" x2="90" y2="56"/><line x1="125" y1="36" x2="125" y2="56"/><line x1="160" y1="22" x2="160" y2="50"/><line x1="195" y1="28" x2="195" y2="52"/><line x1="230" y1="8" x2="230" y2="40"/></g><rect x="15" y="38" width="10" height="20" rx="2" fill="#9b5cff"/><rect x="50" y="42" width="10" height="12" rx="2" fill="#ff6b8a"/><rect x="85" y="32" width="10" height="18" rx="2" fill="#9b5cff"/><rect x="120" y="40" width="10" height="12" rx="2" fill="#ff6b8a"/><rect x="155" y="26" width="10" height="18" rx="2" fill="#9b5cff"/><rect x="190" y="32" width="10" height="14" rx="2" fill="#ff6b8a"/><rect x="225" y="12" width="10" height="24" rx="2" fill="#9b5cff"/></svg>
+          <b style="font:700 15px var(--f-d)">Анализ откроется после регистрации</b><p class="sm">Создай аккаунт Pocket Option по нашей ссылке и пополни счёт. Доступ откроется автоматически. Рекомендуем пополнять от 100 $.</p><div class="btn">Зарегистрироваться</div></div>
       </div>
-      <div class="tabs"><div class="a"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 11l9-8 9 8v9a1 1 0 01-1 1h-5v-6H9v6H4a1 1 0 01-1-1z"/></svg>Главная</div><div><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 17l5-6 4 4 7-9 2 1.5-9 12-4-4-3 3.5z"/></svg>Сигналы</div><div><svg viewBox="0 0 24 24" fill="currentColor"><path d="M5 3h14v18l-3-2-2 2-2-2-2 2-2-2-3 2z"/></svg>Сделки</div><div><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3L1 9l11 6 9-4.9V17h2V9zM5 13.2v4L12 21l7-3.8v-4L12 17z"/></svg>Тренажёр</div><div><svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 4h16v12H8l-4 4z"/></svg>Медиа</div></div>
-    </div><figcaption><b>1 · Главная</b>Баланс, свежие сигналы, менеджер, кнопка пополнения</figcaption></figure>
+      <div class="tabs t4"><div class="a"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 11l9-8 9 8v9a1 1 0 01-1 1h-5v-6H9v6H4a1 1 0 01-1-1z"/></svg>Главная</div><div><svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 5h16v2H4zm0 6h16v2H4zm0 6h16v2H4z"/></svg>Сделки</div><div><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 3h8v8H3zm10 0h8v8h-8zM3 13h8v8H3zm10 0h8v8h-8z"/></svg>Тренажёр</div><div><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 5h18v14H3zm7 3v8l6-4z"/></svg>Медиа</div></div>
+      <div class="foot">@your_bot</div>
+    </div><figcaption><b>1 · Главная до регистрации</b>Пустая статистика, кнопка «Зарегистрироваться» ведёт по партнёрской ссылке</figcaption></figure>
 
-    <figure class="fig"><div class="phone"><div class="tg"><span>‹ Назад</span><b>Сигнал</b><span></span></div>
+    <figure class="fig"><div class="phone"><div class="tg"><span>Закрыть</span><b>Brand AI</b><span>⋯</span></div>
       <div class="scr">
-        <div class="ln"><b style="font:700 18px var(--f-d)">EUR/USD</b><span class="pill ok">BUY · M15</span></div>
-        <svg class="spark" viewBox="0 0 280 120" style="height:130px"><defs><linearGradient id="g1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9b5cff" stop-opacity=".5"/><stop offset="1" stop-color="#9b5cff" stop-opacity="0"/></linearGradient></defs><path d="M0 90 L30 80 L55 95 L85 60 L110 70 L140 40 L170 55 L200 30 L230 38 L280 15 L280 120 L0 120Z" fill="url(#g1)"/><path d="M0 90 L30 80 L55 95 L85 60 L110 70 L140 40 L170 55 L200 30 L230 38 L280 15" fill="none" stroke="#c9a6ff" stroke-width="2"/><line x1="0" y1="62" x2="280" y2="62" stroke="#3ddc97" stroke-dasharray="4 4"/><line x1="0" y1="102" x2="280" y2="102" stroke="#ff6b8a" stroke-dasharray="4 4"/></svg>
-        <div class="c"><div class="ln sm"><span>Вход</span><b class="mono" style="color:var(--fg)">1.0842</b></div><div class="ln sm"><span>Take Profit</span><b class="mono up">1.0890</b></div><div class="ln sm"><span>Stop Loss</span><b class="mono dn">1.0815</b></div><div class="ln sm"><span>Риск</span><b class="mono" style="color:var(--fg)">1% депозита</b></div></div>
-        <div class="c sm"><b style="color:var(--fg)">Почему входим</b><br>Пробой уровня 1.0840 на объёме, отбой от поддержки на H1.</div>
-        <div class="btn">Открыть у брокера</div><div class="btn o">Как входить правильно</div>
-      </div></div><figcaption><b>2 · Сигнал</b>График, вход, TP, SL, риск и разбор. Кнопка ведёт к брокеру</figcaption></figure>
+        <div class="ln"><div class="ln" style="gap:8px"><span class="logo-c">B</span><b style="font:700 15px var(--f-d)">Brand AI</b></div><div class="ln" style="gap:6px"><span class="pill pur" style="border:1px solid var(--line)">Поддержка</span><span class="sm up">● ИИ онлайн</span></div></div>
+        <div class="c ln" style="justify-content:flex-start;gap:12px"><span class="ava">Н</span><div><b style="font:700 15px var(--f-d)">Николай</b><div class="sm">В клубе с 1 октября 2026</div></div></div>
+        <div class="stats4"><div class="c"><b class="big" style="font-size:18px">12</b><div class="sm">сделок</div></div><div class="c"><b class="big up" style="font-size:18px">8</b><div class="sm">плюс</div></div><div class="c"><b class="big dn" style="font-size:18px">4</b><div class="sm">минус</div></div><div class="c"><b class="big" style="font-size:18px">67%</b><div class="sm">успешных</div></div></div>
+        <div class="c"><div class="sm">Валютная пара</div><div class="ln"><b>EUR/USD OTC</b><span class="sm">сменить ▾</span></div><div class="sm" style="margin-top:6px">Экспирация</div><div class="ln" style="justify-content:flex-start;gap:6px"><span class="chip a">1 мин</span><span class="chip">2 мин</span><span class="chip">5 мин</span></div></div>
+        <div class="btn">Запустить анализ</div>
+        <p class="sm" style="text-align:center">Анализ занимает около 10 секунд. Торговля связана с риском потери капитала.</p>
+      </div>
+      <div class="tabs t4"><div class="a"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 11l9-8 9 8v9a1 1 0 01-1 1h-5v-6H9v6H4a1 1 0 01-1-1z"/></svg>Главная</div><div><svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 5h16v2H4zm0 6h16v2H4zm0 6h16v2H4z"/></svg>Сделки</div><div><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 3h8v8H3zm10 0h8v8h-8zM3 13h8v8H3zm10 0h8v8h-8z"/></svg>Тренажёр</div><div><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 5h18v14H3zm7 3v8l6-4z"/></svg>Медиа</div></div>
+      <div class="foot">@your_bot</div>
+    </div><figcaption><b>2 · Главная после депозита</b>Доступ открыт постбеком. Выбор пары и экспирации, кнопка запуска анализа</figcaption></figure>
 
-    <figure class="fig"><div class="phone"><div class="tg"><span></span><b>История сделок</b><span></span></div>
+    <figure class="fig"><div class="phone"><div class="tg"><span>Закрыть</span><b>Brand AI</b><span>⋯</span></div>
       <div class="scr">
-        <div class="ln"><span class="chip a">Все</span><span class="chip">Прибыль</span><span class="chip">Убыток</span><span class="chip">Месяц</span></div>
-        <div class="c"><div class="ln"><span class="sm">Итого за месяц</span><span class="pill ok">винрейт 71%</span></div><div class="big up">+$684.20</div>
-          <div class="cols" style="height:50px"><i style="height:40%"></i><i style="height:70%"></i><i style="height:30%"></i><i style="height:90%"></i><i style="height:55%"></i><i style="height:100%"></i><i style="height:65%"></i></div></div>
-        <div class="c ln"><div><b>EUR/USD</b><div class="sm">BUY · 30 сен, 14:20</div></div><b class="mono up">+$42.10</b></div>
-        <div class="c ln"><div><b>GBP/JPY</b><div class="sm">SELL · 30 сен, 11:05</div></div><b class="mono dn">−$18.00</b></div>
-        <div class="c ln"><div><b>BTC/USDT</b><div class="sm">BUY · 29 сен, 19:40</div></div><b class="mono up">+$96.50</b></div>
-        <div class="c ln"><div><b>XAU/USD</b><div class="sm">BUY · 29 сен, 09:15</div></div><b class="mono up">+$31.80</b></div>
-      </div></div><figcaption><b>3 · История сделок</b>Фильтры, итог за период, список с результатом по каждой сделке</figcaption></figure>
+        <div class="ln"><b style="font:700 16px var(--f-d)">Сигнал готов</b><span class="sm up">● ИИ онлайн</span></div>
+        <div class="c g"><div class="ln"><b style="font:700 16px var(--f-d)">EUR/USD OTC</b><span class="pill ok" style="font-size:13px">ВВЕРХ ▲</span></div>
+          <svg viewBox="0 0 260 80" class="spark" style="height:84px"><defs><linearGradient id="g2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".3"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient></defs><path d="M0 60 L30 52 L55 64 L85 40 L110 48 L140 28 L170 36 L200 20 L260 12 L260 80 L0 80Z" fill="url(#g2)"/><path d="M0 60 L30 52 L55 64 L85 40 L110 48 L140 28 L170 36 L200 20 L260 12" fill="none" stroke="#fff" stroke-width="2"/></svg></div>
+        <div class="c"><div class="ln sm"><span>Экспирация</span><b class="mono" style="color:var(--fg)">1 мин</b></div><div class="ln sm"><span>Войти в</span><b class="mono" style="color:var(--fg)">0:40 свечи</b></div><div class="ln sm"><span>Сумма сделки</span><b class="mono" style="color:var(--fg)">до 2% депозита</b></div></div>
+        <div class="c ln"><span class="sm">До входа</span><b class="big" style="font-size:22px;color:var(--acc2)">0:07</b></div>
+        <div class="btn">Открыть Pocket Option</div><div class="btn o">Урок: как входить</div>
+      </div>
+      <div class="tabs t4"><div class="a"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 11l9-8 9 8v9a1 1 0 01-1 1h-5v-6H9v6H4a1 1 0 01-1-1z"/></svg>Главная</div><div><svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 5h16v2H4zm0 6h16v2H4zm0 6h16v2H4z"/></svg>Сделки</div><div><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 3h8v8H3zm10 0h8v8h-8zM3 13h8v8H3zm10 0h8v8h-8z"/></svg>Тренажёр</div><div><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 5h18v14H3zm7 3v8l6-4z"/></svg>Медиа</div></div>
+      <div class="foot">@your_bot</div>
+    </div><figcaption><b>3 · Результат анализа</b>Направление, экспирация, момент входа и отсчёт. Клиент отмечает итог сделки (плюс или минус)</figcaption></figure>
 
-    <figure class="fig"><div class="phone"><div class="tg"><span></span><b>Тренажёр</b><span></span></div>
+    <figure class="fig"><div class="phone"><div class="tg"><span>Закрыть</span><b>Brand AI</b><span>⋯</span></div>
       <div class="scr">
-        <div class="c g"><div class="sm" style="color:#e6d8ff">Ваш уровень</div><b style="font:700 18px var(--f-d)">Новичок → Трейдер</b><div class="bar" style="margin-top:8px"><i style="width:42%"></i></div><div class="sm" style="color:#e6d8ff">5 из 12 уроков</div></div>
-        <div class="c"><div class="ln"><b>Урок 6 · Вход по сигналу</b><span class="pill pur">новый</span></div><div class="sm">Как читать вход, TP и SL, как считать объём сделки.</div></div>
-        <div class="c"><b>Практика на графике</b><svg class="spark" viewBox="0 0 260 70"><path d="M0 50 L40 42 L70 55 L110 30 L150 36 L190 18 L260 24" fill="none" stroke="#c9a6ff" stroke-width="2"/><circle cx="150" cy="36" r="5" fill="#9b5cff"/></svg><div class="sm">Поставьте точку входа. Мы покажем, где вход был бы удачным.</div></div>
-        <div class="ln"><div class="c" style="flex:1"><div class="sm">Тест</div><b>Риск-менеджмент</b></div><div class="c" style="flex:1"><div class="sm">Серия</div><b>4 дня 🔥</b></div></div>
-        <div class="btn">Продолжить урок</div>
-      </div></div><figcaption><b>4 · Тренажёр</b>Уроки, практика на графике, тесты, прогресс и серия дней</figcaption></figure>
+        <div class="ln"><b style="font:700 16px var(--f-d)">Мои сделки</b><span class="pill pur" style="border:1px solid var(--line)">Поддержка</span></div>
+        <div class="ln" style="justify-content:flex-start;gap:6px"><span class="chip a">7 дней</span><span class="chip">30 дней</span><span class="chip">Всё время</span></div>
+        <div class="stats4" style="grid-template-columns:repeat(3,1fr)"><div class="c"><b class="big" style="font-size:18px">12</b><div class="sm">сделок</div></div><div class="c"><b class="big up" style="font-size:18px">8</b><div class="sm">плюс</div></div><div class="c"><b class="big dn" style="font-size:18px">4</b><div class="sm">минус</div></div></div>
+        <div class="c"><div class="ln"><b>По дням</b><span class="sm">плюс · минус</span></div><div class="cols" style="height:70px;margin-top:8px"><i style="height:30%"></i><i style="height:60%"></i><i style="height:0"></i><i style="height:80%"></i><i style="height:45%"></i><i style="height:100%"></i><i style="height:55%"></i></div><div class="ln sm" style="margin-top:4px"><span>Пт</span><span>Сб</span><span>Вс</span><span>Пн</span><span>Вт</span><span>Ср</span><span>Чт</span></div></div>
+        <b>История</b>
+        <div class="c ln"><div><b>EUR/USD OTC</b><div class="sm">ВВЕРХ · 1 мин · сегодня 14:20</div></div><span class="pill ok">плюс</span></div>
+        <div class="c ln"><div><b>GBP/USD OTC</b><div class="sm">ВНИЗ · 1 мин · сегодня 13:05</div></div><span class="pill bad">минус</span></div>
+      </div>
+      <div class="tabs t4"><div><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 11l9-8 9 8v9a1 1 0 01-1 1h-5v-6H9v6H4a1 1 0 01-1-1z"/></svg>Главная</div><div class="a"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 5h16v2H4zm0 6h16v2H4zm0 6h16v2H4z"/></svg>Сделки</div><div><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 3h8v8H3zm10 0h8v8h-8zM3 13h8v8H3zm10 0h8v8h-8z"/></svg>Тренажёр</div><div><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 5h18v14H3zm7 3v8l6-4z"/></svg>Медиа</div></div>
+      <div class="foot">@your_bot</div>
+    </div><figcaption><b>4 · Сделки</b>Периоды 7 / 30 дней / всё время, счётчики, график по дням и история. У нового клиента здесь пустое состояние</figcaption></figure>
 
-    <figure class="fig"><div class="phone"><div class="tg"><span></span><b>Медиа</b><span></span></div>
+    <figure class="fig"><div class="phone"><div class="tg"><span>Закрыть</span><b>Brand AI</b><span>⋯</span></div>
       <div class="scr">
-        <div class="c g"><div class="ln"><div><div class="sm" style="color:#e6d8ff">Главный канал</div><b>Новости проекта</b></div><span class="pill pur" style="background:#fff;color:#4b1fb0">Открыть</span></div></div>
-        <b>Стримеры</b>
-        <div class="c ln"><div class="ln" style="justify-content:flex-start;gap:10px"><span class="pill pur" style="padding:8px 12px">ИВ</span><div><b>Иван</b><div class="sm">разборы · 12.4к подписчиков</div></div></div><span class="sm">→</span></div>
-        <div class="c ln"><div class="ln" style="justify-content:flex-start;gap:10px"><span class="pill pur" style="padding:8px 12px">МА</span><div><b>Мария</b><div class="sm">live-торговля · 8.1к</div></div></div><span class="sm">→</span></div>
-        <div class="c ln"><div class="ln" style="justify-content:flex-start;gap:10px"><span class="pill pur" style="padding:8px 12px">ДН</span><div><b>Денис</b><div class="sm">крипто · 6.7к</div></div></div><span class="sm">→</span></div>
-        <div class="c ln"><div class="ln" style="justify-content:flex-start;gap:10px"><span class="pill pur" style="padding:8px 12px">СО</span><div><b>Софья</b><div class="sm">новички · 5.2к</div></div></div><span class="sm">→</span></div>
-      </div></div><figcaption><b>5 · Медиа</b>Главный новостной канал и каналы всех стримеров в одном списке</figcaption></figure>
+        <div class="ln"><b style="font:700 16px var(--f-d)">Тренажёр</b><span class="pill pur" style="border:1px solid var(--line)">Поддержка</span></div>
+        <p class="sm">Три урока на учебном графике: как настроить терминал и зайти по сигналу. Учебный баланс 1 000 $, рисковать нечем.</p>
+        <div class="c ln" style="justify-content:flex-start;gap:12px"><span class="ava" style="width:34px;height:34px;font-size:14px">1</span><div><b>Урок 1 · Вход на 0:40</b><div class="sm">настроим терминал и зайдём по сигналу</div></div></div>
+        <div class="c ln" style="justify-content:flex-start;gap:12px"><span class="ava" style="width:34px;height:34px;font-size:14px">2</span><div><b>Урок 2 · Перекрытие</b><div class="sm">что делать, если сделка ушла в минус</div></div></div>
+        <div class="c ln" style="justify-content:flex-start;gap:12px"><span class="ava" style="width:34px;height:34px;font-size:14px">3</span><div><b>Урок 3 · Возврат</b><div class="sm">цена закрылась на уровне входа</div></div></div>
+        <div class="btn">Начать</div>
+      </div>
+      <div class="tabs t4"><div><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 11l9-8 9 8v9a1 1 0 01-1 1h-5v-6H9v6H4a1 1 0 01-1-1z"/></svg>Главная</div><div><svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 5h16v2H4zm0 6h16v2H4zm0 6h16v2H4z"/></svg>Сделки</div><div class="a"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 3h8v8H3zm10 0h8v8h-8zM3 13h8v8H3zm10 0h8v8h-8z"/></svg>Тренажёр</div><div><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 5h18v14H3zm7 3v8l6-4z"/></svg>Медиа</div></div>
+      <div class="foot">@your_bot</div>
+    </div><figcaption><b>5 · Тренажёр</b>Три урока на учебном графике с балансом 1 000 $</figcaption></figure>
 
-    <figure class="fig"><div class="phone"><div class="tg"><span></span><b>Профиль</b><span></span></div>
+    <figure class="fig"><div class="phone"><div class="tg"><span>Закрыть</span><b>Brand AI</b><span>⋯</span></div>
       <div class="scr">
-        <div class="ln" style="justify-content:flex-start;gap:12px"><span class="pill pur" style="padding:14px 16px;font-size:16px">АК</span><div><b>Алексей К.</b><div class="sm">ID 482 910 · с 12 сент</div></div></div>
-        <div class="c"><div class="ln"><span class="sm">Статус счёта</span><span class="pill ok">подтверждён</span></div><div class="ln"><span class="sm">Депозиты</span><b class="mono">$500</b></div><div class="ln"><span class="sm">Выводы</span><b class="mono">$120</b></div></div>
-        <div class="c"><div class="sm">Ваш менеджер</div><div class="ln"><b>Иван</b><span class="pill pur">Написать</span></div></div>
-        <div class="c"><div class="ln"><span>Пуши о сигналах</span><span class="sw"></span></div><div class="ln"><span>Итоги дня</span><span class="sw"></span></div><div class="ln"><span>Новости</span><span class="sw off"></span></div></div>
-        <div class="btn o">Поддержка</div>
-      </div></div><figcaption><b>6 · Профиль</b>Данные, статус счёта, менеджер и чат с ним, настройки уведомлений</figcaption></figure>
+        <div class="ln"><b style="font:700 15px var(--f-d)">Урок 1 · Вход на 0:40</b><span class="sm">1 / 3</span></div>
+        <div class="c"><div class="ln sm"><span>Учебный баланс</span><b class="mono" style="color:var(--fg)">$1 000</b></div>
+          <svg viewBox="0 0 260 120" class="spark" style="height:130px;margin-top:6px"><g stroke="#c9a6ff" stroke-width="2"><line x1="25" y1="70" x2="25" y2="105"/><line x1="65" y1="60" x2="65" y2="95"/><line x1="105" y1="40" x2="105" y2="85"/><line x1="145" y1="45" x2="145" y2="80"/><line x1="185" y1="25" x2="185" y2="70"/></g><rect x="20" y="78" width="10" height="20" rx="2" fill="#9b5cff"/><rect x="60" y="66" width="10" height="22" rx="2" fill="#9b5cff"/><rect x="100" y="48" width="10" height="30" rx="2" fill="#9b5cff"/><rect x="140" y="52" width="10" height="20" rx="2" fill="#ff6b8a"/><rect x="180" y="32" width="10" height="30" rx="2" fill="#9b5cff"/><line x1="0" y1="32" x2="260" y2="32" stroke="#c9a6ff" stroke-dasharray="4 4"/><text x="214" y="28" fill="#c9a6ff" font-size="9" font-family="monospace">вход 0:40</text></svg></div>
+        <div class="c sm"><b style="color:var(--fg)">Шаг 2 из 4</b><br>Дождись 0:40 на таймере свечи и нажми «Вверх», когда сигнал говорит ВВЕРХ.</div>
+        <div class="ln" style="gap:8px"><div class="btn" style="flex:1;background:var(--ok);color:#06210f">Вверх ▲</div><div class="btn" style="flex:1;background:var(--bad);color:#2b0610">Вниз ▼</div></div>
+      </div>
+      <div class="tabs t4"><div><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 11l9-8 9 8v9a1 1 0 01-1 1h-5v-6H9v6H4a1 1 0 01-1-1z"/></svg>Главная</div><div><svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 5h16v2H4zm0 6h16v2H4zm0 6h16v2H4z"/></svg>Сделки</div><div class="a"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 3h8v8H3zm10 0h8v8h-8zM3 13h8v8H3zm10 0h8v8h-8z"/></svg>Тренажёр</div><div><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 5h18v14H3zm7 3v8l6-4z"/></svg>Медиа</div></div>
+      <div class="foot">@your_bot</div>
+    </div><figcaption><b>6 · Урок на тренажёре</b>Учебный график и подсказки по шагам. Прогресс сохраняется в профиле</figcaption></figure>
+
+    <figure class="fig"><div class="phone"><div class="tg"><span>Закрыть</span><b>Brand AI</b><span>⋯</span></div>
+      <div class="scr">
+        <div class="ln"><b style="font:700 16px var(--f-d)">Медиа</b><span class="pill pur" style="border:1px solid var(--line)">Поддержка</span></div>
+        <b>Наши трейдеры</b>
+        <div class="two2"><div class="c" style="display:grid;gap:6px"><span class="ava">Л</span><b>Лера</b><div class="sm">Трейдер клуба</div><div class="btn o" style="padding:7px;font-size:12px">Канал трейдера</div></div>
+          <div class="c" style="display:grid;gap:6px"><span class="ava">Ю</span><b>Юра</b><div class="sm">Трейдер клуба</div><div class="btn o" style="padding:7px;font-size:12px">Канал трейдера</div></div></div>
+        <b>Каналы клуба</b>
+        <div class="c ln"><div><b>Основной канал</b><div class="sm">Новости проекта</div></div><span class="sm">↗</span></div>
+      </div>
+      <div class="tabs t4"><div><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 11l9-8 9 8v9a1 1 0 01-1 1h-5v-6H9v6H4a1 1 0 01-1-1z"/></svg>Главная</div><div><svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 5h16v2H4zm0 6h16v2H4zm0 6h16v2H4z"/></svg>Сделки</div><div><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 3h8v8H3zm10 0h8v8h-8zM3 13h8v8H3zm10 0h8v8h-8z"/></svg>Тренажёр</div><div class="a"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 5h18v14H3zm7 3v8l6-4z"/></svg>Медиа</div></div>
+      <div class="foot">@your_bot</div>
+    </div><figcaption><b>7 · Медиа</b>Карточки трейдеров со ссылками на их каналы и основной канал проекта. Список берётся из админки</figcaption></figure>
   </div>
+
+  <h2>Вход в Office для команды</h2>
+  <p class="lead">Стримеры, тимлидеры, медиабайеры и админ входят с одной страницы по логину и паролю. После входа каждый видит только свой кабинет. Страницу можно поставить на экран телефона как приложение.</p>
+  <div class="desk"><div class="chrome"><i></i><i></i><i></i><span>crm.твойдомен.com/office</span></div>
+    <div style="display:grid;place-items:center;padding:36px 16px;background:var(--bg)">
+      <div class="c" style="width:min(360px,100%);display:grid;gap:12px;padding:20px;border-radius:18px">
+        <div class="ln" style="justify-content:flex-start;gap:10px"><span class="logo-c" style="width:30px;height:30px;font-size:14px">B</span><div><b style="font:700 17px var(--f-d)">Brand Office</b><div class="sm">Кабинет команды Brand AI</div></div></div>
+        <div class="sm">Логин</div><div class="inp"></div><div class="sm">Пароль</div><div class="inp"></div>
+        <div class="btn">Войти</div>
+        <p class="sm">Установи Office как приложение: на iPhone и iPad нажми «Поделиться» → «На экран Домой», на Android и в Chrome нажми «Установить».</p>
+      </div></div></div>
 </section>
 
 <!-- ================= СТРИМЕР ================= -->
