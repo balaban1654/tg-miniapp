@@ -44,7 +44,7 @@ server {
   server_name app.$DOMAIN crm.$DOMAIN;
   ssl_certificate /etc/nginx/ssl/origin.crt;
   ssl_certificate_key /etc/nginx/ssl/origin.key;
-  location / { default_type text/plain; return 200 "Hunter: скоро открытие\n"; }
+  location / { default_type text/plain; charset utf-8; return 200 "Hunter: скоро открытие\n"; }
 }
 server { listen 80 default_server; return 301 https://\$host\$request_uri; }
 NGINX
