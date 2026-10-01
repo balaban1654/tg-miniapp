@@ -1,0 +1,422 @@
+<title>План воронки Telegram Mini App</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+/* Layout: sticky tab bar, then one section per role. Phones in a wrapping row, desktop screens as browser frames. Single dark violet look by choice. */
+:root{
+  --bg:#0d0817; --bg2:#150d26; --card:#1c1233; --card2:#251847; --line:#34255c;
+  --fg:#f1ebff; --mut:#a89cc8; --acc:#9b5cff; --acc2:#c9a6ff; --acc3:#6a2fe0;
+  --ok:#3ddc97; --warn:#ffb84d; --bad:#ff6b8a;
+  --f-d:'Unbounded',system-ui,sans-serif; --f-b:'Manrope',system-ui,sans-serif; --f-m:'JetBrains Mono',ui-monospace,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font:14px/1.55 var(--f-b);padding-inline:clamp(16px,4vw,48px);padding-block:0 64px}
+h1,h2,h3{font-family:var(--f-d);font-weight:700;margin:0;text-wrap:balance;line-height:1.2}
+h1{font-size:clamp(24px,4.5vw,42px)} h2{font-size:clamp(18px,2.5vw,26px)} h3{font-size:14px}
+p{margin:0}
+.wrap{max-width:1240px;margin:0 auto}
+.top{padding-block:40px 24px;display:grid;gap:12px}
+.top p{color:var(--mut);max-width:70ch}
+nav{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);padding-block:10px;display:flex;gap:6px;overflow-x:auto;border-bottom:1px solid var(--line)}
+nav button{font:600 13px var(--f-b);color:var(--mut);background:none;border:1px solid var(--line);border-radius:99px;padding:8px 16px;white-space:nowrap;cursor:pointer}
+nav button[aria-selected=true]{background:var(--acc);border-color:var(--acc);color:#fff}
+nav button:focus-visible,.copy:focus-visible{outline:2px solid var(--acc2);outline-offset:2px}
+section{display:none;padding-block:32px;gap:28px}
+section.on{display:grid}
+.lead{color:var(--mut);max-width:75ch}
+.grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+.box{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;display:grid;gap:8px;align-content:start;min-width:0}
+.box h3{color:var(--acc2)}
+.box ul{margin:0;padding-left:18px;color:var(--mut);display:grid;gap:3px}
+.tag{font:600 11px var(--f-m);letter-spacing:.06em;text-transform:uppercase;color:var(--acc2)}
+.stage{display:grid;grid-template-columns:auto 1fr;gap:16px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px}
+.stage .n{font:700 22px var(--f-m);color:var(--acc);min-width:52px}
+.stage ul{margin:6px 0 0;padding-left:18px;color:var(--mut)}
+.stage .t{font:500 12px var(--f-m);color:var(--acc2)}
+.flow{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.flow span{background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:8px 12px;font-weight:600}
+.flow i{color:var(--acc);font-style:normal}
+code,.mono{font-family:var(--f-m);font-size:12px;color:var(--acc2);overflow-wrap:anywhere}
+.tbl{overflow-x:auto;border:1px solid var(--line);border-radius:14px}
+table{border-collapse:collapse;width:100%;min-width:560px}
+th,td{padding:10px 14px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}
+th{font:600 11px var(--f-m);letter-spacing:.06em;text-transform:uppercase;color:var(--mut);background:var(--bg2)}
+tr:last-child td{border-bottom:0}
+td.num,th.num{text-align:right;font-family:var(--f-m);font-variant-numeric:tabular-nums}
+.pill{display:inline-block;border-radius:99px;padding:2px 10px;font:600 11px var(--f-m)}
+.ok{background:#3ddc9722;color:var(--ok)} .warn{background:#ffb84d22;color:var(--warn)} .bad{background:#ff6b8a22;color:var(--bad)} .pur{background:#9b5cff33;color:var(--acc2)}
+.up{color:var(--ok)} .dn{color:var(--bad)}
+
+/* phone */
+.row{display:flex;flex-wrap:wrap;gap:28px;justify-content:center}
+.fig{display:grid;gap:10px;justify-items:center}
+.fig figcaption{font:600 12px var(--f-m);color:var(--mut);letter-spacing:.04em;text-align:center;max-width:300px}
+.fig figcaption b{color:var(--acc2);display:block}
+.phone{width:300px;height:620px;border-radius:38px;border:8px solid #000;background:linear-gradient(180deg,#1a0f33,#0f0820 55%);position:relative;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 0 0 1px var(--line),0 24px 60px #6a2fe033}
+.tg{height:44px;flex:none;background:#00000055;display:flex;align-items:center;justify-content:space-between;padding:12px 16px 0;font-size:12px;color:var(--mut)}
+.tg b{color:var(--fg)}
+.scr{flex:1;overflow:hidden;padding:12px 14px;display:grid;gap:10px;align-content:start}
+.tabs{flex:none;display:grid;grid-template-columns:repeat(5,1fr);background:#0b0616;border-top:1px solid var(--line);padding:8px 4px 12px}
+.tabs div{text-align:center;font-size:10px;color:var(--mut);display:grid;gap:2px;justify-items:center}
+.tabs div.a{color:var(--acc2)} .tabs svg{width:20px;height:20px}
+.c{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;min-width:0}
+.c.g{background:linear-gradient(135deg,var(--acc3),#3a1c8a);border:0}
+.sm{font-size:11px;color:var(--mut)} .big{font:700 24px var(--f-m)}
+.ln{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.btn{display:block;text-align:center;background:var(--acc);color:#fff;font-weight:700;border-radius:12px;padding:11px;font-size:13px}
+.btn.o{background:none;border:1px solid var(--acc);color:var(--acc2)}
+.bar{height:6px;border-radius:9px;background:#ffffff1a;overflow:hidden} .bar i{display:block;height:100%;background:linear-gradient(90deg,var(--acc),var(--acc2));border-radius:9px}
+.chip{display:inline-block;border:1px solid var(--line);border-radius:99px;padding:3px 10px;font-size:11px;color:var(--mut)} .chip.a{background:var(--acc);border-color:var(--acc);color:#fff}
+.spark{width:100%;height:56px;display:block}
+
+/* desktop */
+.desk{border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--bg2);box-shadow:0 24px 60px #6a2fe022}
+.chrome{display:flex;gap:6px;align-items:center;padding:10px 14px;background:#00000055;border-bottom:1px solid var(--line)}
+.chrome i{width:10px;height:10px;border-radius:50%;background:var(--line)}
+.chrome span{margin-left:10px;font:500 11px var(--f-m);color:var(--mut);background:var(--bg);padding:3px 12px;border-radius:99px}
+.app{display:grid;grid-template-columns:170px 1fr;min-height:420px}
+.side{background:#0a0613;border-right:1px solid var(--line);padding:14px 10px;display:grid;gap:3px;align-content:start}
+.side .logo{font:700 14px var(--f-d);color:var(--acc2);padding:4px 10px 14px}
+.side div{padding:8px 10px;border-radius:9px;color:var(--mut);font-weight:600;font-size:13px}
+.side div.a{background:var(--card2);color:var(--fg)}
+.main{padding:18px;display:grid;gap:14px;align-content:start;min-width:0;overflow-x:auto}
+.kpis{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(130px,1fr))}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px}
+.kpi .sm{text-transform:uppercase;letter-spacing:.05em;font-size:10px}
+.kpi .big{font-size:20px}
+.two{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
+.chat{display:grid;gap:8px;align-content:end}
+.m{max-width:80%;padding:8px 12px;border-radius:12px;font-size:13px}
+.m.in{background:var(--card2);border-top-left-radius:3px}
+.m.out{background:var(--acc3);justify-self:end;border-top-right-radius:3px}
+.sw{display:inline-block;width:34px;height:20px;border-radius:99px;background:var(--acc);position:relative;vertical-align:middle}
+.sw::after{content:"";position:absolute;right:3px;top:3px;width:14px;height:14px;border-radius:50%;background:#fff}
+.sw.off{background:var(--line)} .sw.off::after{right:auto;left:3px}
+.copy{font:600 11px var(--f-m);background:var(--card2);color:var(--acc2);border:1px solid var(--line);border-radius:8px;padding:4px 10px;cursor:pointer}
+.cols{display:flex;align-items:flex-end;gap:5px;height:90px}
+.cols i{flex:1;background:linear-gradient(180deg,var(--acc2),var(--acc3));border-radius:4px 4px 0 0;min-width:0}
+@media(max-width:640px){.app{grid-template-columns:1fr}.side{grid-auto-flow:column;overflow-x:auto;border-right:0;border-bottom:1px solid var(--line)}.side .logo{display:none}.side div{white-space:nowrap}}
+@media(prefers-reduced-motion:no-preference){nav button{transition:background .15s}}
+</style>
+
+<div class="wrap">
+<header class="top">
+  <span class="tag">Проект · Telegram Mini App + CRM</span>
+  <h1>Воронка для клиентов и CRM для команды</h1>
+  <p>Пошаговый план и макеты всех кабинетов в фиолетовой гамме. Каждый экран ниже показывает, что увидит клиент, стример, тимлидер, медиабайер и админ. Все цифры и имена на макетах примерные.</p>
+</header>
+
+<nav role="tablist" id="nav">
+  <button role="tab" data-t="plan" aria-selected="true">План работ</button>
+  <button role="tab" data-t="client" aria-selected="false">Клиент (Mini App)</button>
+  <button role="tab" data-t="streamer" aria-selected="false">Стример</button>
+  <button role="tab" data-t="lead" aria-selected="false">Тимлидер</button>
+  <button role="tab" data-t="mb" aria-selected="false">Медиабайер</button>
+  <button role="tab" data-t="admin" aria-selected="false">Админ</button>
+  <button role="tab" data-t="push" aria-selected="false">Пуши в боте</button>
+</nav>
+
+<!-- ================= ПЛАН ================= -->
+<section id="plan" class="on">
+  <h2>Как всё устроено</h2>
+  <p class="lead">Одна система, три входа: Telegram-бот с Mini App для клиентов, веб-кабинет для команды и API, куда брокер присылает постбеки. Всё держится на одной базе, поэтому клиент видит свой кабинет, а стример видит того же клиента как лида.</p>
+
+  <div class="box"><span class="tag">Главный путь лида</span>
+    <div class="flow"><span>Ссылка стримера</span><i>→</i><span>Домен (Cloudflare)</span><i>→</i><span>Бот: /start s_ref</span><i>→</i><span>Лид закреплён за стримером</span><i>→</i><span>Mini App</span><i>→</i><span>Регистрация у брокера</span><i>→</i><span>Постбек reg / dep / wd</span><i>→</i><span>CRM + пуш + уведомление стримеру</span></div>
+    <p class="sm">Пример ссылки: <code>https://go.твойдомен.com/s/ivan</code> → <code>t.me/твой_бот?start=s_ivan</code>. Параметр <code>start</code> бот читает при первом заходе и навсегда привязывает человека к стримеру.</p>
+  </div>
+
+  <h2>Этапы</h2>
+  <div class="stage"><div class="n">1</div><div><h3>Подготовка и доступы</h3><div class="t">1–2 дня · делаешь ты</div>
+    <ul><li>Бот в @BotFather, название, аватар, команда меню, домен Mini App.</li><li>Купить домен и добавить его в Cloudflare (DNS, SSL, защита от ботов).</li><li>GitHub: репозиторий уже есть, добавим ветки <code>main</code> и <code>dev</code>, секреты для деплоя.</li><li>Сервер: Ubuntu, Docker, доступ по SSH. Cloudflare Tunnel или проксирование на IP сервера.</li><li>Узнать у брокера формат постбеков и макросы (click_id, event, amount).</li></ul></div></div>
+  <div class="stage"><div class="n">2</div><div><h3>Ядро: база, роли, авторизация</h3><div class="t">4–5 дней</div>
+    <ul><li>Вход через Telegram (проверка initData), без паролей для клиентов.</li><li>Логин и пароль плюс 2FA для админа, тимлидера, стримера, медиабайера.</li><li>Роли и права: админ, тимлидер, стример, медиабайер, клиент. Права гибко настраиваются на каждого.</li><li>Таблицы: пользователи, команды, лиды, события, платежи, планы, ссылки, сообщения, пуши.</li></ul></div></div>
+  <div class="stage"><div class="n">3</div><div><h3>Реферальные ссылки и бот</h3><div class="t">3–4 дня</div>
+    <ul><li>Генератор ссылок на домене: на стримера, медиабайера, источник, кампанию.</li><li>Закрепление лида при /start, защита от перехвата: лид не переходит к другому стримеру.</li><li>Кнопка «Открыть кабинет» и приветствие по сценарию.</li></ul></div></div>
+  <div class="stage"><div class="n">4</div><div><h3>Постбеки и CRM</h3><div class="t">4–5 дней</div>
+    <ul><li>Эндпоинт <code>/postback</code> с подписью и защитой от дублей: регистрация, FTD, повторный депозит, вывод.</li><li>Статусы лида: новый → зарегистрирован → FTD → активный → отвал.</li><li>Лента событий, фильтры, поиск, экспорт.</li></ul></div></div>
+  <div class="stage"><div class="n">5</div><div><h3>Кабинет клиента (Mini App)</h3><div class="t">5–7 дней</div>
+    <ul><li>Главная, сигналы, история сделок, тренажёр, медиа, профиль.</li><li>Сигналы публикует админ или аналитик, клиенту приходит пуш.</li><li>Тренажёр: уроки, тесты, разбор входа по графику, прогресс.</li></ul></div></div>
+  <div class="stage"><div class="n">6</div><div><h3>Кабинеты стримера и тимлидера, чат</h3><div class="t">6–8 дней</div>
+    <ul><li>Стример видит только своих лидов, пишет им и отвечает через бота прямо из кабинета.</li><li>Тимлидер видит команду, результаты каждого и общий план.</li><li>Передача лида другому стримеру только через тимлидера или админа.</li></ul></div></div>
+  <div class="stage"><div class="n">7</div><div><h3>Бухгалтерия, планы, медиабайеры</h3><div class="t">5–6 дней</div>
+    <ul><li>Планы по FTD: общий, на команду, на каждого стримера и медиабайера, по периодам.</li><li>Ставки и проценты стримеров, ставка за FTD или процент от залива у медиабайера, холды, выплаты.</li><li>Баланс к выплате, история выплат, штрафы и бонусы.</li></ul></div></div>
+  <div class="stage"><div class="n">8</div><div><h3>Пуши и рассылки</h3><div class="t">3–4 дня</div>
+    <ul><li>Триггеры: регистрация, нет депозита через N часов, FTD, новый сигнал, итоги дня.</li><li>Шаблоны с кнопками и картинками, задержка, сегменты, A/B.</li><li>Рассылка вручную по сегменту и очередь отправки с учётом лимитов Telegram.</li></ul></div></div>
+  <div class="stage"><div class="n">9</div><div><h3>Тесты, запуск, поддержка</h3><div class="t">3–4 дня</div>
+    <ul><li>Тестовые постбеки, нагрузка, резервные копии базы.</li><li>Деплой через GitHub Actions на сервер, мониторинг и логи.</li><li>Обучение стримеров и тимлидеров, запуск на небольшой группе.</li></ul></div></div>
+
+  <h2>Что нужно подготовить</h2>
+  <div class="grid">
+    <div class="box"><h3>GitHub</h3><ul><li>Репозиторий <code>tg-miniapp</code> (есть)</li><li>Ветки main и dev</li><li>Секреты: SSH-ключ, токен бота, ключ постбеков</li><li>Автодеплой при пуше в main</li></ul></div>
+    <div class="box"><h3>Домен и Cloudflare</h3><ul><li>Один домен, поддомены: <code>app.</code> для Mini App, <code>crm.</code> для кабинетов, <code>go.</code> для ссылок, <code>api.</code> для постбеков</li><li>Прокси и SSL</li><li>Правила против ботов на /postback</li></ul></div>
+    <div class="box"><h3>Сервер</h3><ul><li>2 vCPU, 4 ГБ RAM для старта</li><li>Docker, Postgres, Redis, Nginx</li><li>Бэкапы базы раз в сутки</li></ul></div>
+    <div class="box"><h3>Технологии</h3><ul><li>Фронт: React + Vite, Telegram WebApp SDK</li><li>Бэк: Node.js (NestJS), Postgres, Redis</li><li>Бот: grammY, очередь отправки BullMQ</li><li>Один адаптивный интерфейс для телефона и сайта</li></ul></div>
+  </div>
+
+  <h2>Кто что видит</h2>
+  <div class="tbl"><table>
+    <tr><th>Раздел</th><th>Клиент</th><th>Стример</th><th>Тимлидер</th><th>Медиабайер</th><th>Админ</th></tr>
+    <tr><td>Сигналы, тренажёр, медиа</td><td>да</td><td>просмотр</td><td>просмотр</td><td>нет</td><td>управляет</td></tr>
+    <tr><td>Лиды</td><td>нет</td><td>свои</td><td>команды</td><td>со своих ссылок</td><td>все</td></tr>
+    <tr><td>Чат с лидами</td><td>свой</td><td>свои</td><td>команды</td><td>нет</td><td>все</td></tr>
+    <tr><td>Депозиты и выводы</td><td>свои</td><td>своих лидов</td><td>команды</td><td>со своих ссылок</td><td>все</td></tr>
+    <tr><td>Планы по FTD</td><td>нет</td><td>свой</td><td>ставит команде</td><td>свой</td><td>ставит всем</td></tr>
+    <tr><td>Бухгалтерия, ставки</td><td>нет</td><td>свой баланс</td><td>баланс команды</td><td>свой баланс</td><td>полностью</td></tr>
+    <tr><td>Пуши и шаблоны</td><td>нет</td><td>нет</td><td>для команды</td><td>нет</td><td>полностью</td></tr>
+  </table></div>
+  <p class="sm">Итого около 5–6 недель до рабочей версии. Права в таблице настраиваются в админке отдельно для каждого человека.</p>
+</section>
+
+<!-- ================= КЛИЕНТ ================= -->
+<section id="client">
+  <h2>Кабинет клиента в Telegram</h2>
+  <p class="lead">Шесть экранов, нижнее меню из пяти вкладок. Открывается кнопкой в боте и на весь экран.</p>
+  <div class="row">
+
+    <figure class="fig"><div class="phone"><div class="tg"><span>Закрыть</span><b>Mini App</b><span>⋯</span></div>
+      <div class="scr">
+        <div class="ln"><div><div class="sm">Добрый вечер</div><b>Алексей</b></div><span class="pill pur">Ваш менеджер: Иван</span></div>
+        <div class="c g"><div class="sm" style="color:#e6d8ff">Баланс на счёте</div><div class="big">$1 248.50</div><div class="ln sm" style="color:#e6d8ff"><span>за неделю</span><b class="up" style="color:#9bffd0">+$212.40</b></div></div>
+        <div class="ln"><b>Свежие сигналы</b><span class="sm">все →</span></div>
+        <div class="c"><div class="ln"><b>EUR/USD</b><span class="pill ok">BUY</span></div><div class="sm">Вход 1.0842 · TP 1.0890 · SL 1.0815</div><div class="bar"><i style="width:68%"></i></div><div class="sm">Точность разбора 68%</div></div>
+        <div class="c"><div class="ln"><b>BTC/USDT</b><span class="pill bad">SELL</span></div><div class="sm">Вход 67 420 · TP 66 800 · SL 67 900</div></div>
+        <div class="btn">Пополнить счёт</div>
+      </div>
+      <div class="tabs"><div class="a"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 11l9-8 9 8v9a1 1 0 01-1 1h-5v-6H9v6H4a1 1 0 01-1-1z"/></svg>Главная</div><div><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 17l5-6 4 4 7-9 2 1.5-9 12-4-4-3 3.5z"/></svg>Сигналы</div><div><svg viewBox="0 0 24 24" fill="currentColor"><path d="M5 3h14v18l-3-2-2 2-2-2-2 2-2-2-3 2z"/></svg>Сделки</div><div><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3L1 9l11 6 9-4.9V17h2V9zM5 13.2v4L12 21l7-3.8v-4L12 17z"/></svg>Тренажёр</div><div><svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 4h16v12H8l-4 4z"/></svg>Медиа</div></div>
+    </div><figcaption><b>1 · Главная</b>Баланс, свежие сигналы, менеджер, кнопка пополнения</figcaption></figure>
+
+    <figure class="fig"><div class="phone"><div class="tg"><span>‹ Назад</span><b>Сигнал</b><span></span></div>
+      <div class="scr">
+        <div class="ln"><b style="font:700 18px var(--f-d)">EUR/USD</b><span class="pill ok">BUY · M15</span></div>
+        <svg class="spark" viewBox="0 0 280 120" style="height:130px"><defs><linearGradient id="g1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9b5cff" stop-opacity=".5"/><stop offset="1" stop-color="#9b5cff" stop-opacity="0"/></linearGradient></defs><path d="M0 90 L30 80 L55 95 L85 60 L110 70 L140 40 L170 55 L200 30 L230 38 L280 15 L280 120 L0 120Z" fill="url(#g1)"/><path d="M0 90 L30 80 L55 95 L85 60 L110 70 L140 40 L170 55 L200 30 L230 38 L280 15" fill="none" stroke="#c9a6ff" stroke-width="2"/><line x1="0" y1="62" x2="280" y2="62" stroke="#3ddc97" stroke-dasharray="4 4"/><line x1="0" y1="102" x2="280" y2="102" stroke="#ff6b8a" stroke-dasharray="4 4"/></svg>
+        <div class="c"><div class="ln sm"><span>Вход</span><b class="mono" style="color:var(--fg)">1.0842</b></div><div class="ln sm"><span>Take Profit</span><b class="mono up">1.0890</b></div><div class="ln sm"><span>Stop Loss</span><b class="mono dn">1.0815</b></div><div class="ln sm"><span>Риск</span><b class="mono" style="color:var(--fg)">1% депозита</b></div></div>
+        <div class="c sm"><b style="color:var(--fg)">Почему входим</b><br>Пробой уровня 1.0840 на объёме, отбой от поддержки на H1.</div>
+        <div class="btn">Открыть у брокера</div><div class="btn o">Как входить правильно</div>
+      </div></div><figcaption><b>2 · Сигнал</b>График, вход, TP, SL, риск и разбор. Кнопка ведёт к брокеру</figcaption></figure>
+
+    <figure class="fig"><div class="phone"><div class="tg"><span></span><b>История сделок</b><span></span></div>
+      <div class="scr">
+        <div class="ln"><span class="chip a">Все</span><span class="chip">Прибыль</span><span class="chip">Убыток</span><span class="chip">Месяц</span></div>
+        <div class="c"><div class="ln"><span class="sm">Итого за месяц</span><span class="pill ok">винрейт 71%</span></div><div class="big up">+$684.20</div>
+          <div class="cols" style="height:50px"><i style="height:40%"></i><i style="height:70%"></i><i style="height:30%"></i><i style="height:90%"></i><i style="height:55%"></i><i style="height:100%"></i><i style="height:65%"></i></div></div>
+        <div class="c ln"><div><b>EUR/USD</b><div class="sm">BUY · 30 сен, 14:20</div></div><b class="mono up">+$42.10</b></div>
+        <div class="c ln"><div><b>GBP/JPY</b><div class="sm">SELL · 30 сен, 11:05</div></div><b class="mono dn">−$18.00</b></div>
+        <div class="c ln"><div><b>BTC/USDT</b><div class="sm">BUY · 29 сен, 19:40</div></div><b class="mono up">+$96.50</b></div>
+        <div class="c ln"><div><b>XAU/USD</b><div class="sm">BUY · 29 сен, 09:15</div></div><b class="mono up">+$31.80</b></div>
+      </div></div><figcaption><b>3 · История сделок</b>Фильтры, итог за период, список с результатом по каждой сделке</figcaption></figure>
+
+    <figure class="fig"><div class="phone"><div class="tg"><span></span><b>Тренажёр</b><span></span></div>
+      <div class="scr">
+        <div class="c g"><div class="sm" style="color:#e6d8ff">Ваш уровень</div><b style="font:700 18px var(--f-d)">Новичок → Трейдер</b><div class="bar" style="margin-top:8px"><i style="width:42%"></i></div><div class="sm" style="color:#e6d8ff">5 из 12 уроков</div></div>
+        <div class="c"><div class="ln"><b>Урок 6 · Вход по сигналу</b><span class="pill pur">новый</span></div><div class="sm">Как читать вход, TP и SL, как считать объём сделки.</div></div>
+        <div class="c"><b>Практика на графике</b><svg class="spark" viewBox="0 0 260 70"><path d="M0 50 L40 42 L70 55 L110 30 L150 36 L190 18 L260 24" fill="none" stroke="#c9a6ff" stroke-width="2"/><circle cx="150" cy="36" r="5" fill="#9b5cff"/></svg><div class="sm">Поставьте точку входа. Мы покажем, где вход был бы удачным.</div></div>
+        <div class="ln"><div class="c" style="flex:1"><div class="sm">Тест</div><b>Риск-менеджмент</b></div><div class="c" style="flex:1"><div class="sm">Серия</div><b>4 дня 🔥</b></div></div>
+        <div class="btn">Продолжить урок</div>
+      </div></div><figcaption><b>4 · Тренажёр</b>Уроки, практика на графике, тесты, прогресс и серия дней</figcaption></figure>
+
+    <figure class="fig"><div class="phone"><div class="tg"><span></span><b>Медиа</b><span></span></div>
+      <div class="scr">
+        <div class="c g"><div class="ln"><div><div class="sm" style="color:#e6d8ff">Главный канал</div><b>Новости проекта</b></div><span class="pill pur" style="background:#fff;color:#4b1fb0">Открыть</span></div></div>
+        <b>Стримеры</b>
+        <div class="c ln"><div class="ln" style="justify-content:flex-start;gap:10px"><span class="pill pur" style="padding:8px 12px">ИВ</span><div><b>Иван</b><div class="sm">разборы · 12.4к подписчиков</div></div></div><span class="sm">→</span></div>
+        <div class="c ln"><div class="ln" style="justify-content:flex-start;gap:10px"><span class="pill pur" style="padding:8px 12px">МА</span><div><b>Мария</b><div class="sm">live-торговля · 8.1к</div></div></div><span class="sm">→</span></div>
+        <div class="c ln"><div class="ln" style="justify-content:flex-start;gap:10px"><span class="pill pur" style="padding:8px 12px">ДН</span><div><b>Денис</b><div class="sm">крипто · 6.7к</div></div></div><span class="sm">→</span></div>
+        <div class="c ln"><div class="ln" style="justify-content:flex-start;gap:10px"><span class="pill pur" style="padding:8px 12px">СО</span><div><b>Софья</b><div class="sm">новички · 5.2к</div></div></div><span class="sm">→</span></div>
+      </div></div><figcaption><b>5 · Медиа</b>Главный новостной канал и каналы всех стримеров в одном списке</figcaption></figure>
+
+    <figure class="fig"><div class="phone"><div class="tg"><span></span><b>Профиль</b><span></span></div>
+      <div class="scr">
+        <div class="ln" style="justify-content:flex-start;gap:12px"><span class="pill pur" style="padding:14px 16px;font-size:16px">АК</span><div><b>Алексей К.</b><div class="sm">ID 482 910 · с 12 сент</div></div></div>
+        <div class="c"><div class="ln"><span class="sm">Статус счёта</span><span class="pill ok">подтверждён</span></div><div class="ln"><span class="sm">Депозиты</span><b class="mono">$500</b></div><div class="ln"><span class="sm">Выводы</span><b class="mono">$120</b></div></div>
+        <div class="c"><div class="sm">Ваш менеджер</div><div class="ln"><b>Иван</b><span class="pill pur">Написать</span></div></div>
+        <div class="c"><div class="ln"><span>Пуши о сигналах</span><span class="sw"></span></div><div class="ln"><span>Итоги дня</span><span class="sw"></span></div><div class="ln"><span>Новости</span><span class="sw off"></span></div></div>
+        <div class="btn o">Поддержка</div>
+      </div></div><figcaption><b>6 · Профиль</b>Данные, статус счёта, менеджер и чат с ним, настройки уведомлений</figcaption></figure>
+  </div>
+</section>
+
+<!-- ================= СТРИМЕР ================= -->
+<section id="streamer">
+  <h2>Кабинет стримера</h2>
+  <p class="lead">Видит только своих лидов. Главное: кто пришёл, кто не внёс депозит, кому написать сейчас.</p>
+
+  <div class="desk"><div class="chrome"><i></i><i></i><i></i><span>crm.твойдомен.com/streamer</span></div>
+    <div class="app"><div class="side"><div class="logo">◆ CRM</div><div class="a">Обзор</div><div>Мои лиды</div><div>Чат <span class="pill pur">3</span></div><div>Мои ссылки</div><div>Заработок</div><div>План</div></div>
+    <div class="main">
+      <div class="ln"><h3 style="font-size:16px">Обзор · Иван</h3><div><span class="chip a">Сегодня</span> <span class="chip">Неделя</span> <span class="chip">Месяц</span></div></div>
+      <div class="kpis"><div class="kpi"><div class="sm">Переходы</div><div class="big">184</div></div><div class="kpi"><div class="sm">Регистрации</div><div class="big">61</div></div><div class="kpi"><div class="sm">FTD</div><div class="big">17</div></div><div class="kpi"><div class="sm">Депозиты</div><div class="big">$4 820</div></div><div class="kpi"><div class="sm">Заработок</div><div class="big up">$640</div></div></div>
+      <div class="two">
+        <div class="box"><div class="ln"><h3>План по FTD на месяц</h3><b class="mono">17 / 40</b></div><div class="bar"><i style="width:42%"></i></div><p class="sm">Осталось 23 FTD. Среднее в день: 1.7. Нужно в день: 2.4.</p>
+          <div class="cols"><i style="height:30%"></i><i style="height:50%"></i><i style="height:40%"></i><i style="height:75%"></i><i style="height:55%"></i><i style="height:100%"></i><i style="height:65%"></i><i style="height:45%"></i></div></div>
+        <div class="box"><h3>Воронка</h3>
+          <div class="ln sm"><span>Переходы</span><b>184</b></div><div class="bar"><i style="width:100%"></i></div>
+          <div class="ln sm"><span>Регистрации</span><b>61 · 33%</b></div><div class="bar"><i style="width:33%"></i></div>
+          <div class="ln sm"><span>FTD</span><b>17 · 28%</b></div><div class="bar"><i style="width:9%"></i></div></div>
+      </div>
+    </div></div></div>
+
+  <div class="desk"><div class="chrome"><i></i><i></i><i></i><span>crm.твойдомен.com/streamer/leads</span></div>
+    <div class="app"><div class="side"><div class="logo">◆ CRM</div><div>Обзор</div><div class="a">Мои лиды</div><div>Чат <span class="pill pur">3</span></div><div>Мои ссылки</div><div>Заработок</div><div>План</div></div>
+    <div class="main">
+      <div class="ln"><span class="chip a">Все 184</span><span class="chip">Новые 23</span><span class="chip">Рег без депозита 44</span><span class="chip">FTD 17</span><span class="chip">Отвал</span></div>
+      <div class="tbl"><table><tr><th>Лид</th><th>Статус</th><th>Пришёл</th><th class="num">Депозит</th><th>Последнее</th><th></th></tr>
+        <tr><td>@alex_k</td><td><span class="pill ok">FTD</span></td><td>12 сент</td><td class="num">$500</td><td>вывод $120</td><td><span class="pill pur">Написать</span></td></tr>
+        <tr><td>@marina88</td><td><span class="pill warn">Рег без депозита</span></td><td>29 сент</td><td class="num">—</td><td>3 дня молчит</td><td><span class="pill pur">Написать</span></td></tr>
+        <tr><td>@dmitry_t</td><td><span class="pill pur">Новый</span></td><td>сегодня</td><td class="num">—</td><td>открыл Mini App</td><td><span class="pill pur">Написать</span></td></tr>
+        <tr><td>@olga_f</td><td><span class="pill ok">FTD</span></td><td>27 сент</td><td class="num">$250</td><td>новый депозит $100</td><td><span class="pill pur">Написать</span></td></tr>
+        <tr><td>@sergey_77</td><td><span class="pill bad">Отвал</span></td><td>15 сент</td><td class="num">—</td><td>14 дней нет входа</td><td><span class="pill pur">Написать</span></td></tr>
+      </table></div>
+    </div></div></div>
+
+  <div class="two">
+    <div class="desk"><div class="chrome"><i></i><i></i><i></i><span>Чат с лидом</span></div>
+      <div class="main" style="min-height:360px"><div class="ln"><b>@marina88</b><span class="pill warn">Рег без депозита</span></div>
+        <div class="chat"><div class="m in">Привет! Зарегистрировалась, а как пополнить?</div><div class="m out">Привет, Марина! Открой вкладку «Профиль» и нажми «Пополнить». Минимум $50, помогу на каждом шаге.</div><div class="m in">Хорошо, сейчас попробую</div><div class="m out">Жду. После депозита пришлю первый сигнал.</div></div>
+        <div class="ln"><span class="chip">Быстрые ответы ▾</span><span class="chip">Шаблон «Как внести»</span></div>
+        <div class="c sm">Ответ уходит клиенту в бота, ответ клиента приходит сюда и пушем стримеру.</div></div></div>
+    <div class="desk"><div class="chrome"><i></i><i></i><i></i><span>Мои ссылки</span></div>
+      <div class="main"><div class="box"><div class="ln"><h3>Основная ссылка</h3><button class="copy" type="button">Копировать</button></div><code>go.твойдомен.com/s/ivan</code><p class="sm">Переходов 184 · регистраций 61</p></div>
+        <div class="box"><div class="ln"><h3>Для Instagram</h3><button class="copy" type="button">Копировать</button></div><code>go.твойдомен.com/s/ivan-ig</code><p class="sm">Переходов 96 · регистраций 33</p></div>
+        <div class="box"><div class="ln"><h3>Для YouTube</h3><button class="copy" type="button">Копировать</button></div><code>go.твойдомен.com/s/ivan-yt</code><p class="sm">Переходов 88 · регистраций 28</p></div></div></div>
+  </div>
+</section>
+
+<!-- ================= ТИМЛИДЕР ================= -->
+<section id="lead">
+  <h2>Кабинет тимлидера</h2>
+  <p class="lead">Команда стримеров под ним. Видит результаты каждого, ставит планы и разбирает, кто отстаёт.</p>
+  <div class="desk"><div class="chrome"><i></i><i></i><i></i><span>crm.твойдомен.com/team</span></div>
+    <div class="app"><div class="side"><div class="logo">◆ CRM</div><div class="a">Команда</div><div>Лиды</div><div>Планы</div><div>Финансы</div><div>Пуши</div><div>Чаты</div></div>
+    <div class="main">
+      <div class="ln"><h3 style="font-size:16px">Команда «Север» · Артём</h3><div><span class="chip">Неделя</span> <span class="chip a">Месяц</span></div></div>
+      <div class="kpis"><div class="kpi"><div class="sm">Лиды</div><div class="big">812</div></div><div class="kpi"><div class="sm">Регистрации</div><div class="big">290</div></div><div class="kpi"><div class="sm">FTD</div><div class="big">74</div></div><div class="kpi"><div class="sm">Депозиты</div><div class="big">$21 400</div></div><div class="kpi"><div class="sm">Выводы</div><div class="big">$3 900</div></div></div>
+      <div class="box"><div class="ln"><h3>План команды по FTD</h3><b class="mono">74 / 150</b></div><div class="bar"><i style="width:49%"></i></div><p class="sm">Прогноз к концу месяца: 138 FTD, это 92% от плана.</p></div>
+      <div class="tbl"><table><tr><th>Стример</th><th class="num">Лиды</th><th class="num">Рег</th><th class="num">FTD</th><th class="num">План FTD</th><th>Выполнение</th><th class="num">CR рег→FTD</th></tr>
+        <tr><td>Иван</td><td class="num">184</td><td class="num">61</td><td class="num">17</td><td class="num">40</td><td><span class="pill warn">42%</span></td><td class="num">28%</td></tr>
+        <tr><td>Мария</td><td class="num">231</td><td class="num">92</td><td class="num">29</td><td class="num">35</td><td><span class="pill ok">83%</span></td><td class="num">32%</td></tr>
+        <tr><td>Денис</td><td class="num">158</td><td class="num">58</td><td class="num">14</td><td class="num">35</td><td><span class="pill bad">40%</span></td><td class="num">24%</td></tr>
+        <tr><td>Софья</td><td class="num">239</td><td class="num">79</td><td class="num">14</td><td class="num">40</td><td><span class="pill bad">35%</span></td><td class="num">18%</td></tr>
+      </table></div>
+      <div class="two"><div class="box"><h3>Задать план</h3><div class="ln sm"><span>Команда, FTD</span><b class="mono">150</b></div><div class="ln sm"><span>Иван</span><b class="mono">40</b></div><div class="ln sm"><span>Мария</span><b class="mono">35</b></div><div class="ln sm"><span>Период</span><b>1–31 окт</b></div><div class="btn">Сохранить план</div></div>
+      <div class="box"><h3>Требуют внимания</h3><div class="ln sm"><span>Софья: низкая конверсия</span><span class="pill bad">18%</span></div><div class="ln sm"><span>Денис: 12 лидов без ответа 2 дня</span><span class="pill warn">12</span></div><div class="ln sm"><span>Иван: отстаёт от плана</span><span class="pill warn">−12</span></div></div></div>
+    </div></div></div>
+</section>
+
+<!-- ================= МЕДИАБАЕР ================= -->
+<section id="mb">
+  <h2>Кабинет медиабайера</h2>
+  <p class="lead">Заливает трафик по своим ссылкам. Платим ставкой за FTD, процентом от залива или смесью. Видит только свои источники и свой баланс.</p>
+  <div class="desk"><div class="chrome"><i></i><i></i><i></i><span>crm.твойдомен.com/buyer</span></div>
+    <div class="app"><div class="side"><div class="logo">◆ CRM</div><div class="a">Статистика</div><div>Ссылки</div><div>Кампании</div><div>Выплаты</div><div>Условия</div></div>
+    <div class="main">
+      <div class="ln"><h3 style="font-size:16px">Статистика · Кирилл</h3><span class="pill pur">Ставка $45 за FTD + 10% от залива</span></div>
+      <div class="kpis"><div class="kpi"><div class="sm">Клики</div><div class="big">3 420</div></div><div class="kpi"><div class="sm">Рег</div><div class="big">410</div></div><div class="kpi"><div class="sm">FTD</div><div class="big">96</div></div><div class="kpi"><div class="sm">Залив</div><div class="big">$11 300</div></div><div class="kpi"><div class="sm">К выплате</div><div class="big up">$5 450</div></div></div>
+      <div class="tbl"><table><tr><th>Кампания</th><th>Ссылка</th><th class="num">Клики</th><th class="num">Рег</th><th class="num">FTD</th><th class="num">Залив</th><th class="num">Доход</th></tr>
+        <tr><td>FB · Польша</td><td><code>/b/kir-fb-pl</code></td><td class="num">1 640</td><td class="num">190</td><td class="num">44</td><td class="num">$5 200</td><td class="num up">$2 500</td></tr>
+        <tr><td>TikTok · Чехия</td><td><code>/b/kir-tt-cz</code></td><td class="num">1 120</td><td class="num">140</td><td class="num">32</td><td class="num">$3 700</td><td class="num up">$1 810</td></tr>
+        <tr><td>Push · Испания</td><td><code>/b/kir-pu-es</code></td><td class="num">660</td><td class="num">80</td><td class="num">20</td><td class="num">$2 400</td><td class="num up">$1 140</td></tr>
+      </table></div>
+      <div class="two"><div class="box"><h3>Как считается доход</h3><p class="sm">96 FTD × $45 = $4 320<br>10% от залива $11 300 = $1 130<br><b style="color:var(--fg)">Итого $5 450</b>, холд 7 дней, выплата по запросу.</p></div>
+      <div class="box"><h3>Выплаты</h3><div class="ln sm"><span>25 сент · USDT</span><b class="mono">$3 200</b></div><div class="ln sm"><span>11 сент · USDT</span><b class="mono">$2 750</b></div><div class="btn o">Запросить выплату</div></div></div>
+    </div></div></div>
+</section>
+
+<!-- ================= АДМИН ================= -->
+<section id="admin">
+  <h2>Кабинет админа</h2>
+  <p class="lead">Полный доступ. Деньги, планы, люди, ссылки, постбеки, сигналы и пуши в одном месте.</p>
+
+  <div class="desk"><div class="chrome"><i></i><i></i><i></i><span>crm.твойдомен.com/admin</span></div>
+    <div class="app"><div class="side"><div class="logo">◆ CRM</div><div class="a">Дашборд</div><div>Лиды</div><div>Команды</div><div>Бухгалтерия</div><div>Планы</div><div>Ссылки</div><div>Постбеки</div><div>Сигналы</div><div>Пуши</div><div>Доступы</div></div>
+    <div class="main">
+      <div class="ln"><h3 style="font-size:16px">Дашборд проекта</h3><div><span class="chip">Сегодня</span> <span class="chip a">Месяц</span> <span class="chip">Свой период</span></div></div>
+      <div class="kpis"><div class="kpi"><div class="sm">Лиды</div><div class="big">2 940</div></div><div class="kpi"><div class="sm">Рег</div><div class="big">1 018</div></div><div class="kpi"><div class="sm">FTD</div><div class="big">262</div></div><div class="kpi"><div class="sm">Депозиты</div><div class="big">$78 600</div></div><div class="kpi"><div class="sm">Выводы</div><div class="big">$12 300</div></div><div class="kpi"><div class="sm">Расходы</div><div class="big dn">$26 100</div></div><div class="kpi"><div class="sm">Прибыль</div><div class="big up">$40 200</div></div></div>
+      <div class="two">
+        <div class="box"><div class="ln"><h3>FTD по дням</h3><span class="sm">октябрь</span></div><div class="cols" style="height:110px"><i style="height:35%"></i><i style="height:48%"></i><i style="height:40%"></i><i style="height:62%"></i><i style="height:55%"></i><i style="height:80%"></i><i style="height:70%"></i><i style="height:92%"></i><i style="height:60%"></i><i style="height:100%"></i></div></div>
+        <div class="box"><h3>Лента постбеков</h3><div class="ln sm"><span>🟣 reg · @dmitry_t · Иван</span><span>сейчас</span></div><div class="ln sm"><span class="up">● dep $250 · @olga_f · Мария</span><span>2 мин</span></div><div class="ln sm"><span>🟣 reg · @nik_p · FB-PL</span><span>5 мин</span></div><div class="ln sm"><span class="dn">● wd $120 · @alex_k · Иван</span><span>9 мин</span></div></div>
+      </div>
+      <div class="tbl"><table><tr><th>Команда</th><th class="num">FTD</th><th class="num">План</th><th>Выполнение</th><th class="num">Депозиты</th><th class="num">Расходы</th><th class="num">Прибыль</th></tr>
+        <tr><td>Север (Артём)</td><td class="num">74</td><td class="num">150</td><td><span class="pill warn">49%</span></td><td class="num">$21 400</td><td class="num">$7 200</td><td class="num up">$11 100</td></tr>
+        <tr><td>Юг (Лена)</td><td class="num">92</td><td class="num">120</td><td><span class="pill ok">77%</span></td><td class="num">$27 300</td><td class="num">$8 400</td><td class="num up">$14 800</td></tr>
+        <tr><td>Медиабайеры</td><td class="num">96</td><td class="num">100</td><td><span class="pill ok">96%</span></td><td class="num">$29 900</td><td class="num">$10 500</td><td class="num up">$14 300</td></tr>
+      </table></div>
+    </div></div></div>
+
+  <div class="two">
+    <div class="desk"><div class="chrome"><i></i><i></i><i></i><span>Бухгалтерия</span></div><div class="main">
+      <div class="ln"><h3>Выплаты за октябрь</h3><span class="pill pur">Экспорт CSV</span></div>
+      <div class="tbl"><table style="min-width:420px"><tr><th>Кому</th><th>Схема</th><th class="num">К выплате</th><th></th></tr>
+        <tr><td>Иван</td><td>$25 / FTD</td><td class="num">$425</td><td><span class="pill ok">Выплатить</span></td></tr>
+        <tr><td>Мария</td><td>$30 / FTD + 5%</td><td class="num">$1 190</td><td><span class="pill ok">Выплатить</span></td></tr>
+        <tr><td>Кирилл (МБ)</td><td>$45 + 10%</td><td class="num">$5 450</td><td><span class="pill warn">Холд 3 дня</span></td></tr>
+        <tr><td>Артём (ТЛ)</td><td>3% с команды</td><td class="num">$642</td><td><span class="pill ok">Выплатить</span></td></tr>
+      </table></div><p class="sm">Ставки, проценты, холды, штрафы и бонусы настраиваются на каждого человека отдельно.</p></div></div>
+
+    <div class="desk"><div class="chrome"><i></i><i></i><i></i><span>Планы по FTD</span></div><div class="main">
+      <div class="ln"><h3>Октябрь</h3><span class="pill pur">Изменить</span></div>
+      <div class="ln sm"><span>Общий план проекта</span><b class="mono">370</b></div><div class="bar"><i style="width:71%"></i></div>
+      <div class="ln sm"><span>Команда «Север»</span><b class="mono">150</b></div><div class="bar"><i style="width:49%"></i></div>
+      <div class="ln sm"><span>Команда «Юг»</span><b class="mono">120</b></div><div class="bar"><i style="width:77%"></i></div>
+      <div class="ln sm"><span>Иван (лично)</span><b class="mono">40</b></div><div class="bar"><i style="width:42%"></i></div>
+      <div class="ln sm"><span>Кирилл (МБ)</span><b class="mono">100</b></div><div class="bar"><i style="width:96%"></i></div>
+      <p class="sm">План можно разбить по неделям и дням, сменить посреди месяца и скопировать на следующий.</p></div></div>
+  </div>
+
+  <div class="two">
+    <div class="desk"><div class="chrome"><i></i><i></i><i></i><span>Ссылки и закрепление</span></div><div class="main">
+      <div class="ln"><h3>Создать ссылку</h3><span class="pill pur">+ Новая</span></div>
+      <div class="ln sm"><span>Владелец</span><b>Иван (стример)</b></div><div class="ln sm"><span>Источник</span><b>Instagram</b></div><div class="ln sm"><span>Кампания</span><b>Октябрь-1</b></div>
+      <div class="c ln"><code>go.твойдомен.com/s/ivan-ig</code><button class="copy" type="button">Копировать</button></div>
+      <p class="sm">Лид закрепляется при первом /start. Перепривязать может только админ или тимлидер.</p></div></div>
+    <div class="desk"><div class="chrome"><i></i><i></i><i></i><span>Доступы и роли</span></div><div class="main">
+      <div class="tbl"><table style="min-width:380px"><tr><th>Человек</th><th>Роль</th><th>Права</th></tr>
+        <tr><td>Артём</td><td><span class="pill pur">Тимлидер</span></td><td>команда Север</td></tr>
+        <tr><td>Иван</td><td><span class="pill pur">Стример</span></td><td>свои лиды, чат</td></tr>
+        <tr><td>Кирилл</td><td><span class="pill pur">Медиабайер</span></td><td>свои ссылки</td></tr>
+        <tr><td>Аня</td><td><span class="pill warn">Аналитик</span></td><td>сигналы, без денег</td></tr>
+      </table></div><p class="sm">Каждое право (видеть деньги, писать лидам, менять планы) включается отдельным переключателем.</p></div></div>
+  </div>
+
+  <div class="desk"><div class="chrome"><i></i><i></i><i></i><span>Постбеки и настройки брокера</span></div><div class="main">
+    <div class="two"><div class="box"><h3>URL постбека для брокера</h3><code>https://api.твойдомен.com/postback?event={event}&click_id={click_id}&amount={amount}&sig=…</code><p class="sm">События: reg, ftd, dep, wd. Повторные запросы с тем же id игнорируются.</p></div>
+    <div class="box"><h3>Последние запросы</h3><div class="ln sm"><span class="up">200 · ftd · $250</span><span>1 мин</span></div><div class="ln sm"><span class="up">200 · reg</span><span>3 мин</span></div><div class="ln sm"><span class="dn">400 · нет click_id</span><span>14 мин</span></div></div></div></div></div>
+</section>
+
+<!-- ================= ПУШИ ================= -->
+<section id="push">
+  <h2>Пуши и рассылки в боте</h2>
+  <p class="lead">Сообщения уходят автоматически по событиям или вручную по сегменту. Экран ниже есть у админа, а тимлидер видит и меняет только пуши своей команды.</p>
+  <div class="desk"><div class="chrome"><i></i><i></i><i></i><span>crm.твойдомен.com/admin/push</span></div>
+    <div class="app"><div class="side"><div class="logo">◆ CRM</div><div>Дашборд</div><div class="a">Пуши</div><div>Шаблоны</div><div>Рассылки</div><div>Сегменты</div></div>
+    <div class="main">
+      <div class="ln"><h3 style="font-size:16px">Автоматические пуши</h3><span class="pill pur">+ Новый триггер</span></div>
+      <div class="tbl"><table><tr><th>Когда</th><th>Задержка</th><th>Сообщение</th><th>Отправлено</th><th>Открыли</th><th></th></tr>
+        <tr><td>Первый /start</td><td>сразу</td><td>Приветствие + кнопка «Открыть кабинет»</td><td class="num">2 940</td><td class="num">71%</td><td><span class="sw"></span></td></tr>
+        <tr><td>Нет регистрации</td><td>через 2 часа</td><td>«Осталось 2 минуты до первого сигнала»</td><td class="num">1 410</td><td class="num">38%</td><td><span class="sw"></span></td></tr>
+        <tr><td>Регистрация без депозита</td><td>через 24 часа</td><td>Бонус и инструкция по пополнению</td><td class="num">640</td><td class="num">44%</td><td><span class="sw"></span></td></tr>
+        <tr><td>FTD</td><td>сразу</td><td>Поздравление и первый сигнал</td><td class="num">262</td><td class="num">86%</td><td><span class="sw"></span></td></tr>
+        <tr><td>Новый сигнал</td><td>сразу</td><td>Карточка сигнала с кнопкой</td><td class="num">8 120</td><td class="num">63%</td><td><span class="sw"></span></td></tr>
+        <tr><td>Нет входа 7 дней</td><td>через 7 дней</td><td>«Вернитесь, есть свежий разбор»</td><td class="num">390</td><td class="num">21%</td><td><span class="sw off"></span></td></tr>
+      </table></div>
+      <div class="two">
+        <div class="box"><h3>Редактор сообщения</h3>
+          <div class="ln sm"><span>Сегмент</span><b>Регистрация без депозита</b></div><div class="ln sm"><span>Когда</span><b>через 24 часа</b></div><div class="ln sm"><span>Только днём (10:00–21:00)</span><span class="sw"></span></div><div class="ln sm"><span>Подпись стримера</span><span class="sw"></span></div>
+          <div class="c sm" style="color:var(--fg)">{имя}, вы уже зарегистрированы. Пополните счёт от $50 и получите первый сигнал от {стример}.</div>
+          <div class="ln"><span class="chip">+ Картинка</span><span class="chip">+ Кнопка</span><span class="chip">{переменные}</span></div></div>
+        <div class="box"><h3>Предпросмотр в Telegram</h3>
+          <div class="chat"><div class="m in"><b>Бот проекта</b><br>Алексей, вы уже зарегистрированы. Пополните счёт от $50 и получите первый сигнал от Ивана.<div class="btn" style="margin-top:8px">Пополнить в кабинете</div></div></div>
+          <p class="sm">Скорость отправки учитывает лимиты Telegram, большие рассылки идут очередью.</p></div>
+      </div>
+    </div></div></div>
+</section>
+</div>
+
+<script>
+const tabs=[...document.querySelectorAll('#nav button')],secs=[...document.querySelectorAll('section')];
+function show(id){tabs.forEach(b=>b.setAttribute('aria-selected',b.dataset.t===id));secs.forEach(s=>s.classList.toggle('on',s.id===id));window.scrollTo(0,0)}
+tabs.forEach(b=>b.addEventListener('click',()=>show(b.dataset.t)));
+document.querySelectorAll('.copy').forEach(b=>b.addEventListener('click',()=>{const t=b.parentElement.parentElement.querySelector('code')?.textContent||b.parentElement.querySelector('code')?.textContent;
+  (navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>b.textContent='Скопировано',()=>b.textContent='Выделите вручную');setTimeout(()=>b.textContent='Копировать',1500)}));
+</script>
