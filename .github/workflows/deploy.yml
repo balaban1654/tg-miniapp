@@ -31,6 +31,13 @@ jobs:
             -e "ssh -i ~/.ssh/id_deploy" \
             ./ "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/opt/hunter/"
 
+      - name: Обновление Nginx
+        run: |
+          ssh -i ~/.ssh/id_deploy "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" '
+            cp /etc/nginx/sites-available/hunter /tmp/hunter.bak
+            cp /opt/hunter/deploy/nginx-hunter.conf /etc/nginx/sites-available/hunter
+            if nginx -t; then systemctl reload nginx; else cp /tmp/hunter.bak /etc/nginx/sites-available/hunter; echo "Конфиг Nginx с ошибкой, возвращён прежний"; exit 1; fi'
+
       - name: Запуск приложения
         run: |
           ssh -i ~/.ssh/id_deploy "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \

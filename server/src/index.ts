@@ -2,8 +2,23 @@ import Fastify from 'fastify';
 import { config } from './config.js';
 import { db } from './db.js';
 import { bot } from './bot.js';
+import cookie from '@fastify/cookie';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { migrate } from './migrate.js';
+import { ensureAdmin } from './auth.js';
+import { officeRoutes } from './office.js';
 
-const app = Fastify({ logger: true });
+const app = Fastify({ logger: true, trustProxy: true });
+await app.register(cookie);
+
+await migrate();
+await ensureAdmin();
+
+// Интерфейс Hunter Office и его API
+const officeHtml = readFileSync(resolve(process.cwd(), 'public/office.html'), 'utf8');
+app.get('/office', async (_req, reply) => reply.type('text/html; charset=utf-8').header('Cache-Control', 'no-store').send(officeHtml));
+await app.register(officeRoutes, { prefix: '/api/office' });
 
 app.get('/health', async () => {
   await db.query('SELECT 1');
@@ -19,4 +34,8 @@ app.get<{ Params: { kind: string; slug: string } }>('/:kind(s|b)/:slug', async (
 });
 
 await app.listen({ port: config.port, host: '0.0.0.0' });
-bot.start({ onStart: (me) => app.log.info(`Бот @${me.username} запущен`) });
+if (process.env.DISABLE_BOT !== '1') {
+  bot
+    .start({ onStart: (me) => app.log.info(`Бот @${me.username} запущен`) })
+    .catch((e) => app.log.error(e, 'Бот не запустился. Проверьте BOT_TOKEN'));
+}

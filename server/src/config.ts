@@ -13,4 +13,7 @@ export const config = {
   publicUrl: process.env.PUBLIC_URL ?? 'http://localhost:3000',
   databaseUrl: need('DATABASE_URL'),
   port: Number(process.env.PORT ?? 3000),
+  adminLogin: process.env.ADMIN_LOGIN ?? '',
+  adminPassword: process.env.ADMIN_PASSWORD ?? '',
+  secureCookies: process.env.NODE_ENV === 'production',
 };

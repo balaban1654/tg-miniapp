@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0d0817">
+<title>Hunter Office</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+:root{--bg:#0d0817;--bg2:#150d26;--card:#1c1233;--card2:#251847;--line:#34255c;--fg:#f1ebff;--mut:#a89cc8;--acc:#9b5cff;--acc2:#c9a6ff;--acc3:#6a2fe0;--ok:#3ddc97;--warn:#ffb84d;--bad:#ff6b8a;
+--fd:'Unbounded',system-ui,sans-serif;--fb:'Manrope',system-ui,sans-serif;--fm:'JetBrains Mono',ui-monospace,monospace;color-scheme:dark}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%}
+body{background:var(--bg);color:var(--fg);font:14px/1.5 var(--fb)}
+h1,h2,h3{font-family:var(--fd);margin:0;line-height:1.2}
+button,input,select{font:inherit;color:inherit}
+[hidden]{display:none!important}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px}
+.btn{background:var(--acc);color:#fff;border:0;border-radius:11px;padding:10px 16px;font-weight:700;cursor:pointer}
+.btn:hover{background:#a975ff}.btn.o{background:none;border:1px solid var(--acc);color:var(--acc2)}.btn.s{padding:5px 11px;font-size:12px;border-radius:8px}
+.btn:disabled{opacity:.5;cursor:default}
+.btn:focus-visible,input:focus-visible,select:focus-visible,.nav button:focus-visible{outline:2px solid var(--acc2);outline-offset:2px}
+label{display:grid;gap:5px;color:var(--mut);font-size:13px}
+input,select{background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;width:100%}
+.err{color:var(--bad);min-height:1.4em;font-size:13px}
+.ok{color:var(--ok)}.bad{color:var(--bad)}.mut{color:var(--mut)}
+/* вход */
+#login{min-height:100vh;display:grid;place-items:center;padding:24px 16px}
+#login .card{width:min(380px,100%);display:grid;gap:14px;padding:24px;border-radius:18px}
+.brand{display:flex;gap:10px;align-items:center}
+.logo{width:34px;height:34px;border-radius:50%;background:var(--acc);display:grid;place-items:center;font:700 15px var(--fd)}
+.hint{color:var(--mut);font-size:12px}
+/* приложение */
+#app{display:grid;grid-template-columns:200px 1fr;min-height:100vh}
+.side{background:#0a0613;border-right:1px solid var(--line);padding:16px 10px;display:flex;flex-direction:column;gap:4px;position:sticky;top:0;height:100vh}
+.side .brand{padding:4px 10px 16px}
+.nav{display:grid;gap:3px}
+.nav button{text-align:left;background:none;border:0;border-radius:9px;padding:9px 12px;color:var(--mut);font-weight:600;cursor:pointer}
+.nav button.on{background:var(--card2);color:var(--fg)}
+.me{margin-top:auto;padding:10px;color:var(--mut);font-size:12px;display:grid;gap:8px}
+main{padding:22px clamp(14px,3vw,32px);display:grid;gap:18px;align-content:start;min-width:0}
+.head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.kpis{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px}
+.kpi small{color:var(--mut);text-transform:uppercase;letter-spacing:.05em;font-size:10px}
+.kpi b{display:block;font:700 24px var(--fm);margin-top:2px}
+.tbl{overflow-x:auto;border:1px solid var(--line);border-radius:14px}
+table{border-collapse:collapse;width:100%;min-width:560px}
+th,td{padding:10px 14px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}
+th{font:600 11px var(--fm);letter-spacing:.06em;text-transform:uppercase;color:var(--mut);background:var(--bg2)}
+tr:last-child td{border-bottom:0}
+td.n{font-family:var(--fm);text-align:right}
+.pill{display:inline-block;border-radius:99px;padding:2px 10px;font:600 11px var(--fm)}
+.p-ok{background:#3ddc9722;color:var(--ok)}.p-warn{background:#ffb84d22;color:var(--warn)}.p-bad{background:#ff6b8a22;color:var(--bad)}.p-pur{background:#9b5cff33;color:var(--acc2)}
+.form{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));align-items:end}
+.empty{padding:28px;text-align:center;color:var(--mut)}
+code{font-family:var(--fm);font-size:12px;color:var(--acc2)}
+.top{display:none}
+@media(max-width:760px){
+ #app{grid-template-columns:1fr}
+ .side{position:static;height:auto;flex-direction:row;flex-wrap:wrap;align-items:center;padding:10px;border-right:0;border-bottom:1px solid var(--line)}
+ .side .brand{padding:0 8px 0 0}.nav{grid-auto-flow:column;overflow-x:auto}.me{margin:0 0 0 auto;display:flex;align-items:center}
+}
+</style>
+</head>
+<body>
+
+<div id="login" hidden>
+  <form class="card" id="loginForm" autocomplete="on">
+    <div class="brand"><div class="logo">H</div><div><h1 style="font-size:18px">Hunter Office</h1><div class="hint">Кабинет команды Hunter AI</div></div></div>
+    <label>Логин<input id="lLogin" name="username" autocomplete="username" required></label>
+    <label>Пароль<input id="lPass" name="password" type="password" autocomplete="current-password" required></label>
+    <div class="err" id="lErr" role="alert"></div>
+    <button class="btn" id="lBtn" type="submit">Войти</button>
+    <p class="hint">Установи Office как приложение: на iPhone и iPad нажми «Поделиться» → «На экран Домой», на Android и в Chrome нажми «Установить».</p>
+  </form>
+</div>
+
+<div id="app" hidden>
+  <aside class="side">
+    <div class="brand"><div class="logo">H</div><b style="font:700 14px var(--fd)">Hunter Office</b></div>
+    <nav class="nav" id="nav"></nav>
+    <div class="me"><div id="meName"></div><button class="btn o s" id="logout" type="button">Выйти</button></div>
+  </aside>
+  <main id="main"></main>
+</div>
+
+<script>
+const $=s=>document.querySelector(s);
+const ROLE={admin:'Админ',teamlead:'Тимлидер',streamer:'Стример',buyer:'Медиабайер',analyst:'Аналитик'};
+const STATUS={new:['Новый','p-pur'],registered:['Регистрация','p-warn'],ftd:['FTD','p-ok'],active:['Активный','p-ok'],churned:['Отвал','p-bad']};
+let me=null,tab='home';
+
+async function api(path,opts={}){
+  const r=await fetch('/api/office'+path,{credentials:'same-origin',headers:{'content-type':'application/json'},...opts,body:opts.body?JSON.stringify(opts.body):(opts.method&&opts.method!=='GET'?'{}':undefined)});
+  const data=await r.json().catch(()=>({}));
+  if(r.status===401&&path!=='/login'){showLogin();throw new Error('auth')}
+  if(!r.ok)throw new Error(data.error||'Ошибка '+r.status);
+  return data;
+}
+function el(tag,props={},...kids){
+  const e=document.createElement(tag);
+  for(const[k,v]of Object.entries(props)){if(k==='class')e.className=v;else if(k.startsWith('on'))e.addEventListener(k.slice(2),v);else if(v!==undefined&&v!==null)e.setAttribute(k,v)}
+  for(const k of kids.flat())if(k!==null&&k!==undefined)e.append(k.nodeType?k:document.createTextNode(k));
+  return e;
+}
+const money=v=>'$'+Number(v||0).toLocaleString('ru-RU',{maximumFractionDigits:2});
+const date=v=>new Date(v).toLocaleDateString('ru-RU',{day:'numeric',month:'short'});
+const pill=(st)=>{const[t,c]=STATUS[st]||[st,'p-pur'];return el('span',{class:'pill '+c},t)};
+function table(cols,rows,empty){
+  if(!rows.length)return el('div',{class:'card empty'},empty);
+  return el('div',{class:'tbl'},el('table',{},el('thead',{},el('tr',{},cols.map(c=>el('th',{},c)))),el('tbody',{},rows.map(r=>el('tr',{},r.map(c=>c instanceof Node?c:el('td',{},c)))))));
+}
+const td=(v,cls)=>el('td',{class:cls||''},v);
+
+function showLogin(){me=null;$('#app').hidden=true;$('#login').hidden=false;$('#lPass').value=''}
+function showApp(){
+  $('#login').hidden=true;$('#app').hidden=false;
+  $('#meName').textContent=me.name+' · '+ROLE[me.role];
+  const items=[['home','Обзор'],['leads','Лиды'],['links','Ссылки']];
+  if(me.role==='admin'||me.role==='teamlead')items.push(['staff',me.role==='admin'?'Люди':'Моя команда']);
+  const nav=$('#nav');nav.replaceChildren(...items.map(([k,t])=>el('button',{type:'button','data-t':k,class:k===tab?'on':'',onclick:()=>{tab=k;showApp();render()}},t)));
+  render();
+}
+
+$('#loginForm').addEventListener('submit',async e=>{
+  e.preventDefault();$('#lErr').textContent='';$('#lBtn').disabled=true;
+  try{await api('/login',{method:'POST',body:{login:$('#lLogin').value,password:$('#lPass').value}});me=await api('/me');showApp()}
+  catch(x){$('#lErr').textContent=x.message}
+  finally{$('#lBtn').disabled=false}
+});
+$('#logout').addEventListener('click',async()=>{try{await api('/logout',{method:'POST'})}catch{}showLogin()});
+
+async function render(){
+  const m=$('#main');m.replaceChildren(el('div',{class:'mut'},'Загрузка…'));
+  try{
+    if(tab==='home')m.replaceChildren(...await viewHome());
+    else if(tab==='leads')m.replaceChildren(...await viewLeads());
+    else if(tab==='links')m.replaceChildren(...await viewLinks());
+    else if(tab==='staff')m.replaceChildren(...await viewStaff());
+  }catch(x){if(x.message!=='auth')m.replaceChildren(el('div',{class:'err'},x.message))}
+}
+
+async function viewHome(){
+  const s=await api('/stats');const b=s.byStatus;
+  const k=(t,v)=>el('div',{class:'kpi'},el('small',{},t),el('b',{},String(v)));
+  return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Обзор')),
+    el('div',{class:'kpis'},k('Клики по ссылкам',s.clicks),k('Лиды',s.total),k('Регистрации',(b.registered||0)+(b.ftd||0)+(b.active||0)),k('FTD',(b.ftd||0)+(b.active||0)),k('Отвал',b.churned||0)),
+    el('div',{class:'card mut'},'Депозиты, выводы и планы появятся после подключения постбеков Pocket Option.')];
+}
+
+async function viewLeads(){
+  const rows=await api('/leads');
+  const showOwner=me.role==='admin'||me.role==='teamlead';
+  const cols=['Лид','Статус',...(showOwner?['Владелец']:[]),'Ссылка','Пришёл','Депозиты'];
+  return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Лиды'),el('span',{class:'mut'},rows.length+' всего')),
+    table(cols,rows.map(r=>[td(r.username?'@'+r.username:(r.first_name||r.tg_id)),el('td',{},pill(r.status)),...(showOwner?[td(r.owner_name||'не закреплён')]:[]),td(r.link_slug||'—'),td(date(r.created_at)),td(money(r.deposits),'n')]),
+      'Лидов пока нет. Они появятся, когда люди перейдут по вашим ссылкам и нажмут «Старт» в боте.')];
+}
+
+function goUrl(slug){return 'https://'+location.host.replace(/^crm\./,'go.')+'/s/'+slug}
+async function viewLinks(){
+  const [rows,staff]=await Promise.all([api('/links'),(me.role==='admin'||me.role==='teamlead')?api('/staff'):Promise.resolve([])]);
+  const slug=el('input',{id:'nSlug',placeholder:'ivan-instagram',required:'',pattern:'[a-z0-9][a-z0-9_\\-]{1,39}',title:'a-z, 0-9, - и _'});
+  const src=el('input',{id:'nSrc',placeholder:'Instagram'});
+  const owner=el('select',{id:'nOwner'},el('option',{value:''},'Я сам'),...staff.filter(s=>s.id!==me.id&&['streamer','buyer'].includes(s.role)).map(s=>el('option',{value:s.id},s.name+' · '+ROLE[s.role])));
+  const err=el('div',{class:'err',role:'alert'});
+  const form=el('form',{class:'card form',onsubmit:async e=>{e.preventDefault();err.textContent='';
+    try{await api('/links',{method:'POST',body:{slug:slug.value,source:src.value,owner_id:owner.value||undefined}});render()}catch(x){err.textContent=x.message}}},
+    el('label',{},'Адрес ссылки',slug),el('label',{},'Источник',src),
+    (me.role==='admin'||me.role==='teamlead')?el('label',{},'Владелец',owner):el('span'),
+    el('button',{class:'btn',type:'submit'},'Создать'),err);
+  const copyBtn=u=>{const b=el('button',{class:'btn o s',type:'button',onclick:async()=>{try{await navigator.clipboard.writeText(u);b.textContent='Скопировано'}catch{b.textContent='Выделите вручную'}setTimeout(()=>b.textContent='Копировать',1500)}},'Копировать');return b};
+  return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Ссылки')),form,
+    table(['Ссылка','Источник','Владелец','Клики','Старты',''],rows.map(r=>{const u=goUrl(r.slug);return[el('td',{},el('code',{},u)),td(r.source||'—'),td(r.owner_name),td(r.clicks,'n'),td(r.starts,'n'),el('td',{},copyBtn(u))]}),
+      'Ссылок пока нет. Создайте первую выше.')];
+}
+
+async function viewStaff(){
+  const rows=await api('/staff');
+  const isAdmin=me.role==='admin';
+  const f={login:el('input',{required:'',autocomplete:'off'}),name:el('input',{required:''}),password:el('input',{type:'password',minlength:'8',required:'',autocomplete:'new-password'}),
+    role:el('select',{},...(isAdmin?['teamlead','streamer','buyer','analyst','admin']:['streamer']).map(r=>el('option',{value:r},ROLE[r]))),
+    parent:el('select',{},el('option',{value:''},'Без тимлидера'),...rows.filter(s=>s.role==='teamlead').map(s=>el('option',{value:s.id},s.name))),
+    ftd:el('input',{type:'number',min:'0',step:'0.01',placeholder:'25'}),pct:el('input',{type:'number',min:'0',max:'100',step:'0.1',placeholder:'5'})};
+  const err=el('div',{class:'err',role:'alert'});
+  const form=el('form',{class:'card form',onsubmit:async e=>{e.preventDefault();err.textContent='';
+    try{await api('/staff',{method:'POST',body:{login:f.login.value,name:f.name.value,password:f.password.value,role:f.role.value,parent_id:isAdmin?f.parent.value||undefined:undefined,rate_ftd:f.ftd.value,rate_percent:f.pct.value}});render()}catch(x){err.textContent=x.message}}},
+    el('label',{},'Логин',f.login),el('label',{},'Имя',f.name),el('label',{},'Пароль',f.password),el('label',{},'Роль',f.role),
+    isAdmin?el('label',{},'Тимлидер',f.parent):el('span'),el('label',{},'Ставка за FTD, $',f.ftd),el('label',{},'Процент, %',f.pct),
+    el('button',{class:'btn',type:'submit'},'Добавить'),err);
+  const parentName=id=>(rows.find(s=>s.id===id)||{}).name||'—';
+  const toggle=r=>isAdmin&&r.id!==me.id?el('button',{class:'btn o s',type:'button',onclick:async()=>{await api('/staff/'+r.id,{method:'PATCH',body:{active:!r.active}});render()}},r.active?'Отключить':'Включить'):'';
+  return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},isAdmin?'Люди':'Моя команда')),form,
+    table(['Имя','Логин','Роль','Тимлидер','За FTD','Процент','Статус',''],rows.map(r=>[td(r.name),td(r.login),el('td',{},el('span',{class:'pill p-pur'},ROLE[r.role])),td(parentName(r.parent_id)),td(money(r.rate_ftd),'n'),td(Number(r.rate_percent)+'%','n'),el('td',{},el('span',{class:'pill '+(r.active?'p-ok':'p-bad')},r.active?'активен':'отключён')),el('td',{},toggle(r))]),'Пока никого нет.')];
+}
+
+(async()=>{try{me=await api('/me');showApp()}catch{showLogin()}})();
+</script>
+</body>
+</html>

@@ -46,3 +46,11 @@ CREATE TABLE IF NOT EXISTS events (
   created_at  TIMESTAMPTZ DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS events_tg ON events(tg_id, created_at);
+
+-- Сессии входа в Office. В базе хранится только хеш токена
+CREATE TABLE IF NOT EXISTS sessions (
+  token_hash TEXT PRIMARY KEY,
+  staff_id   INT NOT NULL REFERENCES staff(id) ON DELETE CASCADE,
+  expires_at TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
