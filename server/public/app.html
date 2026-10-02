@@ -68,7 +68,6 @@ main{flex:1;padding:6px 16px 96px;display:grid;gap:12px;align-content:start}
 .sig .r{display:flex;justify-content:space-between;gap:12px;padding:13px 0;border-bottom:1px solid var(--line);font-size:14px}.sig .r:last-of-type{border-bottom:0}
 .sig .btn.r{display:block;justify-content:normal;padding:13px;border-bottom:0}   /* класс r у кнопки «Минус» не должен подхватывать строки карточки */
 .sig .r span{color:var(--mut)}.sig .r b{text-align:right}
-.demo{display:inline-block;border:1px dashed var(--warn);color:var(--warn);border-radius:8px;padding:3px 8px;font-size:11px;font-weight:700;margin-bottom:6px}
 .term{display:grid;gap:12px;position:relative}
 .trow{display:flex;gap:10px;align-items:center;justify-content:space-between}
 .chip{background:var(--card);border-radius:12px;padding:10px 12px;font-weight:700;font-size:13px;display:flex;gap:8px;align-items:center}
@@ -421,7 +420,7 @@ async function signalCard(){
   const take=sg.taken?el('div',{class:'sm',style:'text-align:center'},'Сделка записана. Когда она закроется, отметьте итог.'):
     el('button',{class:'btn',type:'button',onclick:async e=>{e.currentTarget.disabled=true;try{await api('/signals/'+sg.id+'/take',{method:'POST'});toast('Сделка записана');render()}catch(x){toast(x.message);render()}}},'Я вошёл в сделку');
   return el('div',{class:'card hero'},
-    el('div',{class:'row'},el('h3',{style:'font-size:15px'},'Сигнал'),el('span',{class:'pill '+(sg.is_test?'p-warn':'p-pur')},sg.is_test?'ТЕСТ':'От аналитика')),
+    el('div',{class:'row'},el('h3',{style:'font-size:15px'},'Сигнал'),el('span',{class:'pill p-pur'},'От аналитика')),
     el('div',{class:'row'},el('b',{style:'font:700 17px var(--fd)'},sg.pair),el('span',{class:'pill '+(up?'p-ok':'p-bad')},up?'ВВЕРХ ▲':'ВНИЗ ▼')),
     el('div',{class:'row sm'},el('span',{},'Экспирация'),el('b',{class:'mono',style:'color:var(--fg)'},sg.expiry_min+' мин')),
     el('div',{class:'row sm'},el('span',{},'Вход в'),el('b',{class:'mono',style:'color:var(--fg)'},hm2)),
