@@ -880,6 +880,18 @@ function extIcon(){
   return n;
 }
 /** Круг с аватаркой из Telegram. Пока не загрузилась или нет фото, показываем первую букву */
+/** Флаг страны картинкой: на Windows эмодзи-флаги показываются буквами */
+function flagImg(cc){
+  if(!/^[A-Z]{2}$/.test(cc||''))return null;
+  const i=new Image();i.alt=cc;i.width=20;i.height=15;i.style.cssText='vertical-align:-2px;margin-left:6px;border-radius:2px';i.src='https://flagcdn.com/w40/'+cc.toLowerCase()+'.png';
+  return i;
+}
+/** 12 345 → «12,3 тыс.» */
+function subsText(n){
+  if(n==null)return '';
+  const v=n>=1e6?(n/1e6).toFixed(1).replace('.',',')+' млн':n>=1e4?Math.round(n/1e3)+' тыс.':n>=1e3?(n/1e3).toFixed(1).replace('.',',')+' тыс.':String(n);
+  return v+' подписчиков';
+}
 function mediaAva(x,size){
   const n=el('div',{class:'ava',style:size?'width:'+size+'px;height:'+size+'px;flex:none':''},(x.title||'?').slice(0,1).toUpperCase());
   if(x.photo){const img=new Image();img.alt='';img.onload=()=>n.replaceChildren(img);img.src=x.photo}
@@ -888,8 +900,8 @@ function mediaAva(x,size){
 async function viewMedia(){
   if(!me)await refreshMe();
   const m=await api('/media');
-  const ch=m.channels.length?m.channels.map(c=>el('button',{class:'lesson',type:'button',onclick:()=>openLink(c.url)},mediaAva(c,44),el('div',{style:'flex:1'},el('b',{},c.title),el('div',{class:'sm'},c.subtitle||'')),extIcon())):[el('div',{class:'card sm'},'Каналы скоро появятся.')];
-  const tr=m.traders.length?el('div',{class:'two'},m.traders.map(t=>el('div',{class:'card tr'},mediaAva(t),el('b',{},t.title),el('div',{class:'sm'},t.subtitle||'Трейдер команды'),el('button',{class:'btn o sm2',type:'button',onclick:()=>openLink(t.url)},'Канал трейдера')))):el('div',{class:'card sm'},'Трейдеры скоро появятся.');
+  const ch=m.channels.length?m.channels.map(c=>el('button',{class:'lesson',type:'button',onclick:()=>openLink(c.url)},mediaAva(c,44),el('div',{style:'flex:1'},el('b',{},c.title,flagImg(c.country)),el('div',{class:'sm'},[c.channelTitle&&c.channelTitle!==c.title?c.channelTitle:c.subtitle||'',c.members!=null?(c.channelTitle||c.subtitle?' · ':'')+subsText(c.members):''].join(''))),extIcon())):[el('div',{class:'card sm'},'Каналы скоро появятся.')];
+  const tr=m.traders.length?el('div',{class:'two'},m.traders.map(t=>el('div',{class:'card tr'},el('div',{style:'display:flex;gap:10px;align-items:center'},mediaAva(t),el('div',{style:'min-width:0'},el('b',{},t.title,flagImg(t.country)),el('div',{class:'sm'},t.channelTitle||t.subtitle||'Трейдер команды'),t.members!=null?el('div',{class:'sm',style:'color:var(--accent,#b79cff)'},subsText(t.members)):null)),el('button',{class:'btn o sm2',type:'button',onclick:()=>openLink(t.url)},'Канал трейдера')))):el('div',{class:'card sm'},'Трейдеры скоро появятся.');
   shell('Медиа',[el('b',{},'Наши трейдеры'),tr,el('b',{},'Каналы команды'),ch]);
 }
 

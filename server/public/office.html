@@ -468,29 +468,31 @@ async function viewSignals(){
 }
 
 let mediaEdit=null;
+const COUNTRIES=[['UA','Украина'],['RU','Россия'],['KZ','Казахстан'],['BY','Беларусь'],['UZ','Узбекистан'],['GE','Грузия'],['AM','Армения'],['AZ','Азербайджан'],['MD','Молдова'],['KG','Кыргызстан'],['PL','Польша'],['LT','Литва'],['LV','Латвия'],['EE','Эстония'],['DE','Германия'],['GB','Великобритания'],['US','США'],['TR','Турция'],['AE','ОАЭ'],['CY','Кипр'],['IL','Израиль'],['ES','Испания'],['IT','Италия'],['FR','Франция'],['CZ','Чехия'],['BR','Бразилия'],['IN','Индия'],['ID','Индонезия'],['VN','Вьетнам'],['TH','Таиланд']];
+const countrySel=()=>el('select',{'aria-label':'Страна'},el('option',{value:''},'Без флага'),COUNTRIES.map(([c,n])=>el('option',{value:c},c+' · '+n)));
 async function viewMedia(){
   const rows=await api('/media');
   if(!rows.some(r=>r.id===mediaEdit))mediaEdit=null;
-  const f={kind:el('select',{},el('option',{value:'trader'},'Трейдер'),el('option',{value:'channel'},'Канал')),title:el('input',{required:'',placeholder:'Лера'}),sub:el('input',{placeholder:'Трейдер команды'}),url:el('input',{required:'',placeholder:'https://t.me/...'}),sort:el('input',{type:'number',placeholder:'1'})};
+  const f={kind:el('select',{},el('option',{value:'trader'},'Трейдер'),el('option',{value:'channel'},'Канал')),title:el('input',{required:'',placeholder:'Лера'}),country:countrySel(),sub:el('input',{placeholder:'Трейдер команды'}),url:el('input',{required:'',placeholder:'https://t.me/...'}),sort:el('input',{type:'number',placeholder:'1'})};
   const err=el('div',{class:'err',role:'alert'});
   const form=el('form',{class:'card form',onsubmit:async e=>{e.preventDefault();err.textContent='';
-    try{await api('/media',{method:'POST',body:{kind:f.kind.value,title:f.title.value,subtitle:f.sub.value,url:f.url.value,sort:f.sort.value}});render()}catch(x){err.textContent=x.message}}},
-    el('label',{},'Тип',f.kind),el('label',{},'Название',f.title),el('label',{},'Подпись',f.sub),el('label',{},'Ссылка',f.url),el('label',{},'Порядок',f.sort),el('button',{class:'btn',type:'submit'},'Добавить'),err);
+    try{await api('/media',{method:'POST',body:{kind:f.kind.value,title:f.title.value,country:f.country.value,subtitle:f.sub.value,url:f.url.value,sort:f.sort.value}});render()}catch(x){err.textContent=x.message}}},
+    el('label',{},'Тип',f.kind),el('label',{},'Имя',f.title),el('label',{},'Страна (флаг)',f.country),el('label',{},'Подпись (если не подтянулась из Telegram)',f.sub),el('label',{},'Ссылка',f.url),el('label',{},'Порядок',f.sort),el('button',{class:'btn',type:'submit'},'Добавить'),err);
   const ICON={pen:'<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/>',ok:'<path d="M5 12.5l4.5 4.5L19 7.5"/>'};
   const BS='display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;height:30px;vertical-align:middle;margin-left:6px';
   const iconBtn=(k,title,fn)=>{const b=el('button',{class:'btn o s',type:'button',title,'aria-label':title,style:BS+';width:34px;padding:0',onclick:fn});b.innerHTML='<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+ICON[k]+'</svg>';return b};
   const txtBtn=(t,fn)=>el('button',{class:'btn o s',type:'button',style:BS+';padding:0 12px',onclick:fn},t);
   const rowErr=el('div',{class:'err',role:'alert'});
   function editRow(r){
-    const e={kind:el('select',{},el('option',{value:'trader'},'Трейдер'),el('option',{value:'channel'},'Канал')),title:el('input',{value:r.title,'aria-label':'Название'}),sub:el('input',{value:r.subtitle||'','aria-label':'Подпись'}),url:el('input',{value:r.url,'aria-label':'Ссылка'}),sort:el('input',{type:'number',value:r.sort,title:'Порядок',placeholder:'№',style:'width:64px;height:30px;box-sizing:border-box;padding:0 8px;vertical-align:middle','aria-label':'Порядок'})};
-    e.kind.value=r.kind;
-    const save=async()=>{rowErr.textContent='';try{await api('/media/'+r.id,{method:'PUT',body:{kind:e.kind.value,title:e.title.value,subtitle:e.sub.value,url:e.url.value,sort:e.sort.value}});mediaEdit=null;render()}catch(x){rowErr.textContent=x.message}};
+    const e={kind:el('select',{},el('option',{value:'trader'},'Трейдер'),el('option',{value:'channel'},'Канал')),title:el('input',{value:r.title,'aria-label':'Название'}),country:countrySel(),sub:el('input',{value:r.subtitle||'','aria-label':'Подпись'}),url:el('input',{value:r.url,'aria-label':'Ссылка'}),sort:el('input',{type:'number',value:r.sort,title:'Порядок',placeholder:'№',style:'width:64px;height:30px;box-sizing:border-box;padding:0 8px;vertical-align:middle','aria-label':'Порядок'})};
+    e.kind.value=r.kind;e.country.value=r.country||'';
+    const save=async()=>{rowErr.textContent='';try{await api('/media/'+r.id,{method:'PUT',body:{kind:e.kind.value,title:e.title.value,country:e.country.value,subtitle:e.sub.value,url:e.url.value,sort:e.sort.value}});mediaEdit=null;render()}catch(x){rowErr.textContent=x.message}};
     [e.title,e.sub,e.url,e.sort].forEach(i=>i.addEventListener('keydown',k=>{if(k.key==='Enter'){k.preventDefault();save()}if(k.key==='Escape'){mediaEdit=null;render()}}));
-    return[el('td',{},e.kind),el('td',{},e.title),el('td',{},e.sub),el('td',{},e.url),el('td',{style:'white-space:nowrap'},e.sort,iconBtn('ok','Сохранить',save),txtBtn('Отмена',()=>{mediaEdit=null;render()}))];
+    return[el('td',{},e.kind),el('td',{},e.title,e.country),el('td',{},e.sub),el('td',{},e.url),el('td',{style:'white-space:nowrap'},e.sort,iconBtn('ok','Сохранить',save),txtBtn('Отмена',()=>{mediaEdit=null;render()}))];
   }
-  const viewRow=r=>[td(r.kind==='trader'?'Трейдер':'Канал'),td(r.title),td(r.subtitle||'—'),el('td',{},el('code',{},r.url)),el('td',{style:'white-space:nowrap'},iconBtn('pen','Изменить',()=>{mediaEdit=r.id;render()}),txtBtn('Удалить',async()=>{await api('/media/'+r.id,{method:'DELETE'});render()}))];
+  const viewRow=r=>[td(r.kind==='trader'?'Трейдер':'Канал'),td(r.title+(r.country?', '+r.country:'')),td(r.subtitle||'—'),el('td',{},el('code',{},r.url)),el('td',{style:'white-space:nowrap'},iconBtn('pen','Изменить',()=>{mediaEdit=r.id;render()}),txtBtn('Удалить',async()=>{await api('/media/'+r.id,{method:'DELETE'});render()}))];
   return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Медиа в Mini App')),form,
-    table(['Тип','Название','Подпись','Ссылка',''],rows.map(r=>r.id===mediaEdit?editRow(r):viewRow(r)),'Пока пусто. Добавьте трейдеров и каналы, они появятся во вкладке «Медиа» в Mini App.'),rowErr];
+    table(['Тип','Имя, страна','Подпись','Ссылка',''],rows.map(r=>r.id===mediaEdit?editRow(r):viewRow(r)),'Пока пусто. Добавьте трейдеров и каналы, они появятся во вкладке «Медиа» в Mini App.'),rowErr];
 }
 
 async function viewPostbacks(){

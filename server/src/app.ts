@@ -147,6 +147,27 @@ function demoPast(preview = false) {
   });
 }
 
+/** Название канала и число подписчиков берём из Telegram по ссылке. Кэш на 30 минут, при ошибке пробуем снова через 5 */
+const tgInfoCache = new Map<string, { until: number; title: string | null; members: number | null }>();
+async function tgInfo(handle: string): Promise<{ title: string | null; members: number | null }> {
+  const hit = tgInfoCache.get(handle);
+  if (hit && hit.until > Date.now()) return hit;
+  let title: string | null = null;
+  let members: number | null = null;
+  if (!config.disableBot) {
+    try {
+      const chat = await bot.api.getChat('@' + handle);
+      title = 'title' in chat ? (chat.title ?? null) : null;
+      members = await bot.api.getChatMemberCount('@' + handle);
+    } catch {
+      /* бот не видит чат: оставим то, что успели получить */
+    }
+  }
+  const out = { until: Date.now() + (title && members !== null ? 1800_000 : 300_000), title, members };
+  tgInfoCache.set(handle, out);
+  return out;
+}
+
 const photoCache = new Map<number, { until: number; data: Buffer | null; type: string }>();
 /** @имя из ссылки https://t.me/имя. Приватные приглашения (+...) и ссылки на посты не подходят */
 function tgHandle(url: string): string | null {
@@ -322,8 +343,14 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
   });
 
   app.get('/media', { preHandler: auth }, async () => {
-    const r = await db.query(`SELECT id, kind, title, subtitle, url FROM media_items WHERE active ORDER BY sort, id`);
-    const rows = r.rows.map((x) => ({ ...x, photo: tgHandle(x.url) ? `/api/app/media/${x.id}/photo` : null }));
+    const r = await db.query(`SELECT id, kind, title, subtitle, url, country FROM media_items WHERE active ORDER BY sort, id`);
+    const rows = await Promise.all(
+      r.rows.map(async (x) => {
+        const handle = tgHandle(x.url);
+        const info = handle ? await Promise.race([tgInfo(handle), new Promise<null>((ok) => setTimeout(() => ok(null), 3000))]) : null;
+        return { ...x, photo: handle ? `/api/app/media/${x.id}/photo` : null, channelTitle: info?.title ?? null, members: info?.members ?? null };
+      }),
+    );
     return { traders: rows.filter((x) => x.kind === 'trader'), channels: rows.filter((x) => x.kind === 'channel') };
   });
 

@@ -111,6 +111,8 @@ CREATE TABLE IF NOT EXISTS media_items (
   active   BOOLEAN DEFAULT TRUE
 );
 
+ALTER TABLE media_items ADD COLUMN IF NOT EXISTS country TEXT;
+
 -- Чат поддержки через бота: сообщения клиентов и ответы команды
 CREATE TABLE IF NOT EXISTS messages (
   id            BIGSERIAL PRIMARY KEY,
