@@ -90,29 +90,40 @@ export const LESSONS = [
   },
 ];
 
-/** Пока настоящих сигналов нет, показываем пример оформления. Все строки помечены is_test, в приложении это подписано «ТЕСТ» и «тестовые данные» */
+/**
+ * Пока настоящих сигналов с итогами нет, показываем пример оформления. Все строки помечены is_test,
+ * в приложении это подписано «ТЕСТ» и «тестовые данные». Новая строка появляется каждые 5–7 минут, старая уходит,
+ * пары идут разные, минус бывает примерно раз в 20–30 минут. Всё считается от времени, поэтому у всех клиентов одинаково.
+ */
 function demoPast() {
-  const hour = Math.floor(Date.now() / 3_600_000);
-  let seed = hour * 2654435761;
-  const rnd = (n: number) => {
-    seed = (seed * 1103515245 + 12345) % 2147483648;
-    return seed % n;
+  const BLOCK = 6 * 60_000; // один пример на блок в 6 минут, внутри блока сдвиг 0–1 минута, интервалы получаются 5–7 минут
+  const pairs = ['EUR/USD OTC', 'GBP/USD OTC', 'AUD/CHF OTC', 'EUR/GBP OTC', 'AUD/USD OTC', 'USD/JPY OTC', 'EUR/JPY OTC', 'GBP/JPY OTC'];
+  const h = (n: number) => {
+    let x = Math.imul(n ^ 0x9e3779b9, 0x85ebca6b);
+    x ^= x >>> 13;
+    x = Math.imul(x, 0xc2b2ae35);
+    x ^= x >>> 16;
+    return x >>> 0;
   };
-  const pairs = ['EUR/USD OTC', 'GBP/USD OTC', 'AUD/CHF OTC', 'EUR/GBP OTC', 'AUD/USD OTC', 'USD/JPY OTC'];
-  const lossAt = rnd(5);
-  let ago = 20;
-  return Array.from({ length: 5 }, (_, i) => {
-    ago += 15 + rnd(55);
-    return {
-      id: -(i + 1),
-      pair: pairs[rnd(pairs.length)],
-      direction: rnd(2) ? 'up' : 'down',
-      entry_at: new Date(Date.now() - ago * 60_000).toISOString(),
+  const eventAt = (b: number) => b * BLOCK + (h(b) % 60) * 1000;
+  const isLoss = (b: number) => h(b + 7919) % 4 === 0 && h(b - 1 + 7919) % 4 !== 0;
+  const now = Date.now();
+  const out = [];
+  for (let b = Math.floor(now / BLOCK) + 1; out.length < 5 && b > 0; b--) {
+    const at = eventAt(b);
+    if (at > now - 90_000) continue; // сигнал считается завершённым через ~1,5 минуты после входа
+    const loss = isLoss(b);
+    out.push({
+      id: -b,
+      pair: pairs[(b * 3) % pairs.length],
+      direction: h(b + 1) % 2 ? 'up' : 'down',
+      entry_at: new Date(at).toISOString(),
       is_test: true,
-      wins: i === lossAt ? 0 : 1,
-      losses: i === lossAt ? 1 : 0,
-    };
-  });
+      wins: loss ? 0 : 1,
+      losses: loss ? 1 : 0,
+    });
+  }
+  return out;
 }
 
 const photoCache = new Map<number, { until: number; data: Buffer | null; type: string }>();
