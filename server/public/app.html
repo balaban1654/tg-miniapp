@@ -108,7 +108,7 @@ main{flex:1;padding:6px 16px 96px;display:grid;gap:12px;align-content:start}
 .rise{animation:riseIn .5s cubic-bezier(.2,.7,.2,1) backwards}
 @keyframes riseIn{from{opacity:0;transform:translateY(14px)}}
 .fin{border:1px solid var(--ok);background:#12301f;border-radius:18px;padding:16px;display:grid;gap:10px}
-.pshead{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-top:6px}
+.pshead{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-top:22px}
 .pshead b{font:700 16px var(--fd);white-space:nowrap}
 .pshead span{font-size:11px;text-align:right}
 .pslist{background:var(--card);border-radius:18px;overflow:hidden}
@@ -426,7 +426,6 @@ async function viewHome(){
       btnBox.replaceChildren(el('button',{class:'btn',type:'button',onclick:()=>{asking=true;drawBtn()}},'Зарегистрироваться'));
     };
     drawBtn();
-    const check=el('button',{class:'btn o',type:'button',onclick:async()=>{await refreshMe();if(me.access){toast('Доступ открыт');render()}else toast('Пока нет депозита. Это может занять несколько минут.')}},'Я пополнил счёт, проверить доступ');
     const lockedSig=await signalCard().catch(()=>null);
     shell('Hunter AI',[profileCard(),stats4({deals:0,wins:0,losses:0,rate:null}),lockedSig,
       el('div',{class:'card hero'},heroArt(),
@@ -435,7 +434,7 @@ async function viewHome(){
         me.promo?el('div',{class:'row card',style:'padding:10px 12px'},el('div',{},el('div',{class:'sm'},'Промокод'),el('b',{class:'mono'},me.promo)),el('button',{class:'pillb',type:'button',onclick:async()=>{try{await navigator.clipboard.writeText(me.promo);toast('Промокод скопирован')}catch{toast('Выделите промокод вручную')}}},'Копировать')):null,
         btnBox,
         el('p',{class:'sm',style:'margin:0'},'Нажимая «Зарегистрироваться», вы подтверждаете, что вам 18+ и вы понимаете: торговля связана с риском потери денег.')),
-      check,...await pastSignals().catch(()=>[])]);
+      ...await pastSignals().catch(()=>[])]);
     return;
   }
   const d=await api('/deals?period=7');
