@@ -165,9 +165,12 @@ $('#loginForm').addEventListener('submit',async e=>{
 });
 $('#logout').addEventListener('click',async()=>{try{await api('/logout',{method:'POST'})}catch{}showLogin()});
 
-async function render(){
+/** render({soft:true}) обновляет страницу на месте: без «Загрузка…» и с сохранением прокрутки, чтобы экран не дёргался */
+async function render(opt){
   stopPoll();
-  const m=$('#main');m.replaceChildren(el('div',{class:'mut'},'Загрузка…'));
+  const soft=!!(opt&&opt.soft===true);
+  const m=$('#main'),y=window.scrollY,mt=m.scrollTop;
+  if(!soft)m.replaceChildren(el('div',{class:'mut'},'Загрузка…'));
   try{
     if(tab==='home')m.replaceChildren(...await viewHome());
     else if(tab==='leads')m.replaceChildren(...await viewLeads());
@@ -179,6 +182,7 @@ async function render(){
     else if(tab==='media')m.replaceChildren(...await viewMedia());
     else if(tab==='pb')m.replaceChildren(...await viewPostbacks());
   }catch(x){if(x.message!=='auth')m.replaceChildren(el('div',{class:'err'},x.message))}
+  if(soft){window.scrollTo(0,y);m.scrollTop=mt}
 }
 
 async function viewHome(){
@@ -454,24 +458,24 @@ async function signalConfigBlock(){
   const flash=m=>{err.className='ok-msg';err.textContent=m};
   const fail=x=>{err.className='err';err.textContent=x.message};
   const save=async()=>{try{await api('/signal-config',{method:'PUT',body:{enabled:f.on.checked,enter_in_sec:Number(f.enter.value),direction_ttl_min:Number(f.ttl.value),cooldown_sec:Number(f.cd.value),entry_second:Number(f.es.value),overlap_gap_sec:Number(f.gap.value),max_events:Number(f.mx.value),overlap_mult:Number(f.mult.value),entry_label:f.el_.value,stake_label:f.sl.value,warning_text:f.warn.value,pocket_url:f.pocket.value}});flash('Настройки сохранены')}catch(x){fail(x)}};
-  const setDir=async(pair,direction)=>{try{await api('/signal-pairs/direction',{method:'POST',body:{pair,direction}});render()}catch(x){fail(x)}};
+  const setDir=async(pair,direction)=>{try{await api('/signal-pairs/direction',{method:'POST',body:{pair,direction}});render({soft:true})}catch(x){fail(x)}};
   const left=p=>{const m=Math.max(0,Math.round((Date.parse(p.direction_at)+S.direction_ttl_min*60000-Date.now())/60000));return p.fresh?'ещё '+m+' мин':'устарело'};
   const dirBtn=(p,d,t)=>el('button',{class:'btn s '+(p.direction===d&&p.fresh?'':'o'),type:'button',style:'margin-right:6px',onclick:()=>setDir(p.pair,d)},t);
   const fmtSec=n=>n>=3600&&n%3600===0?n/3600+' ч':n>=60&&n%60===0?n/60+' мин':n+' сек';
   const expBlock=el('div',{style:'display:flex;flex-wrap:wrap;gap:8px;align-items:center'},
-    cfg.expiries.map(sec=>el('span',{class:'pill p-pur',style:'display:inline-flex;gap:8px;align-items:center'},fmtSec(sec),isAdmin?el('button',{type:'button','aria-label':'Убрать',style:'background:none;border:0;color:inherit;cursor:pointer;padding:0',onclick:async()=>{try{await api('/signal-expiries?sec='+sec,{method:'DELETE'});render()}catch(x){fail(x)}}},'✕'):null)),
+    cfg.expiries.map(sec=>el('span',{class:'pill p-pur',style:'display:inline-flex;gap:8px;align-items:center'},fmtSec(sec),isAdmin?el('button',{type:'button','aria-label':'Убрать',style:'background:none;border:0;color:inherit;cursor:pointer;padding:0',onclick:async()=>{try{await api('/signal-expiries?sec='+sec,{method:'DELETE'});render({soft:true})}catch(x){fail(x)}}},'✕'):null)),
     isAdmin?(()=>{const v=el('input',{type:'number',min:'1',placeholder:'10',style:'width:80px'}),u=el('select',{style:'width:90px'},el('option',{value:'1'},'сек'),el('option',{value:'60'},'мин'),el('option',{value:'3600'},'ч'));
-      return el('span',{style:'display:inline-flex;gap:6px'},v,u,el('button',{class:'btn o s',type:'button',onclick:async()=>{try{await api('/signal-expiries',{method:'POST',body:{sec:Number(v.value)*Number(u.value)}});render()}catch(x){fail(x)}}},'Добавить'))})():null);
+      return el('span',{style:'display:inline-flex;gap:6px'},v,u,el('button',{class:'btn o s',type:'button',onclick:async()=>{try{await api('/signal-expiries',{method:'POST',body:{sec:Number(v.value)*Number(u.value)}});render({soft:true})}catch(x){fail(x)}}},'Добавить'))})():null);
   const bulk=el('textarea',{class:'big',rows:'4',placeholder:'EUR/USD OTC\nGBP/USD OTC'});
   const newPair=el('input',{placeholder:'EUR/USD OTC',style:'max-width:200px'});
   const pairRows=cfg.pairs.map(p=>{
     // Доступна: пара показана клиентам или скрыта. Кнопка-переключатель вместо галочки, чтобы было видно, что она нажимается
     const en=el('button',{class:'btn s '+(p.enabled?'':'o'),type:'button',disabled:!isAdmin,title:p.enabled?'Нажмите, чтобы скрыть пару от клиентов':'Нажмите, чтобы показать пару клиентам',
-      onclick:async()=>{try{await api('/signal-pairs',{method:'PUT',body:{pair:p.pair,enabled:!p.enabled,sort:p.sort}});render()}catch(x){alert(x.message)}}},p.enabled?'Показана':'Скрыта');
+      onclick:async()=>{try{await api('/signal-pairs',{method:'PUT',body:{pair:p.pair,enabled:!p.enabled,sort:p.sort}});render({soft:true})}catch(x){alert(x.message)}}},p.enabled?'Показана':'Скрыта');
     return[td(p.pair),el('td',{},en),
       el('td',{style:'white-space:nowrap'},dirBtn(p,'up','Вверх'),dirBtn(p,'down','Вниз'),el('button',{class:'btn s '+(p.auto?'':'o'),type:'button',title:'Тест: направление случайное, каждую минуту своё. Выдаётся всем, но карточка помечена как тестовая',style:'margin-right:6px',onclick:()=>setDir(p.pair,'auto')},'Авто'),el('button',{class:'btn o s',type:'button',onclick:()=>setDir(p.pair,'')},'Сброс')),
       td(p.auto?'Авто · тест, случайное направление':p.direction?(p.direction==='up'?'Вверх':'Вниз')+' · '+left(p)+(p.direction_by?' · '+p.direction_by:''):'не задано'),
-      el('td',{},isAdmin?el('button',{class:'btn o s',type:'button',onclick:async()=>{try{await api('/signal-pairs?pair='+encodeURIComponent(p.pair),{method:'DELETE'});render()}catch(x){fail(x)}}},'Удалить'):null)];
+      el('td',{},isAdmin?el('button',{class:'btn o s',type:'button',onclick:async()=>{try{await api('/signal-pairs?pair='+encodeURIComponent(p.pair),{method:'DELETE'});render({soft:true})}catch(x){fail(x)}}},'Удалить'):null)];
   });
   return el('div',{style:'display:grid;gap:12px'},
     el('h3',{style:'font-size:15px'},'Сигналы по запросу клиента'),
@@ -489,12 +493,12 @@ async function signalConfigBlock(){
     el('h3',{style:'font-size:13px;margin:4px 0 0'},'Экспирации на выбор клиенту (от 3 секунд до 4 часов)'),
     expBlock,
     isAdmin||me.role==='analyst'?el('div',{style:'display:flex;gap:8px;flex-wrap:wrap;align-items:center'},el('span',{class:'mut sm'},'Для всех пар сразу:'),
-      [['up','Вверх'],['down','Вниз'],['auto','Авто'],['','Сброс']].map(([d,t])=>el('button',{class:'btn o s',type:'button',onclick:async()=>{try{await api('/signal-pairs/direction',{method:'POST',body:{pair:'*',direction:d}});render()}catch(x){fail(x)}}},t))):null,
+      [['up','Вверх'],['down','Вниз'],['auto','Авто'],['','Сброс']].map(([d,t])=>el('button',{class:'btn o s',type:'button',onclick:async()=>{try{await api('/signal-pairs/direction',{method:'POST',body:{pair:'*',direction:d}});render({soft:true})}catch(x){fail(x)}}},t))):null,
     table(['Пара','Доступна','Направление сейчас','Состояние',''],pairRows,'Пар пока нет'),
     isAdmin?el('div',{class:'card',style:'display:grid;gap:8px'},el('b',{style:'font-size:13px'},'Загрузить список пар'),
       el('div',{class:'mut sm'},'По одной паре в строке, например EUR/USD OTC. Процент выплаты не нужен: клиент видит его у брокера.'),bulk,
-      el('div',{},el('button',{class:'btn o s',type:'button',onclick:async()=>{try{const r=await api('/signal-pairs/bulk',{method:'POST',body:{text:bulk.value}});bulk.value='';flash('Загружено пар: '+r.count);setTimeout(render,700)}catch(x){fail(x)}}},'Загрузить'))):null,
-    isAdmin?el('div',{style:'display:flex;gap:8px;align-items:center'},newPair,el('button',{class:'btn o s',type:'button',onclick:async()=>{try{await api('/signal-pairs',{method:'POST',body:{pair:newPair.value}});render()}catch(x){fail(x)}}},'Добавить пару')):null);
+      el('div',{},el('button',{class:'btn o s',type:'button',onclick:async()=>{try{const r=await api('/signal-pairs/bulk',{method:'POST',body:{text:bulk.value}});bulk.value='';flash('Загружено пар: '+r.count);setTimeout(()=>render({soft:true}),700)}catch(x){fail(x)}}},'Загрузить'))):null,
+    isAdmin?el('div',{style:'display:flex;gap:8px;align-items:center'},newPair,el('button',{class:'btn o s',type:'button',onclick:async()=>{try{await api('/signal-pairs',{method:'POST',body:{pair:newPair.value}});render({soft:true})}catch(x){fail(x)}}},'Добавить пару')):null);
 }
 async function viewSignals(){
   const rows=await api('/signals');
