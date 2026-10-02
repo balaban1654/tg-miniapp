@@ -446,6 +446,7 @@ async function viewPush(){
 }
 
 /** Сигналы по запросу клиента: настройки, пары и текущее направление от аналитика */
+let pairsExpanded=false;
 async function signalConfigBlock(){
   const cfg=await api('/signal-config');
   const S=cfg.settings,isAdmin=me.role==='admin';
@@ -473,8 +474,7 @@ async function signalConfigBlock(){
     const en=el('button',{class:'btn s '+(p.enabled?'':'o'),type:'button',disabled:!isAdmin,title:p.enabled?'Нажмите, чтобы скрыть пару от клиентов':'Нажмите, чтобы показать пару клиентам',
       onclick:async()=>{try{await api('/signal-pairs',{method:'PUT',body:{pair:p.pair,enabled:!p.enabled,sort:p.sort}});render({soft:true})}catch(x){alert(x.message)}}},p.enabled?'Показана':'Скрыта');
     return[td(p.pair),el('td',{},en),
-      el('td',{style:'white-space:nowrap'},dirBtn(p,'up','Вверх'),dirBtn(p,'down','Вниз'),el('button',{class:'btn s '+(p.auto?'':'o'),type:'button',title:'Тест: направление случайное, каждую минуту своё. Выдаётся всем, но карточка помечена как тестовая',style:'margin-right:6px',onclick:()=>setDir(p.pair,'auto')},'Авто'),el('button',{class:'btn o s',type:'button',onclick:()=>setDir(p.pair,'')},'Сброс')),
-      td(p.auto?'Авто · тест, случайное направление':p.direction?(p.direction==='up'?'Вверх':'Вниз')+' · '+left(p)+(p.direction_by?' · '+p.direction_by:''):'не задано'),
+      el('td',{},el('button',{class:'btn s '+(p.auto?'':'o'),type:'button',title:'Тест: направление случайное, каждую минуту своё. Выдаётся всем, но карточка помечена как тестовая',onclick:()=>setDir(p.pair,p.auto?'':'auto')},'Авто')),
       el('td',{},isAdmin?el('button',{class:'btn o s',type:'button',onclick:async()=>{try{await api('/signal-pairs?pair='+encodeURIComponent(p.pair),{method:'DELETE'});render({soft:true})}catch(x){fail(x)}}},'Удалить'):null)];
   });
   return el('div',{style:'display:grid;gap:12px'},
@@ -494,7 +494,8 @@ async function signalConfigBlock(){
     expBlock,
     isAdmin||me.role==='analyst'?el('div',{style:'display:flex;gap:8px;flex-wrap:wrap;align-items:center'},el('span',{class:'mut sm'},'Для всех пар сразу:'),
       [['up','Вверх'],['down','Вниз'],['auto','Авто'],['','Сброс']].map(([d,t])=>el('button',{class:'btn o s',type:'button',onclick:async()=>{try{await api('/signal-pairs/direction',{method:'POST',body:{pair:'*',direction:d}});render({soft:true})}catch(x){fail(x)}}},t))):null,
-    table(['Пара','Доступна','Направление сейчас','Состояние',''],pairRows,'Пар пока нет'),
+    table(['Пара','Доступна','Направление',''],pairsExpanded?pairRows:pairRows.slice(0,5),'Пар пока нет'),
+    pairRows.length>5?el('div',{},el('button',{class:'btn o s',type:'button',onclick:()=>{pairsExpanded=!pairsExpanded;render({soft:true})}},pairsExpanded?'Свернуть':'Показать все ('+pairRows.length+')')):null,
     isAdmin?el('div',{class:'card',style:'display:grid;gap:8px'},el('b',{style:'font-size:13px'},'Загрузить список пар'),
       el('div',{class:'mut sm'},'По одной паре в строке, например EUR/USD OTC. Процент выплаты не нужен: клиент видит его у брокера.'),bulk,
       el('div',{},el('button',{class:'btn o s',type:'button',onclick:async()=>{try{const r=await api('/signal-pairs/bulk',{method:'POST',body:{text:bulk.value}});bulk.value='';flash('Загружено пар: '+r.count);setTimeout(()=>render({soft:true}),700)}catch(x){fail(x)}}},'Загрузить'))):null,
