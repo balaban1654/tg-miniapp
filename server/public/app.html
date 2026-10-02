@@ -480,7 +480,7 @@ async function pastSignals(){
   };
   wrap.replaceChildren(...build(await api('/signals/past')).filter(Boolean));
   // Раз в минуту обновляем список, пока экран открыт: новый сигнал появляется, самый старый уходит
-  timers.push(setInterval(async()=>{if(!wrap.isConnected)return;try{wrap.replaceChildren(...build(await api('/signals/past')).filter(Boolean))}catch{}},60000));
+  timers.push(setInterval(async()=>{if(!wrap.isConnected)return;try{wrap.replaceChildren(...build(await api('/signals/past')).filter(Boolean))}catch{}},30000));
   return[wrap];
 }
 

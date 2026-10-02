@@ -92,12 +92,12 @@ export const LESSONS = [
 
 /**
  * Пока настоящих сигналов с итогами нет, показываем пример оформления. Все строки помечены is_test,
- * в приложении это подписано «ТЕСТ» и «тестовые данные». Новая строка появляется каждые 5–7 минут, старая уходит,
- * пары идут разные, минус бывает примерно раз в 20–30 минут. Всё считается от времени, поэтому у всех клиентов одинаково.
+ * в приложении это подписано «ТЕСТ» и «тестовые данные».
+ * Днём новая строка появляется каждые 5–7 минут, вечером (с 18:00) каждые 2–4 минуты, старая уходит.
+ * Пары идут разные, минус редкий. Всё считается от времени, поэтому у всех клиентов одинаково.
  */
 function demoPast() {
-  const BLOCK = 6 * 60_000; // один пример на блок в 6 минут, внутри блока сдвиг 0–1 минута, интервалы получаются 5–7 минут
-  const pairs = ['EUR/USD OTC', 'GBP/USD OTC', 'AUD/CHF OTC', 'EUR/GBP OTC', 'AUD/USD OTC', 'USD/JPY OTC', 'EUR/JPY OTC', 'GBP/JPY OTC'];
+  const pairs = ['EUR/USD', 'GBP/USD', 'AUD/CHF', 'EUR/GBP', 'AUD/USD', 'USD/JPY', 'EUR/JPY', 'GBP/JPY', 'AUD/CAD', 'EUR/CAD', 'CAD/JPY', 'CHF/JPY', 'NZD/USD', 'USD/CAD', 'USD/CHF', 'GBP/CHF', 'EUR/CHF'].map((p) => p + ' OTC');
   const h = (n: number) => {
     let x = Math.imul(n ^ 0x9e3779b9, 0x85ebca6b);
     x ^= x >>> 13;
@@ -105,25 +105,37 @@ function demoPast() {
     x ^= x >>> 16;
     return x >>> 0;
   };
-  const eventAt = (b: number) => b * BLOCK + (h(b) % 60) * 1000;
-  const isLoss = (b: number) => h(b + 7919) % 4 === 0 && h(b - 1 + 7919) % 4 !== 0;
+  const hourFmt = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', hourCycle: 'h23', timeZone: config.pushTz });
+  const evening = (t: number) => Number(hourFmt.format(new Date(t))) >= 18;
+  // Две сетки: на 6 минут (день, интервалы 5–7) и на 3 минуты (вечер, интервалы 2–4). Внутри блока сдвиг 0–1 минута
+  const streams = [
+    { block: 6 * 60_000, salt: 11, lossMod: 4, when: (t: number) => !evening(t) },
+    { block: 3 * 60_000, salt: 29, lossMod: 8, when: (t: number) => evening(t) },
+  ];
   const now = Date.now();
-  const out = [];
-  for (let b = Math.floor(now / BLOCK) + 1; out.length < 5 && b > 0; b--) {
-    const at = eventAt(b);
-    if (at > now - 90_000) continue; // сигнал считается завершённым через ~1,5 минуты после входа
-    const loss = isLoss(b);
-    out.push({
-      id: -b,
-      pair: pairs[(b * 3) % pairs.length],
-      direction: h(b + 1) % 2 ? 'up' : 'down',
-      entry_at: new Date(at).toISOString(),
-      is_test: true,
-      wins: loss ? 0 : 1,
-      losses: loss ? 1 : 0,
-    });
+  const events: { at: number; loss: boolean }[] = [];
+  for (const st of streams) {
+    const top = Math.floor(now / st.block) + 1;
+    for (let b = top; b > top - 30; b--) {
+      const at = b * st.block + (h(b + st.salt * 1000) % 60) * 1000;
+      if (!st.when(at) || at > now - 90_000) continue; // сигнал считается завершённым через ~1,5 минуты после входа
+      const loss = h(b + st.salt * 7919) % st.lossMod === 0 && h(b - 1 + st.salt * 7919) % st.lossMod !== 0;
+      events.push({ at, loss });
+    }
   }
-  return out;
+  events.sort((x, y) => y.at - x.at);
+  return events.slice(0, 5).map((e) => {
+    const slot = Math.floor(e.at / 120_000); // у событий с интервалом от 2 минут слоты разные, пары на 5 соседних строках не повторяются
+    return {
+      id: -Math.floor(e.at / 1000),
+      pair: pairs[(slot * 5) % pairs.length],
+      direction: h(slot + 1) % 2 ? 'up' : 'down',
+      entry_at: new Date(e.at).toISOString(),
+      is_test: true,
+      wins: e.loss ? 0 : 1,
+      losses: e.loss ? 1 : 0,
+    };
+  });
 }
 
 const photoCache = new Map<number, { until: number; data: Buffer | null; type: string }>();
