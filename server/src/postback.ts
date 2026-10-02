@@ -4,12 +4,12 @@ import { db } from './db.js';
 import { config } from './config.js';
 import { bot } from './bot.js';
 
-type Ev = 'reg' | 'ftd' | 'dep' | 'wd';
-const EVENTS: Ev[] = ['reg', 'ftd', 'dep', 'wd'];
+type Ev = 'reg' | 'ftd' | 'dep' | 'wd' | 'comm';
+const EVENTS: Ev[] = ['reg', 'ftd', 'dep', 'wd', 'comm'];
 
 // Партнёрка может называть одни и те же параметры по-разному, берём первый найденный
 const ID_KEYS = ['click_id', 'clickid', 'subid', 'sub_id', 'sub_id1', 'tg_id'];
-const AMOUNT_KEYS = ['sumdep', 'wdr_sum', 'amount', 'sum', 'payout', 'value'];
+const AMOUNT_KEYS = ['commission', 'comm', 'revshare', 'sumdep', 'wdr_sum', 'amount', 'sum', 'payout', 'profit', 'value'];
 const TX_KEYS = ['txid', 'transaction_id', 'order_id', 'deposit_id', 'id'];
 
 const pick = (q: Record<string, string>, keys: string[]): string => {

@@ -68,3 +68,7 @@ CREATE TABLE IF NOT EXISTS postback_log (
 -- ID трейдера в Pocket Option: приходит с регистрацией, потом по нему находим лида
 ALTER TABLE leads ADD COLUMN IF NOT EXISTS trader_id TEXT;
 CREATE INDEX IF NOT EXISTS leads_trader ON leads(trader_id);
+
+-- Добавляем тип события comm: комиссия, которую платит Pocket Option
+ALTER TABLE events DROP CONSTRAINT IF EXISTS events_type_check;
+ALTER TABLE events ADD CONSTRAINT events_type_check CHECK (type IN ('start','reg','ftd','dep','wd','comm'));

@@ -149,15 +149,16 @@ async function viewHome(){
   const k=(t,v)=>el('div',{class:'kpi'},el('small',{},t),el('b',{},String(v)));
   return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Обзор')),
     el('div',{class:'kpis'},k('Клики по ссылкам',s.clicks),k('Лиды',s.total),k('Регистрации',(b.registered||0)+(b.ftd||0)+(b.active||0)),k('FTD',(b.ftd||0)+(b.active||0)),k('Отвал',b.churned||0)),
-    el('div',{class:'card mut'},'Депозиты, выводы и планы появятся после подключения постбеков Pocket Option.')];
+    el('div',{class:'kpis'},k('Депозиты',money(s.deposits)),k('Выводы',money(s.withdrawals)),...(s.commission!==null?[k('Заработано (комиссия)',money(s.commission))]:[]))];
 }
 
 async function viewLeads(){
   const rows=await api('/leads');
   const showOwner=me.role==='admin'||me.role==='teamlead';
-  const cols=['Лид','Статус',...(showOwner?['Владелец']:[]),'Ссылка','Пришёл','Депозиты'];
+  const showComm=me.role==='admin';
+  const cols=['Лид','Статус',...(showOwner?['Владелец']:[]),'Ссылка','Пришёл','Депозиты',...(showComm?['Комиссия']:[])];
   return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Лиды'),el('span',{class:'mut'},rows.length+' всего')),
-    table(cols,rows.map(r=>[td(r.username?'@'+r.username:(r.first_name||r.tg_id)),el('td',{},pill(r.status)),...(showOwner?[td(r.owner_name||'не закреплён')]:[]),td(r.link_slug||'—'),td(date(r.created_at)),td(money(r.deposits),'n')]),
+    table(cols,rows.map(r=>[td(r.username?'@'+r.username:(r.first_name||r.tg_id)),el('td',{},pill(r.status)),...(showOwner?[td(r.owner_name||'не закреплён')]:[]),td(r.link_slug||'—'),td(date(r.created_at)),td(money(r.deposits),'n'),...(showComm?[td(money(r.commission),'n')]:[])]),
       'Лидов пока нет. Они появятся, когда люди перейдут по вашим ссылкам и нажмут «Старт» в боте.')];
 }
 

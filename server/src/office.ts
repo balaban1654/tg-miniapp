@@ -86,9 +86,24 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
       `SELECT status, count(*)::int AS n FROM leads WHERE ${ownerScope(me, 'owner_id')} GROUP BY status`,
     );
     const clicks = await db.query(`SELECT coalesce(sum(clicks),0)::int AS n FROM links WHERE ${ownerScope(me, 'owner_id')}`);
+    const money = await db.query(
+      `SELECT e.type, coalesce(sum(e.amount),0)::float AS s
+         FROM events e JOIN leads d ON d.tg_id = e.tg_id
+        WHERE e.type IN ('ftd','dep','wd','comm') AND ${ownerScope(me, 'd.owner_id')} GROUP BY e.type`,
+    );
+    const m: Record<string, number> = {};
+    for (const x of money.rows) m[x.type] = x.s;
     const by: Record<string, number> = {};
     for (const x of leads.rows) by[x.status] = x.n;
-    return { byStatus: by, total: Object.values(by).reduce((a, b) => a + b, 0), clicks: clicks.rows[0].n };
+    return {
+      byStatus: by,
+      total: Object.values(by).reduce((a, b) => a + b, 0),
+      clicks: clicks.rows[0].n,
+      deposits: (m.ftd ?? 0) + (m.dep ?? 0),
+      withdrawals: m.wd ?? 0,
+      // Комиссия партнёрки видна только админу
+      commission: me.role === 'admin' ? (m.comm ?? 0) : null,
+    };
   });
 
   // Люди команды
@@ -224,7 +239,8 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     const r = await db.query(
       `SELECT d.tg_id, d.username, d.first_name, d.status, d.access, d.created_at, d.owner_id,
               s.name AS owner_name, l.slug AS link_slug,
-              coalesce((SELECT sum(amount) FROM events e WHERE e.tg_id = d.tg_id AND e.type IN ('ftd','dep')),0) AS deposits
+              coalesce((SELECT sum(amount) FROM events e WHERE e.tg_id = d.tg_id AND e.type IN ('ftd','dep')),0) AS deposits,
+              coalesce((SELECT sum(amount) FROM events e WHERE e.tg_id = d.tg_id AND e.type = 'comm'),0) AS commission
          FROM leads d
          LEFT JOIN staff s ON s.id = d.owner_id
          LEFT JOIN links l ON l.id = d.link_id
