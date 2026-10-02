@@ -96,8 +96,8 @@ main{flex:1;padding:6px 16px 96px;display:grid;gap:12px;align-content:start}
 .opt{border:0;border-radius:11px;background:var(--card);padding:12px 4px;font:700 13px var(--fd);color:var(--fg);cursor:pointer}
 .opt.on{background:#4b2f8f}
 .live{position:absolute;left:10px;bottom:10px;background:#0d0817dd;border:1.5px solid var(--ok);border-radius:12px;padding:8px 18px;font:800 20px var(--fd)}
-.cd{position:absolute;z-index:6;left:12px;top:70px;display:grid;justify-items:center;gap:6px;text-align:center;background:#16322aee;border:1px solid var(--ok);border-radius:16px;padding:14px 18px;box-shadow:0 8px 28px #000a;pointer-events:none}
-.cdc{width:62px;height:62px;border-radius:50%;border:3px solid var(--ok);display:grid;place-items:center}
+.cd{position:absolute;z-index:6;left:10px;top:52px;display:grid;justify-items:center;gap:4px;text-align:center;background:#16322aee;border:1px solid var(--ok);border-radius:12px;padding:8px 10px;box-shadow:0 8px 28px #000a;pointer-events:none}
+.cdc{width:38px;height:38px;border-radius:50%;border:2.5px solid var(--ok);display:grid;place-items:center}
 .fld button{transition:transform .08s,background .15s}.fld button:active{transform:scale(.84);background:var(--acc)}
 .val{display:inline-block}.bump{animation:bump .38s ease-out}
 @keyframes bump{40%{transform:scale(1.14);color:var(--ok)}}
@@ -571,7 +571,7 @@ function lesson1(){
       if(st.won)h+='<rect x="'+(xe-46).toFixed(1)+'" y="'+(ey-34).toFixed(1)+'" width="92" height="24" rx="8" fill="#0d0817" stroke="#3ddc97" stroke-width="1.6"/><text x="'+xe.toFixed(1)+'" y="'+(ey-17).toFixed(1)+'" text-anchor="middle" fill="#3ddc97" font-size="14" font-weight="800" font-family="Montserrat,sans-serif">+'+usd(st.sum*.92)+'</text>';
       else h+='<rect x="'+(xe-58).toFixed(1)+'" y="'+(ey-26).toFixed(1)+'" width="116" height="17" rx="6" fill="#7be3b0"/><text x="'+xe.toFixed(1)+'" y="'+(ey-14).toFixed(1)+'" text-anchor="middle" fill="#06210f" font-size="10.5" font-weight="700" font-family="Montserrat,sans-serif">Вход 0:45 · '+st.sum+' $</text>';
     }
-    if(st.timer)h+='<text x="'+(X1-4)+'" y="'+(Y(last)+17).toFixed(1)+'" text-anchor="end" fill="#fff" fill-opacity=".85" font-size="11" font-weight="700" font-family="Montserrat,sans-serif">'+st.iv+' · '+fmtT(st.tt)+'</text>';
+    if(st.timer)h+='<text x="'+(X1-4)+'" y="'+(Y(last)+17).toFixed(1)+'" text-anchor="end" fill="#fff" fill-opacity=".85" font-size="10" font-weight="700" font-family="Montserrat,sans-serif">'+st.iv+' · '+fmtT(st.tt)+'</text>';
     for(let i=0;i<4;i++){const v=hi-(hi-lo)*i/3;h+='<text x="'+(X1+6)+'" y="'+(Y(v)+3).toFixed(1)+'" fill="#8d82ab" font-size="10" font-family="Montserrat,sans-serif">'+v.toFixed(5)+'</text>'}
     h+='<rect x="'+(X1+2)+'" y="'+(Y(last)-8).toFixed(1)+'" width="58" height="16" rx="4" fill="#1f8f4e"/><text x="'+(X1+6)+'" y="'+(Y(last)+4).toFixed(1)+'" fill="#fff" font-size="10.5" font-weight="700" font-family="Montserrat,sans-serif">'+last.toFixed(5)+'</text>';
     return h;
@@ -580,7 +580,7 @@ function lesson1(){
   function liveText(){
     const t=target(),n=until();
     if(t==='buy'){
-      const inWin=st.tt>=42&&st.tt<=48;
+      const inWin=st.tt<=45&&st.tt>=42;
       if(nEl)nEl.textContent=inWin?'!':String(n);
       if(bigEl)bigEl.textContent=inWin?'Сейчас! Жми «Купить»':'секунд до входа. На 0:45 жми «Купить»';
       if(tipEl)tipEl.textContent=inWin?'Таймер свечи показывает 0:45 — жми «Купить»':'Жди: через '+n+' '+plS(n)+' таймер свечи покажет 0:45 — тогда жми «Купить»';
@@ -638,7 +638,7 @@ function lesson1(){
     const d=new Date(Date.now()+60000),hh=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
     return el('div',{class:'sig rise'},el('h3',{},'Сигнал готов'),
       el('div',{class:'r'},el('span',{},'Время'),el('b',{},hh)),
-      el('div',{class:'r'},el('span',{},'Точка входа'),el('b',{},'00:45')),
+      el('div',{class:'r'},el('span',{},'Точка входа'),el('b',{},'0:45')),
       el('div',{class:'r'},el('span',{},'Пара'),el('b',{},st.pair)),
       el('div',{class:'r'},el('span',{},'Направление'),el('b',{style:'color:var(--ok)'},'ВВЕРХ (BUY)')),
       el('div',{class:'r'},el('span',{},'Время сделки'),el('b',{},'5 SEC · M5')),
@@ -696,8 +696,8 @@ function lesson1(){
     const ctlw=el('div',{style:'position:relative'},ctl,hintTxt?el('div',{class:'hint',style:'left:0;right:0;max-width:none;bottom:calc(100% + 8px)'},hintTxt):null);
     const pl=dim(el('div',{class:'pl'},el('span',{},'Выплата '+usd(st.sum*1.92)),el('span',{class:'pay'},'+92%'),el('span',{},'Прибыль +'+usd(st.sum*.92))));
     const buy=mark('buy',el('button',{class:'buy',type:'button',onclick:guard('buy',()=>{
-      if(st.tt>=42&&st.tt<=48){st.trade={entry:price,left:5,gid:Math.floor((base+pts.length-1)/(st.type==='line'?1:IV_G[st.iv]))};st.bal=Math.round((st.bal-st.sum)*100)/100;termView()}
-      else toast(st.tt>48?'Рано: подождите, пока таймер дойдёт до 0:45':'Поздно: дождитесь следующего круга таймера')})},'Купить'),8);
+      if(st.tt<=45&&st.tt>=42){st.trade={entry:price,left:5,gid:Math.floor((base+pts.length-1)/(st.type==='line'?1:IV_G[st.iv]))};st.bal=Math.round((st.bal-st.sum)*100)/100;termView()}
+      else toast(st.tt>45?'Рано: ждите, пока таймер дойдёт до 0:45':'Поздно: дождитесь следующего круга таймера')})},'Купить'),8);
     const sell=el('button',{class:'sell',type:'button',onclick:()=>toast('В сигнале указано «Вверх», то есть «Купить»')},'Продать');
     const tb=el('div',{class:'tb'},buy,sell);
     if(t!=='buy')dim(tb);
@@ -712,7 +712,7 @@ function lesson1(){
     if(t==='dots')termBody.append(el('div',{class:'hint',style:'left:40px;top:92px'},el('b',{},'1 · Настройки графика:'),el('br'),'нажми •••'));
     if(t==='pair')termBody.append(el('div',{class:'hint',style:'left:0;top:54px'},el('b',{},'7 · Пара: '),st.pair+', как в сигнале. Нажми на неё'));
     if(t==='buy'){
-      nEl=el('b',{style:'font:800 34px var(--fd)'});bigEl=el('span',{style:'font-size:12.5px;max-width:170px'});
+      nEl=el('b',{style:'font:800 20px var(--fd)'});bigEl=el('span',{style:'font-size:10.5px;line-height:1.3;max-width:120px'});
       termBody.append(el('div',{class:'cd'},el('div',{class:'cdc'},nEl),bigEl));
     }
     let tipNode;
