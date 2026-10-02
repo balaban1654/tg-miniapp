@@ -56,6 +56,8 @@ th,td{padding:10px 14px;text-align:left;border-bottom:1px solid var(--line);whit
 th{font:600 11px var(--fm);letter-spacing:.06em;text-transform:uppercase;color:var(--mut);background:var(--bg2)}
 tr:last-child td{border-bottom:0}
 td.n{font-family:var(--fm);text-align:right}
+th.n{text-align:right}
+.cp{display:inline-flex;align-items:center;gap:8px}.cp button{background:none;border:0;padding:2px;color:var(--mut);cursor:pointer;display:grid;place-items:center;border-radius:6px}.cp button:hover{color:var(--fg);background:var(--card2)}
 .pill{display:inline-block;border-radius:99px;padding:2px 10px;font:600 11px var(--fm)}
 .p-ok{background:#3ddc9722;color:var(--ok)}.p-warn{background:#ffb84d22;color:var(--warn)}.p-bad{background:#ff6b8a22;color:var(--bad)}.p-pur{background:#9b5cff33;color:var(--acc2)}
 .form{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));align-items:end}
@@ -142,7 +144,7 @@ const date=v=>new Date(v).toLocaleDateString('ru-RU',{timeZone:'Europe/Kyiv',day
 const pill=(st)=>{const[t,c]=STATUS[st]||[st,'p-pur'];return el('span',{class:'pill '+c},t)};
 function table(cols,rows,empty){
   if(!rows.length)return el('div',{class:'card empty'},empty);
-  return el('div',{class:'tbl'},el('table',{},el('thead',{},el('tr',{},cols.map(c=>el('th',{},c)))),el('tbody',{},rows.map(r=>el('tr',{},r.map(c=>c instanceof Node?c:el('td',{},c)))))));
+  return el('div',{class:'tbl'},el('table',{},el('thead',{},el('tr',{},cols.map(c=>Array.isArray(c)?el('th',{class:c[1]},c[0]):el('th',{},c)))),el('tbody',{},rows.map(r=>el('tr',{},r.map(c=>c instanceof Node?c:el('td',{},c)))))));
 }
 const td=(v,cls)=>el('td',{class:cls||''},v);
 
@@ -573,6 +575,15 @@ async function viewMedia(){
     table(['Тип','Имя, страна','Подпись','Ссылка',''],rows.map(r=>r.id===mediaEdit?editRow(r):viewRow(r)),'Пока пусто. Добавьте трейдеров и каналы, они появятся во вкладке «Медиа» в Mini App.'),rowErr];
 }
 
+const COPY_SVG='<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 012-2h9"/>';
+const copyCell=v=>{
+  if(v===undefined||v===null||v===''||v==='—')return td('—');
+  const b=el('button',{type:'button',title:'Копировать','aria-label':'Копировать',onclick:async()=>{
+    try{await navigator.clipboard.writeText(String(v))}catch{const t=el('textarea',{style:'position:fixed;opacity:0'});t.value=String(v);document.body.append(t);t.select();document.execCommand('copy');t.remove()}
+    toast('Скопировано: '+v)}});
+  const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');['viewBox:0 0 24 24','width:15','height:15','fill:none','stroke:currentColor','stroke-width:2','stroke-linecap:round','stroke-linejoin:round'].forEach(a=>{const[k,...r]=a.split(':');svg.setAttribute(k,r.join(':'))});svg.innerHTML=COPY_SVG;b.append(svg);
+  return el('td',{},el('span',{class:'cp'},String(v),b));
+};
 async function viewPostbacks(){
   const rows=await api('/postbacks');
   const clearBox=el('span',{});
@@ -583,7 +594,7 @@ async function viewPostbacks(){
   clearBox.append(askBtn,sure);
   const time=v=>new Date(v).toLocaleString('ru-RU',{timeZone:'Europe/Kyiv',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit',second:'2-digit'});
   return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Постбеки'),el('div',{style:'display:flex;gap:8px;align-items:center'},clearBox,el('button',{class:'btn o s',type:'button',onclick:render},'Обновить'))),
-    table(['Время','Событие','Telegram ID','Pocket ID','Сумма','Результат'],rows.map(r=>{const qq=r.query||{};return[td(time(r.created_at)),el('td',{},el('span',{class:'pill p-pur'},r.event)),td(r.tg_id||qq.click_id||'—'),td(qq.trader_id||'—'),td(qq.commission||qq.sumdep||qq.wdr_sum||qq.amount||qq.sum||'—','n'),el('td',{},el('span',{class:'pill '+(r.result==='ok'?'p-ok':(r.result.startsWith('дубль')||r.result.startsWith('пропущен'))?'p-warn':'p-bad')},r.result))]}),
+    table(['Время','Событие','Telegram ID','Pocket ID',['Сумма','n'],'Результат'],rows.map(r=>{const qq=r.query||{};return[td(time(r.created_at)),el('td',{},el('span',{class:'pill p-pur'},r.event)),copyCell(r.tg_id||qq.click_id),copyCell(qq.trader_id),td(qq.commission||qq.sumdep||qq.wdr_sum||qq.amount||qq.sum||'—','n'),el('td',{},el('span',{class:'pill '+(r.result==='ok'?'p-ok':(r.result.startsWith('дубль')||r.result.startsWith('пропущен'))?'p-warn':'p-bad')},r.result))]}),
       'Постбеков пока нет. Когда партнёрка отправит первый, он появится здесь.')];
 }
 
