@@ -225,7 +225,7 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
               (SELECT count(*)::int FROM deals x WHERE x.signal_id = s.id AND x.result = 'loss') AS losses
          FROM signals s
         WHERE NOT s.is_test AND s.entry_at + (s.expiry_min || ' minutes')::interval < now()
-        ORDER BY s.id DESC LIMIT 20`,
+        ORDER BY s.id DESC LIMIT 5`,
     );
     return r.rows;
   });
