@@ -78,6 +78,12 @@ main{flex:1;padding:6px 16px 96px;display:grid;gap:12px;align-content:start}
 .chips{display:flex;gap:6px;flex-wrap:wrap}
 .chip{border:1px solid var(--line);background:none;border-radius:99px;padding:6px 14px;font-size:12px;color:var(--mut);cursor:pointer}
 .chip.on{background:var(--acc);border-color:var(--acc);color:#fff}
+.rq{color:var(--fg);font-weight:600;font-size:14px}
+.rrow{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.rbtn{border:1.5px solid var(--acc);background:transparent;color:var(--acc2);border-radius:14px;padding:14px 6px;font-weight:700;font-size:14px;cursor:pointer;transition:background .15s,color .15s,transform .1s,box-shadow .15s}
+@media(hover:hover){.rbtn:hover{background:var(--acc);color:#fff;box-shadow:0 0 0 3px #9b5cff33}}
+.rbtn:active,.rbtn:focus-visible{background:var(--acc);color:#fff;outline:none}
+.rbtn:active{transform:scale(.97)}
 .seg{display:grid;grid-template-columns:1fr 1fr;gap:6px;background:var(--bg2);padding:4px;border-radius:12px}
 .seg button{border:0;background:none;border-radius:9px;padding:9px 6px;font-size:12px;font-weight:600;color:var(--mut);cursor:pointer}
 .seg button.on{background:var(--acc);color:#fff}
@@ -262,11 +268,12 @@ async function viewHome(){
     const drawBtn=()=>{
       if(!me.registerUrl.ru&&!me.registerUrl.ww){btnBox.replaceChildren(el('div',{class:'sm'},'Ссылка регистрации пока не настроена. Напишите нам через кнопку «Поддержка».'));return}
       if(asking){
-        // Кнопка «Зарегистрироваться» превращается в две кнопки выбора региона
-        const first=me.regionGuess==='ww'?'ww':'ru',second=first==='ru'?'ww':'ru';
+        // Кнопка «Зарегистрироваться» превращается в вопрос и две кнопки рядом
         btnBox.replaceChildren(
-          el('button',{class:'btn',type:'button',onclick:()=>go(first)},REG[first]),
-          el('button',{class:'btn o',type:'button',onclick:()=>go(second)},REG[second]));
+          el('div',{class:'rq',role:'status'},'Выберите, где вы находитесь'),
+          el('div',{class:'rrow'},
+            el('button',{class:'rbtn',type:'button',onclick:()=>go('ru')},REG.ru),
+            el('button',{class:'rbtn',type:'button',onclick:()=>go('ww')},REG.ww)));
         return;
       }
       btnBox.replaceChildren(el('button',{class:'btn',type:'button',onclick:()=>{asking=true;drawBtn()}},'Зарегистрироваться'));
