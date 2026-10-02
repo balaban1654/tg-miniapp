@@ -613,13 +613,22 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
   app.get('/signals', { preHandler: need('admin', 'analyst') }, async () => {
     const r = await db.query(
       `SELECT s.id, s.pair, s.direction, s.expiry_min, s.expiry_sec, s.requested_by IS NOT NULL AS requested, s.entry_at, s.note, s.source, s.is_test, s.created_at, st.name AS author,
+              CASE WHEN s.requested_by IS NOT NULL THEN coalesce(l.lead_role, 'lead')
+                   ELSE CASE st.role WHEN 'teamlead' THEN 'moder' WHEN 'admin' THEN 'admin' WHEN 'streamer' THEN 'streamer' WHEN 'buyer' THEN 'buyer' ELSE 'analyst' END END AS source_role,
               (SELECT count(*)::int FROM deals x WHERE x.signal_id = s.id) AS taken,
               (SELECT count(*)::int FROM deals x WHERE x.signal_id = s.id AND x.result = 'win') AS wins,
               (SELECT count(*)::int FROM deals x WHERE x.signal_id = s.id AND x.result = 'loss') AS losses,
               (SELECT coalesce(json_object_agg(t.step + 1, t.c), '{}'::json) FROM (SELECT step, count(*)::int AS c FROM deals x WHERE x.signal_id = s.id AND x.result = 'win' AND x.step IS NOT NULL GROUP BY step) t) AS win_steps
-         FROM signals s LEFT JOIN staff st ON st.id = s.created_by ORDER BY s.id DESC LIMIT 40`,
+         FROM signals s LEFT JOIN staff st ON st.id = s.created_by LEFT JOIN leads l ON l.tg_id = s.requested_by ORDER BY s.id DESC LIMIT 40`,
     );
     return r.rows;
+  });
+
+  // Очистка истории: удаляются сигналы, время входа которых уже наступило. Сделки клиентов остаются, у них просто пропадает привязка к сигналу
+  app.delete('/signals', { preHandler: need('admin') }, async () => {
+    await db.query('UPDATE deals SET signal_id = NULL WHERE signal_id IN (SELECT id FROM signals WHERE entry_at <= now())');
+    const r = await db.query('DELETE FROM signals WHERE entry_at <= now()');
+    return { ok: true, removed: r.rowCount };
   });
 
   app.post('/signals', { preHandler: need('admin', 'analyst') }, async (req, reply) => {
@@ -781,7 +790,10 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
   });
 
   app.patch<{ Params: { tgId: string } }>('/leads/:tgId/tester', { preHandler: need('admin') }, async (req, reply) => {
-    const r = await db.query('UPDATE leads SET is_tester = $2 WHERE tg_id = $1 RETURNING tg_id', [Number(req.params.tgId), Boolean((req.body as any)?.value)]);
+    const on = Boolean((req.body as any)?.value);
+    const role = String((req.body as any)?.role ?? 'lead');
+    if (on && !['lead', 'moder', 'admin', 'streamer', 'analyst', 'buyer'].includes(role)) return reply.code(400).send({ error: 'Неизвестная роль' });
+    const r = await db.query('UPDATE leads SET is_tester = $2, lead_role = $3 WHERE tg_id = $1 RETURNING tg_id', [Number(req.params.tgId), on, on ? role : 'lead']);
     if (!r.rowCount) return reply.code(404).send({ error: 'Лид не найден' });
     return { ok: true };
   });
@@ -803,7 +815,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
       extra = ` AND d.status = $1`;
     }
     const r = await db.query(
-      `SELECT d.tg_id, d.trader_id, d.is_tester, d.username, d.first_name, d.status, d.access, d.created_at, d.owner_id,
+      `SELECT d.tg_id, d.trader_id, d.is_tester, d.lead_role, d.username, d.first_name, d.status, d.access, d.created_at, d.owner_id,
               s.name AS owner_name, l.slug AS link_slug,
               coalesce((SELECT sum(amount) FROM events e WHERE e.tg_id = d.tg_id AND e.type IN ('ftd','dep')),0) AS deposits,
               coalesce((SELECT sum(amount) FROM events e WHERE e.tg_id = d.tg_id AND e.type = 'comm'),0) AS commission

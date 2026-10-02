@@ -57,6 +57,7 @@ th{font:600 11px var(--fm);letter-spacing:.06em;text-transform:uppercase;color:v
 tr:last-child td{border-bottom:0}
 td.n{font-family:var(--fm);text-align:right}
 th.n{text-align:right}
+.ctr th,.ctr td,.ctr td.n{text-align:center}
 .cp{display:inline-flex;align-items:center;gap:8px}.cp button{background:none;border:0;padding:2px;color:var(--mut);cursor:pointer;display:grid;place-items:center;border-radius:6px}.cp button:hover{color:var(--fg);background:var(--card2)}
 .pill{display:inline-block;border-radius:99px;padding:2px 10px;font:600 11px var(--fm)}
 .p-ok{background:#3ddc9722;color:var(--ok)}.p-warn{background:#ffb84d22;color:var(--warn)}.p-bad{background:#ff6b8a22;color:var(--bad)}.p-pur{background:#9b5cff33;color:var(--acc2)}
@@ -210,13 +211,30 @@ async function viewHome(){
     el('div',{class:'kpis'},k('Депозиты',money(s.deposits)),k('Выводы',money(s.withdrawals)),...(s.commission!==null?[k('Заработано (комиссия)',money(s.commission))]:[]))];
 }
 
+const LROLES=[['lead','Лид'],['moder','Модер'],['admin','Админ'],['streamer','Стример'],['analyst','Аналитик'],['buyer','Медиабайер']];
+const lroleName=k=>(LROLES.find(x=>x[0]===k)||LROLES[0])[1];
+/** Ячейка «Выдать доступ»: при выдаче спрашиваем роль, при повторном нажатии доступ снимается */
+function accessCell(r){
+  const td=el('td',{});
+  const set=async(value,role)=>{try{await api('/leads/'+r.tg_id+'/tester',{method:'PATCH',body:{value,role}});render()}catch(x){toast(x.message)}};
+  const idle=()=>td.replaceChildren(r.is_tester
+    ?el('button',{class:'btn s',type:'button',title:'Нажмите, чтобы снять доступ',onclick:()=>set(false)},'Доступ: '+lroleName(r.lead_role))
+    :el('button',{class:'btn s o',type:'button',onclick:ask},'Выдать доступ'));
+  const ask=()=>{
+    const sel=el('select',{'aria-label':'Роль',style:'width:auto'},LROLES.map(([k,n])=>el('option',{value:k},n)));
+    td.replaceChildren(el('span',{style:'display:inline-flex;gap:6px;align-items:center'},sel,
+      el('button',{class:'btn s',type:'button',onclick:()=>set(true,sel.value)},'Выдать'),
+      el('button',{class:'btn o s',type:'button','aria-label':'Отмена',onclick:idle},'✕')));
+  };
+  idle();return td;
+}
 async function viewLeads(){
   const rows=await api('/leads');
   const showOwner=me.role==='admin'||me.role==='teamlead';
   const showComm=me.role==='admin';
   const cols=['Лид','Telegram ID','Pocket ID','Статус',...(me.role==='admin'?['Тест']:[]),...(showOwner?['Владелец']:[]),'Ссылка','Пришёл','Депозиты',...(showComm?['Комиссия']:[])];
   return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Лиды'),el('span',{class:'mut'},rows.length+' всего')),
-    table(cols,rows.map(r=>[td(r.username?'@'+r.username:(r.first_name||r.tg_id)),td(r.tg_id,'n'),r.is_tester?td('Тестовый аккаунт','n'):td(r.trader_id||'—','n'),el('td',{},pill(r.status)),...(me.role==='admin'?[el('td',{},el('button',{class:'btn s'+(r.is_tester?'':' o'),type:'button',title:'Открыть аккаунту доступ как у обычного клиента, без реальной регистрации',onclick:async()=>{await api('/leads/'+r.tg_id+'/tester',{method:'PATCH',body:{value:!r.is_tester}});render()}},r.is_tester?'Доступ выдан':'Выдать доступ'))]:[]),...(showOwner?[td(r.owner_name||'не закреплён')]:[]),td(r.link_slug||'—'),td(date(r.created_at)),td(money(r.deposits),'n'),...(showComm?[td(money(r.commission),'n')]:[])]),
+    table(cols,rows.map(r=>[td(r.username?'@'+r.username:(r.first_name||r.tg_id)),td(r.tg_id,'n'),r.is_tester?td('Тестовый аккаунт','n'):td(r.trader_id||'—','n'),el('td',{},pill(r.status)),...(me.role==='admin'?[accessCell(r)]:[]),...(showOwner?[td(r.owner_name||'не закреплён')]:[]),td(r.link_slug||'—'),td(date(r.created_at)),td(money(r.deposits),'n'),...(showComm?[td(money(r.commission),'n')]:[])]),
       'Лидов пока нет. Они появятся, когда люди перейдут по вашим ссылкам и нажмут «Старт» в боте.')];
 }
 
@@ -539,8 +557,16 @@ async function viewSignals(){
     el('div',{style:'display:flex;gap:8px;flex-wrap:wrap'},el('button',{class:'btn',type:'submit'},'Опубликовать')),
     err,el('p',{class:'mut sm',style:'margin:0'},'Общий сигнал публикует человек. Сигналы по запросу клиента выдаются из настроек выше (направление ставит аналитик). Режим «Авто» (случайное направление) нужен только для проверки бота.'));
   const t=r=>new Date(r).toLocaleString('ru-RU',{timeZone:'Europe/Kyiv',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
-  const list=table(['Опубликован','Пара','Направление','Экспирация','Вход','Источник','Вошли','Плюс','Минус',''],rows.map(r=>[td(t(r.created_at)),td(r.pair),el('td',{},el('span',{class:'pill '+(r.direction==='up'?'p-ok':'p-bad')},r.direction==='up'?'Вверх':'Вниз')),td(r.expiry_sec?(r.expiry_sec>=3600&&r.expiry_sec%3600===0?r.expiry_sec/3600+' ч':r.expiry_sec>=60&&r.expiry_sec%60===0?r.expiry_sec/60+' мин':r.expiry_sec+' сек'):r.expiry_min+' мин'),td(new Date(r.entry_at).toLocaleTimeString('ru-RU',{timeZone:'Europe/Kyiv',hour:'2-digit',minute:'2-digit'})),el('td',{},el('span',{class:'pill '+(r.is_test?'p-warn':'p-pur')},r.is_test?'ТЕСТ':(r.requested?'По запросу':(r.author||'Аналитик')))),td(r.taken,'n'),td(r.wins+(Object.keys(r.win_steps||{}).length?' ('+Object.entries(r.win_steps).map(([k,v])=>(k==1?'вход':'пер.'+(k-1))+' '+v).join(', ')+')':''),'n'),td(r.losses,'n'),me.role==='admin'?el('td',{},el('button',{class:'btn o s',type:'button',title:r.is_test?'Вернуть обычным сигналом':'Пометить тестовым: его увидят только тестовые аккаунты',onclick:async()=>{await api('/signals/'+r.id+'/test',{method:'PATCH',body:{is_test:!r.is_test}});render()}},r.is_test?'Сделать обычным':'Сделать тестовым')):td('')]),'Сигналов пока не было.');
-  return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Сигналы')),cfgBlock,form,el('h3',{style:'font-size:15px'},'Опубликованные'),list];
+  const list=table(['Опубликован','Пара','Направление','Экспирация','Вход','Источник','Вошли','Плюс','Минус'],rows.map(r=>[td(t(r.created_at)),td(r.pair),el('td',{},el('span',{class:'pill '+(r.direction==='up'?'p-ok':'p-bad')},r.direction==='up'?'Вверх':'Вниз')),td(r.expiry_sec?(r.expiry_sec>=3600&&r.expiry_sec%3600===0?r.expiry_sec/3600+' ч':r.expiry_sec>=60&&r.expiry_sec%60===0?r.expiry_sec/60+' мин':r.expiry_sec+' сек'):r.expiry_min+' мин'),td(new Date(r.entry_at).toLocaleTimeString('ru-RU',{timeZone:'Europe/Kyiv',hour:'2-digit',minute:'2-digit'})),el('td',{},el('span',{class:'pill p-pur'},lroleName(r.source_role))),td(r.taken,'n'),td(r.wins+(Object.keys(r.win_steps||{}).length?' ('+Object.entries(r.win_steps).map(([k,v])=>(k==1?'вход':'пер.'+(k-1))+' '+v).join(', ')+')':''),'n'),td(r.losses,'n')]),'Сигналов пока не было.');
+  list.classList.add('ctr');
+  // Очистка истории с подтверждением
+  const askClr=el('button',{class:'btn o s',type:'button',onclick:()=>{askClr.hidden=true;sureClr.hidden=false}},'Очистить');
+  const sureClr=el('span',{hidden:'',style:'display:inline-flex;gap:6px;align-items:center'},el('span',{class:'mut'},'Удалить всю историю сигналов?'),
+    el('button',{class:'btn s',type:'button',onclick:async()=>{try{await api('/signals',{method:'DELETE'});render()}catch(x){toast(x.message)}}},'Да, удалить'),
+    el('button',{class:'btn o s',type:'button',onclick:()=>{sureClr.hidden=true;askClr.hidden=false}},'Отмена'));
+  const histHead=el('div',{class:'head'},el('h3',{style:'font-size:15px'},'История'),me.role==='admin'?el('span',{},askClr,sureClr):null);
+
+  return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Сигналы')),cfgBlock,form,histHead,list];
 }
 
 let mediaEdit=null;

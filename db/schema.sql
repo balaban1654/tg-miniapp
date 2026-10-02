@@ -179,6 +179,8 @@ CREATE INDEX IF NOT EXISTS broadcast_jobs_pending ON broadcast_jobs(status) WHER
 -- Сигналы: их публикует человек (аналитик или админ) либо, позже, подключённый движок котировок.
 -- Тестовые сигналы видят только тестовые аккаунты
 ALTER TABLE leads ADD COLUMN IF NOT EXISTS is_tester BOOLEAN DEFAULT FALSE;
+-- Роль аккаунта с выданным доступом: показывается как источник сигнала (lead, moder, admin, streamer, analyst, buyer)
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS lead_role TEXT NOT NULL DEFAULT 'lead';
 CREATE TABLE IF NOT EXISTS signals (
   id         SERIAL PRIMARY KEY,
   pair       TEXT NOT NULL,
