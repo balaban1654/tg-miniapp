@@ -196,6 +196,35 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
     return { ok: true };
   });
 
+  // Активный сигнал: обычные видят клиенты с открытым доступом, тестовые только тестовые аккаунты
+  const ACTIVE = `now() <= s.entry_at + interval '3 minutes' AND s.created_at > now() - interval '2 hours'
+     AND ((NOT s.is_test AND d.access) OR (s.is_test AND d.is_tester))`;
+  app.get('/signals/active', { preHandler: auth }, async (req) => {
+    const r = await db.query(
+      `SELECT s.id, s.pair, s.direction, s.expiry_min, s.entry_at, s.note, s.source, s.is_test,
+              EXISTS (SELECT 1 FROM deals x WHERE x.signal_id = s.id AND x.tg_id = d.tg_id) AS taken
+         FROM signals s JOIN leads d ON d.tg_id = $1 WHERE ${ACTIVE} ORDER BY s.id DESC LIMIT 1`,
+      [req.tg!.id],
+    );
+    return { signal: r.rows[0] ?? null, now: new Date().toISOString() };
+  });
+
+  // Клиент отмечает, что вошёл в сделку по сигналу. Дальше он отмечает итог
+  app.post<{ Params: { id: string } }>('/signals/:id/take', { preHandler: auth }, async (req, reply) => {
+    const r = await db.query(
+      `SELECT s.id, s.pair, s.direction, s.expiry_min FROM signals s JOIN leads d ON d.tg_id = $1
+        WHERE s.id = $2 AND ${ACTIVE}`,
+      [req.tg!.id, Number(req.params.id)],
+    );
+    const sig = r.rows[0];
+    if (!sig) return reply.code(404).send({ error: 'Сигнал уже неактуален' });
+    await db.query(
+      `INSERT INTO deals (tg_id, pair, direction, expiry_min, signal_id) VALUES ($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING`,
+      [req.tg!.id, sig.pair, sig.direction, sig.expiry_min, sig.id],
+    );
+    return { ok: true };
+  });
+
   app.get('/media', { preHandler: auth }, async () => {
     const r = await db.query(`SELECT id, kind, title, subtitle, url FROM media_items WHERE active ORDER BY sort, id`);
     return { traders: r.rows.filter((x) => x.kind === 'trader'), channels: r.rows.filter((x) => x.kind === 'channel') };

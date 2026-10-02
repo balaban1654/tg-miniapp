@@ -3,6 +3,7 @@ import { db } from './db.js';
 import { bot } from './bot.js';
 import { config } from './config.js';
 import { createBroadcast, segmentWhere, SEGMENTS, type Button } from './push.js';
+import { randomInt } from 'node:crypto';
 import {
   type Staff,
   type Role,
@@ -550,6 +551,72 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     return { ok: true };
   });
 
+  // Сигналы. Публикует человек. Случайный режим есть только для тестов и виден только тестовым аккаунтам
+  const PAIR = /^[A-Za-z0-9]{2,8}\/[A-Za-z0-9]{2,8}( OTC)?$/;
+  const EXPIRY = [1, 2, 3, 5, 10, 15];
+  const tfmt = (d: Date) => new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digit', timeZone: config.pushTz }).format(d);
+
+  async function publishSignal(o: { pair: string; direction: 'up' | 'down'; expiry: number; enterIn: number; note: string | null; source: 'analyst' | 'test' | 'engine'; isTest: boolean; by: number; push: boolean }) {
+    const entryAt = new Date(Date.now() + o.enterIn * 60_000);
+    const ins = await db.query(
+      `INSERT INTO signals (pair, direction, expiry_min, entry_at, note, source, is_test, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`,
+      [o.pair, o.direction, o.expiry, entryAt, o.note, o.source, o.isTest, o.by],
+    );
+    let pushed = 0;
+    if (o.push) {
+      const text = `${o.isTest ? 'ТЕСТ. Не для торговли.\n' : ''}Новый сигнал: ${o.pair}, ${o.direction === 'up' ? 'вверх' : 'вниз'}, экспирация ${o.expiry} мин.\nВход в ${tfmt(entryAt)} (МСК). Откройте кабинет.`;
+      const r = await createBroadcast({ text, buttons: [{ label: 'Открыть кабинет', type: 'miniapp' }], segment: o.isTest ? 'testers' : 'access', createdBy: o.by });
+      pushed = r.total;
+    }
+    return { id: ins.rows[0].id, pushed };
+  }
+
+  app.get('/signals', { preHandler: need('admin', 'analyst') }, async () => {
+    const r = await db.query(
+      `SELECT s.id, s.pair, s.direction, s.expiry_min, s.entry_at, s.note, s.source, s.is_test, s.created_at, st.name AS author,
+              (SELECT count(*)::int FROM deals x WHERE x.signal_id = s.id) AS taken,
+              (SELECT count(*)::int FROM deals x WHERE x.signal_id = s.id AND x.result = 'win') AS wins,
+              (SELECT count(*)::int FROM deals x WHERE x.signal_id = s.id AND x.result = 'loss') AS losses
+         FROM signals s LEFT JOIN staff st ON st.id = s.created_by ORDER BY s.id DESC LIMIT 40`,
+    );
+    return r.rows;
+  });
+
+  app.post('/signals', { preHandler: need('admin', 'analyst') }, async (req, reply) => {
+    const b = (req.body ?? {}) as Record<string, unknown>;
+    const pair = str(b.pair, 20).toUpperCase();
+    const direction = str(b.direction, 4);
+    const expiry = Number(b.expiry_min);
+    const enterIn = b.enter_in_min === undefined || b.enter_in_min === '' ? 2 : Math.trunc(Number(b.enter_in_min));
+    if (!PAIR.test(pair)) return reply.code(400).send({ error: 'Пара в формате EUR/USD или EUR/USD OTC' });
+    if (!['up', 'down'].includes(direction)) return reply.code(400).send({ error: 'Выберите направление' });
+    if (!EXPIRY.includes(expiry)) return reply.code(400).send({ error: 'Экспирация: 1, 2, 3, 5, 10 или 15 минут' });
+    if (!Number.isFinite(enterIn) || enterIn < 0 || enterIn > 60) return reply.code(400).send({ error: 'Вход через 0–60 минут' });
+    return publishSignal({ pair, direction: direction as 'up' | 'down', expiry, enterIn, note: str(b.note, 200) || null, source: 'analyst', isTest: Boolean(b.is_test), by: req.staff!.id, push: b.push !== false });
+  });
+
+  // Случайный сигнал только для проверки бота: всегда помечен ТЕСТ и уходит только тестовым аккаунтам
+  app.post('/signals/test', { preHandler: need('admin') }, async (req) => {
+    const pairs = ['EUR/USD OTC', 'GBP/USD OTC', 'USD/JPY OTC', 'AUD/CAD OTC', 'EUR/GBP OTC'];
+    return publishSignal({
+      pair: pairs[randomInt(pairs.length)],
+      direction: randomInt(2) ? 'up' : 'down',
+      expiry: 1,
+      enterIn: 1,
+      note: 'Тестовый сигнал для проверки бота. Это не торговая рекомендация.',
+      source: 'test',
+      isTest: true,
+      by: req.staff!.id,
+      push: true,
+    });
+  });
+
+  app.patch<{ Params: { tgId: string } }>('/leads/:tgId/tester', { preHandler: need('admin') }, async (req, reply) => {
+    const r = await db.query('UPDATE leads SET is_tester = $2 WHERE tg_id = $1 RETURNING tg_id', [Number(req.params.tgId), Boolean((req.body as any)?.value)]);
+    if (!r.rowCount) return reply.code(404).send({ error: 'Лид не найден' });
+    return { ok: true };
+  });
+
   // Очистка журнала. Лиды, события и деньги не затрагиваются
   app.delete('/postbacks', { preHandler: need('admin') }, async () => {
     const r = await db.query('DELETE FROM postback_log');
@@ -567,7 +634,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
       extra = ` AND d.status = $1`;
     }
     const r = await db.query(
-      `SELECT d.tg_id, d.trader_id, d.username, d.first_name, d.status, d.access, d.created_at, d.owner_id,
+      `SELECT d.tg_id, d.trader_id, d.is_tester, d.username, d.first_name, d.status, d.access, d.created_at, d.owner_id,
               s.name AS owner_name, l.slug AS link_slug,
               coalesce((SELECT sum(amount) FROM events e WHERE e.tg_id = d.tg_id AND e.type IN ('ftd','dep')),0) AS deposits,
               coalesce((SELECT sum(amount) FROM events e WHERE e.tg_id = d.tg_id AND e.type = 'comm'),0) AS commission

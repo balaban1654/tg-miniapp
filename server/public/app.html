@@ -195,6 +195,32 @@ const CANDLES=svgEl(`<svg class="hero-art" viewBox="0 0 320 120" aria-hidden="tr
 <circle class="pt" cx="262" cy="40" r="6" fill="#0d0817" stroke="#c9a6ff" stroke-width="2"/><circle cx="262" cy="40" r="2.5" fill="#c9a6ff"/>
 </svg>`);
 
+
+/** Карточка активного сигнала. Сигнал публикует человек (аналитик), тестовые видят только тестовые аккаунты */
+async function signalCard(){
+  const r=await api('/signals/active');
+  const sg=r.signal;if(!sg)return null;
+  const skew=Date.parse(r.now)-Date.now();
+  const entry=Date.parse(sg.entry_at);
+  const hm2=new Date(entry).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
+  const left=el('b',{class:'big',style:'font-size:22px;color:var(--acc2)'});
+  const tick=()=>{const sec=Math.round((entry-(Date.now()+skew))/1000);
+    left.textContent=sec>0?'До входа '+Math.floor(sec/60)+':'+String(sec%60).padStart(2,'0'):'Время входа наступило'};
+  tick();timers.push(setInterval(tick,1000));
+  const up=sg.direction==='up';
+  const take=sg.taken?el('div',{class:'sm',style:'text-align:center'},'Сделка записана. Когда она закроется, отметьте итог.'):
+    el('button',{class:'btn',type:'button',onclick:async e=>{e.currentTarget.disabled=true;try{await api('/signals/'+sg.id+'/take',{method:'POST'});toast('Сделка записана');render()}catch(x){toast(x.message);render()}}},'Я вошёл в сделку');
+  return el('div',{class:'card hero'},
+    el('div',{class:'row'},el('h3',{style:'font-size:15px'},'Сигнал'),el('span',{class:'pill '+(sg.is_test?'p-warn':'p-pur')},sg.is_test?'ТЕСТ':'От аналитика')),
+    sg.is_test?el('div',{class:'sm',style:'color:var(--warn)'},'Тестовый сигнал. Не для торговли.'):null,
+    el('div',{class:'row'},el('b',{style:'font:700 17px var(--fd)'},sg.pair),el('span',{class:'pill '+(up?'p-ok':'p-bad')},up?'ВВЕРХ ▲':'ВНИЗ ▼')),
+    el('div',{class:'row sm'},el('span',{},'Экспирация'),el('b',{class:'mono',style:'color:var(--fg)'},sg.expiry_min+' мин')),
+    el('div',{class:'row sm'},el('span',{},'Вход в'),el('b',{class:'mono',style:'color:var(--fg)'},hm2)),
+    sg.note?el('div',{class:'sm'},sg.note):null,
+    left,take,
+    sg.is_test?null:el('p',{class:'sm',style:'margin:0'},'Это мнение аналитика, а не гарантия результата. Торгуйте только той суммой, которую готовы потерять.'));
+}
+
 async function refreshMe(){me=await api('/me');return me}
 
 async function viewHome(){
@@ -210,7 +236,8 @@ async function viewHome(){
     const drawBtn=()=>{btnBox.replaceChildren(url()?el('button',{class:'btn',type:'button',onclick:async()=>{try{await api('/region',{method:'POST',body:{region}})}catch{}openLink(url())}},'Зарегистрироваться'):el('div',{class:'sm'},'Ссылка регистрации пока не настроена. Напишите нам через кнопку «Поддержка».'))};
     drawSeg();drawBtn();
     const check=el('button',{class:'btn o',type:'button',onclick:async()=>{await refreshMe();if(me.access){toast('Доступ открыт');render()}else toast('Пока нет депозита. Это может занять несколько минут.')}},'Я пополнил счёт, проверить доступ');
-    shell('Hunter AI',[profileCard(),stats4({deals:0,wins:0,losses:0,rate:null}),
+    const lockedSig=await signalCard().catch(()=>null);
+    shell('Hunter AI',[profileCard(),stats4({deals:0,wins:0,losses:0,rate:null}),lockedSig,
       el('div',{class:'card hero'},CANDLES.cloneNode(true),
         el('h2',{style:'font-size:17px'},'Доступ откроется после регистрации'),
         el('p',{class:'sm',style:'margin:0'},'Создайте аккаунт Pocket Option по нашей ссылке и пополните счёт — доступ откроется автоматически. Рекомендуем пополнять от 100 $, так проще соблюдать риск-менеджмент.'),
@@ -223,17 +250,20 @@ async function viewHome(){
   const d=await api('/deals?period=7');
   const pending=d.deals.find(x=>!x.result);
   const items=[profileCard(),stats4(me.stats)];
+  const sigCard=await signalCard().catch(()=>null);
+  if(sigCard)items.push(sigCard);
   if(pending){
     const mark=async r=>{try{await api('/deals/'+pending.id+'/result',{method:'POST',body:{result:r}});await refreshMe();toast('Записано');render()}catch(e){toast(e.message)}};
     items.push(el('div',{class:'card hero'},el('h3',{style:'font-size:14px'},'Чем закончилась сделка?'),
       el('div',{class:'sm'},pending.pair+' · '+(pending.direction==='up'?'Вверх':'Вниз')+' · '+pending.expiry_min+' мин'),
       el('div',{class:'two'},el('button',{class:'btn g',type:'button',onclick:()=>mark('win')},'Плюс'),el('button',{class:'btn r',type:'button',onclick:()=>mark('loss')},'Минус')),
       el('button',{class:'btn o',type:'button',onclick:()=>mark('skip')},'Не входил')));
-  }else{
+  }else if(!sigCard){
     items.push(el('div',{class:'card empty'},el('div',{class:'ic'},svgEl('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.9 19.1a10 10 0 010-14.2M19.1 4.9a10 10 0 010 14.2M8.1 15.9a5.5 5.5 0 010-7.8M15.9 8.1a5.5 5.5 0 010 7.8"/><circle cx="12" cy="12" r="1.6"/></svg>')),el('b',{},'Сейчас нет активного сигнала'),
       el('div',{class:'sm'},'Когда появится новый сигнал, мы пришлём сообщение в Telegram. А пока можно потренироваться.'),
       el('button',{class:'btn o',type:'button',onclick:()=>go('trainer')},'Открыть тренажёр')));
   }
+  timers.push(setInterval(()=>{if(tab==='home')render()},20000));
   items.push(el('p',{class:'sm',style:'margin:0;text-align:center'},'Торговля бинарными опционами связана с риском потери капитала. Сигналы не гарантируют результат.'));
   shell('Hunter AI',items);
 }

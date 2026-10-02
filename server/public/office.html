@@ -148,6 +148,8 @@ function showApp(){
   const items=[['home','Обзор'],['leads','Лиды'],['links','Ссылки']];
   if(me.role==='admin'||me.role==='teamlead')items.push(['staff',me.role==='admin'?'Люди':'Моя команда']);
   if(['admin','teamlead','streamer'].includes(me.role))items.splice(1,0,['chats','Чаты']);
+  if(me.role==='admin')items.splice(1,0,['signals','Сигналы']);
+  if(me.role==='analyst'){items.length=0;items.push(['signals','Сигналы']);if(tab!=='signals')tab='signals'}
   if(me.role==='admin')items.push(['push','Пуши'],['media','Медиа'],['pb','Постбеки']);
   const nav=$('#nav');nav.replaceChildren(...items.map(([k,t])=>el('button',{type:'button','data-t':k,class:k===tab?'on':'',onclick:()=>{tab=k;showApp();render()}},t)));
   render();updateBadge();
@@ -170,6 +172,7 @@ async function render(){
     else if(tab==='links')m.replaceChildren(...await viewLinks());
     else if(tab==='staff')m.replaceChildren(...await viewStaff());
     else if(tab==='chats')m.replaceChildren(...await viewChats());
+    else if(tab==='signals')m.replaceChildren(...await viewSignals());
     else if(tab==='push')m.replaceChildren(...await viewPush());
     else if(tab==='media')m.replaceChildren(...await viewMedia());
     else if(tab==='pb')m.replaceChildren(...await viewPostbacks());
@@ -188,9 +191,9 @@ async function viewLeads(){
   const rows=await api('/leads');
   const showOwner=me.role==='admin'||me.role==='teamlead';
   const showComm=me.role==='admin';
-  const cols=['Лид','Telegram ID','Pocket ID','Статус',...(showOwner?['Владелец']:[]),'Ссылка','Пришёл','Депозиты',...(showComm?['Комиссия']:[])];
+  const cols=['Лид','Telegram ID','Pocket ID','Статус',...(me.role==='admin'?['Тест']:[]),...(showOwner?['Владелец']:[]),'Ссылка','Пришёл','Депозиты',...(showComm?['Комиссия']:[])];
   return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Лиды'),el('span',{class:'mut'},rows.length+' всего')),
-    table(cols,rows.map(r=>[td(r.username?'@'+r.username:(r.first_name||r.tg_id)),td(r.tg_id,'n'),td(r.trader_id||'—','n'),el('td',{},pill(r.status)),...(showOwner?[td(r.owner_name||'не закреплён')]:[]),td(r.link_slug||'—'),td(date(r.created_at)),td(money(r.deposits),'n'),...(showComm?[td(money(r.commission),'n')]:[])]),
+    table(cols,rows.map(r=>[td(r.username?'@'+r.username:(r.first_name||r.tg_id)),td(r.tg_id,'n'),td(r.trader_id||'—','n'),el('td',{},pill(r.status)),...(me.role==='admin'?[el('td',{},el('button',{class:'btn s'+(r.is_tester?'':' o'),type:'button',title:'Тестовые сигналы видят только тестовые аккаунты',onclick:async()=>{await api('/leads/'+r.tg_id+'/tester',{method:'PATCH',body:{value:!r.is_tester}});render()}},r.is_tester?'Тестовый':'Сделать тестовым'))]:[]),...(showOwner?[td(r.owner_name||'не закреплён')]:[]),td(r.link_slug||'—'),td(date(r.created_at)),td(money(r.deposits),'n'),...(showComm?[td(money(r.commission),'n')]:[])]),
       'Лидов пока нет. Они появятся, когда люди перейдут по вашим ссылкам и нажмут «Старт» в боте.')];
 }
 
@@ -398,6 +401,30 @@ async function viewPush(){
   return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Пуши и рассылки'),el('span',{class:'mut sm'},'Каждое правило уходит человеку один раз')),
     el('h3',{style:'font-size:15px'},'Автоматические пуши'),rulesT,form,
     el('h3',{style:'font-size:15px'},'Рассылки'),bform,castT];
+}
+
+async function viewSignals(){
+  const rows=await api('/signals');
+  const f={pair:el('input',{required:'',placeholder:'EUR/USD OTC',list:'pairs'}),dir:el('select',{},el('option',{value:'up'},'Вверх'),el('option',{value:'down'},'Вниз')),
+    exp:el('select',{},[1,2,3,5,10,15].map(n=>el('option',{value:n},n+' мин'))),enter:el('input',{type:'number',min:'0',max:'60',value:'2'}),
+    note:el('input',{placeholder:'Почему такой сигнал (необязательно)',maxlength:'200'}),
+    push:el('input',{type:'checkbox',checked:'',style:'width:auto'}),test:el('input',{type:'checkbox',style:'width:auto'})};
+  const dl=el('datalist',{id:'pairs'},['EUR/USD','GBP/USD','USD/JPY','AUD/CAD','EUR/GBP','EUR/USD OTC','GBP/USD OTC'].map(v=>el('option',{value:v})));
+  const err=el('div',{class:'err',role:'alert'});
+  const form=el('form',{class:'card',style:'display:grid;gap:12px',onsubmit:async e=>{e.preventDefault();err.className='err';err.textContent='';
+    try{const r=await api('/signals',{method:'POST',body:{pair:f.pair.value,direction:f.dir.value,expiry_min:Number(f.exp.value),enter_in_min:f.enter.value,note:f.note.value,push:f.push.checked,is_test:f.test.checked}});
+      err.className='ok-msg';err.textContent='Сигнал опубликован'+(r.pushed?'. Пуш поставлен в очередь: '+r.pushed+' получателей':'');setTimeout(render,900)}catch(x){err.textContent=x.message}}},
+    dl,el('h3',{style:'font-size:14px'},'Новый сигнал'),
+    el('div',{class:'form'},el('label',{},'Пара',f.pair),el('label',{},'Направление',f.dir),el('label',{},'Экспирация',f.exp),el('label',{},'Вход через, мин',f.enter)),
+    el('label',{},'Комментарий',f.note),
+    el('label',{style:'display:flex;gap:8px;align-items:center'},f.push,'Отправить пуш клиентам с открытым доступом'),
+    el('label',{style:'display:flex;gap:8px;align-items:center'},f.test,'Тестовый: увидят только тестовые аккаунты'),
+    el('div',{style:'display:flex;gap:8px;flex-wrap:wrap'},el('button',{class:'btn',type:'submit'},'Опубликовать'),
+      me.role==='admin'?el('button',{class:'btn o',type:'button',onclick:async()=>{err.className='err';err.textContent='';try{const r=await api('/signals/test',{method:'POST'});err.className='ok-msg';err.textContent='Тестовый сигнал отправлен тестовым аккаунтам: '+r.pushed;setTimeout(render,900)}catch(x){err.textContent=x.message}}},'Случайный тестовый сигнал'):null),
+    err,el('p',{class:'mut sm',style:'margin:0'},'Сигнал публикует человек, система сама клиентам сигналов не выдаёт. Случайный режим есть только для проверки бота: такой сигнал помечен «ТЕСТ» и виден только тестовым аккаунтам (отметьте их в разделе «Лиды»).'));
+  const t=r=>new Date(r).toLocaleString('ru-RU',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
+  const list=table(['Опубликован','Пара','Направление','Экспирация','Вход','Источник','Вошли','Плюс','Минус'],rows.map(r=>[td(t(r.created_at)),td(r.pair),el('td',{},el('span',{class:'pill '+(r.direction==='up'?'p-ok':'p-bad')},r.direction==='up'?'Вверх':'Вниз')),td(r.expiry_min+' мин'),td(new Date(r.entry_at).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'})),el('td',{},el('span',{class:'pill '+(r.is_test?'p-warn':'p-pur')},r.is_test?'ТЕСТ':(r.author||'Аналитик'))),td(r.taken,'n'),td(r.wins,'n'),td(r.losses,'n')]),'Сигналов пока не было.');
+  return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Сигналы')),form,el('h3',{style:'font-size:15px'},'Опубликованные'),list];
 }
 
 async function viewMedia(){

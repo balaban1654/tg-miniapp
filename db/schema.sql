@@ -172,3 +172,21 @@ CREATE TABLE IF NOT EXISTS broadcast_jobs (
   PRIMARY KEY (broadcast_id, tg_id)
 );
 CREATE INDEX IF NOT EXISTS broadcast_jobs_pending ON broadcast_jobs(status) WHERE status = 'pending';
+
+-- Сигналы: их публикует человек (аналитик или админ) либо, позже, подключённый движок котировок.
+-- Тестовые сигналы видят только тестовые аккаунты
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS is_tester BOOLEAN DEFAULT FALSE;
+CREATE TABLE IF NOT EXISTS signals (
+  id         SERIAL PRIMARY KEY,
+  pair       TEXT NOT NULL,
+  direction  TEXT NOT NULL CHECK (direction IN ('up','down')),
+  expiry_min INT NOT NULL,
+  entry_at   TIMESTAMPTZ NOT NULL,
+  note       TEXT,
+  source     TEXT NOT NULL DEFAULT 'analyst' CHECK (source IN ('analyst','test','engine')),
+  is_test    BOOLEAN NOT NULL DEFAULT FALSE,
+  created_by INT REFERENCES staff(id),
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+ALTER TABLE deals ADD COLUMN IF NOT EXISTS signal_id INT REFERENCES signals(id);
+CREATE UNIQUE INDEX IF NOT EXISTS deals_signal_once ON deals(tg_id, signal_id) WHERE signal_id IS NOT NULL;

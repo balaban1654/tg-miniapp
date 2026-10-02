@@ -204,6 +204,7 @@ export const SEGMENTS: Record<string, string> = {
   ftd: `d.status IN ('ftd','active')`,
   access: 'd.access',
   churned: `d.status = 'churned'`,
+  testers: 'd.is_tester',
 };
 
 export function segmentWhere(segment: string, ownerId?: number | null): { sql: string; params: unknown[] } {
