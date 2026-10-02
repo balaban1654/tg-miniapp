@@ -478,9 +478,9 @@ async function pastSignals(){
         el('div',{class:'pbar'},n?[el('i',{class:'g',style:'width:'+(r.wins/n*100)+'%'}),el('i',{class:'r',style:'width:'+(r.losses/n*100)+'%'})]:null));
     })),allTest?el('div',{class:'note',style:'padding:2px 4px'},'Тестовые данные для примера, это не реальные результаты. Настоящие сигналы появятся здесь после запуска.'):null];
   };
-  wrap.replaceChildren(...build(await api('/signals/past')));
+  wrap.replaceChildren(...build(await api('/signals/past')).filter(Boolean));
   // Раз в минуту обновляем список, пока экран открыт: новый сигнал появляется, самый старый уходит
-  timers.push(setInterval(async()=>{if(!wrap.isConnected)return;try{wrap.replaceChildren(...build(await api('/signals/past')))}catch{}},60000));
+  timers.push(setInterval(async()=>{if(!wrap.isConnected)return;try{wrap.replaceChildren(...build(await api('/signals/past')).filter(Boolean))}catch{}},60000));
   return[wrap];
 }
 

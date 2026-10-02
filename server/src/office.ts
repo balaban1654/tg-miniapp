@@ -647,6 +647,14 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     });
   });
 
+  // Пометить сигнал тестовым (или вернуть обычным): тестовые сигналы видят только тестовые аккаунты
+  app.patch<{ Params: { id: string } }>('/signals/:id/test', { preHandler: need('admin') }, async (req, reply) => {
+    const on = Boolean((req.body as any)?.is_test);
+    const r = await db.query('UPDATE signals SET is_test = $2 WHERE id = $1 RETURNING id', [Number(req.params.id), on]);
+    if (!r.rowCount) return reply.code(404).send({ error: 'Сигнал не найден' });
+    return { ok: true };
+  });
+
   // Тестовая история для просмотра оформления блока «Прошедшие сигналы». Видят только тестовые аккаунты, везде помечена ТЕСТ
   app.post('/signals/demo-history', { preHandler: need('admin') }, async (req) => {
     const pairs = ['EUR/USD OTC', 'GBP/USD OTC', 'AUD/CHF OTC', 'EUR/GBP OTC', 'AUD/USD OTC', 'USD/JPY OTC'];
