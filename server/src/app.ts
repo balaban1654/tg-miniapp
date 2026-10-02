@@ -230,6 +230,7 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
     const s = st.rows[0];
     const guess = ['ru', 'be', 'kk', 'ky', 'uz', 'tg', 'hy', 'az', 'uk'].includes(u.language_code ?? '') ? 'ru' : 'ww';
     return {
+      now: new Date().toISOString(),
       tgId: u.id,
       name: u.first_name || u.username || 'Клиент',
       username: u.username ?? null,

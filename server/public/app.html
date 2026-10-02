@@ -213,9 +213,19 @@ const money=v=>'$'+Number(v||0).toLocaleString('ru-RU',{maximumFractionDigits:2}
 const dmy=v=>new Date(v).toLocaleDateString('ru-RU',{day:'numeric',month:'long',year:'numeric'}).replace(/\s*г\.?$/,'');
 const hm=v=>new Date(v).toLocaleString('ru-RU',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
 
+// Часы сервера: поправка берётся из ответа с самой короткой задержкой (середина запроса), чтобы таймер и часы не плавали
+const SRV={skew:0,rtt:Infinity,at:0};
+const nowMs=()=>Date.now()+SRV.skew;
+function syncClock(iso,t0,t1){
+  const sv=typeof iso==='string'?Date.parse(iso):NaN;if(!isFinite(sv))return;
+  const rtt=t1-t0;
+  if(rtt<=SRV.rtt||t1-SRV.at>300000){SRV.skew=sv-(t0+t1)/2;SRV.rtt=rtt;SRV.at=t1}
+}
 async function api(path,opts={}){
+  const t0=Date.now();
   const r=await fetch('/api/app'+path,{method:opts.method||'GET',headers:{'content-type':'application/json',authorization:'tma '+(tg?tg.initData:''),'x-tz':(()=>{try{return Intl.DateTimeFormat().resolvedOptions().timeZone||''}catch{return ''}})()},body:opts.body?JSON.stringify(opts.body):(opts.method&&opts.method!=='GET'?'{}':undefined)});
   const data=await r.json().catch(()=>({}));
+  syncClock(data&&data.now,t0,Date.now());
   if(!r.ok)throw new Error(data.error||'Ошибка '+r.status);
   return data;
 }
@@ -247,8 +257,8 @@ function clearTimers(){timers.forEach(clearInterval);timers.forEach(clearTimeout
 const ICON={home:'<path d="M3 11l9-8 9 8"/><path d="M5 9.5V20h14V9.5"/><path d="M10 20v-6h4v6"/>',deals:'<path d="M8 6h12M8 12h12M8 18h12"/><path d="M4 6h.01M4 12h.01M4 18h.01"/>',trainer:'<rect x="3" y="3" width="7.5" height="7.5" rx="1.8"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.8"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.8"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.8"/>',media:'<rect x="3" y="5" width="18" height="14" rx="3.5"/><path d="M10 9.2l5 2.8-5 2.8z"/>'};
 const TABS=[['home','Главная'],['deals','Сделки'],['trainer','Тренажёр'],['media','Медиа']];
 
-const clockNow=()=>new Date().toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
-setInterval(()=>{const t=clockNow();document.querySelectorAll('.clk').forEach(n=>{if(n.textContent!==t)n.textContent=t})},1000);
+const clockNow=()=>new Date(nowMs()).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+setInterval(()=>{const t=clockNow();document.querySelectorAll('.clk').forEach(n=>{if(n.textContent!==t)n.textContent=t})},250);
 function shell(title,body){
   const init=(me.name||'?').trim().slice(0,1).toUpperCase();
   root.replaceChildren(
@@ -404,7 +414,7 @@ async function signalCard(){
   const entry=Date.parse(sg.entry_at);
   const hm2=new Date(entry).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
   const left=el('b',{class:'big',style:'font-size:22px;color:var(--acc2)'});
-  const tick=()=>{const sec=Math.round((entry-(Date.now()+skew))/1000);
+  const tick=()=>{const sec=Math.round((entry-nowMs())/1000);
     left.textContent=sec>0?'До входа '+Math.floor(sec/60)+':'+String(sec%60).padStart(2,'0'):'Время входа наступило'};
   tick();timers.push(setInterval(tick,1000));
   const up=sg.direction==='up';
@@ -526,7 +536,7 @@ function signalLive(sg,skew,cfg){
     el('button',{class:'back',type:'button',onclick:()=>pm()},'‹ Назад'))};
   rateBox.append(rate);
   function paint(){
-    const now=Date.now()+skew;
+    const now=nowMs();
     let n=0;while(n<max&&at(n)<=now)n++;   // n = первое событие, которое ещё впереди
     if(n>=max){set(sTitle,'Все события прошли. Дальше не идём.');sBig.style.visibility='hidden';set(sBig,'0:00');set(sSub,'Оцените сигнал ниже.')}
     else{
@@ -545,7 +555,7 @@ function signalLive(sg,skew,cfg){
     const lock=now<entry+5000; // оценка открывается через 5 секунд после входа, чтобы не упереться в расхождение часов
     if(rate.disabled!==lock)rate.disabled=lock;
   }
-  paint();timers.push(setInterval(paint,500));
+  paint();timers.push(setInterval(paint,200));
   const pocket=()=>{const u=cfg.pocketUrl||'https://pocketoption.com/';openLink(u)};
   return el('div',{style:'display:grid;gap:12px'},
     el('div',{class:'sig'},el('h3',{},'Сигнал готов'),
