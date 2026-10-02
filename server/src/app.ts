@@ -90,6 +90,31 @@ export const LESSONS = [
   },
 ];
 
+/** Пока настоящих сигналов нет, показываем пример оформления. Все строки помечены is_test, в приложении это подписано «ТЕСТ» и «тестовые данные» */
+function demoPast() {
+  const hour = Math.floor(Date.now() / 3_600_000);
+  let seed = hour * 2654435761;
+  const rnd = (n: number) => {
+    seed = (seed * 1103515245 + 12345) % 2147483648;
+    return seed % n;
+  };
+  const pairs = ['EUR/USD OTC', 'GBP/USD OTC', 'AUD/CHF OTC', 'EUR/GBP OTC', 'AUD/USD OTC', 'USD/JPY OTC'];
+  const lossAt = rnd(5);
+  let ago = 20;
+  return Array.from({ length: 5 }, (_, i) => {
+    ago += 15 + rnd(55);
+    return {
+      id: -(i + 1),
+      pair: pairs[rnd(pairs.length)],
+      direction: rnd(2) ? 'up' : 'down',
+      entry_at: new Date(Date.now() - ago * 60_000).toISOString(),
+      is_test: true,
+      wins: i === lossAt ? 0 : 1,
+      losses: i === lossAt ? 1 : 0,
+    };
+  });
+}
+
 const photoCache = new Map<number, { until: number; data: Buffer | null; type: string }>();
 /** @имя из ссылки https://t.me/имя. Приватные приглашения (+...) и ссылки на посты не подходят */
 function tgHandle(url: string): string | null {
@@ -230,7 +255,8 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
         ORDER BY s.entry_at DESC LIMIT 5`,
       [req.tg!.id],
     );
-    return r.rows;
+    if (r.rowCount) return r.rows;
+    return demoPast();
   });
 
   // Клиент отмечает, что вошёл в сделку по сигналу. Дальше он отмечает итог

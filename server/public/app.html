@@ -464,7 +464,8 @@ const plural=(n,a,b,c)=>{const m=n%100,k=n%10;return m>10&&m<20?c:k===1?a:k>1&&k
 /** Прошедшие сигналы: все завершённые, итог по отметкам клиентов, полоска показывает долю плюсов и минусов */
 async function pastSignals(){
   const rows=await api('/signals/past');
-  const head=el('div',{class:'pshead'},el('b',{},'Прошедшие сигналы'),el('span',{class:'sm'},'по отметкам участников'));
+  const allTest=rows.length>0&&rows.every(r=>r.is_test);
+  const head=el('div',{class:'pshead'},el('b',{},'Прошедшие сигналы'),allTest?el('span',{class:'sm',style:'color:var(--warn);font-weight:700'},'ТЕСТОВЫЕ ДАННЫЕ'):el('span',{class:'sm'},'по отметкам участников'));
   if(!rows.length)return[head,el('div',{class:'card sm'},'Завершённых сигналов пока нет.')];
   return[head,el('div',{class:'pslist'},rows.map(r=>{
     const n=r.wins+r.losses,up=r.direction==='up';
@@ -474,7 +475,7 @@ async function pastSignals(){
     return el('div',{class:'ps'},
       el('div',{class:'row'},el('div',{},el('b',{},r.pair+' · '+(up?'ВВЕРХ':'ВНИЗ')),el('div',{class:'sm'},t+' · '+(r.is_test?'ТЕСТ':n+' '+plural(n,'отметка','отметки','отметок')))),el('span',{class:'pbadge '+cls},lab)),
       el('div',{class:'pbar'},n?[el('i',{class:'g',style:'width:'+(r.wins/n*100)+'%'}),el('i',{class:'r',style:'width:'+(r.losses/n*100)+'%'})]:null));
-  }))];
+  })),allTest?el('div',{class:'note',style:'padding:2px 4px'},'Тестовые данные для примера, это не реальные результаты. Настоящие сигналы появятся здесь после запуска.'):null];
 }
 
 let period='7';
