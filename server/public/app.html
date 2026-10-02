@@ -96,7 +96,7 @@ main{flex:1;padding:6px 16px 96px;display:grid;gap:12px;align-content:start}
 .opt{border:0;border-radius:11px;background:var(--card);padding:12px 4px;font:700 13px var(--fd);color:var(--fg);cursor:pointer}
 .opt.on{background:#4b2f8f}
 .live{position:absolute;left:10px;bottom:10px;background:#0d0817dd;border:1.5px solid var(--ok);border-radius:12px;padding:8px 18px;font:800 20px var(--fd)}
-.cd{position:absolute;z-index:6;left:50%;top:84px;transform:translateX(-50%);display:grid;justify-items:center;gap:6px;text-align:center;background:#16322aee;border:1px solid var(--ok);border-radius:16px;padding:14px 18px;box-shadow:0 8px 28px #000a;pointer-events:none}
+.cd{position:absolute;z-index:6;left:12px;top:70px;display:grid;justify-items:center;gap:6px;text-align:center;background:#16322aee;border:1px solid var(--ok);border-radius:16px;padding:14px 18px;box-shadow:0 8px 28px #000a;pointer-events:none}
 .cdc{width:62px;height:62px;border-radius:50%;border:3px solid var(--ok);display:grid;place-items:center}
 .fin{border:1px solid var(--ok);background:#12301f;border-radius:18px;padding:16px;display:grid;gap:10px}
 .pshead{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-top:6px}
@@ -508,13 +508,17 @@ const plS=n=>n%10===1&&n%100!==11?'секунду':[2,3,4].includes(n%10)&&![12,
 const usd=n=>n.toLocaleString('ru-RU',{minimumFractionDigits:2,maximumFractionDigits:2}).replace(/ /g,' ')+' $';
 function lesson1(){
   clearTimers();
-  const st={view:'pairs',pair:PAIRS[0],popup:false,timer:false,type:'line',iv:'M1',tt:60,ti:4,sum:10,paired:false,trade:null,result:null,bal:1000};
-  let price=1.0795,pts=[];for(let i=0;i<130;i++){price+=(Math.random()-.5)*.0003;pts.push(price)}
+  const st={view:'pairs',pair:PAIRS[0],popup:false,timer:false,type:'line',iv:'M1',tt:60,ti:4,sum:10,paired:false,armed:false,trade:null,won:false,result:null,bal:1000};
+  // плавный случайный ход цены: небольшая инерция, без резких скачков
+  let price=1.0795,mom=0,base=0,pts=[];
+  const step=()=>{mom=mom*.85+(Math.random()-.5)*.00003;price+=mom+(Math.random()-.5)*.00002+(1.0795-price)*.01;return price};
+  for(let i=0;i<260;i++)pts.push(step());
+  const pushPt=()=>{pts.push(price);if(pts.length>600){pts.shift();base++}};
   let svg=null,ttag=null,nEl=null,tipEl=null,bigEl=null,liveEl=null;
   const fmtT=n=>Math.floor(n/60)+':'+String(n%60).padStart(2,'0');
-  const until=()=>((st.tt-45)+60)%60;
+  const until=()=>Math.max(0,st.tt-45);
   const target=()=>{
-    if(st.view!=='term'||st.result)return null;
+    if(st.view!=='term'||st.result||st.won)return null;
     if(st.trade)return 'wait';
     if(!st.popup&&!st.timer&&st.type==='line')return 'dots';
     if(!st.timer)return 'timer';if(st.type!=='candles')return 'candles';if(st.iv!=='M5')return 'M5';
@@ -526,12 +530,14 @@ function lesson1(){
 
   function chart(){
     const W=360,H=215,X1=300,top=12,bot=H-14;
-    const seen=pts.slice(-96);
-    let units;
-    if(st.type==='line')units=seen.map(v=>({o:v,c:v,h:v,l:v}));
-    else{const g=IV_G[st.iv];units=[];for(let i=0;i+g<=seen.length;i+=g){const a=seen.slice(i,i+g);units.push({o:a[0],c:a[a.length-1],h:Math.max(...a),l:Math.min(...a)})}units=units.slice(-26)}
+    const g=st.type==='line'?1:IV_G[st.iv];
+    const units=[];let cur=null;
+    for(let i=Math.max(0,pts.length-(st.type==='line'?96:26*g+g));i<pts.length;i++){const gid=Math.floor((base+i)/g),v=pts[i];
+      if(gid!==cur){units.push({gid,o:v,c:v,h:v,l:v});cur=gid}else{const u=units[units.length-1];u.c=v;u.h=Math.max(u.h,v);u.l=Math.min(u.l,v)}}
+    if(st.type!=='line')while(units.length>26)units.shift();
     let lo=Math.min(...units.map(u=>u.l)),hi=Math.max(...units.map(u=>u.h));
     if(st.trade){lo=Math.min(lo,st.trade.entry);hi=Math.max(hi,st.trade.entry)}
+    if(hi-lo<.0016){const m=(hi+lo)/2;lo=m-.0008;hi=m+.0008}
     const r=(hi-lo)||1e-4;
     const Y=v=>bot-((v-lo)/r)*(bot-top-6)-3;
     let h='<g stroke="#fff" stroke-opacity=".06">'+[0,1,2,3].map(i=>'<line x1="0" x2="'+X1+'" y1="'+(top+i*(bot-top)/3)+'" y2="'+(top+i*(bot-top)/3)+'"/>').join('')+'</g>';
@@ -541,34 +547,45 @@ function lesson1(){
       h+='<line x1="'+x.toFixed(1)+'" x2="'+x.toFixed(1)+'" y1="'+Y(u.h).toFixed(1)+'" y2="'+Y(u.l).toFixed(1)+'" stroke="'+col+'"/><rect x="'+(x-dx*.32).toFixed(1)+'" y="'+Math.min(Y(u.o),Y(u.c)).toFixed(1)+'" width="'+(dx*.64).toFixed(1)+'" height="'+Math.max(1.5,Math.abs(Y(u.o)-Y(u.c))).toFixed(1)+'" fill="'+col+'"/>'});
     const last=units[n-1].c;
     h+='<line x1="0" x2="'+X1+'" y1="'+Y(last).toFixed(1)+'" y2="'+Y(last).toFixed(1)+'" stroke="#6ee0a8" stroke-opacity=".5" stroke-dasharray="3 3"/>';
-    if(st.trade){const ey=Y(st.trade.entry);h+='<line x1="0" x2="'+X1+'" y1="'+ey.toFixed(1)+'" y2="'+ey.toFixed(1)+'" stroke="#7be3b0" stroke-opacity=".8" stroke-width="1.2"/><rect x="150" y="'+(ey-21).toFixed(1)+'" width="116" height="17" rx="6" fill="#7be3b0"/><text x="208" y="'+(ey-9).toFixed(1)+'" text-anchor="middle" fill="#06210f" font-size="10.5" font-weight="700" font-family="Montserrat,sans-serif">Вход 0:45 · '+st.sum+' $</text>'}
+    if(st.trade){
+      const ey=Y(st.trade.entry),k=units.findIndex(u=>u.gid===st.trade.gid),xe=Math.min(X1-62,Math.max(62,(k<0?0:(st.type==='line'?k*dx:(k+.5)*dx))));
+      h+='<line x1="0" x2="'+X1+'" y1="'+ey.toFixed(1)+'" y2="'+ey.toFixed(1)+'" stroke="#7be3b0" stroke-opacity=".7" stroke-width="1.1"/><circle cx="'+xe.toFixed(1)+'" cy="'+ey.toFixed(1)+'" r="5" fill="#0d0817" stroke="#fff" stroke-width="2"/>';
+      if(st.won)h+='<rect x="'+(xe-46).toFixed(1)+'" y="'+(ey-34).toFixed(1)+'" width="92" height="24" rx="8" fill="#0d0817" stroke="#3ddc97" stroke-width="1.6"/><text x="'+xe.toFixed(1)+'" y="'+(ey-17).toFixed(1)+'" text-anchor="middle" fill="#3ddc97" font-size="14" font-weight="800" font-family="Montserrat,sans-serif">+'+usd(st.sum*.92)+'</text>';
+      else h+='<rect x="'+(xe-58).toFixed(1)+'" y="'+(ey-26).toFixed(1)+'" width="116" height="17" rx="6" fill="#7be3b0"/><text x="'+xe.toFixed(1)+'" y="'+(ey-14).toFixed(1)+'" text-anchor="middle" fill="#06210f" font-size="10.5" font-weight="700" font-family="Montserrat,sans-serif">Вход 0:45 · '+st.sum+' $</text>';
+    }
+    if(st.timer)h+='<text x="'+(X1-4)+'" y="'+(Y(last)+17).toFixed(1)+'" text-anchor="end" fill="#fff" fill-opacity=".85" font-size="11" font-weight="700" font-family="Montserrat,sans-serif">'+st.iv+' · '+fmtT(st.tt)+'</text>';
     for(let i=0;i<4;i++){const v=hi-(hi-lo)*i/3;h+='<text x="'+(X1+6)+'" y="'+(Y(v)+3).toFixed(1)+'" fill="#8d82ab" font-size="10" font-family="Montserrat,sans-serif">'+v.toFixed(5)+'</text>'}
     h+='<rect x="'+(X1+2)+'" y="'+(Y(last)-8).toFixed(1)+'" width="58" height="16" rx="4" fill="#1f8f4e"/><text x="'+(X1+6)+'" y="'+(Y(last)+4).toFixed(1)+'" fill="#fff" font-size="10.5" font-weight="700" font-family="Montserrat,sans-serif">'+last.toFixed(5)+'</text>';
     return h;
   }
-  function paint(){if(svg)svg.innerHTML=chart();if(ttag){ttag.hidden=!st.timer;ttag.textContent=st.iv+' · '+fmtT(st.tt)}
-    if(liveEl&&st.trade){const d=price-st.trade.entry;const v=d>0?st.sum*.92:d<0?-st.sum:0;liveEl.hidden=false;liveEl.textContent=(v>0?'+':v<0?'−':'')+usd(Math.abs(v)).replace(',00 $',' $');liveEl.style.color=v>0?'var(--ok)':v<0?'var(--bad)':'var(--warn)';liveEl.style.borderColor=liveEl.style.color}}
+  function paint(){if(svg)svg.innerHTML=chart()}
   function liveText(){
-    const t=target(),n=until(),now=n===0||n>=58||n<=0;
+    const t=target(),n=until();
     if(t==='buy'){
       const inWin=st.tt>=42&&st.tt<=48;
       if(nEl)nEl.textContent=inWin?'!':String(n);
       if(bigEl)bigEl.textContent=inWin?'Сейчас! Жми «Купить»':'секунд до входа. На 0:45 жми «Купить»';
       if(tipEl)tipEl.textContent=inWin?'Таймер свечи показывает 0:45 — жми «Купить»':'Жди: через '+n+' '+plS(n)+' таймер свечи покажет 0:45 — тогда жми «Купить»';
     }
-    if(t==='wait'&&st.trade){if(tipEl)tipEl.textContent='Сделка открыта — ждём '+st.trade.left+' '+plS(st.trade.left)}
+    if(t==='wait'&&st.trade&&tipEl)tipEl.textContent='Сделка открыта — ждём '+st.trade.left+' '+plS(st.trade.left);
   }
   function finishTrade(){
-    const tr=st.trade,diff=price-tr.entry;
-    const res=diff>0?'win':diff<0?'loss':'draw';
-    st.result={res,pnl:res==='win'?st.sum*.92:res==='loss'?-st.sum:0};
-    st.bal=Math.round((st.bal+(res==='win'?st.sum*1.92:res==='draw'?st.sum:0))*100)/100;st.trade=null;resultView();
+    // учебный сценарий: после входа график уверенно идёт вверх, сделка закрывается в плюс
+    st.result={res:'win',pnl:st.sum*.92};
+    st.bal=Math.round((st.bal+st.sum*1.92)*100)/100;
+    st.won=true;termView();
+    timers.push(setTimeout(()=>resultView(),2800));
   }
-  timers.push(setInterval(()=>{price+=(Math.random()-.5)*.0003;pts.push(price);if(pts.length>400)pts.shift();paint()},700));
   timers.push(setInterval(()=>{
-    st.tt=st.tt<=0?60:st.tt-1;if(ttag)ttag.textContent=st.iv+' · '+fmtT(st.tt);
-    if(st.trade){st.trade.left--;if(st.trade.left<=0)return finishTrade()}
-    liveText();
+    step();
+    if(st.trade&&!st.won)price+=.00008+Math.random()*.00002;   // свечи уверенно растут после входа
+    pushPt();paint();
+  },350));
+  timers.push(setInterval(()=>{
+    if(target()==='buy'&&!st.trade){if(!st.armed){st.armed=true;st.tt=55}else{st.tt--;if(st.tt<42)st.tt=55}}
+    else st.tt=st.tt<=0?60:st.tt-1;
+    if(st.trade&&!st.won){st.trade.left--;if(st.trade.left<=0){paint();return finishTrade()}}
+    paint();liveText();
   },1000));
 
   const resultView=()=>{
@@ -579,7 +596,7 @@ function lesson1(){
     const amt=(w?'+':l?'−':'')+usd(Math.abs(r.pnl)).replace(',00 $',' $');
     let marked=null;
     const mkBtn=(k,t,c)=>{const b=el('button',{type:'button',style:'border:1.5px solid '+c+';background:var(--card);border-radius:14px;padding:15px;font:700 15px var(--fd);cursor:pointer;color:var(--fg)',onclick:()=>{
-      marked=k;toast(k===r.res?'Верно: так вы отмечаете итог в разделе «Сделки»':'В этой сделке был «'+word+'». В «Сделках» отмечайте то, что видите на платформе')}},t);return b};
+      marked=k;toast(k===r.res?'Верно: так вы отмечаете итог в разделе «Сделки»':'Здесь был «'+word+'». В «Сделках» отмечайте то, что видите на платформе')}},t);return b};
     const body=[
       el('div',{},el('div',{class:'sm',style:'font-size:14px'},w?'Сделка закрыта в плюс':l?'Сделка закрыта в минус':'Цена закрылась на уровне входа'),el('div',{style:'font:800 42px/1.1 var(--fd);color:'+col},amt)),
       el('div',{class:'card',style:'padding:14px 16px;display:grid;gap:10px'},
@@ -587,7 +604,7 @@ function lesson1(){
         el('div',{style:'border-top:1px solid var(--line)'}),
         el('div',{class:'row'},el('b',{},'Итого'),el('b',{style:'color:'+col},amt))),
       el('div',{},'Ты прошёл весь путь: сигнал → настройка → вход → результат.'),
-      el('div',{class:'note'},'Учебная сделка на смоделированном графике: исход случайный. В реальной торговле сигнал тоже не гарантирует плюс.'),
+      el('div',{class:'note'},'Это учебная сделка: график смоделирован так, чтобы показать, как выглядит плюс. В реальной торговле итог может быть любым, и минус тоже бывает. Об этом следующий урок.'),
       el('div',{style:'font-weight:700'},'Отметь результат — с реальными сигналами ты будешь делать так же:'),
       el('div',{class:'tb'},mkBtn('win','Плюс','var(--ok)'),mkBtn('loss','Минус','var(--bad)')),
       me.access?null:el('button',{class:'btn',type:'button',onclick:()=>go('home')},'Зарегистрироваться'),
@@ -621,20 +638,20 @@ function lesson1(){
       el('div',{class:'note'},'Это пример для обучения: он не основан на анализе рынка. Настоящие сигналы приходят в боте и в разделе «Главная» после открытия доступа.')]);
   };
   const termView=()=>{
-    const t=target();
+    let t=target();
+    if(t==='buy'&&!st.armed){st.armed=true;st.tt=55}
     nEl=tipEl=bigEl=null;
     const mark=(name,node,n)=>{if(t===name){node.classList.add('tg');node.setAttribute('data-n',n)}return node};
     const dim=n=>{n.classList.add('off');return n};
     const tips={dots:'Сначала настроим график. Нажми на три точки ••• рядом с парой',timer:'2 — включи таймер, 3 — выбери «Свечи», 4 — интервал M5',candles:'2 — включи таймер, 3 — выбери «Свечи», 4 — интервал M5',M5:'2 — включи таймер, 3 — выбери «Свечи», 4 — интервал M5',
       time:'5 — время сделки 5 секунд, 6 — сумма 3% от депозита, 7 — пара из сигнала',sum:'5 — время сделки 5 секунд, 6 — сумма 3% от депозита, 7 — пара из сигнала',pair:'5 — время сделки 5 секунд, 6 — сумма 3% от депозита, 7 — пара из сигнала'};
     const pills={dots:'Урок 1 · шаг 1',timer:'Урок 1 · шаги 2–4',candles:'Урок 1 · шаги 2–4',M5:'Урок 1 · шаги 2–4',time:'Урок 1 · шаги 5–7',sum:'Урок 1 · шаги 5–7',pair:'Урок 1 · шаги 5–7',buy:'Урок 1 · вход',wait:'Урок 1 · сделка'};
-    const pill=st.result?'Урок 1 · итог':pills[t];
+    const pill=st.won?'Урок 1 · сделка':pills[t];
     const dots=mark('dots',el('button',{class:'dots',type:'button','aria-label':'Настройки графика',onclick:guard('dots',()=>{st.popup=true;termView()})},'•••'),1);
     if(t!=='dots')dim(dots);
     svg=svgEl('<svg viewBox="0 0 360 215" role="img" aria-label="Учебный график"></svg>');
-    ttag=el('div',{class:'ttag',hidden:''});liveEl=el('div',{class:'live',hidden:''});
-    const cv=el('div',{class:'cv'},svg,ttag,liveEl);
-    if(t!=='buy'&&t!=='wait'&&!st.result)dim(cv);
+    const cv=el('div',{class:'cv'},svg);
+    if(t!=='buy'&&t!=='wait'&&!st.won)dim(cv);
     const chip=mark('pair',el('div',{class:'chip',style:'cursor:pointer',role:'button',tabindex:'0',onclick:guard('pair',()=>{st.paired=true;termView()})},st.pair,el('span',{class:'pay'},'+92%')),7);
     if(t!=='pair')dim(chip);
     const bal=el('div',{class:'bal'},'Учебный баланс',el('b',{},usd(st.bal).replace(',00 $',' $')));
@@ -653,7 +670,7 @@ function lesson1(){
     const ctlw=el('div',{style:'position:relative'},ctl,hintTxt?el('div',{class:'hint',style:'left:0;right:0;max-width:none;bottom:calc(100% + 8px)'},hintTxt):null);
     const pl=dim(el('div',{class:'pl'},el('span',{},'Выплата '+usd(st.sum*1.92)),el('span',{class:'pay'},'+92%'),el('span',{},'Прибыль +'+usd(st.sum*.92))));
     const buy=mark('buy',el('button',{class:'buy',type:'button',onclick:guard('buy',()=>{
-      if(st.tt>=42&&st.tt<=48){st.trade={entry:price,left:5};st.bal=Math.round((st.bal-st.sum)*100)/100;termView()}
+      if(st.tt>=42&&st.tt<=48){st.trade={entry:price,left:5,gid:Math.floor((base+pts.length-1)/(st.type==='line'?1:IV_G[st.iv]))};st.bal=Math.round((st.bal-st.sum)*100)/100;termView()}
       else toast(st.tt>48?'Рано: подождите, пока таймер дойдёт до 0:45':'Поздно: дождитесь следующего круга таймера')})},'Купить'),8);
     const sell=el('button',{class:'sell',type:'button',onclick:()=>toast('В сигнале указано «Вверх», то есть «Купить»')},'Продать');
     const tb=el('div',{class:'tb'},buy,sell);
@@ -673,19 +690,10 @@ function lesson1(){
       termBody.append(el('div',{class:'cd'},el('div',{class:'cdc'},nEl),bigEl));
     }
     let tipNode;
-    if(st.result){
-      const r=st.result;
-      tipNode=el('div',{class:'fs-tip'},r.res==='win'?'Сделка закрылась в плюс':r.res==='loss'?'Сделка закрылась в минус':'Цена закрылась на уровне входа');
-    }else tipNode=el('div',{class:'fs-tip'},tips[t]||'');
-    if(t==='buy'||t==='wait'){tipEl=tipNode;}
+    if(st.won)tipNode=el('div',{class:'fs-tip'},'Сделка закрыта в плюс');
+    else tipNode=el('div',{class:'fs-tip'},tips[t]||'');
+    if(t==='buy'||t==='wait'){tipEl=tipNode}
     const body=[tipNode,termBody];
-    if(st.result){
-      const r=st.result,col=r.res==='win'?'var(--ok)':r.res==='loss'?'var(--bad)':'var(--warn)';
-      body.push(el('div',{class:'fin',style:'border-color:'+col},
-        el('b',{style:'font:700 18px var(--fd);color:'+col},r.res==='win'?'+'+usd(r.pnl):r.res==='loss'?'−'+usd(-r.pnl):'Возврат: 0 $'),
-        el('div',{class:'sm'},'Это учебный результат: график смоделирован, и исход получился случайным. В реальной торговле сигнал тоже не гарантирует плюс, поэтому ставка не больше 1–3% от депозита. Учебный баланс: '+usd(st.bal).replace(',00 $',' $')+'.'),
-        el('button',{class:'btn',type:'button',onclick:async()=>{try{await api('/trainer/1/done',{method:'POST'})}catch{}tab='trainer';render()}},'Завершить урок')));
-    }
     fsShell(pill,body);
     paint();liveText();
   };
