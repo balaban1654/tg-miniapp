@@ -37,6 +37,8 @@ app.get<{ Params: { name: string } }>('/fonts/:name', async (req, reply) => {
 // Заглушка для корня домена, пока основного сайта нет
 const siteHtml = readFileSync(resolve(process.cwd(), 'public/site.html'), 'utf8').replaceAll('{{BOT}}', config.botUsername);
 app.get('/site', async (_req, reply) => reply.type('text/html; charset=utf-8').header('Cache-Control', 'public, max-age=300').send(siteHtml));
+const termsHtml = readFileSync(resolve(process.cwd(), 'public/terms.html'), 'utf8');
+app.get('/terms', async (_req, reply) => reply.type('text/html; charset=utf-8').header('Cache-Control', 'public, max-age=300').send(termsHtml));
 
 // Клиентский Mini App
 const appHtml = readFileSync(resolve(process.cwd(), 'public/app.html'), 'utf8');
