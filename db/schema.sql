@@ -193,3 +193,13 @@ CREATE UNIQUE INDEX IF NOT EXISTS deals_signal_once ON deals(tg_id, signal_id) W
 
 -- Тестовая история для просмотра оформления: только для тестовых аккаунтов, итог хранится прямо в сигнале
 ALTER TABLE signals ADD COLUMN IF NOT EXISTS demo_result TEXT CHECK (demo_result IN ('win','loss'));
+
+-- Разовая пометка: все сигналы, созданные до запуска, считаются тестовыми (их можно вернуть кнопкой «Сделать обычным» в Office)
+CREATE TABLE IF NOT EXISTS app_flags (key TEXT PRIMARY KEY, set_at TIMESTAMPTZ DEFAULT now());
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM app_flags WHERE key = 'pre_launch_signals_test') THEN
+    UPDATE signals SET is_test = TRUE WHERE source <> 'engine';
+    INSERT INTO app_flags (key) VALUES ('pre_launch_signals_test');
+  END IF;
+END $$;

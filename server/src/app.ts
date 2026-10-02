@@ -267,7 +267,6 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
 
   // Прошедшие сигналы. Показываем ВСЕ завершённые, без отбора. Итог считается по отметкам клиентов
   app.get('/signals/past', { preHandler: auth }, async (req) => {
-    // Тестовые сигналы с тестовыми итогами видят только тестовые аккаунты, и они помечены ТЕСТ
     // В истории только сигналы, по которым уже есть итоги от клиентов: без отметок результата у сигнала нет
     const r = await db.query(
       `SELECT * FROM (
@@ -275,12 +274,12 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
                 (SELECT count(*)::int FROM deals x WHERE x.signal_id = s.id AND x.result = 'win') + coalesce((s.demo_result = 'win')::int, 0) AS wins,
                 (SELECT count(*)::int FROM deals x WHERE x.signal_id = s.id AND x.result = 'loss') + coalesce((s.demo_result = 'loss')::int, 0) AS losses
            FROM signals s
-          WHERE (NOT s.is_test OR EXISTS (SELECT 1 FROM leads d WHERE d.tg_id = $1 AND d.is_tester))
+          WHERE NOT s.is_test
             AND s.entry_at + (s.expiry_min || ' minutes')::interval < now()
        ) q
         WHERE q.wins + q.losses > 0
         ORDER BY q.entry_at DESC LIMIT 5`,
-      [req.tg!.id],
+      [],
     );
     if (r.rowCount) return r.rows;
     return demoPast();
