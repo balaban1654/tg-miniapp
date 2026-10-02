@@ -837,7 +837,10 @@ async function viewTrainer(sel){
   shell('Тренажёр',[el('div',{},el('h2',{style:'font-size:20px'},'Тренажёр'),
     el('p',{class:'sm',style:'margin:8px 0 0;font-size:14px;line-height:1.5'},'Три урока на учебном графике: как настроить терминал и зайти по сигналу. Учебный баланс 1 000 $ — рисковать нечем.')),
     lessons.map(l=>el('button',{class:'lesson',type:'button',onclick:()=>viewTrainer(l.id)},el('div',{class:'num'+(l.done?' done':'')},l.done?'✓':l.id),el('div',{},el('b',{},'Урок '+l.id+' · '+l.title),el('div',{class:'sm'},l.sub)))),
-    el('button',{class:'btn',type:'button',onclick:()=>viewTrainer(next.id)},'Продолжить')]);
+    lessons.every(l=>l.done)
+      ?[needReg()?el('button',{class:'btn',type:'button',onclick:()=>go('home')},'Зарегистрироваться'):null,
+        el('button',{class:needReg()?'btn o':'btn',type:'button',onclick:()=>viewTrainer(1)},'Пройти заново')]
+      :el('button',{class:'btn',type:'button',onclick:()=>viewTrainer(next.id)},'Продолжить')]);
 }
 
 function lessonView(l){
