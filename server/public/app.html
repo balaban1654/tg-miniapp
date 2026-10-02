@@ -133,10 +133,13 @@ main{flex:1;padding:6px 16px 96px;display:grid;gap:12px;align-content:start}
 .btn:active{transform:scale(.98)}.btn.o{background:none;border:1px solid var(--acc);color:var(--acc2)}.btn:disabled{opacity:.45}
 .btn.g{background:var(--ok);color:#06210f}.btn.r{background:var(--bad);color:#2b0610}
 .btn.sm2{padding:8px;font-size:12px;border-radius:10px}
-.tl{display:flex;gap:10px;align-items:center}
+.tl{display:flex;gap:9px;align-items:center;min-width:0}
+.tl>div{min-width:0;flex:1}
+.tl>.ava{width:44px;height:44px}
+.tl b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tl.lk{cursor:pointer;-webkit-tap-highlight-color:transparent;border-radius:12px;transition:transform .08s}
 .tl.lk:active{transform:scale(.98)}
-.tl .un{display:block;margin-top:2px;font-size:13px;color:var(--acc2);transition:color .15s,text-shadow .15s}
+.tl .un{display:block;margin-top:2px;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--acc2);transition:color .15s,text-shadow .15s}
 .tl.lk:hover .un,.tl.lk:active .un,.tl.lk:focus-visible .un{color:#fff;text-shadow:0 0 10px #9b5cffcc}
 .tr .btn.o,.lesson{transition:background .15s,color .15s,box-shadow .15s}
 .tr .btn.o:active{background:var(--acc);color:#fff}
@@ -174,7 +177,7 @@ main{flex:1;padding:6px 16px 96px;display:grid;gap:12px;align-content:start}
 @media(hover:hover){.lesson:hover{background:var(--card2);border-color:var(--acc)}}
 .num{width:34px;height:34px;border-radius:50%;background:var(--card2);display:grid;place-items:center;font:700 14px var(--fm);flex:none;color:var(--acc2)}
 .num.done{background:var(--ok);color:#06210f}
-.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}
 .tr{display:grid;gap:8px}
 .back{background:none;border:0;color:var(--acc2);padding:4px 0;cursor:pointer;font-size:13px;text-align:left}
 ol.steps{margin:0;padding-left:20px;display:grid;gap:8px}
