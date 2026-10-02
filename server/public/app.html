@@ -465,7 +465,7 @@ async function pastSignals(){
   const wrap=el('div',{});
   const build=rows=>{
     const allTest=rows.length>0&&rows.every(r=>r.is_test);
-    const head=el('div',{class:'pshead'},el('b',{},'Прошедшие сигналы'),allTest?el('span',{class:'sm',style:'color:var(--warn);font-weight:700'},'ТЕСТОВЫЕ ДАННЫЕ'):el('span',{class:'sm'},'по отметкам участников'));
+    const head=el('div',{class:'pshead'},el('b',{},'Прошедшие сигналы'),allTest?null:el('span',{class:'sm'},'по отметкам участников'));
     if(!rows.length)return[head,el('div',{class:'card sm'},'Завершённых сигналов пока нет.')];
     return[head,el('div',{class:'pslist'},rows.map(r=>{
       const n=r.wins+r.losses,up=r.direction==='up';
