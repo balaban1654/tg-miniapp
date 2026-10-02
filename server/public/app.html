@@ -594,7 +594,7 @@ async function viewHome(){
   if(pending){
     const mark=async r=>{try{await api('/deals/'+pending.id+'/result',{method:'POST',body:{result:r}});await refreshMe();toast('Записано');render()}catch(e){toast(e.message)}};
     items.push(el('div',{class:'card hero'},el('h3',{style:'font-size:14px'},'Чем закончилась сделка?'),
-      el('div',{class:'sm'},pending.pair+' · '+(pending.direction==='up'?'Вверх':'Вниз')+' · '+pending.expiry_min+' мин'),
+      el('div',{class:'sm'},pending.pair+' · '+(pending.direction==='up'?'Вверх':'Вниз')+' · '+fmtDur(pending.expiry_sec)),
       el('div',{class:'two'},el('button',{class:'btn g',type:'button',onclick:()=>mark('win')},'Плюс'),el('button',{class:'btn r',type:'button',onclick:()=>mark('loss')},'Минус')),
       el('button',{class:'btn o',type:'button',onclick:()=>mark('skip')},'Не входил')));
   }else if(!sigCard&&!reqCard){
@@ -647,10 +647,17 @@ async function viewDeals(){
   const chart=el('div',{class:'card'},el('div',{class:'row'},el('b',{},'По дням'),el('span',{class:'sm'},'плюс · минус')),
     el('div',{class:'bars',style:'margin-top:10px'},days.map(k=>{const x=byDay[k]||{wins:0,losses:0};return el('div',{},el('i',{class:'w'+(x.wins?' has':''),style:'height:'+(x.wins/max*100)+'%'}),el('i',{class:'l'+(x.losses?' has':''),style:'height:'+(x.losses/max*100)+'%'}))})),
     el('div',{class:'days',style:'margin-top:4px'},days.map(k=>el('span',{},new Date(k+'T12:00:00').toLocaleDateString('ru-RU',{weekday:'short'})))));
-  const hist=d.deals.length?el('div',{style:'display:grid;gap:8px'},d.deals.map(x=>el('div',{class:'card row'},el('div',{},el('b',{},x.pair),el('div',{class:'sm'},(x.direction==='up'?'Вверх':'Вниз')+' · '+x.expiry_min+' мин · '+hm(x.created_at))),
+  const hist=d.deals.length?el('div',{style:'display:grid;gap:8px'},d.deals.map(x=>el('div',{class:'card row'},el('div',{},el('b',{},x.pair),el('div',{class:'sm'},(x.direction==='up'?'Вверх':'Вниз')+' · '+fmtDur(x.expiry_sec)+' · '+hm(x.created_at))),
     x.result==='win'?el('span',{class:'pill p-ok'},'плюс'):x.result==='loss'?el('span',{class:'pill p-bad'},'минус'):x.result==='skip'?el('span',{class:'pill p-pur'},'не входил'):el('span',{class:'pill p-warn'},'ждёт итога')))):
     el('div',{class:'card',style:'padding:20px 22px;color:var(--mut)'},'Сделок пока нет. Когда появится сигнал, он будет на главной, а ваша сделка появится здесь.');
-  shell('Мои сделки',[chips,sum,chart,el('b',{},'История'),hist]);
+  // Корзина справа от периода: очистка истории с подтверждением «Да / Нет»
+  const confirmBox=el('div',{});
+  const TRASH='<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 002 2h6a2 2 0 002-2l1-12M9 7V4h6v3"/></svg>';
+  const trash=el('button',{type:'button','aria-label':'Очистить историю',title:'Очистить историю',style:'flex:none;width:38px;height:38px;border-radius:50%;border:1px solid var(--line);background:var(--card);color:var(--mut);display:grid;place-items:center;cursor:pointer',onclick:()=>{
+    if(!d.deals.length){toast('История уже пуста');return}
+    confirmBox.replaceChildren(el('div',{class:'card',style:'display:grid;gap:10px'},el('b',{},'Очистить всю историю сделок?'),el('div',{class:'sm'},'Статистика обнулится. Это действие нельзя отменить.'),
+      el('div',{class:'two'},el('button',{class:'btn r',type:'button',onclick:async()=>{try{await api('/deals',{method:'DELETE'});await refreshMe().catch(()=>{});toast('История очищена');render()}catch(e){toast(e.message)}}},'Да'),el('button',{class:'btn o',type:'button',onclick:()=>confirmBox.replaceChildren()},'Нет'))))}},svgEl(TRASH));
+  shell('Мои сделки',[el('div',{style:'display:flex;gap:8px;align-items:center'},el('div',{style:'flex:1;min-width:0'},chips),trash),confirmBox,sum,chart,el('b',{},'История'),hist]);
 }
 
 let lessons=null;

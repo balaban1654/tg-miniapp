@@ -261,7 +261,7 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
     const days = req.query.period === '30' ? 30 : req.query.period === 'all' ? 36500 : 7;
     const rows = (
       await db.query(
-        `SELECT id, pair, direction, expiry_min, result, created_at FROM deals
+        `SELECT id, pair, direction, expiry_min, coalesce((SELECT s.expiry_sec FROM signals s WHERE s.id = deals.signal_id), expiry_min * 60) AS expiry_sec, result, created_at FROM deals
           WHERE tg_id = $1 AND created_at > now() - ($2 || ' days')::interval ORDER BY id DESC LIMIT 200`,
         [req.tg!.id, String(days)],
       )
@@ -280,6 +280,12 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
       total: rows.filter((x) => x.result && x.result !== 'skip').length,
       byDay: by.rows,
     };
+  });
+
+  // Очистка истории сделок клиента (его статистика обнуляется)
+  app.delete('/deals', { preHandler: auth }, async (req) => {
+    const r = await db.query('DELETE FROM deals WHERE tg_id = $1', [req.tg!.id]);
+    return { ok: true, removed: r.rowCount };
   });
 
   app.post<{ Params: { id: string } }>('/deals/:id/result', { preHandler: auth }, async (req, reply) => {
