@@ -237,7 +237,8 @@ function support(){
   // на телефоне openTelegramLink сам Mini App не закрывает — закрываем явно
   try{if(tg&&tg.close)setTimeout(()=>tg.close(),300)}catch{}
 }
-function clearTimers(){timers.forEach(clearInterval);timers.forEach(clearTimeout);timers=[]}
+let liveSignalOn=false;
+function clearTimers(){timers.forEach(clearInterval);timers.forEach(clearTimeout);timers=[];liveSignalOn=false}
 
 const ICON={home:'<path d="M3 11l9-8 9 8"/><path d="M5 9.5V20h14V9.5"/><path d="M10 20v-6h4v6"/>',deals:'<path d="M8 6h12M8 12h12M8 18h12"/><path d="M4 6h.01M4 12h.01M4 18h.01"/>',trainer:'<rect x="3" y="3" width="7.5" height="7.5" rx="1.8"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.8"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.8"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.8"/>',media:'<rect x="3" y="5" width="18" height="14" rx="3.5"/><path d="M10 9.2l5 2.8-5 2.8z"/>'};
 const TABS=[['home','Главная'],['deals','Сделки'],['trainer','Тренажёр'],['media','Медиа']];
@@ -470,8 +471,9 @@ async function signalPrep(pair,sec){
     buzzL();signalResult(res.r);
   },6300));
 }
-/** Карточка сигнала по запросу: время входа по часам, расписание вход + перекрытия, оценка результата */
+/** Карточка сигнала по запросу: две карточки. Первая: параметры сигнала и «Открыть Pocket Option». Вторая: отсчёт, расписание, оценка */
 function signalLive(sg,skew,cfg){
+  liveSignalOn=true;   // пока карточка на экране, главную не перерисовываем по таймеру: иначе всё мигает
   const entry=Date.parse(sg.entry_at),gap=cfg.gapSec*1000,max=cfg.maxEvents;
   const up=sg.direction==='up';
   const p2=n=>String(n).padStart(2,'0');
@@ -479,26 +481,16 @@ function signalLive(sg,skew,cfg){
   const timerAt=t=>'0:'+p2((60-new Date(t).getSeconds())%60);
   const at=i=>entry+i*gap;
   const name=i=>i===0?'Вход':'Перекрытие '+i;
-  const status=el('div',{style:'display:grid;gap:6px;padding:12px 0;border-bottom:1px solid var(--line)'});
-  const list=el('div',{style:'display:grid;gap:6px;padding:12px 0'});
   const row=(k,v)=>el('div',{class:'r'},el('span',{},k),el('b',{},v));
-  function paint(){
-    const now=Date.now()+skew;
-    let n=0;while(n<max&&at(n)<=now)n++;   // n = первое событие, которое ещё впереди
-    status.replaceChildren();
-    if(n>=max)status.append(el('b',{style:'font-size:15px'},'Все события прошли. Дальше не идём.'),el('div',{class:'sm'},'Оцените сигнал ниже.'));
-    else{
-      const sec=Math.ceil((at(n)-now)/1000);
-      status.append(el('div',{class:'sm'},n===0?'До входа':'До перекрытия '+n),
-        el('b',{style:'font-size:32px;color:var(--acc2);text-align:center;display:block'},Math.floor(sec/60)+':'+p2(sec%60)),
-        el('div',{class:'sm',style:'text-align:center'},name(n)+' в '+hms(at(n))+' (таймер свечи '+timerAt(at(n))+')'));
-    }
-    list.replaceChildren(...Array.from({length:max},(_,i)=>{
-      const past=at(i)<=now,cur=i===n;
-      return el('div',{class:'row sm',style:'color:'+(cur?'var(--fg)':'var(--mut)')},el('span',{},el('b',{style:'color:'+(cur?'var(--acc2)':'var(--mut)')+';display:inline-block;width:18px'},past?'✓':cur?'▶':'·'),name(i)),el('span',{class:'mono'},hms(at(i))+' · '+timerAt(at(i))));
-    }));
-    rate.disabled=now<entry;
-  }
+  // Живая часть собирается один раз, дальше меняется только текст: без перерисовки нет и мигания
+  const sTitle=el('div',{class:'sm'}),sBig=el('b',{style:'font-size:32px;color:var(--acc2);text-align:center;display:block;font-variant-numeric:tabular-nums;min-height:38px'}),sSub=el('div',{class:'sm',style:'text-align:center'});
+  const status=el('div',{style:'display:grid;gap:6px;padding:4px 0 12px;border-bottom:1px solid var(--line)'},sTitle,sBig,sSub);
+  const rows=Array.from({length:max},(_,i)=>{
+    const mk=el('b',{style:'display:inline-block;width:18px'}),tm=el('span',{class:'mono'},hms(at(i))+' · '+timerAt(at(i)));
+    return{mk,node:el('div',{class:'row sm'},el('span',{},mk,name(i)),tm)};
+  });
+  const list=el('div',{style:'display:grid;gap:6px;padding:12px 0'},rows.map(r=>r.node));
+  const set=(node,txt)=>{if(node.textContent!==txt)node.textContent=txt};
   // Оценка: «Оценить сигнал» → Плюс/Минус → при плюсе номер шага 1–4 (1 = со входа, 2–4 = с перекрытий)
   const rateBox=el('div',{style:'display:grid;gap:10px;margin-top:4px'});
   const send=async(result,step)=>{try{await api('/signals/'+sg.id+'/rate',{method:'POST',body:{result,step}});await refreshMe().catch(()=>{});signalRated(sg,result,step)}catch(e){toast(e.message)}};
@@ -511,17 +503,36 @@ function signalLive(sg,skew,cfg){
     el('div',{style:'display:grid;grid-template-columns:repeat('+max+',minmax(0,1fr));gap:8px'},Array.from({length:max},(_,i)=>el('button',{class:'btn g',type:'button',onclick:()=>send('win',i+1)},String(i+1)))),
     el('button',{class:'back',type:'button',onclick:()=>pm()},'‹ Назад'))};
   rateBox.append(rate);
+  function paint(){
+    const now=Date.now()+skew;
+    let n=0;while(n<max&&at(n)<=now)n++;   // n = первое событие, которое ещё впереди
+    if(n>=max){set(sTitle,'Все события прошли. Дальше не идём.');sBig.style.visibility='hidden';set(sBig,'0:00');set(sSub,'Оцените сигнал ниже.')}
+    else{
+      const sec=Math.ceil((at(n)-now)/1000);
+      sBig.style.visibility='visible';
+      set(sTitle,n===0?'До входа':'До перекрытия '+n);
+      set(sBig,Math.floor(sec/60)+':'+p2(sec%60));
+      set(sSub,name(n)+' в '+hms(at(n))+' (таймер свечи '+timerAt(at(n))+')');
+    }
+    rows.forEach((r,i)=>{
+      const past=at(i)<=now,cur=i===n;
+      set(r.mk,past?'✓':cur?'▶':'·');
+      r.mk.style.color=cur?'var(--acc2)':'var(--mut)';
+      r.node.style.color=cur?'var(--fg)':'var(--mut)';
+    });
+    if(rate.disabled!==(now<entry))rate.disabled=now<entry;
+  }
   paint();timers.push(setInterval(paint,500));
   const pocket=()=>{const u=cfg.pocketUrl||(me&&me.registerUrl&&(me.registerUrl.ru||me.registerUrl.ww))||'https://pocketoption.com/';openLink(u)};
-  return el('div',{class:'sig rise'},el('h3',{},'Сигнал готов'),
-    sg.is_test?el('div',{class:'sm',style:'color:var(--warn);font-weight:700'},sg.source==='test'?'ТЕСТОВЫЙ СИГНАЛ: направление выбрано случайно, это не анализ. Не для торговли.':'Тестовый сигнал. Не для торговли.'):null,
-    row('Время',hms(entry)),row('Точка входа',cfg.entryLabel),row('Пара',sg.pair),
-    el('div',{class:'r'},el('span',{},'Направление'),el('b',{style:'color:var(--'+(up?'ok':'bad')+')'},up?'ВВЕРХ (BUY)':'ВНИЗ (SELL)')),
-    row('Время сделки',sg.expiry_sec?fmtDur(sg.expiry_sec):sg.expiry_min+' мин'),row('Ставка',cfg.stakeLabel),
-    status,list,
-    el('button',{class:'btn',type:'button',onclick:pocket},'Открыть Pocket Option'),
-    rateBox,
-    cfg.warning?el('div',{style:'margin-top:6px;color:var(--warn);font-weight:700;font-size:13px;line-height:1.45'},cfg.warning):null);
+  return el('div',{style:'display:grid;gap:12px'},
+    el('div',{class:'sig'},el('h3',{},'Сигнал готов'),
+      sg.is_test?el('div',{class:'sm',style:'color:var(--warn);font-weight:700'},sg.source==='test'?'ТЕСТОВЫЙ СИГНАЛ: направление выбрано случайно, это не анализ. Не для торговли.':'Тестовый сигнал. Не для торговли.'):null,
+      row('Время',hms(entry)),row('Точка входа',cfg.entryLabel),row('Пара',sg.pair),
+      el('div',{class:'r'},el('span',{},'Направление'),el('b',{style:'color:var(--'+(up?'ok':'bad')+')'},up?'ВВЕРХ (BUY)':'ВНИЗ (SELL)')),
+      row('Время сделки',sg.expiry_sec?fmtDur(sg.expiry_sec):sg.expiry_min+' мин'),row('Ставка',cfg.stakeLabel),
+      el('button',{class:'btn',type:'button',style:'margin-top:8px',onclick:pocket},'Открыть Pocket Option')),
+    el('div',{class:'sig'},status,list,rateBox,
+      cfg.warning?el('div',{style:'margin-top:10px;color:var(--warn);font-weight:700;font-size:13px;line-height:1.45'},cfg.warning):null));
 }
 /** После оценки: запросить новый анализ или завершить торговлю */
 function signalRated(sg,result,step){
@@ -602,7 +613,7 @@ async function viewHome(){
       el('div',{class:'sm'},'Когда появится новый сигнал, мы пришлём сообщение в Telegram. А пока можно потренироваться.'),
       el('button',{class:'btn o',type:'button',onclick:()=>go('trainer')},'Открыть тренажёр')));
   }
-  timers.push(setInterval(()=>{if(tab==='home')render()},20000));
+  timers.push(setInterval(()=>{if(tab==='home'&&!liveSignalOn)render()},20000));
   items.push(...await pastSignals().catch(()=>[]));
   items.push(el('p',{class:'sm',style:'margin:0;text-align:center'},'Торговля бинарными опционами связана с риском потери капитала. Сигналы не гарантируют результат.'));
   shell('Hunter AI',items);
