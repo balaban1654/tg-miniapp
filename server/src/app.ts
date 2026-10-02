@@ -422,7 +422,7 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
     const ins = await db.query(
       `INSERT INTO signals (pair, direction, expiry_min, expiry_sec, entry_at, note, source, is_test, created_by, requested_by)
        VALUES ($1,$2,$3,$4,$5,NULL,CASE WHEN $6 THEN 'test' ELSE 'analyst' END,$6,$7,$8) RETURNING id, pair, direction, expiry_min, expiry_sec, entry_at, is_test, source, requested_by`,
-      [p.pair, p.direction, Math.max(1, Math.ceil(expirySec / 60)), expirySec, new Date(entryMs), !lead.access || Boolean(p.auto), p.direction_by, req.tg!.id],
+      [p.pair, p.direction, Math.max(1, Math.ceil(expirySec / 60)), expirySec, new Date(entryMs), !(lead.access || lead.is_tester) || Boolean(p.auto), p.direction_by, req.tg!.id],
     );
     return { signal: { ...ins.rows[0], taken: false }, steps: [], cfg: cfgOf(set), now: new Date().toISOString() };
   });
