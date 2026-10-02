@@ -297,7 +297,8 @@ async function viewChats(){
     if(!active)return;
     const d=await api('/chats/'+active);
     const near=msgs.scrollHeight-msgs.scrollTop-msgs.clientHeight<80;
-    head.replaceChildren(el('div',{},el('a',{href:profileUrl(d.lead),target:'_blank',rel:'noopener',title:'Открыть профиль в Telegram',style:'font-weight:700;color:inherit;text-decoration:none;border-bottom:1px dashed var(--acc2)'},cname(d.lead)),d.lead.first_name&&d.lead.username?el('a',{href:profileUrl(d.lead),target:'_blank',rel:'noopener',class:'mut sm',style:'margin-left:8px;text-decoration:none'},'@'+d.lead.username):null),el('span',{class:'mut sm'},'Telegram ID '+d.lead.tg_id+' · Pocket ID '+(d.lead.trader_id||'нет')+' · '+(d.lead.owner_name?'ведёт '+d.lead.owner_name:'не закреплён')));
+    const L={href:profileUrl(d.lead),target:'_blank',rel:'noopener',title:'Открыть профиль в Telegram',style:'color:#6cb4ff;text-decoration:none'};
+    head.replaceChildren(el('div',{},d.lead.username?[d.lead.first_name?el('b',{style:'margin-right:8px'},d.lead.first_name):null,el('a',{...L,style:L.style+';font-weight:600'},'@'+d.lead.username)]:el('a',{...L,style:L.style+';font-weight:700'},cname(d.lead))),el('span',{class:'mut sm'},'Telegram ID '+d.lead.tg_id+' · Pocket ID '+(d.lead.trader_id||'нет')+' · '+(d.lead.owner_name?'ведёт '+d.lead.owner_name:'не закреплён')));
     msgs.replaceChildren(...d.messages.map(m=>{
       const body=[];
       if(m.has_file&&m.kind==='photo')body.push(el('img',{src:'/api/office/chats/'+d.lead.tg_id+'/file/'+m.id,alt:'Фото от клиента'}));
