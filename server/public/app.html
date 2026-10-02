@@ -163,7 +163,11 @@ function withPhoto(node){
   return node;
 }
 const CHAT_ICON='<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.5 12a8.5 8.5 0 01-12.3 7.6L3.8 20.6l1.1-4.2A8.5 8.5 0 1120.5 12z"/></svg>';
-function support(){openLink('https://t.me/'+me.botUsername+'?start=support')}
+function support(){
+  openLink('https://t.me/'+me.botUsername+'?start=support');
+  // на телефоне openTelegramLink сам Mini App не закрывает — закрываем явно
+  try{if(tg&&tg.close)setTimeout(()=>tg.close(),300)}catch{}
+}
 function clearTimers(){timers.forEach(clearInterval);timers.forEach(clearTimeout);timers=[]}
 
 const ICON={home:'<path d="M3 11l9-8 9 8"/><path d="M5 9.5V20h14V9.5"/><path d="M10 20v-6h4v6"/>',deals:'<path d="M8 6h12M8 12h12M8 18h12"/><path d="M4 6h.01M4 12h.01M4 18h.01"/>',trainer:'<rect x="3" y="3" width="7.5" height="7.5" rx="1.8"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.8"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.8"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.8"/>',media:'<rect x="3" y="5" width="18" height="14" rx="3.5"/><path d="M10 9.2l5 2.8-5 2.8z"/>'};
