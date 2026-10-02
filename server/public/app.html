@@ -462,7 +462,7 @@ async function signalPrep(pair,sec){
   const rows=labels.map(l=>{const ic=el('span',{class:'spin'}),st2=el('span',{class:'sm'},'…');return{ic,st2,node:el('div',{class:'i'},ic,el('b',{style:'flex:1'},l),st2)}});
   const holder=el('div',{});
   shell('Анализ',[el('div',{class:'fs-tip'},'Анализируем '+pair+' · '+fmtDur(sec)+'…'),el('div',{class:'ck'},rows.map(r=>r.node)),holder]);
-  const req=api('/signals/request',{method:'POST',body:{pair,expiry_sec:sec}}).then(r=>({r}),e=>({e}));
+  const req=api('/signals/request',{method:'POST',body:{pair,expiry_sec:sec}}).then(r=>({r:{...r,skew:Date.parse(r.now)-Date.now()}}),e=>({e}));   // разницу часов считаем сразу по ответу, а не после анимации
   rows.forEach((r,i)=>timers.push(setTimeout(()=>{r.ic.className='tick';r.ic.textContent='✓';r.st2.textContent='готово';r.st2.style.color='var(--ok)';buzzL()},(i+1)*2000)));
   timers.push(setTimeout(async()=>{
     const res=await req;
@@ -538,7 +538,7 @@ function signalRated(sg,result,step){
 }
 function signalResult(r){
   clearTimers();
-  shell('Сигнал',[signalLive(r.signal,Date.parse(r.now)-Date.now(),r.cfg),
+  shell('Сигнал',[signalLive(r.signal,r.skew!==undefined?r.skew:Date.parse(r.now)-Date.now(),r.cfg),
     el('button',{class:'btn o',type:'button',onclick:()=>{tab='home';render()}},'На главную'),
     el('p',{class:'sm',style:'margin:0'},'Это мнение аналитика, а не гарантия результата. Торгуйте только той суммой, которую готовы потерять.')]);
 }
