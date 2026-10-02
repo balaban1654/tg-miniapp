@@ -442,11 +442,11 @@ async function viewTrainer(sel){
   if(!me)await refreshMe();
   lessons=await api('/trainer');
   if(sel){return lessonView(lessons.find(l=>l.id===sel))}
-  const done=lessons.filter(l=>l.done).length;
-  shell('Тренажёр',[el('div',{},el('h2',{style:'font-size:18px'},'Тренажёр'),
-    el('p',{class:'sm',style:'margin:6px 0 0'},'Три коротких урока и практика на учебном графике. Учебный баланс 1 000 $, рисковать нечем.')),
-    el('div',{class:'card'},el('div',{class:'row'},el('span',{class:'sm'},'Пройдено'),el('b',{class:'mono'},done+' из '+lessons.length)),el('div',{style:'height:6px;border-radius:9px;background:#ffffff1a;margin-top:8px;overflow:hidden'},el('i',{style:'display:block;height:100%;width:'+(done/lessons.length*100)+'%;background:linear-gradient(90deg,var(--acc),var(--acc2))'}))),
-    lessons.map(l=>el('button',{class:'lesson',type:'button',onclick:()=>viewTrainer(l.id)},el('div',{class:'num'+(l.done?' done':'')},l.done?'✓':l.id),el('div',{},el('b',{},'Урок '+l.id+' · '+l.title),el('div',{class:'sm'},l.sub))))]);
+  const next=lessons.find(l=>!l.done)||lessons[0];
+  shell('Тренажёр',[el('div',{},el('h2',{style:'font-size:20px'},'Тренажёр'),
+    el('p',{class:'sm',style:'margin:8px 0 0;font-size:14px;line-height:1.5'},'Три урока на учебном графике: как настроить терминал и зайти по сигналу. Учебный баланс 1 000 $ — рисковать нечем.')),
+    lessons.map(l=>el('button',{class:'lesson',type:'button',onclick:()=>viewTrainer(l.id)},el('div',{class:'num'+(l.done?' done':'')},l.done?'✓':l.id),el('div',{},el('b',{},'Урок '+l.id+' · '+l.title),el('div',{class:'sm'},l.sub)))),
+    el('button',{class:'btn',type:'button',onclick:()=>viewTrainer(next.id)},'Продолжить')]);
 }
 
 function lessonView(l){
