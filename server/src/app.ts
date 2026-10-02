@@ -308,7 +308,8 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
 
   // Активный сигнал: обычные видят клиенты с открытым доступом, тестовые только тестовые аккаунты
   const ACTIVE = `now() <= s.entry_at + interval '3 minutes' AND s.created_at > now() - interval '2 hours'
-     AND ((NOT s.is_test AND d.access) OR (s.is_test AND d.is_tester))`;
+     AND ((NOT s.is_test AND d.access) OR (s.is_test AND d.is_tester))
+     AND (s.requested_by IS NULL OR s.requested_by = d.tg_id)`;
   app.get('/signals/active', { preHandler: auth }, async (req) => {
     const r = await db.query(
       `SELECT s.id, s.pair, s.direction, s.expiry_min, s.entry_at, s.note, s.source, s.is_test,
@@ -328,7 +329,7 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
                 (SELECT count(*)::int FROM deals x WHERE x.signal_id = s.id AND x.result = 'win') + coalesce((s.demo_result = 'win')::int, 0) AS wins,
                 (SELECT count(*)::int FROM deals x WHERE x.signal_id = s.id AND x.result = 'loss') + coalesce((s.demo_result = 'loss')::int, 0) AS losses
            FROM signals s
-          WHERE NOT s.is_test
+          WHERE NOT s.is_test AND s.requested_by IS NULL
             AND s.entry_at + (s.expiry_min || ' minutes')::interval < now()
        ) q
         WHERE q.wins + q.losses > 0
@@ -338,6 +339,49 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
     if (r.rowCount) return r.rows;
     const t = await db.query('SELECT is_tester FROM leads WHERE tg_id = $1', [req.tg!.id]);
     return demoPast(Boolean(t.rows[0]?.is_tester));
+  });
+
+  // Сигнал по запросу клиента. Направление берётся из того, что поставил человек в Office, и действует ограниченное время
+  const requestRules = async (tgId: number) => {
+    const set = (await db.query('SELECT * FROM signal_settings WHERE id = 1')).rows[0];
+    const lead = (await db.query('SELECT access, is_tester FROM leads WHERE tg_id = $1', [tgId])).rows[0];
+    const allowed = Boolean(lead && (lead.access || lead.is_tester) && set.enabled);
+    const last = (await db.query('SELECT extract(epoch FROM now() - created_at)::int AS ago FROM signals WHERE requested_by = $1 ORDER BY id DESC LIMIT 1', [tgId])).rows[0];
+    const cooldownLeft = last ? Math.max(0, set.cooldown_sec - last.ago) : 0;
+    return { set, lead, allowed, cooldownLeft };
+  };
+
+  app.get('/signals/request', { preHandler: auth }, async (req) => {
+    const { set, allowed, cooldownLeft } = await requestRules(req.tg!.id);
+    if (!allowed) return { enabled: false, pairs: [], cooldownLeft: 0, enterInSec: set.enter_in_sec, expiryMin: set.expiry_min };
+    const pairs = (
+      await db.query(
+        `SELECT pair, payout, (direction IS NOT NULL AND direction_at > now() - ($1 || ' minutes')::interval) AS available
+           FROM signal_pairs WHERE enabled ORDER BY sort, pair`,
+        [String(set.direction_ttl_min)],
+      )
+    ).rows;
+    return { enabled: true, pairs, cooldownLeft, enterInSec: set.enter_in_sec, expiryMin: set.expiry_min };
+  });
+
+  app.post<{ Body: { pair?: string } }>('/signals/request', { preHandler: auth }, async (req, reply) => {
+    const { set, lead, allowed, cooldownLeft } = await requestRules(req.tg!.id);
+    if (!allowed) return reply.code(403).send({ error: 'Сигналы по запросу пока недоступны' });
+    if (cooldownLeft > 0) return reply.code(429).send({ error: `Следующий сигнал можно получить через ${cooldownLeft} сек.`, cooldownLeft });
+    const p = (
+      await db.query(
+        `SELECT pair, direction, direction_by FROM signal_pairs
+          WHERE pair = $1 AND enabled AND direction IS NOT NULL AND direction_at > now() - ($2 || ' minutes')::interval`,
+        [String(req.body?.pair ?? ''), String(set.direction_ttl_min)],
+      )
+    ).rows[0];
+    if (!p) return reply.code(409).send({ error: 'По этой паре сейчас нет подходящего входа. Попробуйте другую пару или чуть позже.' });
+    const ins = await db.query(
+      `INSERT INTO signals (pair, direction, expiry_min, entry_at, note, source, is_test, created_by, requested_by)
+       VALUES ($1,$2,$3, now() + ($4 || ' seconds')::interval, NULL, 'analyst', $5, $6, $7) RETURNING id, pair, direction, expiry_min, entry_at, is_test`,
+      [p.pair, p.direction, set.expiry_min, String(set.enter_in_sec), !lead.access, p.direction_by, req.tg!.id],
+    );
+    return { signal: { ...ins.rows[0], taken: false }, now: new Date().toISOString() };
   });
 
   // Клиент отмечает, что вошёл в сделку по сигналу. Дальше он отмечает итог

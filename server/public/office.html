@@ -441,8 +441,44 @@ async function viewPush(){
     el('h3',{style:'font-size:15px'},'Рассылки'),bform,castT];
 }
 
+/** Сигналы по запросу клиента: настройки, пары и текущее направление от аналитика */
+async function signalConfigBlock(){
+  const cfg=await api('/signal-config');
+  const S=cfg.settings,isAdmin=me.role==='admin';
+  const f={on:el('input',{type:'checkbox',style:'width:auto'}),exp:el('select',{},[1,2,3,5,10,15].map(n=>el('option',{value:n},n+' мин'))),enter:el('input',{type:'number',min:'30',max:'600'}),ttl:el('input',{type:'number',min:'1',max:'240'}),cd:el('input',{type:'number',min:'0',max:'3600'})};
+  f.on.checked=S.enabled;f.exp.value=S.expiry_min;f.enter.value=S.enter_in_sec;f.ttl.value=S.direction_ttl_min;f.cd.value=S.cooldown_sec;
+  if(!isAdmin)Object.values(f).forEach(i=>i.disabled=true);
+  const err=el('div',{class:'err',role:'alert'});
+  const flash=m=>{err.className='ok-msg';err.textContent=m};
+  const fail=x=>{err.className='err';err.textContent=x.message};
+  const save=async()=>{try{await api('/signal-config',{method:'PUT',body:{enabled:f.on.checked,expiry_min:Number(f.exp.value),enter_in_sec:Number(f.enter.value),direction_ttl_min:Number(f.ttl.value),cooldown_sec:Number(f.cd.value)}});flash('Настройки сохранены')}catch(x){fail(x)}};
+  const setDir=async(pair,direction)=>{try{await api('/signal-pairs/direction',{method:'POST',body:{pair,direction}});render()}catch(x){fail(x)}};
+  const left=p=>{const m=Math.max(0,Math.round((Date.parse(p.direction_at)+S.direction_ttl_min*60000-Date.now())/60000));return p.fresh?'ещё '+m+' мин':'устарело'};
+  const dirBtn=(p,d,t)=>el('button',{class:'btn s '+(p.direction===d&&p.fresh?'':'o'),type:'button',style:'margin-right:6px',onclick:()=>setDir(p.pair,d)},t);
+  const newPair=el('input',{placeholder:'EUR/USD OTC',style:'max-width:200px'});
+  const pairRows=cfg.pairs.map(p=>{
+    const en=el('input',{type:'checkbox',style:'width:auto',disabled:!isAdmin});en.checked=p.enabled;
+    const pay=el('input',{type:'number',min:'1',max:'100',value:p.payout,style:'width:70px',disabled:!isAdmin});
+    const upd=async()=>{try{await api('/signal-pairs',{method:'PUT',body:{pair:p.pair,enabled:en.checked,payout:Number(pay.value),sort:p.sort}});flash('Сохранено')}catch(x){fail(x)}};
+    en.onchange=upd;pay.onchange=upd;
+    return[td(p.pair),el('td',{},en),el('td',{},pay,' %'),
+      el('td',{style:'white-space:nowrap'},dirBtn(p,'up','Вверх'),dirBtn(p,'down','Вниз'),el('button',{class:'btn o s',type:'button',onclick:()=>setDir(p.pair,'')},'Сброс')),
+      td(p.direction?(p.direction==='up'?'Вверх':'Вниз')+' · '+left(p)+(p.direction_by?' · '+p.direction_by:''):'не задано'),
+      el('td',{},isAdmin?el('button',{class:'btn o s',type:'button',onclick:async()=>{try{await api('/signal-pairs?pair='+encodeURIComponent(p.pair),{method:'DELETE'});render()}catch(x){fail(x)}}},'Удалить'):null)];
+  });
+  return el('div',{style:'display:grid;gap:12px'},
+    el('h3',{style:'font-size:15px'},'Сигналы по запросу клиента'),
+    el('div',{class:'card',style:'display:grid;gap:12px'},
+      el('p',{class:'mut sm',style:'margin:0'},'Клиент с открытым доступом нажимает «Получить сигнал», выбирает пару, видит анализ и карточку с обратным отсчётом до входа. Направление по паре ставит аналитик ниже: клиент получит именно его, пока оно не устарело. Если направления нет, пара для клиента недоступна.'),
+      el('label',{style:'display:flex;gap:8px;align-items:center'},f.on,'Включить выдачу сигналов по запросу'),
+      el('div',{class:'form'},el('label',{},'Экспирация',f.exp),el('label',{},'До входа, сек (120 = 2 мин)',f.enter),el('label',{},'Направление действует, мин',f.ttl),el('label',{},'Пауза между запросами клиента, сек',f.cd)),
+      isAdmin?el('div',{},el('button',{class:'btn',type:'button',onclick:save},'Сохранить настройки')):null,err),
+    table(['Пара','Доступна','Выплата','Направление сейчас','Состояние',''],pairRows,'Пар пока нет'),
+    isAdmin?el('div',{style:'display:flex;gap:8px;align-items:center'},newPair,el('button',{class:'btn o s',type:'button',onclick:async()=>{try{await api('/signal-pairs',{method:'POST',body:{pair:newPair.value}});render()}catch(x){fail(x)}}},'Добавить пару')):null);
+}
 async function viewSignals(){
   const rows=await api('/signals');
+  const cfgBlock=await signalConfigBlock();
   const f={pair:el('input',{required:'',placeholder:'EUR/USD OTC',list:'pairs'}),dir:el('select',{},el('option',{value:'up'},'Вверх'),el('option',{value:'down'},'Вниз')),
     exp:el('select',{},[1,2,3,5,10,15].map(n=>el('option',{value:n},n+' мин'))),enter:el('input',{type:'number',min:'0',max:'60',value:'2'}),
     note:el('input',{placeholder:'Почему такой сигнал (необязательно)',maxlength:'200'}),
@@ -461,10 +497,10 @@ async function viewSignals(){
       me.role==='admin'?el('button',{class:'btn o',type:'button',onclick:async()=>{err.className='err';err.textContent='';try{const r=await api('/signals/test',{method:'POST'});err.className='ok-msg';err.textContent='Тестовый сигнал отправлен тестовым аккаунтам: '+r.pushed;setTimeout(render,900)}catch(x){err.textContent=x.message}}},'Случайный тестовый сигнал'):null),
       me.role==='admin'?el('button',{class:'btn o',type:'button',title:'Создаёт 5 тестовых завершённых сигналов. Их видят только тестовые аккаунты, везде помечено ТЕСТ',onclick:async()=>{err.className='err';err.textContent='';try{await api('/signals/demo-history',{method:'POST'});err.className='ok-msg';err.textContent='Тестовая история создана. Её видят только тестовые аккаунты';setTimeout(render,900)}catch(x){err.textContent=x.message}}},'Тестовая история'):null,
       me.role==='admin'?el('button',{class:'btn o',type:'button',onclick:async()=>{err.className='err';err.textContent='';try{const r=await api('/signals/demo-history',{method:'DELETE'});err.className='ok-msg';err.textContent='Удалено тестовых записей: '+r.removed;setTimeout(render,900)}catch(x){err.textContent=x.message}}},'Убрать тестовую историю'):null,
-    err,el('p',{class:'mut sm',style:'margin:0'},'Сигнал публикует человек, система сама клиентам сигналов не выдаёт. Случайный режим есть только для проверки бота: такой сигнал помечен «ТЕСТ» и виден только тестовым аккаунтам (отметьте их в разделе «Лиды»).'));
+    err,el('p',{class:'mut sm',style:'margin:0'},'Общий сигнал публикует человек. Сигналы по запросу клиента выдаются из настроек выше (направление ставит аналитик). Случайный режим есть только для проверки бота: такой сигнал помечен «ТЕСТ» и виден только тестовым аккаунтам (отметьте их в разделе «Лиды»).'));
   const t=r=>new Date(r).toLocaleString('ru-RU',{timeZone:'Europe/Kyiv',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
   const list=table(['Опубликован','Пара','Направление','Экспирация','Вход','Источник','Вошли','Плюс','Минус',''],rows.map(r=>[td(t(r.created_at)),td(r.pair),el('td',{},el('span',{class:'pill '+(r.direction==='up'?'p-ok':'p-bad')},r.direction==='up'?'Вверх':'Вниз')),td(r.expiry_min+' мин'),td(new Date(r.entry_at).toLocaleTimeString('ru-RU',{timeZone:'Europe/Kyiv',hour:'2-digit',minute:'2-digit'})),el('td',{},el('span',{class:'pill '+(r.is_test?'p-warn':'p-pur')},r.is_test?'ТЕСТ':(r.author||'Аналитик'))),td(r.taken,'n'),td(r.wins,'n'),td(r.losses,'n'),me.role==='admin'?el('td',{},el('button',{class:'btn o s',type:'button',title:r.is_test?'Вернуть обычным сигналом':'Пометить тестовым: его увидят только тестовые аккаунты',onclick:async()=>{await api('/signals/'+r.id+'/test',{method:'PATCH',body:{is_test:!r.is_test}});render()}},r.is_test?'Сделать обычным':'Сделать тестовым')):td('')]),'Сигналов пока не было.');
-  return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Сигналы')),form,el('h3',{style:'font-size:15px'},'Опубликованные'),list];
+  return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Сигналы')),cfgBlock,form,el('h3',{style:'font-size:15px'},'Опубликованные'),list];
 }
 
 let mediaEdit=null;

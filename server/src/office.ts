@@ -634,6 +634,62 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     return publishSignal({ pair, direction: direction as 'up' | 'down', expiry, enterIn, note: str(b.note, 200) || null, source: 'analyst', isTest: Boolean(b.is_test), by: req.staff!.id, push: b.push !== false });
   });
 
+  // Настройка сигналов по запросу клиента: общие параметры, пары и текущее направление по каждой паре
+  const PAYOUT_MAX = 100;
+  app.get('/signal-config', { preHandler: need('admin', 'analyst') }, async () => {
+    const settings = (await db.query('SELECT enabled, expiry_min, enter_in_sec, direction_ttl_min, cooldown_sec FROM signal_settings WHERE id = 1')).rows[0];
+    const pairs = (
+      await db.query(
+        `SELECT p.pair, p.enabled, p.sort, p.payout, p.direction, p.direction_at, st.name AS direction_by,
+                (p.direction IS NOT NULL AND p.direction_at > now() - ($1 || ' minutes')::interval) AS fresh
+           FROM signal_pairs p LEFT JOIN staff st ON st.id = p.direction_by ORDER BY p.sort, p.pair`,
+        [String(settings.direction_ttl_min)],
+      )
+    ).rows;
+    return { settings, pairs };
+  });
+  app.put('/signal-config', { preHandler: need('admin') }, async (req, reply) => {
+    const b = (req.body ?? {}) as Record<string, unknown>;
+    const expiry = Math.trunc(Number(b.expiry_min));
+    const enterIn = Math.trunc(Number(b.enter_in_sec));
+    const ttl = Math.trunc(Number(b.direction_ttl_min));
+    const cooldown = Math.trunc(Number(b.cooldown_sec));
+    if (!EXPIRY.includes(expiry)) return reply.code(400).send({ error: 'Экспирация: 1, 2, 3, 5, 10 или 15 минут' });
+    if (!(enterIn >= 30 && enterIn <= 600)) return reply.code(400).send({ error: 'Время до входа: 30–600 секунд' });
+    if (!(ttl >= 1 && ttl <= 240)) return reply.code(400).send({ error: 'Срок действия направления: 1–240 минут' });
+    if (!(cooldown >= 0 && cooldown <= 3600)) return reply.code(400).send({ error: 'Пауза между запросами: 0–3600 секунд' });
+    await db.query('UPDATE signal_settings SET enabled=$1, expiry_min=$2, enter_in_sec=$3, direction_ttl_min=$4, cooldown_sec=$5 WHERE id = 1', [Boolean(b.enabled), expiry, enterIn, ttl, cooldown]);
+    return { ok: true };
+  });
+  app.post('/signal-pairs', { preHandler: need('admin') }, async (req, reply) => {
+    const b = (req.body ?? {}) as Record<string, unknown>;
+    const pair = str(b.pair, 20).toUpperCase();
+    if (!PAIR.test(pair)) return reply.code(400).send({ error: 'Пара в формате EUR/USD или EUR/USD OTC' });
+    await db.query('INSERT INTO signal_pairs (pair, sort) VALUES ($1, (SELECT coalesce(max(sort),0)+1 FROM signal_pairs)) ON CONFLICT DO NOTHING', [pair]);
+    return { ok: true };
+  });
+  app.put('/signal-pairs', { preHandler: need('admin') }, async (req, reply) => {
+    const b = (req.body ?? {}) as Record<string, unknown>;
+    const payout = Math.trunc(Number(b.payout));
+    if (!(payout >= 1 && payout <= PAYOUT_MAX)) return reply.code(400).send({ error: 'Выплата 1–100%' });
+    const r = await db.query('UPDATE signal_pairs SET enabled=$2, payout=$3, sort=$4 WHERE pair=$1', [str(b.pair, 20), Boolean(b.enabled), payout, Math.trunc(num(b.sort))]);
+    if (!r.rowCount) return reply.code(404).send({ error: 'Пара не найдена' });
+    return { ok: true };
+  });
+  app.delete('/signal-pairs', { preHandler: need('admin') }, async (req) => {
+    await db.query('DELETE FROM signal_pairs WHERE pair = $1', [str((req.query as any)?.pair, 20)]);
+    return { ok: true };
+  });
+  // Аналитик ставит направление по паре (или сбрасывает). Клиент получит именно его, пока оно не устарело
+  app.post('/signal-pairs/direction', { preHandler: need('admin', 'analyst') }, async (req, reply) => {
+    const d = str((req.body as any)?.direction, 4);
+    const pair = str((req.body as any)?.pair, 20);
+    if (d && !['up', 'down'].includes(d)) return reply.code(400).send({ error: 'Неверное направление' });
+    const r = await db.query('UPDATE signal_pairs SET direction=$2, direction_at=CASE WHEN $2::text IS NULL THEN NULL ELSE now() END, direction_by=CASE WHEN $2::text IS NULL THEN NULL ELSE $3::int END WHERE pair=$1', [pair, d || null, req.staff!.id]);
+    if (!r.rowCount) return reply.code(404).send({ error: 'Пара не найдена' });
+    return { ok: true };
+  });
+
   // Случайный сигнал только для проверки бота: всегда помечен ТЕСТ и уходит только тестовым аккаунтам
   app.post('/signals/test', { preHandler: need('admin') }, async (req) => {
     const pairs = ['EUR/USD OTC', 'GBP/USD OTC', 'USD/JPY OTC', 'AUD/CAD OTC', 'EUR/GBP OTC'];

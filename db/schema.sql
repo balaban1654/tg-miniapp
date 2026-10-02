@@ -197,6 +197,31 @@ CREATE UNIQUE INDEX IF NOT EXISTS deals_signal_once ON deals(tg_id, signal_id) W
 -- Тестовая история для просмотра оформления: только для тестовых аккаунтов, итог хранится прямо в сигнале
 ALTER TABLE signals ADD COLUMN IF NOT EXISTS demo_result TEXT CHECK (demo_result IN ('win','loss'));
 
+-- Сигналы по запросу клиента: сигнал виден только тому, кто его запросил
+ALTER TABLE signals ADD COLUMN IF NOT EXISTS requested_by BIGINT;
+-- Пары для запроса сигнала. Направление ставит человек (аналитик) в Office и оно действует ограниченное время
+CREATE TABLE IF NOT EXISTS signal_pairs (
+  pair         TEXT PRIMARY KEY,
+  enabled      BOOLEAN NOT NULL DEFAULT TRUE,
+  sort         INT NOT NULL DEFAULT 0,
+  payout       INT NOT NULL DEFAULT 92,
+  direction    TEXT CHECK (direction IN ('up','down')),
+  direction_at TIMESTAMPTZ,
+  direction_by INT REFERENCES staff(id)
+);
+INSERT INTO signal_pairs (pair, sort) VALUES
+  ('EUR/USD OTC',1),('GBP/USD OTC',2),('AUD/CHF OTC',3),('AUD/USD OTC',4),('USD/JPY OTC',5),('EUR/JPY OTC',6)
+  ON CONFLICT DO NOTHING;
+CREATE TABLE IF NOT EXISTS signal_settings (
+  id                INT PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+  enabled           BOOLEAN NOT NULL DEFAULT FALSE,
+  expiry_min        INT NOT NULL DEFAULT 1,
+  enter_in_sec      INT NOT NULL DEFAULT 120,
+  direction_ttl_min INT NOT NULL DEFAULT 10,
+  cooldown_sec      INT NOT NULL DEFAULT 180
+);
+INSERT INTO signal_settings (id) VALUES (1) ON CONFLICT DO NOTHING;
+
 -- Разовая пометка: все сигналы, созданные до запуска, считаются тестовыми (их можно вернуть кнопкой «Сделать обычным» в Office)
 CREATE TABLE IF NOT EXISTS app_flags (key TEXT PRIMARY KEY, set_at TIMESTAMPTZ DEFAULT now());
 DO $$

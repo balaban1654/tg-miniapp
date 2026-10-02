@@ -413,6 +413,66 @@ async function signalCard(){
     sg.is_test?null:el('p',{class:'sm',style:'margin:0'},'Это мнение аналитика, а не гарантия результата. Торгуйте только той суммой, которую готовы потерять.'));
 }
 
+/** Сигнал по запросу клиента: выбор пары, «анализ» и карточка с обратным отсчётом до входа */
+async function requestCard(){
+  const o=await api('/signals/request');
+  if(!o.enabled)return null;
+  const mins=Math.round(o.enterInSec/60*10)/10;
+  const btn=el('button',{class:'btn',type:'button',onclick:()=>signalPairs()},'Получить сигнал');
+  const hint=el('div',{class:'sm',style:'text-align:center'});
+  if(o.cooldownLeft>0){
+    btn.disabled=true;let left=o.cooldownLeft;
+    const t=()=>{if(left<=0){btn.disabled=false;hint.textContent='';return}hint.textContent='Следующий сигнал можно получить через '+left+' сек.';left--};
+    t();timers.push(setInterval(t,1000));
+  }
+  return el('div',{class:'card hero'},el('h3',{style:'font-size:15px'},'Сигнал по запросу'),
+    el('div',{class:'sm',style:'line-height:1.5'},'Выберите пару: мы подготовим сигнал и покажем время до входа ('+String(mins).replace('.',',')+' мин). Это мнение аналитика, а не гарантия результата.'),btn,hint);
+}
+async function signalPairs(){
+  clearTimers();
+  let o;try{o=await api('/signals/request')}catch(e){toast(e.message);return}
+  if(!o.enabled){toast('Сигналы по запросу пока недоступны');render();return}
+  shell('Сигнал',[el('button',{class:'back',type:'button',onclick:()=>{tab='home';render()}},'‹ Назад'),
+    el('div',{class:'fs-tip'},'Выберите валютную пару'),
+    o.pairs.length?o.pairs.map(p=>el('button',{class:'prow',type:'button',disabled:!p.available,style:p.available?'':'opacity:.5',onclick:()=>signalPrep(p.pair)},el('span',{},p.pair),el('span',{class:'pay'},p.available?'+'+p.payout+'%':'нет входа'))):el('div',{class:'card sm'},'Пары скоро появятся.'),
+    el('div',{class:'note'},'Перед началом торговли проверяйте процент выплаты на платформе Pocket Option: он может меняться.')]);
+}
+async function signalPrep(pair){
+  clearTimers();
+  const buzzL=()=>{try{if(tg&&tg.HapticFeedback)tg.HapticFeedback.impactOccurred('light');else if(navigator.vibrate)navigator.vibrate(12)}catch{}};
+  const labels=['Пара из списка','Настройки терминала','Время входа'];
+  const rows=labels.map(l=>{const ic=el('span',{class:'spin'}),st2=el('span',{class:'sm'},'…');return{ic,st2,node:el('div',{class:'i'},ic,el('b',{style:'flex:1'},l),st2)}});
+  const holder=el('div',{});
+  shell('Сигнал',[el('div',{class:'fs-tip'},'Готовим сигнал по '+pair+'…'),el('div',{class:'ck'},rows.map(r=>r.node)),holder]);
+  const req=api('/signals/request',{method:'POST',body:{pair}}).then(r=>({r}),e=>({e}));
+  rows.forEach((r,i)=>timers.push(setTimeout(()=>{r.ic.className='tick';r.ic.textContent='✓';r.st2.textContent='готово';r.st2.style.color='var(--ok)';buzzL()},(i+1)*2000)));
+  timers.push(setTimeout(async()=>{
+    const res=await req;
+    if(res.e){toast(res.e.message);signalPairs();return}
+    buzzL();signalResult(res.r);
+  },6300));
+}
+function signalResult(r){
+  clearTimers();
+  const sg=r.signal,skew=Date.parse(r.now)-Date.now(),entry=Date.parse(sg.entry_at),up=sg.direction==='up';
+  const hm=new Date(entry).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
+  const left=el('b',{class:'big',style:'font-size:30px;color:var(--acc2);text-align:center;display:block'});
+  const tick=()=>{const sec=Math.round((entry-(Date.now()+skew))/1000);
+    left.textContent=sec>0?'До входа '+Math.floor(sec/60)+':'+String(sec%60).padStart(2,'0'):'Время входа наступило'};
+  tick();timers.push(setInterval(tick,1000));
+  const take=el('button',{class:'btn',type:'button',style:'margin-top:8px',onclick:async e=>{e.currentTarget.disabled=true;try{await api('/signals/'+sg.id+'/take',{method:'POST'});toast('Сделка записана');tab='home';render()}catch(x){toast(x.message);tab='home';render()}}},'Я вошёл в сделку');
+  shell('Сигнал',[
+    sg.is_test?el('div',{class:'sm',style:'color:var(--warn)'},'Тестовый сигнал. Не для торговли.'):null,
+    el('div',{class:'sig rise'},el('h3',{},'Сигнал готов'),left,
+      el('div',{class:'r'},el('span',{},'Время входа'),el('b',{},hm)),
+      el('div',{class:'r'},el('span',{},'Пара'),el('b',{},sg.pair)),
+      el('div',{class:'r'},el('span',{},'Направление'),el('b',{style:'color:var(--'+(up?'ok':'bad')+')'},up?'ВВЕРХ (BUY)':'ВНИЗ (SELL)')),
+      el('div',{class:'r'},el('span',{},'Время сделки'),el('b',{},sg.expiry_min+' мин')),
+      el('div',{class:'r'},el('span',{},'Ставка'),el('b',{},'1–3% от депозита')),
+      take),
+    el('button',{class:'btn o',type:'button',onclick:()=>{tab='home';render()}},'На главную'),
+    el('p',{class:'sm',style:'margin:0'},'Это мнение аналитика, а не гарантия результата. Торгуйте только той суммой, которую готовы потерять.')]);
+}
 async function refreshMe(){me=await api('/me');return me}
 
 async function viewHome(){
@@ -457,14 +517,16 @@ async function viewHome(){
   const pending=d.deals.find(x=>!x.result);
   const items=[profileCard(),stats4(me.stats)];
   const sigCard=await signalCard().catch(()=>null);
+  const reqCard=sigCard||d.deals.find(x=>!x.result)?null:await requestCard().catch(()=>null);
   if(sigCard)items.push(sigCard);
+  if(reqCard)items.push(reqCard);
   if(pending){
     const mark=async r=>{try{await api('/deals/'+pending.id+'/result',{method:'POST',body:{result:r}});await refreshMe();toast('Записано');render()}catch(e){toast(e.message)}};
     items.push(el('div',{class:'card hero'},el('h3',{style:'font-size:14px'},'Чем закончилась сделка?'),
       el('div',{class:'sm'},pending.pair+' · '+(pending.direction==='up'?'Вверх':'Вниз')+' · '+pending.expiry_min+' мин'),
       el('div',{class:'two'},el('button',{class:'btn g',type:'button',onclick:()=>mark('win')},'Плюс'),el('button',{class:'btn r',type:'button',onclick:()=>mark('loss')},'Минус')),
       el('button',{class:'btn o',type:'button',onclick:()=>mark('skip')},'Не входил')));
-  }else if(!sigCard){
+  }else if(!sigCard&&!reqCard){
     items.push(el('div',{class:'card empty'},el('div',{class:'ic'},svgEl('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.9 19.1a10 10 0 010-14.2M19.1 4.9a10 10 0 010 14.2M8.1 15.9a5.5 5.5 0 010-7.8M15.9 8.1a5.5 5.5 0 010 7.8"/><circle cx="12" cy="12" r="1.6"/></svg>')),el('b',{},'Сейчас нет активного сигнала'),
       el('div',{class:'sm'},'Когда появится новый сигнал, мы пришлём сообщение в Telegram. А пока можно потренироваться.'),
       el('button',{class:'btn o',type:'button',onclick:()=>go('trainer')},'Открыть тренажёр')));
