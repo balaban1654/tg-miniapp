@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#0d0817">
+<title>Hunter AI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap">
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+:root{--bg:#0d0817;--bg2:#150d26;--card:#1c1233;--card2:#251847;--line:#34255c;--fg:#f1ebff;--mut:#a89cc8;--acc:#9b5cff;--acc2:#c9a6ff;--acc3:#6a2fe0;--ok:#3ddc97;--warn:#ffb84d;--bad:#ff6b8a;
+--fd:'Unbounded',system-ui,sans-serif;--fb:'Manrope',system-ui,sans-serif;--fm:'JetBrains Mono',ui-monospace,monospace;color-scheme:dark}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%}
+body{background:linear-gradient(180deg,#1a0f33,#0d0817 45%) fixed,var(--bg);color:var(--fg);font:14px/1.5 var(--fb);overscroll-behavior:none}
+h1,h2,h3{font-family:var(--fd);margin:0;line-height:1.25}
+button{font:inherit;color:inherit}
+[hidden]{display:none!important}
+#root{max-width:480px;margin:0 auto;min-height:100%;display:flex;flex-direction:column}
+.hd{position:sticky;top:0;z-index:5;background:#0d0817ee;backdrop-filter:blur(8px);padding:12px 16px 10px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.brand{display:flex;gap:8px;align-items:center;font:700 15px var(--fd)}
+.logo{width:28px;height:28px;border-radius:50%;background:var(--acc);display:grid;place-items:center;font:700 12px var(--fd)}
+.hr{display:flex;gap:8px;align-items:center}
+.pillb{border:1px solid var(--line);background:none;border-radius:99px;padding:6px 12px;font-size:12px;color:var(--mut);cursor:pointer}
+.avb{width:32px;height:32px;border-radius:50%;border:2px solid var(--acc);background:var(--card2);color:var(--acc2);font:700 12px var(--fd);cursor:pointer;display:grid;place-items:center;padding:0}
+main{flex:1;padding:6px 16px 96px;display:grid;gap:12px;align-content:start}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;min-width:0}
+.card.hero{border-color:var(--acc);background:linear-gradient(180deg,#2a1857,var(--card));display:grid;gap:10px}
+.card.grad{background:linear-gradient(135deg,var(--acc3),#3a1c8a);border:0}
+.row{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.sm{font-size:12px;color:var(--mut)} .mut{color:var(--mut)} .mono{font-family:var(--fm)}
+.ok{color:var(--ok)} .bad{color:var(--bad)}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.stats.s3{grid-template-columns:repeat(3,1fr)}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 12px}
+.stat b{display:block;font:700 20px var(--fm)}
+.btn{display:block;width:100%;text-align:center;background:var(--acc);color:#fff;border:0;border-radius:14px;padding:13px;font-weight:700;font-size:14px;cursor:pointer}
+.btn:active{transform:scale(.98)}.btn.o{background:none;border:1px solid var(--acc);color:var(--acc2)}.btn:disabled{opacity:.45}
+.btn.g{background:var(--ok);color:#06210f}.btn.r{background:var(--bad);color:#2b0610}
+.btn.sm2{padding:8px;font-size:12px;border-radius:10px}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{border:1px solid var(--line);background:none;border-radius:99px;padding:6px 14px;font-size:12px;color:var(--mut);cursor:pointer}
+.chip.on{background:var(--acc);border-color:var(--acc);color:#fff}
+.seg{display:grid;grid-template-columns:1fr 1fr;gap:6px;background:var(--bg2);padding:4px;border-radius:12px}
+.seg button{border:0;background:none;border-radius:9px;padding:9px 6px;font-size:12px;font-weight:600;color:var(--mut);cursor:pointer}
+.seg button.on{background:var(--acc);color:#fff}
+.tabs{position:fixed;left:0;right:0;bottom:0;z-index:6;background:#0b0616;border-top:1px solid var(--line);padding:8px 8px calc(8px + env(safe-area-inset-bottom,0px))}
+.tabs div{max-width:480px;margin:0 auto;display:grid;grid-template-columns:repeat(4,1fr)}
+.tabs button{background:none;border:0;display:grid;justify-items:center;gap:2px;font-size:11px;color:var(--mut);padding:4px;cursor:pointer}
+.tabs button.on{color:var(--acc2)} .tabs svg{width:22px;height:22px}
+.pill{display:inline-block;border-radius:99px;padding:2px 10px;font:600 11px var(--fm)}
+.p-ok{background:#3ddc9722;color:var(--ok)}.p-bad{background:#ff6b8a22;color:var(--bad)}.p-pur{background:#9b5cff33;color:var(--acc2)}.p-warn{background:#ffb84d22;color:var(--warn)}
+.bars{display:flex;gap:6px;align-items:flex-end;height:80px}
+.bars div{flex:1;display:flex;flex-direction:column-reverse;gap:2px;height:100%;justify-content:flex-start}
+.bars i{display:block;border-radius:3px}.bars i.has{min-height:3px}
+.bars .w{background:var(--ok)}.bars .l{background:var(--bad)}
+.days{display:flex;gap:6px;color:var(--mut);font-size:10px}.days span{flex:1;text-align:center}
+.ava{width:48px;height:48px;border-radius:50%;border:2px solid var(--acc);background:var(--card2);color:var(--acc2);font:700 18px var(--fd);display:grid;place-items:center;flex:none}
+.empty{text-align:center;padding:26px 10px;display:grid;gap:8px;justify-items:center}
+.empty .ic{font-size:34px}
+.lesson{display:flex;gap:12px;align-items:center;cursor:pointer;width:100%;text-align:left;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:13px;color:inherit}
+.num{width:34px;height:34px;border-radius:50%;background:var(--card2);display:grid;place-items:center;font:700 14px var(--fm);flex:none;color:var(--acc2)}
+.num.done{background:var(--ok);color:#06210f}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.tr{display:grid;gap:8px}
+.back{background:none;border:0;color:var(--acc2);padding:4px 0;cursor:pointer;font-size:13px;text-align:left}
+ol.steps{margin:0;padding-left:20px;display:grid;gap:8px}
+.toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:var(--card2);border:1px solid var(--acc);padding:10px 16px;border-radius:12px;z-index:9;max-width:90%;text-align:center}
+svg{max-width:100%}
+.err{color:var(--bad)}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+const tg=window.Telegram&&window.Telegram.WebApp;
+try{tg&&tg.ready();tg&&tg.expand();tg&&tg.setHeaderColor&&tg.setHeaderColor('#0d0817');tg&&tg.setBackgroundColor&&tg.setBackgroundColor('#0d0817')}catch{}
+const $=s=>document.querySelector(s);
+const root=$('#root');
+let me=null,tab='home',region=null,timers=[];
+
+function el(tag,props={},...kids){
+  const e=document.createElement(tag);
+  for(const[k,v]of Object.entries(props)){if(k==='class')e.className=v;else if(k.startsWith('on'))e.addEventListener(k.slice(2),v);else if(v!==undefined&&v!==null&&v!==false)e.setAttribute(k,v===true?'':v)}
+  for(const k of kids.flat(Infinity))if(k!==null&&k!==undefined&&k!==false)e.append(k.nodeType?k:document.createTextNode(k));
+  return e;
+}
+const svgEl=h=>{const d=document.createElement('div');d.innerHTML=h;return d.firstElementChild};
+const money=v=>'$'+Number(v||0).toLocaleString('ru-RU',{maximumFractionDigits:2});
+const dmy=v=>new Date(v).toLocaleDateString('ru-RU',{day:'numeric',month:'long',year:'numeric'});
+const hm=v=>new Date(v).toLocaleString('ru-RU',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
+
+async function api(path,opts={}){
+  const r=await fetch('/api/app'+path,{method:opts.method||'GET',headers:{'content-type':'application/json',authorization:'tma '+(tg?tg.initData:'')},body:opts.body?JSON.stringify(opts.body):(opts.method&&opts.method!=='GET'?'{}':undefined)});
+  const data=await r.json().catch(()=>({}));
+  if(!r.ok)throw new Error(data.error||'Ошибка '+r.status);
+  return data;
+}
+function toast(t){const n=el('div',{class:'toast',role:'status'},t);document.body.append(n);setTimeout(()=>n.remove(),2200)}
+function openLink(u){
+  if(!u)return;
+  try{
+    if(tg&&/^https:\/\/t\.me\//.test(u)&&tg.openTelegramLink)return tg.openTelegramLink(u);
+    if(tg&&tg.openLink)return tg.openLink(u);
+  }catch{}
+  window.open(u,'_blank');
+}
+function clearTimers(){timers.forEach(clearInterval);timers.forEach(clearTimeout);timers=[]}
+
+const ICON={home:'<path d="M3 11l9-8 9 8v9a1 1 0 01-1 1h-5v-6H9v6H4a1 1 0 01-1-1z"/>',deals:'<path d="M4 5h16v2H4zm0 6h16v2H4zm0 6h16v2H4z"/>',trainer:'<path d="M3 3h8v8H3zm10 0h8v8h-8zM3 13h8v8H3zm10 0h8v8h-8z"/>',media:'<path d="M3 5h18v14H3zm7 3v8l6-4z"/>'};
+const TABS=[['home','Главная'],['deals','Сделки'],['trainer','Тренажёр'],['media','Медиа']];
+
+function shell(title,body){
+  const init=(me.name||'?').trim().slice(0,1).toUpperCase();
+  root.replaceChildren(
+    el('div',{class:'hd'},
+      el('div',{class:'brand'},el('div',{class:'logo'},'H'),title||'Hunter AI'),
+      el('div',{class:'hr'},me.supportUrl?el('button',{class:'pillb',type:'button',onclick:()=>openLink(me.supportUrl)},'Поддержка'):null,
+        el('button',{class:'avb',type:'button','aria-label':'Профиль',onclick:()=>go('profile')},init))),
+    el('main',{},body),
+    el('nav',{class:'tabs'},el('div',{},TABS.map(([k,t])=>el('button',{type:'button',class:k===tab?'on':'',onclick:()=>go(k)},svgEl('<svg viewBox="0 0 24 24" fill="currentColor">'+ICON[k]+'</svg>'),t)))));
+}
+function go(t){tab=t;render()}
+
+async function render(){
+  clearTimers();
+  try{
+    if(tab==='home')await viewHome();
+    else if(tab==='deals')await viewDeals();
+    else if(tab==='trainer')await viewTrainer();
+    else if(tab==='media')await viewMedia();
+    else if(tab==='profile')viewProfile();
+  }catch(e){shell('Hunter AI',el('div',{class:'card err'},e.message))}
+}
+
+const stats4=s=>el('div',{class:'stats'},
+  el('div',{class:'stat'},el('b',{},s.deals),el('span',{class:'sm'},'сделок')),
+  el('div',{class:'stat'},el('b',{class:'ok'},s.wins),el('span',{class:'sm'},'плюс')),
+  el('div',{class:'stat'},el('b',{class:'bad'},s.losses),el('span',{class:'sm'},'минус')),
+  el('div',{class:'stat'},el('b',{},s.rate===null?'—':s.rate+'%'),el('span',{class:'sm'},'успешных')));
+
+const profileCard=()=>el('div',{class:'card row',style:'justify-content:flex-start;gap:12px'},
+  el('div',{class:'ava'},(me.name||'?').trim().slice(0,1).toUpperCase()),
+  el('div',{},el('b',{style:'font:700 15px var(--fd)'},me.name),el('div',{class:'sm'},'В клубе с '+dmy(me.since))));
+
+const CANDLES=svgEl(`<svg viewBox="0 0 260 70" aria-hidden="true" style="height:70px;width:100%"><g stroke="#c9a6ff" stroke-width="2"><line x1="20" y1="30" x2="20" y2="62"/><line x1="55" y1="38" x2="55" y2="60"/><line x1="90" y1="26" x2="90" y2="56"/><line x1="125" y1="36" x2="125" y2="56"/><line x1="160" y1="22" x2="160" y2="50"/><line x1="195" y1="28" x2="195" y2="52"/><line x1="230" y1="8" x2="230" y2="40"/></g><rect x="15" y="38" width="10" height="20" rx="2" fill="#9b5cff"/><rect x="50" y="42" width="10" height="12" rx="2" fill="#ff6b8a"/><rect x="85" y="32" width="10" height="18" rx="2" fill="#9b5cff"/><rect x="120" y="40" width="10" height="12" rx="2" fill="#ff6b8a"/><rect x="155" y="26" width="10" height="18" rx="2" fill="#9b5cff"/><rect x="190" y="32" width="10" height="14" rx="2" fill="#ff6b8a"/><rect x="225" y="12" width="10" height="24" rx="2" fill="#9b5cff"/></svg>`);
+
+async function refreshMe(){me=await api('/me');return me}
+
+async function viewHome(){
+  if(!me)await refreshMe();
+  if(!me.access){
+    region=region||me.region||me.regionGuess;
+    const url=()=>me.registerUrl[region];
+    const seg=el('div',{class:'seg',role:'group','aria-label':'Регион'});
+    const drawSeg=()=>{seg.replaceChildren(
+      el('button',{type:'button',class:region==='ru'?'on':'',onclick:()=>{region='ru';drawSeg();drawBtn()}},'Россия и СНГ'),
+      el('button',{type:'button',class:region==='ww'?'on':'',onclick:()=>{region='ww';drawSeg();drawBtn()}},'Европа и другие страны'))};
+    const btnBox=el('div',{});
+    const drawBtn=()=>{btnBox.replaceChildren(url()?el('button',{class:'btn',type:'button',onclick:async()=>{try{await api('/region',{method:'POST',body:{region}})}catch{}openLink(url())}},'Зарегистрироваться'):el('div',{class:'sm'},'Ссылка регистрации пока не настроена. Напишите в поддержку.'))};
+    drawSeg();drawBtn();
+    const check=el('button',{class:'btn o',type:'button',onclick:async()=>{await refreshMe();if(me.access){toast('Доступ открыт');render()}else toast('Пока нет депозита. Это может занять несколько минут.')}},'Я пополнил счёт, проверить доступ');
+    shell('Hunter AI',[profileCard(),stats4({deals:0,wins:0,losses:0,rate:null}),
+      el('div',{class:'card hero'},CANDLES.cloneNode(true),
+        el('h2',{style:'font-size:16px'},'Доступ откроется после регистрации'),
+        el('p',{class:'sm',style:'margin:0'},'Создайте аккаунт Pocket Option по нашей ссылке и пополните счёт. Доступ откроется автоматически. Рекомендуем пополнять от 100 $.'),
+        el('div',{class:'sm'},'Где вы находитесь?'),seg,
+        me.promo?el('div',{class:'row card',style:'padding:10px 12px'},el('div',{},el('div',{class:'sm'},'Промокод'),el('b',{class:'mono'},me.promo)),el('button',{class:'pillb',type:'button',onclick:async()=>{try{await navigator.clipboard.writeText(me.promo);toast('Промокод скопирован')}catch{toast('Выделите промокод вручную')}}},'Копировать')):null,
+        btnBox),
+      check]);
+    return;
+  }
+  const d=await api('/deals?period=7');
+  const pending=d.deals.find(x=>!x.result);
+  const items=[profileCard(),stats4(me.stats)];
+  if(pending){
+    const mark=async r=>{try{await api('/deals/'+pending.id+'/result',{method:'POST',body:{result:r}});await refreshMe();toast('Записано');render()}catch(e){toast(e.message)}};
+    items.push(el('div',{class:'card hero'},el('h3',{style:'font-size:14px'},'Чем закончилась сделка?'),
+      el('div',{class:'sm'},pending.pair+' · '+(pending.direction==='up'?'Вверх':'Вниз')+' · '+pending.expiry_min+' мин'),
+      el('div',{class:'two'},el('button',{class:'btn g',type:'button',onclick:()=>mark('win')},'Плюс'),el('button',{class:'btn r',type:'button',onclick:()=>mark('loss')},'Минус')),
+      el('button',{class:'btn o',type:'button',onclick:()=>mark('skip')},'Не входил')));
+  }else{
+    items.push(el('div',{class:'card empty'},el('div',{class:'ic'},'📡'),el('b',{},'Сейчас нет активного сигнала'),
+      el('div',{class:'sm'},'Когда появится новый сигнал, мы пришлём сообщение в Telegram. А пока можно потренироваться.'),
+      el('button',{class:'btn o',type:'button',onclick:()=>go('trainer')},'Открыть тренажёр')));
+  }
+  items.push(el('p',{class:'sm',style:'margin:0;text-align:center'},'Торговля бинарными опционами связана с риском потери капитала. Сигналы не гарантируют результат.'));
+  shell('Hunter AI',items);
+}
+
+let period='7';
+async function viewDeals(){
+  if(!me)await refreshMe();
+  const d=await api('/deals?period='+period);
+  const chips=el('div',{class:'chips'},[['7','7 дней'],['30','30 дней'],['all','Всё время']].map(([k,t])=>el('button',{type:'button',class:'chip'+(k===period?' on':''),onclick:()=>{period=k;render()}},t)));
+  const sum=el('div',{class:'stats s3'},
+    el('div',{class:'stat'},el('b',{},d.total),el('span',{class:'sm'},'сделок')),
+    el('div',{class:'stat'},el('b',{class:'ok'},d.wins),el('span',{class:'sm'},'плюс')),
+    el('div',{class:'stat'},el('b',{class:'bad'},d.losses),el('span',{class:'sm'},'минус')));
+  const days=[];for(let i=6;i>=0;i--){const t=new Date(Date.now()-i*864e5);days.push(t.toISOString().slice(0,10))}
+  const byDay=Object.fromEntries(d.byDay.map(x=>[x.day,x]));
+  const max=Math.max(1,...days.map(k=>(byDay[k]?.wins||0)+(byDay[k]?.losses||0)));
+  const chart=el('div',{class:'card'},el('div',{class:'row'},el('b',{},'По дням'),el('span',{class:'sm'},'плюс · минус')),
+    el('div',{class:'bars',style:'margin-top:10px'},days.map(k=>{const x=byDay[k]||{wins:0,losses:0};return el('div',{},el('i',{class:'w'+(x.wins?' has':''),style:'height:'+(x.wins/max*100)+'%'}),el('i',{class:'l'+(x.losses?' has':''),style:'height:'+(x.losses/max*100)+'%'}))})),
+    el('div',{class:'days',style:'margin-top:4px'},days.map(k=>el('span',{},new Date(k+'T12:00:00').toLocaleDateString('ru-RU',{weekday:'short'})))));
+  const hist=d.deals.length?el('div',{style:'display:grid;gap:8px'},d.deals.map(x=>el('div',{class:'card row'},el('div',{},el('b',{},x.pair),el('div',{class:'sm'},(x.direction==='up'?'Вверх':'Вниз')+' · '+x.expiry_min+' мин · '+hm(x.created_at))),
+    x.result==='win'?el('span',{class:'pill p-ok'},'плюс'):x.result==='loss'?el('span',{class:'pill p-bad'},'минус'):x.result==='skip'?el('span',{class:'pill p-pur'},'не входил'):el('span',{class:'pill p-warn'},'ждёт итога')))):
+    el('div',{class:'card empty'},el('div',{class:'ic'},'📈'),el('b',{},'Сделок пока нет'),el('div',{class:'sm'},'Когда вы отметите результат первой сделки, она появится здесь.'));
+  shell('Мои сделки',[chips,sum,chart,el('b',{},'История'),hist]);
+}
+
+let lessons=null;
+async function viewTrainer(sel){
+  if(!me)await refreshMe();
+  lessons=await api('/trainer');
+  if(sel){return lessonView(lessons.find(l=>l.id===sel))}
+  const done=lessons.filter(l=>l.done).length;
+  shell('Тренажёр',[el('div',{},el('h2',{style:'font-size:18px'},'Тренажёр'),
+    el('p',{class:'sm',style:'margin:6px 0 0'},'Три коротких урока и практика на учебном графике. Учебный баланс 1 000 $, рисковать нечем.')),
+    el('div',{class:'card'},el('div',{class:'row'},el('span',{class:'sm'},'Пройдено'),el('b',{class:'mono'},done+' из '+lessons.length)),el('div',{style:'height:6px;border-radius:9px;background:#ffffff1a;margin-top:8px;overflow:hidden'},el('i',{style:'display:block;height:100%;width:'+(done/lessons.length*100)+'%;background:linear-gradient(90deg,var(--acc),var(--acc2))'}))),
+    lessons.map(l=>el('button',{class:'lesson',type:'button',onclick:()=>viewTrainer(l.id)},el('div',{class:'num'+(l.done?' done':'')},l.done?'✓':l.id),el('div',{},el('b',{},'Урок '+l.id+' · '+l.title),el('div',{class:'sm'},l.sub))))]);
+}
+
+function lessonView(l){
+  const bal=()=>{try{return Number(localStorage.getItem('train_bal'))||1000}catch{return 1000}};
+  const setBal=v=>{try{localStorage.setItem('train_bal',String(v))}catch{}};
+  const balEl=el('b',{class:'mono'},money(bal()));
+  const msg=el('div',{class:'sm',role:'status'},'Нажмите «Вверх» или «Вниз», результат через 8 секунд.');
+  const svg=svgEl('<svg viewBox="0 0 280 120" role="img" aria-label="Учебный график" style="width:100%;height:150px"><polyline id="ln" fill="none" stroke="#c9a6ff" stroke-width="2"/><line id="en" x1="0" x2="280" stroke="#3ddc97" stroke-dasharray="4 4" visibility="hidden"/></svg>');
+  let p=[];let v=100;for(let i=0;i<60;i++){v+=(Math.random()-.5)*2.2;p.push(v)}
+  let entry=null,busy=false;
+  const draw=()=>{const lo=Math.min(...p),hi=Math.max(...p),r=(hi-lo)||1;const y=x=>110-((x-lo)/r)*100;
+    svg.querySelector('#ln').setAttribute('points',p.map((x,i)=>(i/(p.length-1)*280).toFixed(1)+','+y(x).toFixed(1)).join(' '));
+    const en=svg.querySelector('#en');if(entry!==null){en.setAttribute('y1',y(entry));en.setAttribute('y2',y(entry));en.setAttribute('visibility','visible')}else en.setAttribute('visibility','hidden')};
+  draw();
+  timers.push(setInterval(()=>{p.push(p[p.length-1]+(Math.random()-.5)*2.2);p.shift();draw()},400));
+  const bet=dir=>{
+    if(busy)return;busy=true;entry=p[p.length-1];up.disabled=down.disabled=true;
+    let left=8;msg.textContent='Сделка открыта. Осталось '+left+' с';
+    const t=setInterval(()=>{left--;msg.textContent='Сделка открыта. Осталось '+left+' с';
+      if(left<=0){clearInterval(t);const now=p[p.length-1];const diff=now-entry;
+        const res=Math.abs(diff)<.01?'draw':((diff>0)===(dir==='up')?'win':'loss');
+        const stake=50;let b=bal();
+        if(res==='win'){b+=stake*.8;msg.textContent='Плюс! +'+money(stake*.8)}else if(res==='loss'){b-=stake;msg.textContent='Минус: −'+money(stake)+'. Так бывает, главное держать риск под контролем.'}else msg.textContent='Цена закрылась на уровне входа. Ставка возвращается.';
+        setBal(b);balEl.textContent=money(b);entry=null;busy=false;up.disabled=down.disabled=false}},1000);
+    timers.push(t)};
+  const up=el('button',{class:'btn g',type:'button',onclick:()=>bet('up')},'Вверх ▲');
+  const down=el('button',{class:'btn r',type:'button',onclick:()=>bet('down')},'Вниз ▼');
+  const finish=el('button',{class:'btn',type:'button',onclick:async()=>{try{await api('/trainer/'+l.id+'/done',{method:'POST'});toast('Урок пройден');tab='trainer';render()}catch(e){toast(e.message)}}},l.done?'Пройти заново позже':'Отметить урок пройденным');
+  shell('Урок '+l.id,[el('button',{class:'back',type:'button',onclick:()=>{tab='trainer';render()}},'‹ Назад к урокам'),
+    el('h2',{style:'font-size:17px'},l.title),
+    el('div',{class:'card'},el('ol',{class:'steps'},l.steps.map(s=>el('li',{},s)))),
+    el('div',{class:'card'},el('div',{class:'row'},el('b',{},'Практика'),el('span',{class:'sm'},'Учебный баланс '),balEl),svg,msg,el('div',{class:'two',style:'margin-top:8px'},up,down)),
+    finish]);
+}
+
+async function viewMedia(){
+  if(!me)await refreshMe();
+  const m=await api('/media');
+  const ch=m.channels.length?m.channels.map(c=>el('button',{class:'lesson',type:'button',onclick:()=>openLink(c.url)},el('div',{style:'flex:1'},el('b',{},c.title),el('div',{class:'sm'},c.subtitle||'')),el('span',{class:'sm'},'↗'))):[el('div',{class:'card sm'},'Каналы скоро появятся.')];
+  const tr=m.traders.length?el('div',{class:'two'},m.traders.map(t=>el('div',{class:'card tr'},el('div',{class:'ava'},t.title.slice(0,1).toUpperCase()),el('b',{},t.title),el('div',{class:'sm'},t.subtitle||'Трейдер клуба'),el('button',{class:'btn o sm2',type:'button',onclick:()=>openLink(t.url)},'Канал трейдера')))):el('div',{class:'card sm'},'Трейдеры скоро появятся.');
+  shell('Медиа',[el('b',{},'Наши трейдеры'),tr,el('b',{},'Каналы клуба'),ch]);
+}
+
+function viewProfile(){
+  const rows=[['Telegram ID',me.tgId],['Pocket ID',me.pocketId||'ещё нет'],['Статус',({new:'новый',registered:'зарегистрирован',ftd:'пополнил счёт',active:'активен',churned:'неактивен'})[me.status]||me.status],['Менеджер',me.manager||'не назначен'],['Доступ',me.access?'открыт':'закрыт']];
+  shell('Профиль',[el('div',{class:'card row',style:'justify-content:flex-start;gap:12px'},el('div',{class:'ava'},(me.name||'?').trim().slice(0,1).toUpperCase()),el('div',{},el('b',{style:'font:700 16px var(--fd)'},me.name),el('div',{class:'sm'},me.username?'@'+me.username:''))),
+    el('div',{class:'card',style:'display:grid;gap:10px'},rows.map(([k,v])=>el('div',{class:'row'},el('span',{class:'sm'},k),el('b',{class:'mono'},String(v))))),
+    me.promo?el('div',{class:'card row'},el('span',{class:'sm'},'Промокод'),el('b',{class:'mono'},me.promo)):null,
+    me.supportUrl?el('button',{class:'btn o',type:'button',onclick:()=>openLink(me.supportUrl)},'Написать в поддержку'):null,
+    el('button',{class:'back',type:'button',onclick:()=>go('home')},'‹ На главную')]);
+}
+
+document.addEventListener('visibilitychange',async()=>{if(!document.hidden&&me&&!me.access&&tab==='home'){try{await refreshMe();if(me.access)render()}catch{}}});
+
+(async()=>{
+  if(!tg||!tg.initData){root.replaceChildren(el('main',{style:'padding:40px 16px;text-align:center;display:grid;gap:12px'},el('div',{class:'logo',style:'margin:auto;width:48px;height:48px;font-size:20px'},'H'),el('h2',{style:'font-size:18px'},'Hunter AI'),el('p',{class:'mut'},'Откройте приложение из Telegram, через бота @hunters_aibot.')));return}
+  try{await refreshMe();render()}catch(e){root.replaceChildren(el('main',{style:'padding:40px 16px;text-align:center'},el('p',{class:'err'},e.message)))}
+})();
+</script>
+</body>
+</html>

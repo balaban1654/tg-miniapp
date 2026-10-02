@@ -120,7 +120,7 @@ function showApp(){
   $('#meName').textContent=me.name+' · '+ROLE[me.role];
   const items=[['home','Обзор'],['leads','Лиды'],['links','Ссылки']];
   if(me.role==='admin'||me.role==='teamlead')items.push(['staff',me.role==='admin'?'Люди':'Моя команда']);
-  if(me.role==='admin')items.push(['pb','Постбеки']);
+  if(me.role==='admin')items.push(['media','Медиа'],['pb','Постбеки']);
   const nav=$('#nav');nav.replaceChildren(...items.map(([k,t])=>el('button',{type:'button','data-t':k,class:k===tab?'on':'',onclick:()=>{tab=k;showApp();render()}},t)));
   render();
 }
@@ -140,6 +140,7 @@ async function render(){
     else if(tab==='leads')m.replaceChildren(...await viewLeads());
     else if(tab==='links')m.replaceChildren(...await viewLinks());
     else if(tab==='staff')m.replaceChildren(...await viewStaff());
+    else if(tab==='media')m.replaceChildren(...await viewMedia());
     else if(tab==='pb')m.replaceChildren(...await viewPostbacks());
   }catch(x){if(x.message!=='auth')m.replaceChildren(el('div',{class:'err'},x.message))}
 }
@@ -212,6 +213,17 @@ async function viewStaff(){
     el('button',{class:'btn',type:'submit'},'Сохранить'),perr):el('span');
   return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},isAdmin?'Люди':'Моя команда')),form,poForm,
     table(['Имя','Логин','Роль','Тимлидер','Кампания PO','Промокод','За FTD','Процент','Статус',''],rows.map(r=>[td(r.name),td(r.login),el('td',{},el('span',{class:'pill p-pur'},ROLE[r.role])),td(parentName(r.parent_id)),td(r.po_campaign||'—'),td(r.po_promo||'—'),td(money(r.rate_ftd),'n'),td(Number(r.rate_percent)+'%','n'),el('td',{},el('span',{class:'pill '+(r.active?'p-ok':'p-bad')},r.active?'активен':'отключён')),el('td',{},toggle(r))]),'Пока никого нет.')];
+}
+
+async function viewMedia(){
+  const rows=await api('/media');
+  const f={kind:el('select',{},el('option',{value:'trader'},'Трейдер'),el('option',{value:'channel'},'Канал')),title:el('input',{required:'',placeholder:'Лера'}),sub:el('input',{placeholder:'Трейдер клуба'}),url:el('input',{required:'',placeholder:'https://t.me/...'}),sort:el('input',{type:'number',placeholder:'1'})};
+  const err=el('div',{class:'err',role:'alert'});
+  const form=el('form',{class:'card form',onsubmit:async e=>{e.preventDefault();err.textContent='';
+    try{await api('/media',{method:'POST',body:{kind:f.kind.value,title:f.title.value,subtitle:f.sub.value,url:f.url.value,sort:f.sort.value}});render()}catch(x){err.textContent=x.message}}},
+    el('label',{},'Тип',f.kind),el('label',{},'Название',f.title),el('label',{},'Подпись',f.sub),el('label',{},'Ссылка',f.url),el('label',{},'Порядок',f.sort),el('button',{class:'btn',type:'submit'},'Добавить'),err);
+  return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Медиа в Mini App')),form,
+    table(['Тип','Название','Подпись','Ссылка',''],rows.map(r=>[td(r.kind==='trader'?'Трейдер':'Канал'),td(r.title),td(r.subtitle||'—'),el('td',{},el('code',{},r.url)),el('td',{},el('button',{class:'btn o s',type:'button',onclick:async()=>{await api('/media/'+r.id,{method:'DELETE'});render()}},'Удалить'))]),'Пока пусто. Добавьте трейдеров и каналы, они появятся во вкладке «Медиа» в Mini App.')];
 }
 
 async function viewPostbacks(){

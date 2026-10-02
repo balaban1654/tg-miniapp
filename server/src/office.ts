@@ -294,6 +294,29 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     return r.rows;
   });
 
+  // Медиа для Mini App: трейдеры и каналы
+  app.get('/media', { preHandler: need('admin') }, async () => {
+    return (await db.query('SELECT id, kind, title, subtitle, url, sort, active FROM media_items ORDER BY kind DESC, sort, id')).rows;
+  });
+  app.post('/media', { preHandler: need('admin') }, async (req, reply) => {
+    const b = (req.body ?? {}) as Record<string, unknown>;
+    const kind = str(b.kind, 10);
+    const title = str(b.title, 80);
+    const url = str(b.url, 300);
+    if (!['trader', 'channel'].includes(kind)) return reply.code(400).send({ error: 'Неверный тип' });
+    if (!title) return reply.code(400).send({ error: 'Укажите название' });
+    if (!/^https:\/\/[^\s]+$/.test(url)) return reply.code(400).send({ error: 'Ссылка должна начинаться с https://' });
+    const r = await db.query(
+      'INSERT INTO media_items (kind, title, subtitle, url, sort) VALUES ($1,$2,$3,$4,$5) RETURNING id',
+      [kind, title, str(b.subtitle, 80) || null, url, Math.trunc(num(b.sort))],
+    );
+    return { id: r.rows[0].id };
+  });
+  app.delete<{ Params: { id: string } }>('/media/:id', { preHandler: need('admin') }, async (req) => {
+    await db.query('DELETE FROM media_items WHERE id = $1', [Number(req.params.id)]);
+    return { ok: true };
+  });
+
   // Очистка журнала. Лиды, события и деньги не затрагиваются
   app.delete('/postbacks', { preHandler: need('admin') }, async () => {
     const r = await db.query('DELETE FROM postback_log');

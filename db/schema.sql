@@ -79,3 +79,34 @@ ALTER TABLE staff ADD COLUMN IF NOT EXISTS po_promo    TEXT;
 ALTER TABLE staff ADD COLUMN IF NOT EXISTS po_link     TEXT;
 ALTER TABLE staff ADD COLUMN IF NOT EXISTS po_link_ru  TEXT;
 CREATE UNIQUE INDEX IF NOT EXISTS staff_po_campaign ON staff (lower(po_campaign)) WHERE po_campaign IS NOT NULL;
+
+-- Mini App: регион клиента, сделки, прогресс тренажёра, медиа
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS region TEXT;  -- 'ru' или 'ww'
+
+CREATE TABLE IF NOT EXISTS deals (
+  id         SERIAL PRIMARY KEY,
+  tg_id      BIGINT NOT NULL REFERENCES leads(tg_id),
+  pair       TEXT NOT NULL,
+  direction  TEXT NOT NULL CHECK (direction IN ('up','down')),
+  expiry_min INT NOT NULL DEFAULT 1,
+  result     TEXT CHECK (result IN ('win','loss','skip')),
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS deals_tg ON deals(tg_id, created_at);
+
+CREATE TABLE IF NOT EXISTS lesson_progress (
+  tg_id   BIGINT NOT NULL REFERENCES leads(tg_id),
+  lesson  INT NOT NULL,
+  done_at TIMESTAMPTZ DEFAULT now(),
+  PRIMARY KEY (tg_id, lesson)
+);
+
+CREATE TABLE IF NOT EXISTS media_items (
+  id       SERIAL PRIMARY KEY,
+  kind     TEXT NOT NULL CHECK (kind IN ('trader','channel')),
+  title    TEXT NOT NULL,
+  subtitle TEXT,
+  url      TEXT NOT NULL,
+  sort     INT DEFAULT 0,
+  active   BOOLEAN DEFAULT TRUE
+);

@@ -9,6 +9,7 @@ import { migrate } from './migrate.js';
 import { ensureAdmin } from './auth.js';
 import { officeRoutes } from './office.js';
 import { postbackRoutes } from './postback.js';
+import { appRoutes } from './app.js';
 
 const app = Fastify({ logger: true, trustProxy: true });
 await app.register(cookie);
@@ -21,6 +22,11 @@ const officeHtml = readFileSync(resolve(process.cwd(), 'public/office.html'), 'u
 app.get('/office', async (_req, reply) => reply.type('text/html; charset=utf-8').header('Cache-Control', 'no-store').send(officeHtml));
 await app.register(officeRoutes, { prefix: '/api/office' });
 await app.register(postbackRoutes);
+
+// Клиентский Mini App
+const appHtml = readFileSync(resolve(process.cwd(), 'public/app.html'), 'utf8');
+app.get('/app', async (_req, reply) => reply.type('text/html; charset=utf-8').header('Cache-Control', 'no-store').send(appHtml));
+await app.register(appRoutes, { prefix: '/api/app' });
 
 app.get('/health', async () => {
   await db.query('SELECT 1');
