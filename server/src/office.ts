@@ -415,15 +415,18 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
       const label = str(b.label, 40);
       const type = str(b.type, 12);
       if (!label) return 'У кнопки нужна подпись';
+      const extra: Partial<Button> = {};
+      if (['primary', 'success', 'danger'].includes(str(b.style, 10))) extra.style = str(b.style, 10) as Button['style'];
+      if (b.inline === true) extra.inline = true;
       if (type === 'url') {
         const url = str(b.url, 400);
         if (!/^https:\/\/[^\s]+$/.test(url)) return 'Ссылка кнопки должна начинаться с https://';
-        out.push({ label, type, url });
+        out.push({ label, type, url, ...extra });
       } else if (type === 'callback') {
         const data = str(b.data, 20);
-        if (!['acc_no', 'acc_yes'].includes(data)) return 'Неизвестное действие кнопки';
-        out.push({ label, type, data });
-      } else if (['miniapp', 'support', 'register'].includes(type)) out.push({ label, type: type as Button['type'] });
+        if (!['acc_no', 'acc_yes', 'acc_ready'].includes(data)) return 'Неизвестное действие кнопки';
+        out.push({ label, type, data, ...extra });
+      } else if (['miniapp', 'support', 'register'].includes(type)) out.push({ label, type: type as Button['type'], ...extra });
       else return 'Неизвестный тип кнопки';
     }
     return out;

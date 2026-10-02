@@ -1,7 +1,7 @@
 import Fastify from 'fastify';
 import { config } from './config.js';
 import { db } from './db.js';
-import { bot } from './bot.js';
+import { bot, setupBotProfile } from './bot.js';
 import cookie from '@fastify/cookie';
 import { readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -61,6 +61,7 @@ app.get<{ Params: { kind: string; slug: string } }>('/:kind(s|b)/:slug', async (
 await app.listen({ port: config.port, host: '0.0.0.0' });
 if (process.env.DISABLE_BOT !== '1') {
   startScheduler();
+  void setupBotProfile();
   bot
     .start({ onStart: (me) => app.log.info(`Бот @${me.username} запущен`) })
     .catch((e) => app.log.error(e, 'Бот не запустился. Проверьте BOT_TOKEN'));

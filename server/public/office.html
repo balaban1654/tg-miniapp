@@ -329,7 +329,7 @@ async function viewChats(){
 }
 
 const TRIG={start:'Нажал /start',no_reg:'Нет регистрации',no_deposit:'Регистрация без депозита',ftd:'Депозит получен',inactive:'Давно не заходил'};
-const BTYPE={miniapp:'Открыть кабинет',support:'Поддержка (чат в боте)',register:'Регистрация',url:'Своя ссылка',acc_no:'Ответ «Нет, создать»',acc_yes:'Ответ «Да, уже есть»'};
+const BTYPE={miniapp:'Открыть кабинет',support:'Поддержка (чат в боте)',register:'Регистрация',url:'Своя ссылка',acc_ready:'Ответ «Всё понятно — регистрация»',acc_no:'Ответ «Нет, создать»',acc_yes:'Ответ «Да, уже есть»'};
 const fmtDelay=m=>m===0?'сразу':m%1440===0?'через '+(m/1440)+' дн.':m%60===0?'через '+(m/60)+' ч':'через '+m+' мин';
 const sample=t=>t.replaceAll('{имя}','Аня').replaceAll('{стример}','Иван').replaceAll('{промокод}','LIO669');
 
@@ -343,16 +343,17 @@ function buttonsEditor(initial){
     const url=el('input',{placeholder:'https://…',value:b.url||''});
     const del=el('button',{class:'btn o s',type:'button',onclick:()=>{rows.splice(rows.indexOf(r),1);r.node.remove()}},'Убрать');
     const sync=()=>{url.hidden=type.value!=='url'};type.addEventListener('change',sync);sync();
-    const r={node:el('div',{class:'bt'},label,type,url,del),label,type,url};
+    const r={node:el('div',{class:'bt'},label,type,url,del),label,type,url,orig:b};
     rows.push(r);box.append(r.node);
   };
   (initial||[]).forEach(add);
   const addBtn=el('button',{class:'btn o s',type:'button',onclick:()=>{if(rows.length<4)add()}},'+ Кнопка');
   return{node:el('div',{style:'display:grid;gap:8px'},el('span',{class:'mut sm'},'Кнопки под сообщением (до 4)'),box,addBtn),
     get:()=>rows.filter(r=>r.label.value.trim()).map(r=>{const k=r.type.value;
-      if(k==='acc_no'||k==='acc_yes')return{label:r.label.value.trim(),type:'callback',data:k};
-      if(k==='url')return{label:r.label.value.trim(),type:'url',url:r.url.value.trim()};
-      return{label:r.label.value.trim(),type:k}})};
+      const keep={...(r.orig.style?{style:r.orig.style}:{}),...(r.orig.inline?{inline:true}:{})};
+      if(k==='acc_no'||k==='acc_yes'||k==='acc_ready')return{label:r.label.value.trim(),type:'callback',data:k,...keep};
+      if(k==='url')return{label:r.label.value.trim(),type:'url',url:r.url.value.trim(),...keep};
+      return{label:r.label.value.trim(),type:k,...keep}})};
 }
 function preview(text,buttons){
   return el('div',{class:'pv'},sample(text)||'Текст сообщения',buttons.length?el('div',{class:'k'},buttons.map(b=>el('span',{},b.label))):null);

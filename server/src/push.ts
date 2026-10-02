@@ -1,4 +1,5 @@
 import { GrammyError, InlineKeyboard } from 'grammy';
+import type { InlineKeyboardButton } from 'grammy/types';
 import { db } from './db.js';
 import { config } from './config.js';
 import { bot } from './tg.js';
@@ -10,6 +11,10 @@ export interface Button {
   type: 'miniapp' | 'url' | 'support' | 'register' | 'callback';
   url?: string;
   data?: string;
+  /** Цвет кнопки в Telegram: primary — синяя, success — зелёная */
+  style?: 'primary' | 'success' | 'danger';
+  /** Кнопка стоит в одной строке со следующей */
+  inline?: boolean;
 }
 export interface Rule {
   id: number;
@@ -54,21 +59,34 @@ export function registerUrl(t: Target): string | null {
   return pick ? withClickId(pick, t.tg_id) : null;
 }
 
+/** Простая разметка для текстов: **жирный**, __курсив__, [текст](https://ссылка). Остальное экранируется. */
+export function toHtml(text: string): string {
+  return text
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replace(/\*\*(.+?)\*\*/gs, '<b>$1</b>')
+    .replace(/__(.+?)__/gs, '<i>$1</i>')
+    .replace(/\[([^\]]+)\]\((https:\/\/[^\s)]+)\)/g, '<a href="$2">$1</a>');
+}
+
 export function buildKeyboard(buttons: Button[], t: Target): InlineKeyboard | undefined {
   const kb = new InlineKeyboard();
   let any = false;
   for (const b of buttons) {
-    if (b.type === 'callback' && b.data) kb.text(b.label, b.data).row();
-    else if (b.type === 'url' && b.url) kb.url(b.label, b.url).row();
-    else if (b.type === 'support') kb.url(b.label, `https://t.me/${config.botUsername}?start=support`).row();
+    let btn: InlineKeyboardButton | null = null;
+    if (b.type === 'callback' && b.data) btn = InlineKeyboard.text(b.label, b.data);
+    else if (b.type === 'url' && b.url) btn = InlineKeyboard.url(b.label, b.url);
+    else if (b.type === 'support') btn = InlineKeyboard.url(b.label, `https://t.me/${config.botUsername}?start=support`);
     else if (b.type === 'register') {
       const u = registerUrl(t);
       // Регион ещё неизвестен: ведём в Mini App, там клиент выберет регион
-      if (u) kb.url(b.label, u).row();
-      else if (config.miniAppUrl) kb.webApp(b.label, config.miniAppUrl).row();
-      else continue;
-    } else if (b.type === 'miniapp' && config.miniAppUrl) kb.webApp(b.label, config.miniAppUrl).row();
-    else continue;
+      if (u) btn = InlineKeyboard.url(b.label, u);
+      else if (config.miniAppUrl) btn = InlineKeyboard.webApp(b.label, config.miniAppUrl);
+    } else if (b.type === 'miniapp' && config.miniAppUrl) btn = InlineKeyboard.webApp(b.label, config.miniAppUrl);
+    if (!btn) continue;
+    kb.add(b.style ? { ...btn, style: b.style } : btn);
+    if (!b.inline) kb.row();
     any = true;
   }
   // .row() оставляет в конце пустую строку, Telegram такое не любит
@@ -96,7 +114,7 @@ async function deliver(tgId: string, text: string, kb?: InlineKeyboard): Promise
     return { ok: true };
   }
   try {
-    await bot.api.sendMessage(tgId, text, kb ? { reply_markup: kb } : undefined);
+    await bot.api.sendMessage(tgId, toHtml(text), { parse_mode: 'HTML', link_preview_options: { is_disabled: true }, ...(kb ? { reply_markup: kb } : {}) });
     return { ok: true };
   } catch (e) {
     if (e instanceof GrammyError) {
@@ -278,7 +296,17 @@ export function startScheduler(): void {
 
 // ---------- Правила по умолчанию ----------
 
+export const GREETING_OLD = 'Привет, {имя}! Это Hunter AI. Здесь тренажёр, учёт твоих сделок и материалы команды. У тебя уже есть аккаунт Pocket Option?';
+export const GREETING_TEXT = '**Привет! Я Hunter AI.**\n\nДаю готовые сигналы: пара, направление, точки входа. Твоя задача — просто повторить.\n\nЗа 1 минуту покажу в тренажёре, как это выглядит на практике.';
+export const GREETING_BUTTONS: Button[] = [
+  { label: 'Тренажёр', type: 'miniapp', style: 'primary' },
+  { label: 'Всё понятно — регистрация', type: 'callback', data: 'acc_ready', style: 'success' },
+  { label: 'Написать в поддержку', type: 'support' },
+];
+
 export async function seedDefaultRules(): Promise<void> {
+  // Новое приветствие, если админ не менял прежнее
+  await db.query(`UPDATE push_rules SET text = $1, buttons = $2 WHERE trigger = 'start' AND text = $3`, [GREETING_TEXT, JSON.stringify(GREETING_BUTTONS), GREETING_OLD]);
   // Переименование «клуб» в «команда» для уже сохранённых текстов и подписей
   await db.query(`UPDATE push_rules SET text = replace(text, 'материалы клуба', 'материалы команды') WHERE text LIKE '%материалы клуба%'`);
   await db.query(`UPDATE media_items SET subtitle = replace(subtitle, 'Трейдер клуба', 'Трейдер команды') WHERE subtitle LIKE '%Трейдер клуба%'`);
@@ -288,7 +316,7 @@ export async function seedDefaultRules(): Promise<void> {
   const register: Button = { label: 'Зарегистрироваться', type: 'register' };
   const cabinet: Button = { label: 'Открыть кабинет', type: 'miniapp' };
   const rules: [string, Trigger, number, string, Button[], boolean][] = [
-    ['Приветствие', 'start', 0, 'Привет, {имя}! Это Hunter AI. Здесь тренажёр, учёт твоих сделок и материалы команды. У тебя уже есть аккаунт Pocket Option?', [{ label: 'Нет, создать', type: 'callback', data: 'acc_no' }, { label: 'Да, уже есть', type: 'callback', data: 'acc_yes' }, support], false],
+    ['Приветствие', 'start', 0, GREETING_TEXT, GREETING_BUTTONS, false],
     ['Нет регистрации, через 1 час', 'no_reg', 60, '{имя}, не вижу твоей регистрации. Если возникли трудности, напиши в поддержку: ответим прямо здесь, в этом чате.', [support, register], false],
     ['Нет регистрации, через сутки', 'no_reg', 1440, '{имя}, регистрация в Pocket Option занимает пару минут. После неё и пополнения счёта в приложении откроется доступ. Если что-то непонятно, напиши нам.', [register, support], true],
     ['Нет депозита, через 2 часа', 'no_deposit', 120, '{имя}, регистрация есть. Осталось пополнить счёт, и доступ откроется автоматически. Рекомендуем от 100 $. Если не получается, напиши сюда, подскажем.', [cabinet, support], true],

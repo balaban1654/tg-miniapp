@@ -10,6 +10,7 @@ export const config = {
   botToken: need('BOT_TOKEN'),
   botUsername: process.env.BOT_USERNAME ?? 'hunters_aibot',
   miniAppUrl: process.env.MINIAPP_URL ?? '',
+  termsUrl: process.env.TERMS_URL ?? 'https://hunterai.space/terms',
   publicUrl: process.env.PUBLIC_URL ?? 'http://localhost:3000',
   databaseUrl: need('DATABASE_URL'),
   port: Number(process.env.PORT ?? 3000),
