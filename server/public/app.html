@@ -449,7 +449,7 @@ async function signalPairs(){
     const exp=el('div',{style:'display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px'},opts.map(n=>{
       const on=o.expiries.includes(n);
       return el('button',{type:'button',class:'lesson',disabled:!on,style:'justify-content:center;font-weight:700;'+(!on?'opacity:.4;':n===sec?'border-color:var(--acc);background:var(--card2);':''),onclick:()=>{sec=n;paint()}},fmtDur(n))}));
-    box.replaceChildren(el('div',{class:'fs-tip'},'Валютная пара'),head,list,el('div',{class:'fs-tip',style:'margin-top:4px'},'Время экспирации'),exp);
+    box.replaceChildren(...[el('div',{class:'fs-tip'},'Валютная пара'),head,list,el('div',{class:'fs-tip',style:'margin-top:4px'},'Время экспирации'),exp].filter(Boolean));
   };
   paint();
   shell('Анализ',[el('button',{class:'back',type:'button',onclick:()=>{tab='home';render()}},'‹ Назад'),box,go,
