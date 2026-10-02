@@ -393,6 +393,7 @@ async function signalCard(){
   const r=await api('/signals/active');
   const sg=r.signal;if(!sg)return null;
   const skew=Date.parse(r.now)-Date.now();
+  if(sg.requested_by)return signalLive(sg,skew,r.cfg,r.steps||[]);
   const entry=Date.parse(sg.entry_at);
   const hm2=new Date(entry).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
   const left=el('b',{class:'big',style:'font-size:22px;color:var(--acc2)'});
@@ -452,24 +453,67 @@ async function signalPrep(pair){
     buzzL();signalResult(res.r);
   },6300));
 }
+/** Живая карточка сигнала по запросу: время входа по часам, расписание вход + перекрытия, отметка итога после каждого события */
+function signalLive(sg,skew,cfg,steps0){
+  const steps=steps0.slice();
+  const entry=Date.parse(sg.entry_at),gap=cfg.gapSec*1000,tradeMs=cfg.tradeSec*1000,max=cfg.maxEvents;
+  const up=sg.direction==='up';
+  const p2=n=>String(n).padStart(2,'0');
+  const hms=t=>{const d=new Date(t);return p2(d.getHours())+':'+p2(d.getMinutes())+':'+p2(d.getSeconds())};
+  const timerAt=t=>'0:'+p2((60-new Date(t).getSeconds())%60);
+  const at=i=>entry+i*gap;
+  const name=i=>i===0?'Вход':'Перекрытие '+i;
+  const status=el('div',{style:'display:grid;gap:8px;padding:12px 0;border-bottom:1px solid var(--line)'});
+  const list=el('div',{style:'display:grid;gap:6px;padding:12px 0'});
+  const row=(k,v)=>el('div',{class:'r'},el('span',{},k),el('b',{},v));
+  const closedBy=()=>{const w=steps.find(x=>x.result==='win'),sk=steps.find(x=>x.result==='skip');return w?'win':sk?'skip':steps.length>=max?'loss':null};
+  async function mark(result){
+    const n=steps.length;
+    try{await api('/signals/'+sg.id+'/step',{method:'POST',body:{step:n,result}});steps.push({step:n,result});paint()}
+    catch(e){toast(e.message)}
+  }
+  function paint(){
+    const now=Date.now()+skew,n=steps.length,end=closedBy();
+    const T=at(Math.min(n,max-1));
+    status.replaceChildren();
+    if(end==='win')status.append(el('b',{style:'color:var(--ok);font-size:16px'},'Плюс! Серия закрыта, дальше не идём.'),el('div',{class:'sm'},'Новый сигнал можно будет запросить после паузы.'));
+    else if(end==='skip')status.append(el('b',{style:'font-size:15px'},'Сигнал пропущен. Дальше не идём.'),el('div',{class:'sm'},'Перекрытия без входа не делают.'));
+    else if(end==='loss')status.append(el('b',{style:'color:var(--bad);font-size:15px'},'Максимум '+max+' события, дальше не идём.'),el('div',{class:'sm'},'Сделайте паузу и не пытайтесь отыграться. Следующий сигнал запросите позже.'));
+    else if(now<T){
+      const sec=Math.ceil((T-now)/1000);
+      status.append(el('div',{class:'sm'},n===0?'До входа':'До перекрытия '+n),
+        el('b',{style:'font-size:32px;color:var(--acc2);text-align:center;display:block'},Math.floor(sec/60)+':'+p2(sec%60)),
+        el('div',{class:'sm',style:'text-align:center'},name(n)+' в '+hms(T)+' (таймер свечи '+timerAt(T)+')'),
+        n>0?el('div',{class:'sm',style:'text-align:center;color:var(--warn)'},'Первая сделка в минус. Заходите в перекрытие '+n+', сумма ×'+cfg.overlapMult+' от прошлой.'):null);
+    }else if(now<T+tradeMs){
+      status.append(el('b',{style:'font-size:24px;color:var(--ok);text-align:center;display:block'},'СЕЙЧАС! '+name(n)),el('div',{class:'sm',style:'text-align:center'},(up?'ВВЕРХ (BUY)':'ВНИЗ (SELL)')+' · '+cfg.tradeLabel));
+    }else{
+      status.append(el('b',{style:'font-size:15px'},'Чем закончилась сделка ('+name(n).toLowerCase()+')?'),
+        el('div',{class:'two'},el('button',{class:'btn g',type:'button',onclick:()=>mark('win')},'Плюс'),el('button',{class:'btn r',type:'button',onclick:()=>mark('loss')},'Минус')),
+        el('button',{class:'btn o',type:'button',onclick:()=>mark('skip')},'Не входил'),
+        n+1<max?el('div',{class:'sm',style:'color:var(--warn)'},'Если минус: следующий шаг, перекрытие '+(n+1)+', в '+hms(at(n+1))+', сумма ×'+cfg.overlapMult+'.'):null);
+    }
+    list.replaceChildren(...Array.from({length:max},(_,i)=>{
+      const s=steps[i],cur=!end&&i===n;
+      const mk=s?(s.result==='win'?'✓':s.result==='loss'?'✗':'–'):cur?'▶':'·';
+      const col=s?(s.result==='win'?'var(--ok)':s.result==='loss'?'var(--bad)':'var(--mut)'):cur?'var(--acc2)':'var(--mut)';
+      return el('div',{class:'row sm',style:'color:'+(cur?'var(--fg)':'var(--mut)')},el('span',{},el('b',{style:'color:'+col+';display:inline-block;width:18px'},mk),name(i)),el('span',{class:'mono'},hms(at(i))+' · '+timerAt(at(i))));
+    }));
+  }
+  paint();timers.push(setInterval(paint,500));
+  const pocket=()=>{const u=cfg.pocketUrl||(me&&me.registerUrl&&(me.registerUrl.ru||me.registerUrl.ww))||'https://pocketoption.com/';openLink(u)};
+  return el('div',{class:'sig rise'},el('h3',{},'Сигнал готов'),
+    sg.is_test?el('div',{class:'sm',style:'color:var(--warn)'},'Тестовый сигнал. Не для торговли.'):null,
+    row('Время',hms(entry)),row('Точка входа',cfg.entryLabel),row('Пара',sg.pair),
+    el('div',{class:'r'},el('span',{},'Направление'),el('b',{style:'color:var(--'+(up?'ok':'bad')+')'},up?'ВВЕРХ (BUY)':'ВНИЗ (SELL)')),
+    row('Время сделки',cfg.tradeLabel),row('Ставка',cfg.stakeLabel),
+    status,list,
+    el('button',{class:'btn',type:'button',style:'margin-top:4px',onclick:pocket},'Открыть Pocket Option'),
+    cfg.warning?el('div',{style:'margin-top:10px;color:var(--warn);font-weight:700;font-size:13px;line-height:1.45'},cfg.warning):null);
+}
 function signalResult(r){
   clearTimers();
-  const sg=r.signal,skew=Date.parse(r.now)-Date.now(),entry=Date.parse(sg.entry_at),up=sg.direction==='up';
-  const hm=new Date(entry).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
-  const left=el('b',{class:'big',style:'font-size:30px;color:var(--acc2);text-align:center;display:block'});
-  const tick=()=>{const sec=Math.round((entry-(Date.now()+skew))/1000);
-    left.textContent=sec>0?'До входа '+Math.floor(sec/60)+':'+String(sec%60).padStart(2,'0'):'Время входа наступило'};
-  tick();timers.push(setInterval(tick,1000));
-  const take=el('button',{class:'btn',type:'button',style:'margin-top:8px',onclick:async e=>{e.currentTarget.disabled=true;try{await api('/signals/'+sg.id+'/take',{method:'POST'});toast('Сделка записана');tab='home';render()}catch(x){toast(x.message);tab='home';render()}}},'Я вошёл в сделку');
-  shell('Сигнал',[
-    sg.is_test?el('div',{class:'sm',style:'color:var(--warn)'},'Тестовый сигнал. Не для торговли.'):null,
-    el('div',{class:'sig rise'},el('h3',{},'Сигнал готов'),left,
-      el('div',{class:'r'},el('span',{},'Время входа'),el('b',{},hm)),
-      el('div',{class:'r'},el('span',{},'Пара'),el('b',{},sg.pair)),
-      el('div',{class:'r'},el('span',{},'Направление'),el('b',{style:'color:var(--'+(up?'ok':'bad')+')'},up?'ВВЕРХ (BUY)':'ВНИЗ (SELL)')),
-      el('div',{class:'r'},el('span',{},'Время сделки'),el('b',{},sg.expiry_min+' мин')),
-      el('div',{class:'r'},el('span',{},'Ставка'),el('b',{},'1–3% от депозита')),
-      take),
+  shell('Сигнал',[signalLive(r.signal,Date.parse(r.now)-Date.now(),r.cfg,r.steps||[]),
     el('button',{class:'btn o',type:'button',onclick:()=>{tab='home';render()}},'На главную'),
     el('p',{class:'sm',style:'margin:0'},'Это мнение аналитика, а не гарантия результата. Торгуйте только той суммой, которую готовы потерять.')]);
 }

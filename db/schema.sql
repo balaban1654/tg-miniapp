@@ -221,6 +221,27 @@ CREATE TABLE IF NOT EXISTS signal_settings (
   cooldown_sec      INT NOT NULL DEFAULT 180
 );
 INSERT INTO signal_settings (id) VALUES (1) ON CONFLICT DO NOTHING;
+-- Расписание по часам: вход на entry_second секунде минуты, перекрытия каждые overlap_gap_sec секунд, всего max_events событий
+ALTER TABLE signal_settings ADD COLUMN IF NOT EXISTS entry_second   INT NOT NULL DEFAULT 15;
+ALTER TABLE signal_settings ADD COLUMN IF NOT EXISTS overlap_gap_sec INT NOT NULL DEFAULT 30;
+ALTER TABLE signal_settings ADD COLUMN IF NOT EXISTS max_events     INT NOT NULL DEFAULT 4;
+ALTER TABLE signal_settings ADD COLUMN IF NOT EXISTS trade_sec      INT NOT NULL DEFAULT 5;
+ALTER TABLE signal_settings ADD COLUMN IF NOT EXISTS overlap_mult   INT NOT NULL DEFAULT 2;
+-- Подписи в карточке сигнала, каждая настраивается отдельно
+ALTER TABLE signal_settings ADD COLUMN IF NOT EXISTS entry_label    TEXT NOT NULL DEFAULT 'M5 · 0:45';
+ALTER TABLE signal_settings ADD COLUMN IF NOT EXISTS trade_label    TEXT NOT NULL DEFAULT '5 SEC';
+ALTER TABLE signal_settings ADD COLUMN IF NOT EXISTS stake_label    TEXT NOT NULL DEFAULT '1–3% от депозита';
+ALTER TABLE signal_settings ADD COLUMN IF NOT EXISTS warning_text   TEXT NOT NULL DEFAULT 'Вход на 45 секунде, перекрытия на 15, 45, 15 секундах! Максимум 4 события, дальше не идём.';
+ALTER TABLE signal_settings ADD COLUMN IF NOT EXISTS pocket_url     TEXT NOT NULL DEFAULT '';
+-- Что клиент отметил по сигналу: вход и перекрытия (step 0..3)
+CREATE TABLE IF NOT EXISTS signal_steps (
+  signal_id  INT NOT NULL REFERENCES signals(id) ON DELETE CASCADE,
+  tg_id      BIGINT NOT NULL,
+  step       INT NOT NULL,
+  result     TEXT NOT NULL CHECK (result IN ('win','loss','skip')),
+  created_at TIMESTAMPTZ DEFAULT now(),
+  PRIMARY KEY (signal_id, tg_id, step)
+);
 
 -- Разовая пометка: все сигналы, созданные до запуска, считаются тестовыми (их можно вернуть кнопкой «Сделать обычным» в Office)
 CREATE TABLE IF NOT EXISTS app_flags (key TEXT PRIMARY KEY, set_at TIMESTAMPTZ DEFAULT now());

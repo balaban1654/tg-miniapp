@@ -312,12 +312,16 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
      AND (s.requested_by IS NULL OR s.requested_by = d.tg_id)`;
   app.get('/signals/active', { preHandler: auth }, async (req) => {
     const r = await db.query(
-      `SELECT s.id, s.pair, s.direction, s.expiry_min, s.entry_at, s.note, s.source, s.is_test,
+      `SELECT s.id, s.pair, s.direction, s.expiry_min, s.entry_at, s.note, s.source, s.is_test, s.requested_by,
               EXISTS (SELECT 1 FROM deals x WHERE x.signal_id = s.id AND x.tg_id = d.tg_id) AS taken
          FROM signals s JOIN leads d ON d.tg_id = $1 WHERE ${ACTIVE} ORDER BY s.id DESC LIMIT 1`,
       [req.tg!.id],
     );
-    return { signal: r.rows[0] ?? null, now: new Date().toISOString() };
+    const sg = r.rows[0] ?? null;
+    if (!sg?.requested_by) return { signal: sg, now: new Date().toISOString() };
+    const steps = (await db.query('SELECT step, result FROM signal_steps WHERE signal_id = $1 AND tg_id = $2 ORDER BY step', [sg.id, req.tg!.id])).rows;
+    const set = (await db.query('SELECT * FROM signal_settings WHERE id = 1')).rows[0];
+    return { signal: sg, steps, cfg: cfgOf(set), now: new Date().toISOString() };
   });
 
   // Прошедшие сигналы. Показываем ВСЕ завершённые, без отбора. Итог считается по отметкам клиентов
@@ -342,6 +346,11 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // Сигнал по запросу клиента. Направление берётся из того, что поставил человек в Office, и действует ограниченное время
+  /** Что нужно клиенту, чтобы нарисовать карточку и расписание входа с перекрытиями */
+  const cfgOf = (set: Record<string, any>) => ({
+    gapSec: set.overlap_gap_sec, maxEvents: set.max_events, tradeSec: set.trade_sec, overlapMult: set.overlap_mult,
+    entryLabel: set.entry_label, tradeLabel: set.trade_label, stakeLabel: set.stake_label, warning: set.warning_text, pocketUrl: set.pocket_url,
+  });
   const requestRules = async (tgId: number) => {
     const set = (await db.query('SELECT * FROM signal_settings WHERE id = 1')).rows[0];
     const lead = (await db.query('SELECT access, is_tester FROM leads WHERE tg_id = $1', [tgId])).rows[0];
@@ -353,7 +362,7 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
 
   app.get('/signals/request', { preHandler: auth }, async (req) => {
     const { set, allowed, cooldownLeft } = await requestRules(req.tg!.id);
-    if (!allowed) return { enabled: false, pairs: [], cooldownLeft: 0, enterInSec: set.enter_in_sec, expiryMin: set.expiry_min };
+    if (!allowed) return { enabled: false, pairs: [], cooldownLeft: 0, enterInSec: set.enter_in_sec, expiryMin: set.expiry_min, cfg: cfgOf(set) };
     const pairs = (
       await db.query(
         `SELECT pair, payout, (direction IS NOT NULL AND direction_at > now() - ($1 || ' minutes')::interval) AS available
@@ -361,7 +370,7 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
         [String(set.direction_ttl_min)],
       )
     ).rows;
-    return { enabled: true, pairs, cooldownLeft, enterInSec: set.enter_in_sec, expiryMin: set.expiry_min };
+    return { enabled: true, pairs, cooldownLeft, enterInSec: set.enter_in_sec, expiryMin: set.expiry_min, cfg: cfgOf(set) };
   });
 
   app.post<{ Body: { pair?: string } }>('/signals/request', { preHandler: auth }, async (req, reply) => {
@@ -376,12 +385,40 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
       )
     ).rows[0];
     if (!p) return reply.code(409).send({ error: 'По этой паре сейчас нет подходящего входа. Попробуйте другую пару или чуть позже.' });
+    // Вход: ближайший момент не раньше «через enter_in_sec», когда секундная стрелка стоит на entry_second (например 23:42:15)
+    const es = set.entry_second * 1000;
+    const entryMs = Math.ceil((Date.now() + set.enter_in_sec * 1000 - es) / 60_000) * 60_000 + es;
     const ins = await db.query(
       `INSERT INTO signals (pair, direction, expiry_min, entry_at, note, source, is_test, created_by, requested_by)
-       VALUES ($1,$2,$3, now() + ($4 || ' seconds')::interval, NULL, 'analyst', $5, $6, $7) RETURNING id, pair, direction, expiry_min, entry_at, is_test`,
-      [p.pair, p.direction, set.expiry_min, String(set.enter_in_sec), !lead.access, p.direction_by, req.tg!.id],
+       VALUES ($1,$2,$3,$4,NULL,'analyst',$5,$6,$7) RETURNING id, pair, direction, expiry_min, entry_at, is_test, requested_by`,
+      [p.pair, p.direction, set.expiry_min, new Date(entryMs), !lead.access, p.direction_by, req.tg!.id],
     );
-    return { signal: { ...ins.rows[0], taken: false }, now: new Date().toISOString() };
+    return { signal: { ...ins.rows[0], taken: false }, steps: [], cfg: cfgOf(set), now: new Date().toISOString() };
+  });
+
+  // Клиент отмечает итог входа (step 0) или перекрытия (step 1..). Плюс, пропуск или последний минус закрывают серию
+  app.post<{ Params: { id: string } }>('/signals/:id/step', { preHandler: auth }, async (req, reply) => {
+    const id = Number(req.params.id);
+    const step = Math.trunc(Number((req.body as any)?.step));
+    const result = String((req.body as any)?.result ?? '');
+    if (!['win', 'loss', 'skip'].includes(result) || !Number.isInteger(step) || step < 0) return reply.code(400).send({ error: 'Неверные данные' });
+    const set = (await db.query('SELECT max_events FROM signal_settings WHERE id = 1')).rows[0];
+    const sg = (await db.query('SELECT id, pair, direction, expiry_min FROM signals WHERE id = $1 AND requested_by = $2 AND entry_at > now() - interval \'30 minutes\'', [id, req.tg!.id])).rows[0];
+    if (!sg) return reply.code(404).send({ error: 'Сигнал не найден или уже неактуален' });
+    const done = (await db.query('SELECT step, result FROM signal_steps WHERE signal_id = $1 AND tg_id = $2 ORDER BY step', [id, req.tg!.id])).rows;
+    const finished = done.some((x) => x.result !== 'loss') || done.length >= set.max_events;
+    if (finished || step !== done.length || step >= set.max_events) return reply.code(409).send({ error: 'Этот шаг уже отмечен или серия закрыта' });
+    await db.query('INSERT INTO signal_steps (signal_id, tg_id, step, result) VALUES ($1,$2,$3,$4)', [id, req.tg!.id, step, result]);
+    const closed = result !== 'loss' || step + 1 >= set.max_events;
+    if (closed) {
+      // В статистику идёт итог серии: плюс на любом шаге = плюс, все минусы = минус
+      await db.query(
+        `INSERT INTO deals (tg_id, pair, direction, expiry_min, signal_id, result) VALUES ($1,$2,$3,$4,$5,$6)
+         ON CONFLICT (tg_id, signal_id) WHERE signal_id IS NOT NULL DO NOTHING`,
+        [req.tg!.id, sg.pair, sg.direction, sg.expiry_min, id, result],
+      );
+    }
+    return { ok: true, closed };
   });
 
   // Клиент отмечает, что вошёл в сделку по сигналу. Дальше он отмечает итог

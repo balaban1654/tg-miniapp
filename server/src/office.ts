@@ -637,7 +637,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
   // Настройка сигналов по запросу клиента: общие параметры, пары и текущее направление по каждой паре
   const PAYOUT_MAX = 100;
   app.get('/signal-config', { preHandler: need('admin', 'analyst') }, async () => {
-    const settings = (await db.query('SELECT enabled, expiry_min, enter_in_sec, direction_ttl_min, cooldown_sec FROM signal_settings WHERE id = 1')).rows[0];
+    const settings = (await db.query('SELECT * FROM signal_settings WHERE id = 1')).rows[0];
     const pairs = (
       await db.query(
         `SELECT p.pair, p.enabled, p.sort, p.payout, p.direction, p.direction_at, st.name AS direction_by,
@@ -658,7 +658,25 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     if (!(enterIn >= 30 && enterIn <= 600)) return reply.code(400).send({ error: 'Время до входа: 30–600 секунд' });
     if (!(ttl >= 1 && ttl <= 240)) return reply.code(400).send({ error: 'Срок действия направления: 1–240 минут' });
     if (!(cooldown >= 0 && cooldown <= 3600)) return reply.code(400).send({ error: 'Пауза между запросами: 0–3600 секунд' });
-    await db.query('UPDATE signal_settings SET enabled=$1, expiry_min=$2, enter_in_sec=$3, direction_ttl_min=$4, cooldown_sec=$5 WHERE id = 1', [Boolean(b.enabled), expiry, enterIn, ttl, cooldown]);
+    const entrySec = Math.trunc(Number(b.entry_second));
+    const gap = Math.trunc(Number(b.overlap_gap_sec));
+    const maxEv = Math.trunc(Number(b.max_events));
+    const tradeSec = Math.trunc(Number(b.trade_sec));
+    const mult = Math.trunc(Number(b.overlap_mult));
+    if (!(entrySec >= 0 && entrySec <= 59)) return reply.code(400).send({ error: 'Секунда входа: 0–59' });
+    if (!(gap >= 10 && gap <= 300)) return reply.code(400).send({ error: 'Интервал между перекрытиями: 10–300 секунд' });
+    if (!(maxEv >= 1 && maxEv <= 6)) return reply.code(400).send({ error: 'Событий всего: 1–6' });
+    if (!(tradeSec >= 1 && tradeSec <= 60)) return reply.code(400).send({ error: 'Длительность сделки: 1–60 секунд' });
+    if (!(mult >= 1 && mult <= 5)) return reply.code(400).send({ error: 'Множитель суммы перекрытия: 1–5' });
+    const pocket = str(b.pocket_url, 300);
+    if (pocket && !/^https:\/\/[^\s]+$/.test(pocket)) return reply.code(400).send({ error: 'Ссылка Pocket Option должна начинаться с https://' });
+    await db.query(
+      `UPDATE signal_settings SET enabled=$1, expiry_min=$2, enter_in_sec=$3, direction_ttl_min=$4, cooldown_sec=$5,
+              entry_second=$6, overlap_gap_sec=$7, max_events=$8, trade_sec=$9, overlap_mult=$10,
+              entry_label=$11, trade_label=$12, stake_label=$13, warning_text=$14, pocket_url=$15 WHERE id = 1`,
+      [Boolean(b.enabled), expiry, enterIn, ttl, cooldown, entrySec, gap, maxEv, tradeSec, mult,
+        str(b.entry_label, 40), str(b.trade_label, 40), str(b.stake_label, 60), str(b.warning_text, 300), pocket],
+    );
     return { ok: true };
   });
   app.post('/signal-pairs', { preHandler: need('admin') }, async (req, reply) => {
