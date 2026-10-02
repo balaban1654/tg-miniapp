@@ -308,8 +308,9 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
 
   // Активный сигнал: обычные видят клиенты с открытым доступом, тестовые только тестовые аккаунты
   // Общий сигнал живёт 3 минуты после входа. Сигнал по запросу остаётся у клиента 30 минут: за это время его можно оценить
-  const ACTIVE = `((s.requested_by IS NULL AND now() <= s.entry_at + interval '3 minutes') OR (s.requested_by = d.tg_id AND now() <= s.entry_at + interval '30 minutes'))
-     AND s.created_at > now() - interval '2 hours'
+  // Сигнал по запросу остаётся у клиента, пока он его не оценит
+  const ACTIVE = `((s.requested_by IS NULL AND now() <= s.entry_at + interval '3 minutes' AND s.created_at > now() - interval '2 hours')
+       OR (s.requested_by = d.tg_id AND NOT EXISTS (SELECT 1 FROM signal_steps t WHERE t.signal_id = s.id AND t.tg_id = d.tg_id)))
      AND ((NOT s.is_test AND d.access) OR (s.is_test AND d.is_tester))
      AND (s.requested_by IS NULL OR s.requested_by = d.tg_id)`;
   app.get('/signals/active', { preHandler: auth }, async (req) => {
@@ -359,7 +360,8 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
     const allowed = Boolean(lead && (lead.access || lead.is_tester) && set.enabled);
     const last = (await db.query('SELECT extract(epoch FROM now() - created_at)::int AS ago FROM signals WHERE requested_by = $1 ORDER BY id DESC LIMIT 1', [tgId])).rows[0];
     const cooldownLeft = last ? Math.max(0, set.cooldown_sec - last.ago) : 0;
-    return { set, lead, allowed, cooldownLeft };
+    const open = (await db.query('SELECT 1 FROM signals s WHERE s.requested_by = $1 AND NOT EXISTS (SELECT 1 FROM signal_steps t WHERE t.signal_id = s.id AND t.tg_id = $1) LIMIT 1', [tgId])).rowCount;
+    return { set, lead, allowed, cooldownLeft, open: Boolean(open) };
   };
 
   app.get('/signals/request', { preHandler: auth }, async (req) => {
@@ -377,8 +379,9 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
   });
 
   app.post<{ Body: { pair?: string; expiry_sec?: number } }>('/signals/request', { preHandler: auth }, async (req, reply) => {
-    const { set, lead, allowed, cooldownLeft } = await requestRules(req.tg!.id);
+    const { set, lead, allowed, cooldownLeft, open } = await requestRules(req.tg!.id);
     if (!allowed) return reply.code(403).send({ error: 'Сигналы по запросу пока недоступны' });
+    if (open) return reply.code(409).send({ error: 'Сначала оцените предыдущий сигнал' });
     if (cooldownLeft > 0) return reply.code(429).send({ error: `Следующий сигнал можно получить через ${cooldownLeft} сек.`, cooldownLeft });
     const p = (
       await db.query(

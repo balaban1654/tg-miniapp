@@ -225,8 +225,14 @@ CREATE TABLE IF NOT EXISTS signal_expiries (sec INT PRIMARY KEY CHECK (sec BETWE
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM app_flags WHERE key = 'signal_expiries_seeded') THEN
-    INSERT INTO signal_expiries (sec) VALUES (5),(15),(30),(60),(180),(300),(900),(1800),(3600),(14400) ON CONFLICT DO NOTHING;
+    INSERT INTO signal_expiries (sec) VALUES (5) ON CONFLICT DO NOTHING;
     INSERT INTO app_flags (key) VALUES ('signal_expiries_seeded');
+  END IF;
+  -- Пока доступна только экспирация 5 секунд. Остальные добавляются в Office
+  IF NOT EXISTS (SELECT 1 FROM app_flags WHERE key = 'signal_expiries_only5') THEN
+    DELETE FROM signal_expiries WHERE sec <> 5;
+    INSERT INTO signal_expiries (sec) VALUES (5) ON CONFLICT DO NOTHING;
+    INSERT INTO app_flags (key) VALUES ('signal_expiries_only5');
   END IF;
 END $$;
 ALTER TABLE signals ADD COLUMN IF NOT EXISTS expiry_sec INT;
@@ -238,9 +244,17 @@ CREATE TABLE IF NOT EXISTS signal_settings (
   expiry_min        INT NOT NULL DEFAULT 1,
   enter_in_sec      INT NOT NULL DEFAULT 120,
   direction_ttl_min INT NOT NULL DEFAULT 10,
-  cooldown_sec      INT NOT NULL DEFAULT 180
+  cooldown_sec      INT NOT NULL DEFAULT 0
 );
 INSERT INTO signal_settings (id) VALUES (1) ON CONFLICT DO NOTHING;
+-- Новый анализ можно просить сразу после оценки предыдущего: прежняя пауза 180 сек сбрасывается один раз
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM app_flags WHERE key = 'signal_cooldown_zero') THEN
+    UPDATE signal_settings SET cooldown_sec = 0 WHERE cooldown_sec = 180;
+    INSERT INTO app_flags (key) VALUES ('signal_cooldown_zero');
+  END IF;
+END $$;
 -- Расписание по часам: вход на entry_second секунде минуты, перекрытия каждые overlap_gap_sec секунд, всего max_events событий
 ALTER TABLE signal_settings ADD COLUMN IF NOT EXISTS entry_second   INT NOT NULL DEFAULT 15;
 ALTER TABLE signal_settings ADD COLUMN IF NOT EXISTS overlap_gap_sec INT NOT NULL DEFAULT 30;

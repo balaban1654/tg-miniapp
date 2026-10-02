@@ -434,8 +434,8 @@ async function signalPairs(){
   let o;try{o=await api('/signals/request')}catch(e){toast(e.message);return}
   if(!o.enabled){toast('Анализ пока недоступен');render();return}
   shell('Анализ',[el('button',{class:'back',type:'button',onclick:()=>{tab='home';render()}},'‹ Назад'),
-    el('div',{class:'fs-tip'},'Шаг 1 из 2 · выберите валютную пару'),
-    o.pairs.length?o.pairs.map(p=>el('button',{class:'prow',type:'button',disabled:!p.available,style:p.available?'':'opacity:.5',onclick:()=>signalExpiry(p.pair,o)},el('span',{},p.pair),el('span',{class:'pay'},p.available?'+'+p.payout+'%':'нет входа'))):el('div',{class:'card sm'},'Пары скоро появятся.'),
+    el('div',{class:'fs-tip'},o.expiries.length===1?'Выберите валютную пару · экспирация '+fmtDur(o.expiries[0]):'Шаг 1 из 2 · выберите валютную пару'),
+    o.pairs.length?o.pairs.map(p=>el('button',{class:'prow',type:'button',disabled:!p.available,style:p.available?'':'opacity:.5',onclick:()=>o.expiries.length===1?signalPrep(p.pair,o.expiries[0]):signalExpiry(p.pair,o)},el('span',{},p.pair),el('span',{class:'pay'},p.available?'+'+p.payout+'%':'нет входа'))):el('div',{class:'card sm'},'Пары скоро появятся.'),
     el('div',{class:'note'},'Перед началом торговли проверяйте процент выплаты на платформе Pocket Option: он может меняться.')]);
 }
 function signalExpiry(pair,o){
@@ -490,7 +490,7 @@ function signalLive(sg,skew,cfg){
   }
   // Оценка: «Оценить сигнал» → Плюс/Минус → при плюсе номер шага 1–4 (1 = со входа, 2–4 = с перекрытий)
   const rateBox=el('div',{style:'display:grid;gap:10px;margin-top:4px'});
-  const send=async(result,step)=>{try{await api('/signals/'+sg.id+'/rate',{method:'POST',body:{result,step}});toast('Оценка записана в статистику');await refreshMe().catch(()=>{});tab='home';render()}catch(e){toast(e.message)}};
+  const send=async(result,step)=>{try{await api('/signals/'+sg.id+'/rate',{method:'POST',body:{result,step}});await refreshMe().catch(()=>{});signalRated(sg,result,step)}catch(e){toast(e.message)}};
   const rate=el('button',{class:'btn o',type:'button',onclick:()=>pm()},'Оценить сигнал');
   const pm=()=>{rateBox.replaceChildren(el('b',{style:'font-size:15px'},'Чем закончился сигнал?'),
     el('div',{class:'two'},el('button',{class:'btn g',type:'button',onclick:()=>steps()},'Плюс'),el('button',{class:'btn r',type:'button',onclick:()=>send('loss')},'Минус')),
@@ -511,6 +511,19 @@ function signalLive(sg,skew,cfg){
     el('button',{class:'btn',type:'button',onclick:pocket},'Открыть Pocket Option'),
     rateBox,
     cfg.warning?el('div',{style:'margin-top:6px;color:var(--warn);font-weight:700;font-size:13px;line-height:1.45'},cfg.warning):null);
+}
+/** После оценки: запросить новый анализ или завершить торговлю */
+function signalRated(sg,result,step){
+  clearTimers();
+  const win=result==='win';
+  shell('Анализ',[
+    el('div',{class:'card',style:'display:grid;gap:6px;text-align:center'},
+      el('b',{style:'font-size:20px;color:var(--'+(win?'ok':'bad')+')'},win?'Плюс':'Минус'),
+      el('div',{class:'sm'},sg.pair+(win?' · '+(step===1?'со входа':'с перекрытия '+(step-1)):'')),
+      el('div',{class:'sm'},'Оценка записана в статистику.')),
+    el('button',{class:'btn',type:'button',onclick:()=>signalPairs()},'Запросить новый анализ'),
+    el('button',{class:'btn o',type:'button',onclick:()=>{toast('Торговля завершена');tab='home';render()}},'Завершить торговлю'),
+    el('p',{class:'sm',style:'margin:0'},'Не пытайтесь отыграться и торгуйте только той суммой, которую готовы потерять.')]);
 }
 function signalResult(r){
   clearTimers();
