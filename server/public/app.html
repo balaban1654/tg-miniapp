@@ -523,7 +523,8 @@ function signalLive(sg,skew,cfg){
       r.mk.style.color=cur?'var(--acc2)':'var(--mut)';
       r.node.style.color=cur?'var(--fg)':'var(--mut)';
     });
-    if(rate.disabled!==(now<entry))rate.disabled=now<entry;
+    const lock=now<entry+5000; // оценка открывается через 5 секунд после входа, чтобы не упереться в расхождение часов
+    if(rate.disabled!==lock)rate.disabled=lock;
   }
   paint();timers.push(setInterval(paint,500));
   const pocket=()=>{const u=cfg.pocketUrl||'https://pocketoption.com/';openLink(u)};
