@@ -106,6 +106,7 @@ main{flex:1;padding:6px 16px 96px;display:grid;gap:12px;align-content:start}
 .ava{overflow:hidden;width:48px;height:48px;border-radius:50%;border:2px solid var(--acc);background:var(--card2);color:var(--acc2);font:700 18px var(--fd);display:grid;place-items:center;flex:none}
 .empty{text-align:center;padding:26px 10px;display:grid;gap:8px;justify-items:center}
 
+.ext{display:grid;place-items:center;color:var(--mut,#9d8fc4);flex:none}
 .lesson{display:flex;gap:12px;align-items:center;cursor:pointer;width:100%;text-align:left;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:13px;color:inherit}
 .num{width:34px;height:34px;border-radius:50%;background:var(--card2);display:grid;place-items:center;font:700 14px var(--fm);flex:none;color:var(--acc2)}
 .num.done{background:var(--ok);color:#06210f}
@@ -405,6 +406,12 @@ function lessonView(l){
     finish]);
 }
 
+/** Иконка «открыть во внешней ссылке»: квадрат со стрелкой */
+function extIcon(){
+  const n=el('span',{class:'ext','aria-hidden':'true'});
+  n.innerHTML='<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M18 14v4.5a1.5 1.5 0 01-1.5 1.5h-11A1.5 1.5 0 014 18.5v-11A1.5 1.5 0 015.5 6H10"/><path d="M14 4h6v6"/><path d="M20 4l-9 9"/></svg>';
+  return n;
+}
 /** Круг с аватаркой из Telegram. Пока не загрузилась или нет фото, показываем первую букву */
 function mediaAva(x,size){
   const n=el('div',{class:'ava',style:size?'width:'+size+'px;height:'+size+'px;flex:none':''},(x.title||'?').slice(0,1).toUpperCase());
@@ -414,7 +421,7 @@ function mediaAva(x,size){
 async function viewMedia(){
   if(!me)await refreshMe();
   const m=await api('/media');
-  const ch=m.channels.length?m.channels.map(c=>el('button',{class:'lesson',type:'button',onclick:()=>openLink(c.url)},mediaAva(c,44),el('div',{style:'flex:1'},el('b',{},c.title),el('div',{class:'sm'},c.subtitle||'')),el('span',{class:'sm'},'↗'))):[el('div',{class:'card sm'},'Каналы скоро появятся.')];
+  const ch=m.channels.length?m.channels.map(c=>el('button',{class:'lesson',type:'button',onclick:()=>openLink(c.url)},mediaAva(c,44),el('div',{style:'flex:1'},el('b',{},c.title),el('div',{class:'sm'},c.subtitle||'')),extIcon())):[el('div',{class:'card sm'},'Каналы скоро появятся.')];
   const tr=m.traders.length?el('div',{class:'two'},m.traders.map(t=>el('div',{class:'card tr'},mediaAva(t),el('b',{},t.title),el('div',{class:'sm'},t.subtitle||'Трейдер команды'),el('button',{class:'btn o sm2',type:'button',onclick:()=>openLink(t.url)},'Канал трейдера')))):el('div',{class:'card sm'},'Трейдеры скоро появятся.');
   shell('Медиа',[el('b',{},'Наши трейдеры'),tr,el('b',{},'Каналы команды'),ch]);
 }
