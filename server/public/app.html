@@ -524,7 +524,7 @@ function signalLive(sg,skew,cfg){
     if(rate.disabled!==(now<entry))rate.disabled=now<entry;
   }
   paint();timers.push(setInterval(paint,500));
-  const pocket=()=>{const u=cfg.pocketUrl||(me&&me.registerUrl&&(me.registerUrl.ru||me.registerUrl.ww))||'https://pocketoption.com/';openLink(u)};
+  const pocket=()=>{const u=cfg.pocketUrl||'https://pocketoption.com/';openLink(u)};
   return el('div',{style:'display:grid;gap:12px'},
     el('div',{class:'sig'},el('h3',{},'Сигнал готов'),
       row('Время',hms(entry)),row('Точка входа',cfg.entryLabel),row('Пара',sg.pair),
