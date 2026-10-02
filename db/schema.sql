@@ -190,3 +190,6 @@ CREATE TABLE IF NOT EXISTS signals (
 );
 ALTER TABLE deals ADD COLUMN IF NOT EXISTS signal_id INT REFERENCES signals(id);
 CREATE UNIQUE INDEX IF NOT EXISTS deals_signal_once ON deals(tg_id, signal_id) WHERE signal_id IS NOT NULL;
+
+-- Тестовая история для просмотра оформления: только для тестовых аккаунтов, итог хранится прямо в сигнале
+ALTER TABLE signals ADD COLUMN IF NOT EXISTS demo_result TEXT CHECK (demo_result IN ('win','loss'));

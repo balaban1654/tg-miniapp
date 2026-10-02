@@ -218,14 +218,17 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // Прошедшие сигналы. Показываем ВСЕ завершённые, без отбора. Итог считается по отметкам клиентов
-  app.get('/signals/past', { preHandler: auth }, async () => {
+  app.get('/signals/past', { preHandler: auth }, async (req) => {
+    // Тестовые сигналы с тестовыми итогами видят только тестовые аккаунты, и они помечены ТЕСТ
     const r = await db.query(
-      `SELECT s.id, s.pair, s.direction, s.entry_at,
-              (SELECT count(*)::int FROM deals x WHERE x.signal_id = s.id AND x.result = 'win') AS wins,
-              (SELECT count(*)::int FROM deals x WHERE x.signal_id = s.id AND x.result = 'loss') AS losses
+      `SELECT s.id, s.pair, s.direction, s.entry_at, s.is_test,
+              (SELECT count(*)::int FROM deals x WHERE x.signal_id = s.id AND x.result = 'win') + (s.demo_result = 'win')::int AS wins,
+              (SELECT count(*)::int FROM deals x WHERE x.signal_id = s.id AND x.result = 'loss') + (s.demo_result = 'loss')::int AS losses
          FROM signals s
-        WHERE NOT s.is_test AND s.entry_at + (s.expiry_min || ' minutes')::interval < now()
-        ORDER BY s.id DESC LIMIT 5`,
+        WHERE (NOT s.is_test OR EXISTS (SELECT 1 FROM leads d WHERE d.tg_id = $1 AND d.is_tester))
+          AND s.entry_at + (s.expiry_min || ' minutes')::interval < now()
+        ORDER BY s.entry_at DESC LIMIT 5`,
+      [req.tg!.id],
     );
     return r.rows;
   });

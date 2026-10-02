@@ -647,6 +647,26 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     });
   });
 
+  // Тестовая история для просмотра оформления блока «Прошедшие сигналы». Видят только тестовые аккаунты, везде помечена ТЕСТ
+  app.post('/signals/demo-history', { preHandler: need('admin') }, async (req) => {
+    const pairs = ['EUR/USD OTC', 'GBP/USD OTC', 'AUD/CHF OTC', 'EUR/GBP OTC', 'AUD/USD OTC', 'USD/JPY OTC'];
+    const lossAt = randomInt(5);
+    let at = Date.now() - 20 * 60_000;
+    for (let i = 0; i < 5; i++) {
+      at -= (10 + randomInt(80)) * 60_000;
+      await db.query(
+        `INSERT INTO signals (pair, direction, expiry_min, entry_at, note, source, is_test, demo_result, created_by) VALUES ($1,$2,1,$3,'Тестовая история. Это не результаты торговли.','test',TRUE,$4,$5)`,
+        [pairs[randomInt(pairs.length)], randomInt(2) ? 'up' : 'down', new Date(at), i === lossAt ? 'loss' : 'win', req.staff!.id],
+      );
+    }
+    return { ok: true };
+  });
+
+  app.delete('/signals/demo-history', { preHandler: need('admin') }, async () => {
+    const r = await db.query(`DELETE FROM signals s WHERE s.demo_result IS NOT NULL AND NOT EXISTS (SELECT 1 FROM deals x WHERE x.signal_id = s.id)`);
+    return { removed: r.rowCount };
+  });
+
   app.patch<{ Params: { tgId: string } }>('/leads/:tgId/tester', { preHandler: need('admin') }, async (req, reply) => {
     const r = await db.query('UPDATE leads SET is_tester = $2 WHERE tg_id = $1 RETURNING tg_id', [Number(req.params.tgId), Boolean((req.body as any)?.value)]);
     if (!r.rowCount) return reply.code(404).send({ error: 'Лид не найден' });
