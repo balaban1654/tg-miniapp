@@ -488,7 +488,7 @@ async function viewMedia(){
     e.kind.value=r.kind;e.country.value=r.country||'';
     const save=async()=>{rowErr.textContent='';try{await api('/media/'+r.id,{method:'PUT',body:{kind:e.kind.value,title:e.title.value,country:e.country.value,subtitle:e.sub.value,url:e.url.value,sort:e.sort.value}});mediaEdit=null;render()}catch(x){rowErr.textContent=x.message}};
     [e.title,e.sub,e.url,e.sort].forEach(i=>i.addEventListener('keydown',k=>{if(k.key==='Enter'){k.preventDefault();save()}if(k.key==='Escape'){mediaEdit=null;render()}}));
-    return[el('td',{},e.kind),el('td',{},e.title,e.country),el('td',{},e.sub),el('td',{},e.url),el('td',{style:'white-space:nowrap'},e.sort,iconBtn('ok','Сохранить',save),txtBtn('Отмена',()=>{mediaEdit=null;render()}))];
+    return[el('td',{},e.kind),el('td',{},el('div',{style:'display:grid;gap:6px;min-width:170px'},e.title,e.country)),el('td',{},e.sub),el('td',{},e.url),el('td',{style:'white-space:nowrap'},e.sort,iconBtn('ok','Сохранить',save),txtBtn('Отмена',()=>{mediaEdit=null;render()}))];
   }
   const viewRow=r=>[td(r.kind==='trader'?'Трейдер':'Канал'),td(r.title+(r.country?', '+r.country:'')),td(r.subtitle||'—'),el('td',{},el('code',{},r.url)),el('td',{style:'white-space:nowrap'},iconBtn('pen','Изменить',()=>{mediaEdit=r.id;render()}),txtBtn('Удалить',async()=>{await api('/media/'+r.id,{method:'DELETE'});render()}))];
   return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Медиа в Mini App')),form,
