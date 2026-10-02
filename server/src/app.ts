@@ -124,12 +124,16 @@ function demoPast(preview = false) {
     }
   }
   events.sort((x, y) => y.at - x.at);
+  const used = new Set<number>(); // голоса в пяти строках не повторяются
   return events.slice(0, 5).map((e) => {
     const slot = Math.floor(e.at / 120_000); // у событий с интервалом от 2 минут слоты разные, пары на 5 соседних строках не повторяются
     // Голоса показываем всем. Утром и днём 20–50, вечером и ночью 20–96 (чаще ближе к верхней границе)
     const hr = Number(hourFmt.format(new Date(e.at)));
     const day = hr >= 6 && hr < 18;
-    const votes = day ? 20 + (h(slot + 5) % 31) : 20 + Math.max(h(slot + 5) % 77, h(slot + 6) % 77);
+    const [lo, span] = day ? [20, 31] : [20, 77];
+    let votes = day ? lo + (h(slot + 5) % span) : lo + Math.max(h(slot + 5) % span, h(slot + 6) % span);
+    while (used.has(votes)) votes = lo + ((votes - lo + 1) % span);
+    used.add(votes);
     return {
       id: -Math.floor(e.at / 1000),
       preview,
