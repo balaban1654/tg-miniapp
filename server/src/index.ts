@@ -43,6 +43,9 @@ app.get<{ Params: { name: string } }>('/img/:name', async (req, reply) => {
   return reply.type(req.params.name.endsWith('.png') ? 'image/png' : 'image/webp').header('Cache-Control', 'public, max-age=86400').send(f);
 });
 
+// Браузеры сами просят /favicon.ico на любой странице и на любом поддомене: отдаём ту же круглую иконку
+app.get('/favicon.ico', async (_req, reply) => reply.type('image/png').header('Cache-Control', 'public, max-age=86400').send(imgs.get('favicon.png')));
+
 // Заглушка для корня домена, пока основного сайта нет
 const siteHtml = readFileSync(resolve(process.cwd(), 'public/site.html'), 'utf8').replaceAll('{{BOT}}', config.botUsername);
 app.get('/site', async (_req, reply) => reply.type('text/html; charset=utf-8').header('Cache-Control', 'public, max-age=300').send(siteHtml));
