@@ -133,6 +133,15 @@ main{flex:1;padding:6px 16px 96px;display:grid;gap:12px;align-content:start}
 .btn:active{transform:scale(.98)}.btn.o{background:none;border:1px solid var(--acc);color:var(--acc2)}.btn:disabled{opacity:.45}
 .btn.g{background:var(--ok);color:#06210f}.btn.r{background:var(--bad);color:#2b0610}
 .btn.sm2{padding:8px;font-size:12px;border-radius:10px}
+.tl{display:flex;gap:10px;align-items:center}
+.tl.lk{cursor:pointer;-webkit-tap-highlight-color:transparent;border-radius:12px;transition:transform .08s}
+.tl.lk:active{transform:scale(.98)}
+.tl .un{display:block;margin-top:2px;font-size:13px;color:var(--acc2);transition:color .15s,text-shadow .15s}
+.tl.lk:hover .un,.tl.lk:active .un,.tl.lk:focus-visible .un{color:#fff;text-shadow:0 0 10px #9b5cffcc}
+.tr .btn.o,.lesson{transition:background .15s,color .15s,box-shadow .15s}
+.tr .btn.o:active{background:var(--acc);color:#fff}
+@media(hover:hover){.tr .btn.o:hover{background:var(--acc);color:#fff;box-shadow:0 0 0 3px #9b5cff33}}
+
 .chips{display:flex;gap:6px;flex-wrap:wrap}
 .chip{border:1px solid var(--line);background:none;border-radius:99px;padding:6px 14px;font-size:12px;color:var(--mut);cursor:pointer}
 .chip.on{background:var(--acc);border-color:var(--acc);color:#fff}
@@ -161,6 +170,8 @@ main{flex:1;padding:6px 16px 96px;display:grid;gap:12px;align-content:start}
 
 .ext{display:grid;place-items:center;color:var(--mut,#9d8fc4);flex:none}
 .lesson{display:flex;gap:12px;align-items:center;cursor:pointer;width:100%;text-align:left;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:13px;color:inherit}
+.lesson:active{background:var(--card2);border-color:var(--acc)}
+@media(hover:hover){.lesson:hover{background:var(--card2);border-color:var(--acc)}}
 .num{width:34px;height:34px;border-radius:50%;background:var(--card2);display:grid;place-items:center;font:700 14px var(--fm);flex:none;color:var(--acc2)}
 .num.done{background:var(--ok);color:#06210f}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
@@ -904,7 +915,7 @@ async function viewMedia(){
   if(!me)await refreshMe();
   const m=await api('/media');
   const ch=m.channels.length?m.channels.map(c=>el('button',{class:'lesson',type:'button',onclick:()=>openLink(c.url)},mediaAva(c,44),el('div',{style:'flex:1'},el('b',{},c.title,flagImg(c.country)),el('div',{class:'sm'},[c.channelTitle&&c.channelTitle!==c.title?c.channelTitle:c.subtitle||'',c.members!=null?(c.channelTitle||c.subtitle?' · ':'')+subsText(c.members):''].join(''))),extIcon())):[el('div',{class:'card sm'},'Каналы скоро появятся.')];
-  const tr=m.traders.length?el('div',{class:'two'},m.traders.map(t=>el('div',{class:'card tr'},el('div',{style:'display:flex;gap:10px;align-items:center'},mediaAva(t),el('div',{style:'min-width:0'},el('b',{},t.title,flagImg(t.country)),t.contact?el('a',{href:t.contact.url,class:'sm',style:'display:block;color:var(--accent,#b79cff);text-decoration:none;margin-top:2px',onclick:e=>{e.preventDefault();openLink(t.contact.url)}},'@'+t.contact.handle):null)),el('div',{style:'text-align:center'},el('div',{class:'sm'},t.channelTitle||t.subtitle||'Трейдер команды'),t.members!=null?el('div',{class:'sm',style:'color:var(--accent,#b79cff)'},subsText(t.members)):null),el('button',{class:'btn o sm2',type:'button',onclick:()=>openLink(t.url)},'Канал трейдера')))):el('div',{class:'card sm'},'Трейдеры скоро появятся.');
+  const tr=m.traders.length?el('div',{class:'two'},m.traders.map(t=>el('div',{class:'card tr'},el('div',{class:'tl'+(t.contact?' lk':''),...(t.contact?{role:'link',tabindex:'0',onclick:()=>openLink(t.contact.url),onkeydown:e=>{if(e.key==='Enter')openLink(t.contact.url)}}:{})},mediaAva(t),el('div',{style:'min-width:0'},el('b',{},t.title,flagImg(t.country)),t.contact?el('span',{class:'un'},'@'+t.contact.handle):null)),el('div',{style:'text-align:center'},el('div',{class:'sm'},t.channelTitle||t.subtitle||'Трейдер команды'),t.members!=null?el('div',{class:'sm',style:'color:var(--accent,#b79cff)'},subsText(t.members)):null),el('button',{class:'btn o sm2',type:'button',onclick:()=>openLink(t.url)},'Канал трейдера')))):el('div',{class:'card sm'},'Трейдеры скоро появятся.');
   shell('Медиа',[el('b',{},'Каналы команды'),ch,el('b',{},'Наши трейдеры'),tr]);
 }
 
