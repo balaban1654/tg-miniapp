@@ -41,7 +41,7 @@ input,select{background:var(--bg2);border:1px solid var(--line);border-radius:10
 .side{background:#0a0613;border-right:1px solid var(--line);padding:16px 10px;display:flex;flex-direction:column;gap:4px;position:sticky;top:0;height:100vh}
 .side .brand{padding:4px 10px 16px}
 .nav{display:grid;gap:3px}
-.nav button{text-align:left;background:none;border:0;border-radius:9px;padding:9px 12px;color:var(--mut);font-weight:600;cursor:pointer}
+.nav button{display:flex;align-items:center;gap:10px;text-align:left;white-space:nowrap;background:none;border:0;border-radius:9px;padding:9px 12px;color:var(--mut);font-weight:600;cursor:pointer}
 .nav button.on{background:var(--card2);color:var(--fg)}
 .me{margin-top:auto;padding:10px;color:var(--mut);font-size:12px;display:grid;gap:8px}
 main{padding:22px clamp(14px,3vw,32px);display:grid;gap:18px;align-content:start;min-width:0}
@@ -144,16 +144,27 @@ function table(cols,rows,empty){
 const td=(v,cls)=>el('td',{class:cls||''},v);
 
 function showLogin(){me=null;$('#app').hidden=true;$('#login').hidden=false;$('#lPass').value=''}
+const ICONS={
+  home:'<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>',
+  signals:'<path d="M3 17l5-6 4 3 8-9"/><path d="M15 5h5v5"/>',
+  chats:'<path d="M21 12a8 8 0 01-11.6 7.1L4 20l1-4.6A8 8 0 1121 12z"/>',
+  leads:'<path d="M3 5h18l-7 8v6l-4 2v-8z"/>',
+  links:'<path d="M10 14a4 4 0 005.7 0l3-3a4 4 0 00-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 00-5.7 0l-3 3a4 4 0 005.7 5.7l1-1"/>',
+  staff:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.5 3-6 6.5-6s6.5 2.5 6.5 6"/><path d="M16 4.6a3.5 3.5 0 010 6.8M18 14.3c2.2.7 3.5 2.6 3.5 5.7"/>',
+  push:'<path d="M6 16V11a6 6 0 1112 0v5l2 2H4z"/><path d="M10 21a2 2 0 004 0"/>',
+  media:'<rect x="3" y="5" width="18" height="14" rx="3"/><path d="M10 9.5v5l4.5-2.5z"/>',
+  pb:'<path d="M4 12h5l2-6 3 12 2-6h4"/>'};
+const icon=k=>{const s=document.createElementNS('http://www.w3.org/2000/svg','svg');s.setAttribute('viewBox','0 0 24 24');s.setAttribute('width','18');s.setAttribute('height','18');s.setAttribute('fill','none');s.setAttribute('stroke','currentColor');s.setAttribute('stroke-width','2');s.setAttribute('stroke-linecap','round');s.setAttribute('stroke-linejoin','round');s.setAttribute('aria-hidden','true');s.innerHTML=ICONS[k]||'';return s};
 function showApp(){
   $('#login').hidden=true;$('#app').hidden=false;
   $('#meName').textContent=me.name+' · '+ROLE[me.role];
-  const items=[['home','Обзор'],['leads','Лиды'],['links','Ссылки']];
+  const items=[['home','Дашборд'],['leads','Лиды'],['links','Ссылки']];
   if(me.role==='admin'||me.role==='teamlead')items.push(['staff',me.role==='admin'?'Люди':'Моя команда']);
   if(['admin','teamlead','streamer'].includes(me.role))items.splice(1,0,['chats','Чаты']);
   if(me.role==='admin')items.splice(1,0,['signals','Сигналы']);
   if(me.role==='analyst'){items.length=0;items.push(['signals','Сигналы']);if(tab!=='signals')tab='signals'}
   if(me.role==='admin')items.push(['push','Пуши'],['media','Медиа'],['pb','Постбеки']);
-  const nav=$('#nav');nav.replaceChildren(...items.map(([k,t])=>el('button',{type:'button','data-t':k,class:k===tab?'on':'',onclick:()=>{tab=k;showApp();render()}},t)));
+  const nav=$('#nav');nav.replaceChildren(...items.map(([k,t])=>el('button',{type:'button','data-t':k,class:k===tab?'on':'',onclick:()=>{tab=k;showApp();render()}},icon(k),t)));
   render();updateBadge();
 }
 
@@ -188,7 +199,7 @@ async function render(opt){
 async function viewHome(){
   const s=await api('/stats');const b=s.byStatus;
   const k=(t,v)=>el('div',{class:'kpi'},el('small',{},t),el('b',{},String(v)));
-  return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Обзор')),
+  return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Дашборд')),
     el('div',{class:'kpis'},k('Клики по ссылкам',s.clicks),k('Лиды',s.total),k('Регистрации',(b.registered||0)+(b.ftd||0)+(b.active||0)),k('FTD',(b.ftd||0)+(b.active||0)),k('Отвал',b.churned||0)),
     el('div',{class:'kpis'},k('Депозиты',money(s.deposits)),k('Выводы',money(s.withdrawals)),...(s.commission!==null?[k('Заработано (комиссия)',money(s.commission))]:[]))];
 }
