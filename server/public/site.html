@@ -63,7 +63,7 @@ footer{position:relative;z-index:1;text-align:center;color:#8f82b3;font-size:12p
 <footer>© Hunter AI · <a href="/terms">Условия использования</a></footer>
 <script>
 (function(){
-  var NS='http://www.w3.org/2000/svg',still=matchMedia('(prefers-reduced-motion:reduce)').matches;
+  var NS='http://www.w3.org/2000/svg',touch=matchMedia('(hover:none),(pointer:coarse)').matches,still=matchMedia('(prefers-reduced-motion:reduce)').matches;
   var core=document.getElementById('core'),planet=document.getElementById('planet');
   var back=document.getElementById('back'),front=document.getElementById('front');
   function mk(tag,attrs,parent){var n=document.createElementNS(NS,tag);for(var k in attrs)n.setAttribute(k,attrs[k]);if(parent)parent.appendChild(n);return n}
@@ -91,12 +91,13 @@ footer{position:relative;z-index:1;text-align:center;color:#8f82b3;font-size:12p
       it.gl.setAttribute('stroke-dashoffset',(-(t*it.o.sp*100)%100).toFixed(2));
     })});
     pulses.forEach(function(c,i){var p=((t/3.6)+i*.5)%1;c.setAttribute('r',(106+78*p).toFixed(1));c.setAttribute('stroke-opacity',(.6*Math.pow(1-p,1.6)).toFixed(3));c.setAttribute('stroke-width',(2.4-1.4*p).toFixed(2))});
-    cx+=(tx-cx)*.08;cy+=(ty-cy)*.08;
+    if(!touch){cx+=(tx-cx)*.08;cy+=(ty-cy)*.08;
     planet.style.transform='rotateY('+(cx*38).toFixed(2)+'deg) rotateX('+(-cy*24).toFixed(2)+'deg)';
-    core.style.setProperty('--lx',(50-cx*38).toFixed(1)+'%');core.style.setProperty('--ly',(32-cy*30).toFixed(1)+'%');
+    core.style.setProperty('--lx',(50-cx*38).toFixed(1)+'%');core.style.setProperty('--ly',(32-cy*30).toFixed(1)+'%');}
     if(!still)requestAnimationFrame(frame);
   }
-  if(!still){
+  if(touch){planet.style.willChange='auto';planet.style.transformStyle='flat';[].forEach.call(planet.querySelectorAll('.edge'),function(e){e.remove()})}
+  if(!still&&!touch){
     addEventListener('pointermove',function(e){tx=(e.clientX/innerWidth-.5)*2;ty=(e.clientY/innerHeight-.5)*2},{passive:true});
     document.addEventListener('pointerleave',function(){tx=0;ty=0});
   }
