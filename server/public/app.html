@@ -443,20 +443,36 @@ async function signalPairs(){
   // Пары приходят отсортированными по популярности: первые 5 — топ, дальше остальные
   const pairs=o.pairs.map(p=>p.pair),TOP=5;
   const SHOWN=[3,5,15,30],opts=[...new Set([...SHOWN,...o.expiries])].sort((a,b)=>a-b);
-  let pair=null,sec=o.expiries.includes(5)?5:(o.expiries[0]||null),open=false;
+  let pair=null,sec=o.expiries.includes(5)?5:(o.expiries[0]||null),open=false,query='';
   const box=el('div',{style:'display:grid;gap:14px'});
   const go=el('button',{class:'btn',type:'button',onclick:()=>{if(pair&&sec)signalPrep(pair,sec)}},'Получить анализ');
   const paint=()=>{
     go.disabled=!(pair&&sec);
-    const head=el('button',{type:'button',class:'lesson',style:'justify-content:space-between;font-weight:700',onclick:()=>{open=!open;paint()}},
-      el('span',{style:pair?'':'color:var(--mut);font-weight:600'},pair||'Выберите валютную пару'),el('span',{style:'color:var(--acc2)'},open?'▴':'▾'));
-    const item=p=>el('button',{type:'button',class:'prow',style:p===pair?'border-color:var(--acc)':'',onclick:()=>{pair=p;open=false;paint()}},el('span',{},p),p===pair?el('span',{class:'pay'},'✓'):null);
-    const list=open?el('div',{style:'display:grid;gap:8px;max-height:46vh;overflow:auto'},
-      pairs.length?[el('div',{class:'sm',style:'padding:0 4px'},'Популярные'),...pairs.slice(0,TOP).map(item),pairs.length>TOP?el('div',{class:'sm',style:'padding:4px 4px 0'},'Остальные'):null,...pairs.slice(TOP).map(item)]:el('div',{class:'card sm'},'Пары скоро появятся.')):null;
+    const item=p=>el('button',{type:'button',class:'prow',style:p===pair?'border-color:var(--acc)':'',onclick:()=>{pair=p;open=false;query='';paint()}},el('span',{},p),p===pair?el('span',{class:'pay'},'✓'):null);
+    const norm=t=>t.toUpperCase().replace(/[^A-Z0-9А-Я]/g,'');
+    const matches=()=>{const q=norm(query);return q?pairs.filter(x=>norm(x).includes(q)):pairs};
+    // Список перерисовываем отдельно от поля, чтобы при вводе не терялся фокус
+    const list=open?el('div',{style:'display:grid;gap:8px;max-height:46vh;overflow:auto'}):null;
+    const drawList=()=>{
+      const m=matches();
+      list.replaceChildren(...(!pairs.length?[el('div',{class:'card sm'},'Пары скоро появятся.')]:!m.length?[el('div',{class:'card sm'},'Ничего не найдено')]:
+        query?m.map(item):[el('div',{class:'sm',style:'padding:0 4px'},'Популярные'),...pairs.slice(0,TOP).map(item),pairs.length>TOP?el('div',{class:'sm',style:'padding:4px 4px 0'},'Остальные'):null,...pairs.slice(TOP).map(item)]).filter(Boolean));
+    };
+    const head=open
+      ?el('div',{class:'lesson',style:'justify-content:space-between;gap:8px;padding-top:0;padding-bottom:0'},
+        el('input',{type:'text',placeholder:'Поиск пары, например EUR',autocomplete:'off',autocapitalize:'characters',spellcheck:'false',value:query,
+          style:'flex:1;min-width:0;background:none;border:0;outline:0;color:var(--fg);font:700 15px var(--fb,inherit);padding:14px 0',
+          oninput:e=>{query=e.target.value;drawList()},
+          onkeydown:e=>{if(e.key==='Enter'){const m=matches();if(m.length){pair=m[0];open=false;query='';paint()}}}}),
+        el('button',{type:'button','aria-label':'Закрыть список',style:'background:none;border:0;color:var(--acc2);cursor:pointer;padding:6px',onclick:()=>{open=false;query='';paint()}},'▴'))
+      :el('button',{type:'button',class:'lesson',style:'justify-content:space-between;font-weight:700',onclick:()=>{open=true;paint()}},
+        el('span',{style:pair?'':'color:var(--mut);font-weight:600'},pair||'Выберите валютную пару'),el('span',{style:'color:var(--acc2)'},'▾'));
+    if(list)drawList();
     const exp=el('div',{style:'display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px'},opts.map(n=>{
       const on=o.expiries.includes(n);
       return el('button',{type:'button',class:'lesson',disabled:!on,style:'justify-content:center;font-weight:700;'+(!on?'opacity:.4;':n===sec?'border-color:var(--acc);background:var(--card2);':''),onclick:()=>{sec=n;paint()}},fmtDur(n))}));
     box.replaceChildren(...[el('div',{class:'fs-tip'},'Валютная пара'),head,list,el('div',{class:'fs-tip',style:'margin-top:4px'},'Время экспирации'),exp].filter(Boolean));
+    if(open){const inp=head.querySelector('input');if(inp)setTimeout(()=>inp.focus(),0)}
   };
   paint();
   shell('Анализ',[el('button',{class:'back',type:'button',onclick:()=>{tab='home';render()}},'‹ Назад'),box,go,
