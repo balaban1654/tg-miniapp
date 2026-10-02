@@ -216,8 +216,14 @@ async function viewStaff(){
 
 async function viewPostbacks(){
   const rows=await api('/postbacks');
+  const clearBox=el('span',{});
+  const askBtn=el('button',{class:'btn o s',type:'button',onclick:()=>{askBtn.hidden=true;sure.hidden=false}},'Очистить журнал');
+  const sure=el('span',{hidden:'',style:'display:inline-flex;gap:6px;align-items:center'},el('span',{class:'mut'},'Удалить все записи журнала?'),
+    el('button',{class:'btn s',type:'button',onclick:async()=>{await api('/postbacks',{method:'DELETE'});render()}},'Да, удалить'),
+    el('button',{class:'btn o s',type:'button',onclick:()=>{sure.hidden=true;askBtn.hidden=false}},'Отмена'));
+  clearBox.append(askBtn,sure);
   const time=v=>new Date(v).toLocaleString('ru-RU',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit',second:'2-digit'});
-  return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Постбеки'),el('button',{class:'btn o s',type:'button',onclick:render},'Обновить')),
+  return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Постбеки'),el('div',{style:'display:flex;gap:8px;align-items:center'},clearBox,el('button',{class:'btn o s',type:'button',onclick:render},'Обновить'))),
     table(['Время','Событие','Лид (ID)','Трейдер PO','Сумма','Результат'],rows.map(r=>{const qq=r.query||{};return[td(time(r.created_at)),el('td',{},el('span',{class:'pill p-pur'},r.event)),td(r.tg_id||qq.click_id||'—'),td(qq.trader_id||'—'),td(qq.commission||qq.sumdep||qq.wdr_sum||qq.amount||qq.sum||'—','n'),el('td',{},el('span',{class:'pill '+(r.result==='ok'?'p-ok':r.result.startsWith('дубль')?'p-warn':'p-bad')},r.result))]}),
       'Постбеков пока нет. Когда партнёрка отправит первый, он появится здесь.')];
 }

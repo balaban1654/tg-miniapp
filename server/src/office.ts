@@ -294,6 +294,12 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     return r.rows;
   });
 
+  // Очистка журнала. Лиды, события и деньги не затрагиваются
+  app.delete('/postbacks', { preHandler: need('admin') }, async () => {
+    const r = await db.query('DELETE FROM postback_log');
+    return { ok: true, deleted: r.rowCount };
+  });
+
   // Лиды
   app.get<{ Querystring: { status?: string } }>('/leads', { preHandler: auth }, async (req) => {
     const me = req.staff!;
