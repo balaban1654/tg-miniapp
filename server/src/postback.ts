@@ -70,11 +70,12 @@ export async function postbackRoutes(app: FastifyInstance): Promise<void> {
     }
     if (!lead.rowCount) {
       let why: string;
-      if (!rawId) why = 'нет click_id, trader_id неизвестен';
-      else if (!idValid) why = `click_id не число: "${rawId.slice(0, 40)}"`;
-      else why = `лид ${tgId} не найден: нажмите /start у бота`;
-      await log(event, q, idValid ? tgId : null, why);
-      return reply.code(idValid ? 404 : 400).send({ ok: false, error: why });
+      if (!rawId) why = `клиент не из бота (Pocket ID ${traderId || 'нет'}, нет click_id)`;
+      else if (!idValid) why = `клиент не из бота (click_id не число: "${rawId.slice(0, 40)}")`;
+      else why = `клиент не из бота (Telegram ID ${tgId} не найден, нужен /start у бота)`;
+      await log(event, q, idValid ? tgId : null, 'пропущен: ' + why);
+      // Отвечаем «принято», иначе партнёрка будет повторять запрос. Событие чужого клиента нам не нужно
+      return { ok: true, ignored: true, reason: why };
     }
     if (traderId && !lead.rows[0].trader_id) {
       await db.query('UPDATE leads SET trader_id = $2 WHERE tg_id = $1 AND trader_id IS NULL', [tgId, traderId]);

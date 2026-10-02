@@ -317,7 +317,7 @@ async function viewPostbacks(){
   clearBox.append(askBtn,sure);
   const time=v=>new Date(v).toLocaleString('ru-RU',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit',second:'2-digit'});
   return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Постбеки'),el('div',{style:'display:flex;gap:8px;align-items:center'},clearBox,el('button',{class:'btn o s',type:'button',onclick:render},'Обновить'))),
-    table(['Время','Событие','Telegram ID','Pocket ID','Сумма','Результат'],rows.map(r=>{const qq=r.query||{};return[td(time(r.created_at)),el('td',{},el('span',{class:'pill p-pur'},r.event)),td(r.tg_id||qq.click_id||'—'),td(qq.trader_id||'—'),td(qq.commission||qq.sumdep||qq.wdr_sum||qq.amount||qq.sum||'—','n'),el('td',{},el('span',{class:'pill '+(r.result==='ok'?'p-ok':r.result.startsWith('дубль')?'p-warn':'p-bad')},r.result))]}),
+    table(['Время','Событие','Telegram ID','Pocket ID','Сумма','Результат'],rows.map(r=>{const qq=r.query||{};return[td(time(r.created_at)),el('td',{},el('span',{class:'pill p-pur'},r.event)),td(r.tg_id||qq.click_id||'—'),td(qq.trader_id||'—'),td(qq.commission||qq.sumdep||qq.wdr_sum||qq.amount||qq.sum||'—','n'),el('td',{},el('span',{class:'pill '+(r.result==='ok'?'p-ok':(r.result.startsWith('дубль')||r.result.startsWith('пропущен'))?'p-warn':'p-bad')},r.result))]}),
       'Постбеков пока нет. Когда партнёрка отправит первый, он появится здесь.')];
 }
 
