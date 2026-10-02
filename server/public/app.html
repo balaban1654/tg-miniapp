@@ -619,7 +619,7 @@ function lesson1(n=1){
       const ey=Y(st.trade.entry),xe=Math.min(X1-30,Math.max(30,xEntry==null?30:xEntry));
       h+='<line x1="'+xe.toFixed(1)+'" x2="'+xe.toFixed(1)+'" y1="'+(ey-26).toFixed(1)+'" y2="'+ey.toFixed(1)+'" stroke="#fff" stroke-opacity=".25"/><circle cx="'+xe.toFixed(1)+'" cy="'+ey.toFixed(1)+'" r="3.2" fill="#fff"/>';
       if(st.won){
-        const rs=st.result.res,txt=rs==='win'?'+'+usd(st.sum*.92).replace(',00 $',' $'):rs==='loss'?'−'+st.sum+' $':'0 $',col=rs==='win'?'#3ddc97':rs==='loss'?'#ff6b8a':'#ffb84d';
+        const rs=st.result.res,txt=rs==='win'?'+'+usd(st.sum*.92).replace(',00 $',' $'):rs==='loss'?'−'+st.sum+' $':st.sum+' $',col=rs==='win'?'#3ddc97':rs==='loss'?'#ff6b8a':'#ffb84d';
         h+='<g><rect x="'+(xe-40).toFixed(1)+'" y="'+(ey-48).toFixed(1)+'" width="80" height="20" rx="10" fill="#0d0817" stroke="'+col+'" stroke-width="1.4"/><text x="'+(xe-6).toFixed(1)+'" y="'+(ey-34).toFixed(1)+'" text-anchor="middle" fill="#fff" font-size="11.5" font-weight="800" font-family="Montserrat,sans-serif">'+txt+'</text><circle cx="'+(xe+28).toFixed(1)+'" cy="'+(ey-38).toFixed(1)+'" r="6" fill="'+col+'"/><path d="'+(rs==='win'?'M'+(xe+25).toFixed(1)+','+(ey-38).toFixed(1)+' l2.2,2.4 l4,-4.6':rs==='loss'?'M'+(xe+25.5).toFixed(1)+','+(ey-41).toFixed(1)+' l5,5 M'+(xe+30.5).toFixed(1)+','+(ey-41).toFixed(1)+' l-5,5':'M'+(xe+25).toFixed(1)+','+(ey-38).toFixed(1)+' h6')+'" stroke="#06210f" stroke-width="1.6" fill="none" stroke-linecap="round"/></g>';
       }
       else h+='<text x="'+xe.toFixed(1)+'" y="'+(ey-27).toFixed(1)+'" text-anchor="middle" fill="#fff" font-size="11" font-weight="800" font-family="Montserrat,sans-serif">▲ '+st.sum+' $</text><text x="'+xe.toFixed(1)+'" y="'+(ey-16).toFixed(1)+'" text-anchor="middle" fill="#fff" fill-opacity=".7" font-size="9" font-family="Montserrat,sans-serif">0:0'+Math.max(0,st.trade.left)+'</text>';
@@ -675,7 +675,8 @@ function lesson1(n=1){
       const sc=curSC();
       const f=sc==='win'?(dip!==null?dip:-.00028+.0006*(1-Math.cos(Math.PI*Math.min(1,Math.max(0,(e-2.2)/2.8))))/2)
         :sc==='loss'?(dip!==null?dip:-.00028-.00032*(1-Math.cos(Math.PI*Math.min(1,(e-2)/3)))/2)
-        :-.0003*Math.sin(Math.PI*Math.min(1,e/5));
+        :e<4?(dip!==null?dip:-.00028*(1-.93*(1-Math.cos(Math.PI*Math.min(1,(e-2)/2)))/2))   // возврат: на 4-й секунде свеча почти у точки входа
+        :-.0000196*Math.max(0,5-e);   // на 5-й секунде ровно на уровне входа
       price=st.trade.entry+f+(Math.random()-.5)*.000006;
     }
     pushPt();
@@ -693,7 +694,7 @@ function lesson1(n=1){
     const r=st.result,w=r.res==='win',l=r.res==='loss';
     const col=w?'var(--ok)':l?'var(--bad)':'var(--warn)';
     const word=w?'Плюс':l?'Минус':'Возврат';
-    const amt=(w?'+':l?'−':'')+usd(Math.abs(r.pnl)).replace(',00 $',' $');
+    const amt=(w?'+':l?'−':'')+usd(r.res==='draw'?st.sum:Math.abs(r.pnl)).replace(',00 $',' $');
     const series=n===2&&st.r1?st.r1.pnl+r.pnl:null;
     const sAmt=series===null?'':(series>0?'+':series<0?'−':'')+usd(Math.abs(series));
     const buzz2=()=>{try{if(tg&&tg.HapticFeedback)tg.HapticFeedback.notificationOccurred('success');else if(navigator.vibrate)navigator.vibrate(15)}catch{}};
@@ -714,16 +715,16 @@ function lesson1(n=1){
       el('div',{class:'note'},'Заранее решите дневной лимит потерь (например, 3–5% депозита) и остановитесь, когда он достигнут.'));
     const notes={1:'Это учебная сделка: график смоделирован так, чтобы показать, как выглядит плюс. В реальной торговле итог может быть любым, и минус тоже бывает. Об этом следующий урок.',
       2:'Это учебная серия: график смоделирован. Выплата меньше 100% (здесь 92%), поэтому один плюс на ту же сумму не покрывает один минус, и итог серии остаётся отрицательным. В реальной торговле вторая сделка тоже может закончиться минусом, поэтому не пытайтесь «отыграться» и не увеличивайте сумму.',
-      3:'Это учебная сделка: график смоделирован так, чтобы цена закрылась ровно на уровне входа. При возврате сумма, на которую вы зашли, возвращается в полном объёме. Чтобы получить возврат, свеча должна вернуться к точке входа и ненадолго остановиться на ней.'};
+      3:'Это учебная сделка: график смоделирован так, чтобы цена закрылась ровно на уровне входа. При возврате ставка возвращается в полном объёме. Чтобы получить возврат, свеча должна вернуться к точке входа и ненадолго остановиться на ней.'};
     const nextLabel=n===1?'Урок 2 · '+(lessons&&lessons[1]?lessons[1].title:'Перекрытие'):n===2?'Урок 3 · '+(lessons&&lessons[2]?lessons[2].title:'Возврат'):'К списку уроков';
     const rowS=(t1,t2,c,v)=>el('div',{class:'row'},el('div',{},el('b',{},t1),el('div',{class:'sm'},t2)),el('b',{style:'color:'+c},v));
     const body=[
-      el('div',{},el('div',{class:'sm',style:'font-size:14px'},n===2?'Урок 2 · Перекрытие':(w?'Сделка закрыта в плюс':l?'Сделка закрыта в минус':'Цена закрылась на уровне входа')),el('div',{style:'font:800 42px/1.1 var(--fd);color:'+(n===2?(series<0?'var(--bad)':'var(--ok)'):col)},n===2?sAmt:(r.res==='draw'?'0 $':amt))),
+      el('div',{},el('div',{class:'sm',style:'font-size:14px'},n===2?'Урок 2 · Перекрытие':(w?'Сделка закрыта в плюс':l?'Сделка закрыта в минус':'Цена закрылась на уровне входа')),el('div',{style:'font:800 42px/1.1 var(--fd);color:'+(n===2?(series<0?'var(--bad)':'var(--ok)'):col)},n===2?sAmt:(amt))),
       el('div',{class:'card',style:'padding:14px 16px;display:grid;gap:10px'},
         n===2?[rowS('Шаг 1 · вход на 0:45',st.sum+' $ · 3% депозита · Минус','var(--bad)','−'+usd(st.sum)),rowS('Шаг 2 · повторный вход на 0:15',st.sum+' $ · Плюс · выплата 92%','var(--ok)','+'+usd(st.sum*.92))]
-          :el('div',{class:'row'},el('div',{},el('b',{},'Вход на 0:45'),el('div',{class:'sm'},st.sum+' $ · 3% депозита · '+word+(r.res==='draw'?'':' · выплата 92%'))),el('b',{style:'color:'+col},r.res==='draw'?'0 $':amt)),
+          :el('div',{class:'row'},el('div',{},el('b',{},'Вход на 0:45'),el('div',{class:'sm'},st.sum+' $ · 3% депозита · '+word+(r.res==='draw'?'':' · выплата 92%'))),el('b',{style:'color:'+col},amt)),
         el('div',{style:'border-top:1px solid var(--line)'}),
-        el('div',{class:'row'},el('b',{},'Итого'),el('b',{style:'color:'+(n===2?(series<0?'var(--bad)':'var(--ok)'):col)},n===2?sAmt:(r.res==='draw'?'0 $':amt)))),
+        el('div',{class:'row'},el('b',{},'Итого'),el('b',{style:'color:'+(n===2?(series<0?'var(--bad)':'var(--ok)'):col)},n===2?sAmt:(amt)))),
       el('div',{},'Ты прошёл весь путь: сигнал → настройка → вход → результат.'),
       el('div',{class:'note'},notes[n]),
       markBox,
