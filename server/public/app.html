@@ -528,12 +528,18 @@ function lesson1(){
   const st={view:'pairs',pair:PAIRS[0],popup:false,timer:false,type:'line',iv:'M1',tt:60,ti:4,sum:10,paired:false,armed:false,trade:null,won:false,result:null,bal:1000};
   // плавный случайный ход цены: небольшая инерция, без резких скачков
   let price=1.0795,mom=0,base=0,pts=[];
-  const step=()=>{mom=mom*.85+(Math.random()-.5)*.00004;price+=mom+(Math.random()-.5)*.00002+(1.0795-price)*.012;return price};
-  // свечи по 10 точек (3 секунды); при покупке начинается новая свеча
-  const TICK=300,GP=10;
-  let gid=0,cn=0,gids=[],forceBreak=false;
-  const addGid=()=>{if(forceBreak||cn>=GP){gid++;cn=0;forceBreak=false}cn++;gids.push(gid)};
-  for(let i=0;i<260;i++){pts.push(step());addGid()}
+  let vm=1;
+  const step=()=>{mom=mom*.85+(Math.random()-.5)*.00004*vm;price+=mom+(Math.random()-.5)*.00002*vm+(1.0795-price)*.012;return price};
+  // новая свеча каждые 4 секунды; после покупки начинается новая, и следующая появляется уже через 3 секунды
+  const TICK=250,GP=16,POST=12;
+  let gid=0,cn=0,lim=GP,gids=[],forceBreak=false,lastNew=0;
+  const newCandle=()=>{vm=Math.random()<.3?1.7+Math.random()*1.6:.35+Math.random()*.7;lastNew=performance.now()};
+  const addGid=()=>{
+    if(forceBreak){gid++;cn=0;forceBreak=false;lim=POST;newCandle()}
+    else if(cn>=lim){gid++;cn=0;lim=GP;newCandle()}
+    cn++;gids.push(gid);
+  };
+  for(let i=0;i<300;i++){pts.push(step());addGid()}
   const pushPt=()=>{pts.push(price);addGid();if(pts.length>600){pts.shift();gids.shift();base++}};
   let svg=null,ttag=null,nEl=null,tipEl=null,bigEl=null,liveEl=null;
   const fmtT=n=>Math.floor(n/60)+':'+String(n%60).padStart(2,'0');
@@ -551,7 +557,7 @@ function lesson1(){
   const guard=(name,fn)=>()=>{const t=target();if(t===name){buzz();fn()}else if(t)toast(needMsg[t])};
 
   // Свечи рисуются как на главной: последняя свеча «тикает», всё плавно едет влево
-  const DXC=27,BWC=19,X1=300,XH=262,PP=DXC/GP;
+  const DXC=27,BWC=19,X1=300,XL=262;
   let lastTick=performance.now(),prevPrice=price,lo=0,hi=1,first=true;
   function chart(now){
     const H=215,top=34,bot=H-14;
@@ -570,15 +576,15 @@ function lesson1(){
       lastV2=hv;
       if(st.trade)xEntry=xOf(Math.max(0,len-1-(lastAbs-st.trade.abs)));
     }else{
-      // свечи: положение считается по времени, поэтому всё едет плавно и без скачков
-      const headAbs=lastAbs-1+interp;
+      // свечи стоят на местах; когда появляется новая, весь ряд быстро сдвигается на одну свечу влево
       const map=new Map();
-      for(let i=Math.max(0,shown.length-170);i<shown.length;i++){const v=shown[i],k=gids[i],ai=base+i;
+      for(let i=Math.max(0,shown.length-220);i<shown.length;i++){const v=shown[i],k=gids[i],ai=base+i;
         const u=map.get(k);if(!u)map.set(k,{k,a0:ai,a1:ai,o:v,c:v,h:v,l:v});else{u.c=v;u.a1=ai;u.h=Math.max(u.h,v);u.l=Math.min(u.l,v)}}
-      units=[...map.values()].filter((u,i,arr)=>XH-(headAbs-u.a0)*PP>-DXC);
-      xOf=ai=>XH-(headAbs-ai)*PP;
-      units.forEach((u,i)=>{const nxt=units[i+1],slot=(nxt?nxt.a0-u.a0:GP)*PP;u.slot=slot;u.x=xOf(u.a0)+slot/2;u.w=Math.min(BWC,slot*.82)});
-      if(st.trade)xEntry=xOf(st.trade.abs);
+      units=[...map.values()].slice(-12);
+      const t=Math.min(1,(now-lastNew)/320),off=DXC*Math.pow(1-t,3);
+      units.forEach((u,i)=>{u.x=XL+(i-(units.length-1))*DXC+off;u.w=BWC;u.slot=DXC});
+      units=units.filter(u=>u.x>-DXC);
+      if(st.trade){const eu=units.find(u=>st.trade.abs>=u.a0&&st.trade.abs<=u.a1);xEntry=eu?eu.x:null}
     }
     let mn=Math.min(...units.map(u=>u.l)),mx=Math.max(...units.map(u=>u.h));
     if(st.trade){mn=Math.min(mn,st.trade.entry);mx=Math.max(mx,st.trade.entry)}
