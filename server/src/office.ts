@@ -1,4 +1,5 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import { InputFile } from 'grammy';
 import { db } from './db.js';
 import { bot } from './bot.js';
 import { config } from './config.js';
@@ -356,11 +357,22 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     }
   });
 
-  app.post<{ Params: { tgId: string } }>('/chats/:tgId/reply', { preHandler: auth }, async (req, reply) => {
+  app.post<{ Params: { tgId: string } }>('/chats/:tgId/reply', { preHandler: auth, bodyLimit: 9 * 1024 * 1024 }, async (req, reply) => {
     const me = req.staff!;
     const tgId = Number(req.params.tgId);
     const text = str((req.body as any)?.text, 4000);
-    if (!text) return reply.code(400).send({ error: 'Введите сообщение' });
+    // Скриншот приходит как base64; принимаем только настоящие jpg/png/webp до 6 МБ
+    let photo: Buffer | null = null;
+    const rawPhoto = (req.body as any)?.photo;
+    if (typeof rawPhoto === 'string' && rawPhoto) {
+      const b = Buffer.from(rawPhoto.replace(/^data:[^,]*,/, ''), 'base64');
+      const ok = b.length > 12 && ((b[0] === 0xff && b[1] === 0xd8) || b.subarray(1, 4).toString() === 'PNG' || (b.subarray(0, 4).toString() === 'RIFF' && b.subarray(8, 12).toString() === 'WEBP'));
+      if (!ok) return reply.code(400).send({ error: 'Прикрепите картинку JPG, PNG или WebP' });
+      if (b.length > 6 * 1024 * 1024) return reply.code(400).send({ error: 'Картинка больше 6 МБ' });
+      photo = b;
+    }
+    if (!text && !photo) return reply.code(400).send({ error: 'Введите сообщение' });
+    if (photo && text.length > 1024) return reply.code(400).send({ error: 'Подпись к картинке не длиннее 1024 символов' });
     const lead = await db.query(`SELECT d.owner_id FROM leads d WHERE d.tg_id = $1 AND ${chatScope(me, 'd.owner_id')}`, [tgId]);
     if (!lead.rowCount) return reply.code(404).send({ error: 'Чат не найден' });
 
@@ -374,14 +386,21 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     }
 
     let tgMessageId: number | null = null;
+    let fileId: string | null = null;
     if (!config.disableBot) {
       try {
-        tgMessageId = (await bot.api.sendMessage(tgId, text)).message_id;
+        if (photo) {
+          const sent = await bot.api.sendPhoto(tgId, new InputFile(photo, 'image'), text ? { caption: text } : {});
+          tgMessageId = sent.message_id;
+          fileId = sent.photo[sent.photo.length - 1]?.file_id ?? null;
+        } else {
+          tgMessageId = (await bot.api.sendMessage(tgId, text)).message_id;
+        }
       } catch {
         return reply.code(502).send({ error: 'Telegram не принял сообщение. Возможно, клиент заблокировал бота.' });
       }
     }
-    await db.query(`INSERT INTO messages (tg_id, direction, staff_id, kind, text, tg_message_id) VALUES ($1,'out',$2,'text',$3,$4)`, [tgId, me.id, text, tgMessageId]);
+    await db.query(`INSERT INTO messages (tg_id, direction, staff_id, kind, text, file_id, tg_message_id) VALUES ($1,'out',$2,$3,$4,$5,$6)`, [tgId, me.id, photo ? 'photo' : 'text', text || null, fileId, tgMessageId]);
     return { ok: true };
   });
 

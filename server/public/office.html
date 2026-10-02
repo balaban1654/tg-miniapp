@@ -257,21 +257,38 @@ async function updateBadge(){
 }
 setInterval(updateBadge,20000);
 
-const cname=r=>r.username?'@'+r.username:(r.first_name||String(r.tg_id));
+const cname=r=>r.first_name||(r.username?'@'+r.username:String(r.tg_id));
+const profileUrl=r=>r.username?'https://t.me/'+r.username:'tg://user?id='+r.tg_id;
+const fileToDataUrl=f=>new Promise((ok,no)=>{const fr=new FileReader();fr.onload=()=>ok(fr.result);fr.onerror=()=>no(new Error('Не удалось прочитать файл'));fr.readAsDataURL(f)});
 async function viewChats(){
   let active=null;
   const list=el('div',{class:'chat-list'});
   const head=el('div',{class:'thread-head'});
   const msgs=el('div',{class:'msgs'});
-  const ta=el('textarea',{id:'replyText',rows:'1',placeholder:'Ответ клиенту. Он придёт в бота. Enter — отправить',maxlength:'4000'});
+  const ta=el('textarea',{id:'replyText',rows:'1',placeholder:'Ответ клиенту. Скриншот можно вставить Ctrl+V. Enter — отправить',maxlength:'4000'});
   const sendBtn=el('button',{class:'btn',type:'button'},'Отправить');
+  let photo=null;
+  const fileIn=el('input',{type:'file',accept:'image/jpeg,image/png,image/webp',style:'display:none'});
+  const attachBtn=el('button',{class:'btn o',type:'button',title:'Прикрепить скриншот (или вставьте Ctrl+V)','aria-label':'Прикрепить скриншот'},'📎');
+  const prev=el('div',{style:'display:none;padding:8px 12px 0;gap:8px;align-items:center'});
+  function setPhoto(f){
+    if(!f)return;
+    if(!/^image\/(jpeg|png|webp)$/.test(f.type)){err.textContent='Прикрепите картинку JPG, PNG или WebP';return}
+    if(f.size>6*1024*1024){err.textContent='Картинка больше 6 МБ';return}
+    err.textContent='';photo=f;
+    prev.style.display='flex';
+    prev.replaceChildren(el('img',{src:URL.createObjectURL(f),alt:'Скриншот к отправке',style:'height:56px;border-radius:8px'}),el('button',{class:'btn o',type:'button',onclick:clearPhoto},'Убрать'));
+  }
+  function clearPhoto(){photo=null;fileIn.value='';prev.style.display='none';prev.replaceChildren()}
+  attachBtn.addEventListener('click',()=>fileIn.click());
+  fileIn.addEventListener('change',()=>setPhoto(fileIn.files[0]));
   const err=el('div',{class:'err',role:'alert',style:'padding:0 12px'});
-  const thread=el('div',{class:'chat-thread'},head,msgs,el('div',{},err,el('div',{class:'reply'},ta,sendBtn)));
+  const thread=el('div',{class:'chat-thread'},head,msgs,el('div',{},err,prev,el('div',{class:'reply'},attachBtn,fileIn,ta,sendBtn)));
   const preview=r=>(r.last_dir==='out'?'Вы: ':'')+(r.last_text||({photo:'📷 Фото',document:'📎 Файл',voice:'🎤 Голосовое',video:'🎬 Видео',sticker:'Стикер'})[r.last_kind]||'Сообщение');
   async function loadList(){
     const rows=await api('/chats');
     list.replaceChildren(...(rows.length?rows.map(r=>el('button',{type:'button',class:'chat-item'+(r.tg_id==active?' on':''),onclick:()=>openChat(r.tg_id)},
-      el('div',{class:'row2'},el('b',{},cname(r)),r.waiting?el('span',{class:'dot',title:'Ждёт ответа'}):null),
+      el('div',{class:'row2'},el('b',{},cname(r),r.first_name&&r.username?el('span',{class:'mut sm',style:'font-weight:400'},' @'+r.username):null),r.waiting?el('span',{class:'dot',title:'Ждёт ответа'}):null),
       el('div',{class:'mut sm t'},preview(r)),
       el('div',{class:'mut sm'},r.owner_name?'Ведёт: '+r.owner_name:'Не закреплён: ответит первый, тот и заберёт'))):[el('div',{class:'empty'},'Сообщений пока нет. Когда клиент напишет боту, чат появится здесь.')]));
     updateBadge();
@@ -280,7 +297,7 @@ async function viewChats(){
     if(!active)return;
     const d=await api('/chats/'+active);
     const near=msgs.scrollHeight-msgs.scrollTop-msgs.clientHeight<80;
-    head.replaceChildren(el('b',{},cname(d.lead)),el('span',{class:'mut sm'},'Telegram ID '+d.lead.tg_id+' · Pocket ID '+(d.lead.trader_id||'нет')+' · '+(d.lead.owner_name?'ведёт '+d.lead.owner_name:'не закреплён')));
+    head.replaceChildren(el('div',{},el('a',{href:profileUrl(d.lead),target:'_blank',rel:'noopener',title:'Открыть профиль в Telegram',style:'font-weight:700;color:inherit;text-decoration:none;border-bottom:1px dashed var(--acc2)'},cname(d.lead)),d.lead.first_name&&d.lead.username?el('a',{href:profileUrl(d.lead),target:'_blank',rel:'noopener',class:'mut sm',style:'margin-left:8px;text-decoration:none'},'@'+d.lead.username):null),el('span',{class:'mut sm'},'Telegram ID '+d.lead.tg_id+' · Pocket ID '+(d.lead.trader_id||'нет')+' · '+(d.lead.owner_name?'ведёт '+d.lead.owner_name:'не закреплён')));
     msgs.replaceChildren(...d.messages.map(m=>{
       const body=[];
       if(m.has_file&&m.kind==='photo')body.push(el('img',{src:'/api/office/chats/'+d.lead.tg_id+'/file/'+m.id,alt:'Фото от клиента'}));
@@ -294,13 +311,15 @@ async function viewChats(){
   }
   async function openChat(id){active=id;msgs.dataset.init='';err.textContent='';try{await loadThread();await loadList()}catch(e){err.textContent=e.message}}
   async function send(){
-    const text=ta.value.trim();if(!text||!active)return;
+    const text=ta.value.trim();if((!text&&!photo)||!active)return;
     sendBtn.disabled=true;err.textContent='';
-    try{await api('/chats/'+active+'/reply',{method:'POST',body:{text}});ta.value='';await loadThread();await loadList()}
+    try{const body={text};if(photo)body.photo=await fileToDataUrl(photo);
+      await api('/chats/'+active+'/reply',{method:'POST',body});ta.value='';clearPhoto();await loadThread();await loadList()}
     catch(e){err.textContent=e.message;if(/уже взял/.test(e.message)){await loadList();await loadThread().catch(()=>{})}}
     finally{sendBtn.disabled=false;ta.focus()}
   }
   sendBtn.addEventListener('click',send);
+  ta.addEventListener('paste',e=>{const f=[...(e.clipboardData?.files||[])].find(x=>x.type.startsWith('image/'));if(f){e.preventDefault();setPhoto(f)}});
   ta.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send()}});
   await loadList();
   head.replaceChildren(el('span',{class:'mut'},'Выберите чат слева'));
@@ -387,6 +406,21 @@ async function viewPush(){
   bt.addEventListener('input',bupd);bbe.node.addEventListener('input',bupd);bbe.node.addEventListener('click',()=>setTimeout(bupd,0));bupd();
   const berr=el('div',{class:'err',role:'alert'});
   const sendBtn=el('button',{class:'btn',type:'button'},'Отправить');
+  let photo=null;
+  const fileIn=el('input',{type:'file',accept:'image/jpeg,image/png,image/webp',style:'display:none'});
+  const attachBtn=el('button',{class:'btn o',type:'button',title:'Прикрепить скриншот (или вставьте Ctrl+V)','aria-label':'Прикрепить скриншот'},'📎');
+  const prev=el('div',{style:'display:none;padding:8px 12px 0;gap:8px;align-items:center'});
+  function setPhoto(f){
+    if(!f)return;
+    if(!/^image\/(jpeg|png|webp)$/.test(f.type)){err.textContent='Прикрепите картинку JPG, PNG или WebP';return}
+    if(f.size>6*1024*1024){err.textContent='Картинка больше 6 МБ';return}
+    err.textContent='';photo=f;
+    prev.style.display='flex';
+    prev.replaceChildren(el('img',{src:URL.createObjectURL(f),alt:'Скриншот к отправке',style:'height:56px;border-radius:8px'}),el('button',{class:'btn o',type:'button',onclick:clearPhoto},'Убрать'));
+  }
+  function clearPhoto(){photo=null;fileIn.value='';prev.style.display='none';prev.replaceChildren()}
+  attachBtn.addEventListener('click',()=>fileIn.click());
+  fileIn.addEventListener('change',()=>setPhoto(fileIn.files[0]));
   sendBtn.addEventListener('click',async()=>{
     berr.className='err';berr.textContent='';
     if(!sendBtn.dataset.s){const n=(sel.selectedOptions[0].textContent.match(/\((\d+)\)/)||[])[1];sendBtn.dataset.s='1';sendBtn.textContent='Подтвердить отправку '+n+' получателям';return}
