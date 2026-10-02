@@ -1077,7 +1077,7 @@ async function viewMedia(){
 }
 
 function viewProfile(){
-  const rows=[['Telegram ID',me.tgId],['Pocket ID',me.pocketId||'ещё нет'],['Статус',({new:'новый',registered:'зарегистрирован',ftd:'пополнил счёт',active:'активен',churned:'неактивен'})[me.status]||me.status],['Менеджер',me.manager||'не назначен'],['Доступ',me.access?'открыт':'закрыт']];
+  const rows=[['Telegram ID',me.tgId],['Pocket ID',me.isTester?'Тестовый аккаунт':(me.pocketId||'ещё нет')],['Статус',({new:'новый',registered:'зарегистрирован',ftd:'пополнил счёт',active:'активен',churned:'неактивен'})[me.status]||me.status],['Менеджер',me.manager||'не назначен'],['Доступ',me.access?'открыт':'закрыт']];
   shell('Профиль',[el('div',{class:'card row',style:'justify-content:flex-start;gap:12px'},withPhoto(el('div',{class:'ava'},(me.name||'?').trim().slice(0,1).toUpperCase())),el('div',{},el('b',{style:'font:700 16px var(--fd)'},me.name),el('div',{class:'sm'},me.username?'@'+me.username:''))),
     el('div',{class:'card',style:'display:grid;gap:10px'},rows.map(([k,v])=>el('div',{class:'row'},el('span',{class:'sm'},k),el('b',{class:'mono'},String(v))))),
     me.promo?el('div',{class:'card row'},el('span',{class:'sm'},'Промокод'),el('b',{class:'mono'},me.promo)):null,

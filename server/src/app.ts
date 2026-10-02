@@ -214,7 +214,7 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
   app.get('/me', { preHandler: auth }, async (req) => {
     const u = req.tg!;
     const r = await db.query(
-      `SELECT d.status, d.access, d.region, d.created_at, d.trader_id, o.name AS manager,
+      `SELECT d.status, d.access, d.is_tester, d.region, d.created_at, d.trader_id, o.name AS manager,
               o.po_promo, o.po_link, o.po_link_ru
          FROM leads d LEFT JOIN staff o ON o.id = d.owner_id WHERE d.tg_id = $1`,
       [u.id],
@@ -235,7 +235,8 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
       username: u.username ?? null,
       since: l.created_at,
       status: l.status,
-      access: l.access,
+      access: Boolean(l.access || l.is_tester), // тестовый аккаунт: доступ как у обычного клиента
+      isTester: Boolean(l.is_tester),
       pocketId: l.trader_id,
       manager: l.manager,
       promo: l.po_promo,
@@ -326,7 +327,7 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
   // Сигнал по запросу остаётся у клиента, пока он его не оценит
   const ACTIVE = `((s.requested_by IS NULL AND now() <= s.entry_at + interval '3 minutes' AND s.created_at > now() - interval '2 hours')
        OR (s.requested_by = d.tg_id AND NOT EXISTS (SELECT 1 FROM signal_steps t WHERE t.signal_id = s.id AND t.tg_id = d.tg_id)))
-     AND ((NOT s.is_test AND d.access) OR (s.is_test AND d.is_tester) OR s.requested_by = d.tg_id)
+     AND ((NOT s.is_test AND (d.access OR d.is_tester)) OR (s.is_test AND d.is_tester) OR s.requested_by = d.tg_id)
      AND (s.requested_by IS NULL OR s.requested_by = d.tg_id)`;
   app.get('/signals/active', { preHandler: auth }, async (req) => {
     const r = await db.query(
