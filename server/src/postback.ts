@@ -55,9 +55,11 @@ export async function postbackRoutes(app: FastifyInstance): Promise<void> {
 
     // Лида ищем по метке из ссылки (click_id), а если её нет, по trader_id, который запомнили при регистрации
     const traderId = q.trader_id ?? '';
-    let tgId = Number(pick(q, ID_KEYS));
+    const rawId = pick(q, ID_KEYS);
+    let tgId = Number(rawId);
+    const idValid = Number.isSafeInteger(tgId) && tgId > 0;
     let lead: { rowCount: number | null; rows: any[] } = { rowCount: 0, rows: [] };
-    if (Number.isSafeInteger(tgId) && tgId > 0) {
+    if (idValid) {
       lead = await db.query('SELECT tg_id, status, access, trader_id, owner_id FROM leads WHERE tg_id = $1', [tgId]);
     }
     if (!lead.rowCount && traderId) {
@@ -65,9 +67,12 @@ export async function postbackRoutes(app: FastifyInstance): Promise<void> {
       if (lead.rowCount) tgId = Number(lead.rows[0].tg_id);
     }
     if (!lead.rowCount) {
-      const known = Number.isSafeInteger(tgId) && tgId > 0;
-      await log(event, q, known ? tgId : null, known ? 'лид не найден' : 'нет click_id и trader_id неизвестен');
-      return reply.code(known ? 404 : 400).send({ ok: false, error: known ? 'lead not found' : 'click_id required' });
+      let why: string;
+      if (!rawId) why = 'нет click_id, trader_id неизвестен';
+      else if (!idValid) why = `click_id не число: "${rawId.slice(0, 40)}"`;
+      else why = `лид ${tgId} не найден: нажмите /start у бота`;
+      await log(event, q, idValid ? tgId : null, why);
+      return reply.code(idValid ? 404 : 400).send({ ok: false, error: why });
     }
     if (traderId && !lead.rows[0].trader_id) {
       await db.query('UPDATE leads SET trader_id = $2 WHERE tg_id = $1 AND trader_id IS NULL', [tgId, traderId]);
