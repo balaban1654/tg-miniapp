@@ -422,7 +422,6 @@ async function signalCard(){
     el('button',{class:'btn',type:'button',onclick:async e=>{e.currentTarget.disabled=true;try{await api('/signals/'+sg.id+'/take',{method:'POST'});toast('Сделка записана');render()}catch(x){toast(x.message);render()}}},'Я вошёл в сделку');
   return el('div',{class:'card hero'},
     el('div',{class:'row'},el('h3',{style:'font-size:15px'},'Сигнал'),el('span',{class:'pill '+(sg.is_test?'p-warn':'p-pur')},sg.is_test?'ТЕСТ':'От аналитика')),
-    sg.is_test?el('div',{class:'sm',style:'color:var(--warn)'},'Тестовый сигнал. Не для торговли.'):null,
     el('div',{class:'row'},el('b',{style:'font:700 17px var(--fd)'},sg.pair),el('span',{class:'pill '+(up?'p-ok':'p-bad')},up?'ВВЕРХ ▲':'ВНИЗ ▼')),
     el('div',{class:'row sm'},el('span',{},'Экспирация'),el('b',{class:'mono',style:'color:var(--fg)'},sg.expiry_min+' мин')),
     el('div',{class:'row sm'},el('span',{},'Вход в'),el('b',{class:'mono',style:'color:var(--fg)'},hm2)),
@@ -656,7 +655,7 @@ async function pastSignals(){
   const wrap=el('div',{});
   const build=rows=>{
     const allTest=rows.length>0&&rows.every(r=>r.is_test);
-    const head=el('div',{class:'pshead'},el('b',{},'Прошедшие сигналы'),allTest?(rows[0].preview?el('span',{class:'sm',style:'color:var(--warn);font-weight:700'},'Предпросмотр, видите только вы'):null):el('span',{class:'sm'},'по отметкам участников'));
+    const head=el('div',{class:'pshead'},el('b',{},'Прошедшие сигналы'),allTest?null:el('span',{class:'sm'},'по отметкам участников'));
     if(!rows.length)return[head,el('div',{class:'card sm'},'Завершённых сигналов пока нет.')];
     return[head,el('div',{class:'pslist'},rows.map(r=>{
       const n=r.wins+r.losses,up=r.direction==='up';
