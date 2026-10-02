@@ -183,7 +183,9 @@ main{flex:1;padding:6px 16px 96px;display:grid;gap:12px;align-content:start}
 .tr{display:grid;gap:8px}
 .back{background:none;border:0;color:var(--acc2);padding:4px 0;cursor:pointer;font-size:13px;text-align:left}
 ol.steps{margin:0;padding-left:20px;display:grid;gap:8px}
-.toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:var(--card2);border:1px solid var(--acc);padding:10px 16px;border-radius:12px;z-index:9;max-width:90%;text-align:center}
+.toast{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);background:rgba(37,24,71,.96);border:1px solid var(--acc);box-shadow:0 14px 44px rgba(0,0,0,.55),0 0 24px rgba(155,92,255,.22);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);padding:14px 22px;border-radius:16px;z-index:99;max-width:86%;text-align:center;font-weight:600;line-height:1.4;pointer-events:none;animation:toastIn .18s ease-out,toastOut .7s ease-in 1.3s forwards}
+@keyframes toastIn{from{opacity:0;transform:translate(-50%,-46%) scale(.96)}to{opacity:1;transform:translate(-50%,-50%) scale(1)}}
+@keyframes toastOut{0%{opacity:1}40%{opacity:.6}100%{opacity:0}}
 svg{max-width:100%}
 .err{color:var(--bad)}
 @media(max-width:350px){.stat{padding:8px 6px}.stat b{font-size:17px}.stat span{font-size:10px}main{padding-inline:12px}.hd{padding-inline:12px}}
@@ -216,7 +218,7 @@ async function api(path,opts={}){
   if(!r.ok)throw new Error(data.error||'Ошибка '+r.status);
   return data;
 }
-function toast(t){const n=el('div',{class:'toast',role:'status'},t);document.body.append(n);setTimeout(()=>n.remove(),2200)}
+function toast(t){document.querySelectorAll('.toast').forEach(x=>x.remove());const n=el('div',{class:'toast',role:'status'},t);document.body.append(n);setTimeout(()=>n.remove(),2050)}
 function openLink(u){
   if(!u)return;
   try{

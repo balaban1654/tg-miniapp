@@ -75,6 +75,9 @@ code{font-family:var(--fm);font-size:12px;color:var(--acc2)}
 .pv .k{display:grid;gap:4px;margin-top:8px}.pv .k span{background:#ffffff14;border-radius:8px;text-align:center;padding:6px;font-weight:600;font-size:12px;color:var(--acc2)}
 textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;width:100%;font:inherit;color:inherit;min-height:110px;resize:vertical}
 .ok-msg{color:var(--ok)}
+.toast{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);background:rgba(37,24,71,.96);border:1px solid var(--acc);box-shadow:0 14px 44px rgba(0,0,0,.55),0 0 24px rgba(155,92,255,.22);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);padding:14px 22px;border-radius:16px;z-index:99;max-width:86%;text-align:center;font-weight:600;line-height:1.4;pointer-events:none;animation:toastIn .18s ease-out,toastOut .7s ease-in 1.3s forwards}
+@keyframes toastIn{from{opacity:0;transform:translate(-50%,-46%) scale(.96)}to{opacity:1;transform:translate(-50%,-50%) scale(1)}}
+@keyframes toastOut{0%{opacity:1}40%{opacity:.6}100%{opacity:0}}
 .chat-thread{display:grid;grid-template-rows:auto 1fr auto;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--bg2);min-width:0}
 .thread-head{padding:12px 14px;border-bottom:1px solid var(--line);display:grid;gap:2px}
 .msgs{overflow:auto;padding:14px;display:grid;gap:8px;align-content:start}
@@ -143,6 +146,7 @@ function table(cols,rows,empty){
 }
 const td=(v,cls)=>el('td',{class:cls||''},v);
 
+function toast(t){document.querySelectorAll('.toast').forEach(x=>x.remove());const n=el('div',{class:'toast',role:'status'},t);document.body.append(n);setTimeout(()=>n.remove(),2050)}
 function showLogin(){me=null;$('#app').hidden=true;$('#login').hidden=false;$('#lPass').value=''}
 const ICONS={
   home:'<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>',
@@ -467,7 +471,7 @@ async function signalConfigBlock(){
   f.on.checked=S.enabled;f.enter.value=S.enter_in_sec;f.ttl.value=S.direction_ttl_min;f.cd.value=S.cooldown_sec;f.es.value=S.entry_second;f.gap.value=S.overlap_gap_sec;f.mx.value=S.max_events;f.mult.value=S.overlap_mult;f.el_.value=S.entry_label;f.sl.value=S.stake_label;f.warn.value=S.warning_text;f.pocket.value=S.pocket_url;
   if(!isAdmin)Object.values(f).forEach(i=>i.disabled=true);
   const err=el('div',{class:'err',role:'alert'});
-  const flash=m=>{err.className='ok-msg';err.textContent=m};
+  const flash=m=>{err.textContent='';toast(m)};
   const fail=x=>{err.className='err';err.textContent=x.message};
   const save=async()=>{try{await api('/signal-config',{method:'PUT',body:{enabled:f.on.checked,enter_in_sec:Number(f.enter.value),direction_ttl_min:Number(f.ttl.value),cooldown_sec:Number(f.cd.value),entry_second:Number(f.es.value),overlap_gap_sec:Number(f.gap.value),max_events:Number(f.mx.value),overlap_mult:Number(f.mult.value),entry_label:f.el_.value,stake_label:f.sl.value,warning_text:f.warn.value,pocket_url:f.pocket.value}});flash('Настройки сохранены')}catch(x){fail(x)}};
   const setDir=async(pair,direction)=>{try{await api('/signal-pairs/direction',{method:'POST',body:{pair,direction}});render({soft:true})}catch(x){fail(x)}};
@@ -483,7 +487,7 @@ async function signalConfigBlock(){
   const pairRows=cfg.pairs.map(p=>{
     // Доступна: пара показана клиентам или скрыта. Кнопка-переключатель вместо галочки, чтобы было видно, что она нажимается
     const en=el('button',{class:'btn s '+(p.enabled?'':'o'),type:'button',disabled:!isAdmin,title:p.enabled?'Нажмите, чтобы скрыть пару от клиентов':'Нажмите, чтобы показать пару клиентам',
-      onclick:async()=>{try{await api('/signal-pairs',{method:'PUT',body:{pair:p.pair,enabled:!p.enabled,sort:p.sort}});render({soft:true})}catch(x){alert(x.message)}}},p.enabled?'Показана':'Скрыта');
+      onclick:async()=>{try{await api('/signal-pairs',{method:'PUT',body:{pair:p.pair,enabled:!p.enabled,sort:p.sort}});render({soft:true})}catch(x){toast(x.message)}}},p.enabled?'Показана':'Скрыта');
     return[td(p.pair),el('td',{},en),
       el('td',{style:'white-space:nowrap'},dirBtn(p,'up','Вверх'),dirBtn(p,'down','Вниз'),
         el('button',{class:'btn s '+(p.auto?'':'o'),type:'button',title:'Тест: направление случайное, каждую минуту своё. Выдаётся всем, но карточка помечена как тестовая',style:'margin-right:6px',onclick:()=>setDir(p.pair,'auto')},'Авто'),
