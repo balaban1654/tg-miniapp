@@ -209,6 +209,19 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
     return { signal: r.rows[0] ?? null, now: new Date().toISOString() };
   });
 
+  // Прошедшие сигналы. Показываем ВСЕ завершённые, без отбора. Итог считается по отметкам клиентов
+  app.get('/signals/past', { preHandler: auth }, async () => {
+    const r = await db.query(
+      `SELECT s.id, s.pair, s.direction, s.entry_at,
+              (SELECT count(*)::int FROM deals x WHERE x.signal_id = s.id AND x.result = 'win') AS wins,
+              (SELECT count(*)::int FROM deals x WHERE x.signal_id = s.id AND x.result = 'loss') AS losses
+         FROM signals s
+        WHERE NOT s.is_test AND s.entry_at + (s.expiry_min || ' minutes')::interval < now()
+        ORDER BY s.id DESC LIMIT 20`,
+    );
+    return r.rows;
+  });
+
   // Клиент отмечает, что вошёл в сделку по сигналу. Дальше он отмечает итог
   app.post<{ Params: { id: string } }>('/signals/:id/take', { preHandler: auth }, async (req, reply) => {
     const r = await db.query(

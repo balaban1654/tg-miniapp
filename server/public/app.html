@@ -51,6 +51,15 @@ main{flex:1;padding:6px 16px 96px;display:grid;gap:12px;align-content:start}
 @keyframes ripple{0%{transform:scale(.3);opacity:.5}100%{transform:scale(1);opacity:0}}
 @keyframes ping{0%,100%{transform:scale(1)}50%{transform:scale(1.18)}}
 @media(prefers-reduced-motion:reduce){.hero-art .cd{opacity:1}.hero-art .scan{display:none}}
+.pshead{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-top:6px}
+.pshead b{font:700 16px var(--fd);white-space:nowrap}
+.pshead span{font-size:11px;text-align:right}
+.pslist{background:var(--card);border-radius:18px;overflow:hidden}
+.ps{padding:14px 16px;display:grid;gap:8px}.ps+.ps{border-top:1px solid #ffffff10}
+.pbadge{border:1px solid;border-radius:8px;padding:4px 12px;font-size:13px;font-weight:600;white-space:nowrap}
+.pbadge.w{color:var(--ok);border-color:var(--ok);background:#3ddc9712}.pbadge.l{color:var(--bad);border-color:var(--bad);background:#ff6b8a12}.pbadge.n{color:var(--mut);border-color:var(--line)}
+.pbar{height:5px;border-radius:9px;background:#ffffff14;overflow:hidden;display:flex}
+.pbar i{display:block;height:100%}.pbar .g{background:var(--ok)}.pbar .r{background:var(--bad)}
 .since{display:flex;align-items:center;gap:6px}.since svg{width:13px;height:13px;flex:none}
 .ic svg{width:44px;height:44px;color:var(--acc2)}
 .card.grad{background:linear-gradient(135deg,var(--acc3),#3a1c8a);border:0}
@@ -248,8 +257,9 @@ async function viewHome(){
         el('p',{class:'sm',style:'margin:0'},'Создайте аккаунт Pocket Option по нашей ссылке и пополните счёт — доступ откроется автоматически. Рекомендуем пополнять от 100 $, так проще соблюдать риск-менеджмент.'),
         el('div',{class:'sm'},'Где вы находитесь?'),seg,
         me.promo?el('div',{class:'row card',style:'padding:10px 12px'},el('div',{},el('div',{class:'sm'},'Промокод'),el('b',{class:'mono'},me.promo)),el('button',{class:'pillb',type:'button',onclick:async()=>{try{await navigator.clipboard.writeText(me.promo);toast('Промокод скопирован')}catch{toast('Выделите промокод вручную')}}},'Копировать')):null,
-        btnBox),
-      check]);
+        btnBox,
+        el('p',{class:'sm',style:'margin:0'},'Нажимая «Зарегистрироваться», вы подтверждаете, что вам 18+ и вы понимаете: торговля связана с риском потери денег.')),
+      check,...await pastSignals().catch(()=>[])]);
     return;
   }
   const d=await api('/deals?period=7');
@@ -269,8 +279,26 @@ async function viewHome(){
       el('button',{class:'btn o',type:'button',onclick:()=>go('trainer')},'Открыть тренажёр')));
   }
   timers.push(setInterval(()=>{if(tab==='home')render()},20000));
+  items.push(...await pastSignals().catch(()=>[]));
   items.push(el('p',{class:'sm',style:'margin:0;text-align:center'},'Торговля бинарными опционами связана с риском потери капитала. Сигналы не гарантируют результат.'));
   shell('Hunter AI',items);
+}
+
+const plural=(n,a,b,c)=>{const m=n%100,k=n%10;return m>10&&m<20?c:k===1?a:k>1&&k<5?b:c};
+/** Прошедшие сигналы: все завершённые, итог по отметкам клиентов, полоска показывает долю плюсов и минусов */
+async function pastSignals(){
+  const rows=await api('/signals/past');
+  const head=el('div',{class:'pshead'},el('b',{},'Прошедшие сигналы'),el('span',{class:'sm'},'по отметкам участников'));
+  if(!rows.length)return[head,el('div',{class:'card sm'},'Завершённых сигналов пока нет.')];
+  return[head,el('div',{class:'pslist'},rows.map(r=>{
+    const n=r.wins+r.losses,up=r.direction==='up';
+    const cls=n===0||r.wins===r.losses?'n':r.wins>r.losses?'w':'l';
+    const lab=cls==='w'?'Плюс':cls==='l'?'Минус':(n===0?'Нет итогов':'Поровну');
+    const t=new Date(r.entry_at).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
+    return el('div',{class:'ps'},
+      el('div',{class:'row'},el('div',{},el('b',{},r.pair+' · '+(up?'ВВЕРХ':'ВНИЗ')),el('div',{class:'sm'},t+' · '+n+' '+plural(n,'отметка','отметки','отметок'))),el('span',{class:'pbadge '+cls},lab)),
+      el('div',{class:'pbar'},n?[el('i',{class:'g',style:'width:'+(r.wins/n*100)+'%'}),el('i',{class:'r',style:'width:'+(r.losses/n*100)+'%'})]:null));
+  }))];
 }
 
 let period='7';
@@ -290,7 +318,7 @@ async function viewDeals(){
     el('div',{class:'days',style:'margin-top:4px'},days.map(k=>el('span',{},new Date(k+'T12:00:00').toLocaleDateString('ru-RU',{weekday:'short'})))));
   const hist=d.deals.length?el('div',{style:'display:grid;gap:8px'},d.deals.map(x=>el('div',{class:'card row'},el('div',{},el('b',{},x.pair),el('div',{class:'sm'},(x.direction==='up'?'Вверх':'Вниз')+' · '+x.expiry_min+' мин · '+hm(x.created_at))),
     x.result==='win'?el('span',{class:'pill p-ok'},'плюс'):x.result==='loss'?el('span',{class:'pill p-bad'},'минус'):x.result==='skip'?el('span',{class:'pill p-pur'},'не входил'):el('span',{class:'pill p-warn'},'ждёт итога')))):
-    el('div',{class:'card empty'},el('div',{class:'ic'},svgEl('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 17l5-5 4 4 8-9"/><path d="M15 7h5v5"/></svg>')),el('b',{},'Сделок пока нет'),el('div',{class:'sm'},'Когда вы отметите результат первой сделки, она появится здесь.'));
+    el('div',{class:'card',style:'padding:20px 22px;color:var(--mut)'},'Сделок пока нет. Когда появится сигнал, он будет на главной, а ваша сделка появится здесь.');
   shell('Мои сделки',[chips,sum,chart,el('b',{},'История'),hist]);
 }
 
