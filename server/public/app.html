@@ -274,8 +274,8 @@ async function viewMedia(){
   if(!me)await refreshMe();
   const m=await api('/media');
   const ch=m.channels.length?m.channels.map(c=>el('button',{class:'lesson',type:'button',onclick:()=>openLink(c.url)},el('div',{style:'flex:1'},el('b',{},c.title),el('div',{class:'sm'},c.subtitle||'')),el('span',{class:'sm'},'↗'))):[el('div',{class:'card sm'},'Каналы скоро появятся.')];
-  const tr=m.traders.length?el('div',{class:'two'},m.traders.map(t=>el('div',{class:'card tr'},el('div',{class:'ava'},t.title.slice(0,1).toUpperCase()),el('b',{},t.title),el('div',{class:'sm'},t.subtitle||'Трейдер клуба'),el('button',{class:'btn o sm2',type:'button',onclick:()=>openLink(t.url)},'Канал трейдера')))):el('div',{class:'card sm'},'Трейдеры скоро появятся.');
-  shell('Медиа',[el('b',{},'Наши трейдеры'),tr,el('b',{},'Каналы клуба'),ch]);
+  const tr=m.traders.length?el('div',{class:'two'},m.traders.map(t=>el('div',{class:'card tr'},el('div',{class:'ava'},t.title.slice(0,1).toUpperCase()),el('b',{},t.title),el('div',{class:'sm'},t.subtitle||'Трейдер команды'),el('button',{class:'btn o sm2',type:'button',onclick:()=>openLink(t.url)},'Канал трейдера')))):el('div',{class:'card sm'},'Трейдеры скоро появятся.');
+  shell('Медиа',[el('b',{},'Наши трейдеры'),tr,el('b',{},'Каналы команды'),ch]);
 }
 
 function viewProfile(){

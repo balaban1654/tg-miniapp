@@ -402,7 +402,7 @@ async function viewPush(){
 
 async function viewMedia(){
   const rows=await api('/media');
-  const f={kind:el('select',{},el('option',{value:'trader'},'Трейдер'),el('option',{value:'channel'},'Канал')),title:el('input',{required:'',placeholder:'Лера'}),sub:el('input',{placeholder:'Трейдер клуба'}),url:el('input',{required:'',placeholder:'https://t.me/...'}),sort:el('input',{type:'number',placeholder:'1'})};
+  const f={kind:el('select',{},el('option',{value:'trader'},'Трейдер'),el('option',{value:'channel'},'Канал')),title:el('input',{required:'',placeholder:'Лера'}),sub:el('input',{placeholder:'Трейдер команды'}),url:el('input',{required:'',placeholder:'https://t.me/...'}),sort:el('input',{type:'number',placeholder:'1'})};
   const err=el('div',{class:'err',role:'alert'});
   const form=el('form',{class:'card form',onsubmit:async e=>{e.preventDefault();err.textContent='';
     try{await api('/media',{method:'POST',body:{kind:f.kind.value,title:f.title.value,subtitle:f.sub.value,url:f.url.value,sort:f.sort.value}});render()}catch(x){err.textContent=x.message}}},

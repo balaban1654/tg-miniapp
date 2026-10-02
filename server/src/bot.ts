@@ -30,7 +30,7 @@ bot.command('start', async (ctx) => {
 
   const cabinet = config.miniAppUrl ? new InlineKeyboard().webApp('Открыть кабинет', config.miniAppUrl) : undefined;
   if (lead.access) {
-    await ctx.reply('Доступ открыт. Откройте кабинет: там сделки, тренажёр и материалы клуба.', cabinet ? { reply_markup: cabinet } : undefined);
+    await ctx.reply('Доступ открыт. Откройте кабинет: там сделки, тренажёр и материалы команды.', cabinet ? { reply_markup: cabinet } : undefined);
     return;
   }
   // Приветствие берётся из настроек пушей в Office. Если его там нет, шлём короткое

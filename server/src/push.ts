@@ -278,19 +278,22 @@ export function startScheduler(): void {
 // ---------- Правила по умолчанию ----------
 
 export async function seedDefaultRules(): Promise<void> {
+  // Переименование «клуб» в «команда» для уже сохранённых текстов и подписей
+  await db.query(`UPDATE push_rules SET text = replace(text, 'материалы клуба', 'материалы команды') WHERE text LIKE '%материалы клуба%'`);
+  await db.query(`UPDATE media_items SET subtitle = replace(subtitle, 'Трейдер клуба', 'Трейдер команды') WHERE subtitle LIKE '%Трейдер клуба%'`);
   const c = await db.query('SELECT count(*)::int AS n FROM push_rules');
   if (c.rows[0].n > 0) return;
   const support: Button = { label: 'Написать в поддержку', type: 'support' };
   const register: Button = { label: 'Зарегистрироваться', type: 'register' };
   const cabinet: Button = { label: 'Открыть кабинет', type: 'miniapp' };
   const rules: [string, Trigger, number, string, Button[], boolean][] = [
-    ['Приветствие', 'start', 0, 'Привет, {имя}! Это Hunter AI. Здесь тренажёр, учёт твоих сделок и материалы клуба. У тебя уже есть аккаунт Pocket Option?', [{ label: 'Нет, создать', type: 'callback', data: 'acc_no' }, { label: 'Да, уже есть', type: 'callback', data: 'acc_yes' }, support], false],
+    ['Приветствие', 'start', 0, 'Привет, {имя}! Это Hunter AI. Здесь тренажёр, учёт твоих сделок и материалы команды. У тебя уже есть аккаунт Pocket Option?', [{ label: 'Нет, создать', type: 'callback', data: 'acc_no' }, { label: 'Да, уже есть', type: 'callback', data: 'acc_yes' }, support], false],
     ['Нет регистрации, через 1 час', 'no_reg', 60, '{имя}, не вижу твоей регистрации. Если возникли трудности, напиши в поддержку: ответим прямо здесь, в этом чате.', [support, register], false],
     ['Нет регистрации, через сутки', 'no_reg', 1440, '{имя}, регистрация в Pocket Option занимает пару минут. После неё и пополнения счёта в приложении откроется доступ. Если что-то непонятно, напиши нам.', [register, support], true],
     ['Нет депозита, через 2 часа', 'no_deposit', 120, '{имя}, регистрация есть. Осталось пополнить счёт, и доступ откроется автоматически. Рекомендуем от 100 $. Если не получается, напиши сюда, подскажем.', [cabinet, support], true],
     ['Нет депозита, через сутки', 'no_deposit', 1440, '{имя}, ждём твой первый депозит. Как только он поступит, мы сразу откроем доступ. Если нужна помощь, напиши нам.', [cabinet, support], true],
-    ['Депозит получен', 'ftd', 0, 'Депозит получен. Доступ открыт. Откройте кабинет: там сделки, тренажёр и материалы клуба.', [cabinet], false],
-    ['Давно не заходил, через 7 дней', 'inactive', 10080, '{имя}, давно не виделись. В кабинете тренажёр и материалы клуба, заглядывай.', [cabinet], true],
+    ['Депозит получен', 'ftd', 0, 'Депозит получен. Доступ открыт. Откройте кабинет: там сделки, тренажёр и материалы команды.', [cabinet], false],
+    ['Давно не заходил, через 7 дней', 'inactive', 10080, '{имя}, давно не виделись. В кабинете тренажёр и материалы команды, заглядывай.', [cabinet], true],
   ];
   let i = 0;
   for (const [name, trigger, delay, text, buttons, day] of rules) {
