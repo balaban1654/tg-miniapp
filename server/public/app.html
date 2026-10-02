@@ -133,13 +133,14 @@ main{flex:1;padding:6px 16px 96px;display:grid;gap:12px;align-content:start}
 .btn:active{transform:scale(.98)}.btn.o{background:none;border:1px solid var(--acc);color:var(--acc2)}.btn:disabled{opacity:.45}
 .btn.g{background:var(--ok);color:#06210f}.btn.r{background:var(--bad);color:#2b0610}
 .btn.sm2{padding:8px;font-size:12px;border-radius:10px}
-.tl{display:flex;gap:9px;align-items:center;min-width:0}
-.tl>div{min-width:0;flex:1}
-.tl>.ava{width:44px;height:44px}
-.tl b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tl{display:flex;gap:8px;align-items:center;min-width:0}
+.tl>div:not(.ava){min-width:0;flex:1}
+.tl>.ava{width:40px;height:40px;flex:none}
+.tl b{font-size:14px}
+.card.tr{padding:12px}
 .tl.lk{cursor:pointer;-webkit-tap-highlight-color:transparent;border-radius:12px;transition:transform .08s}
 .tl.lk:active{transform:scale(.98)}
-.tl .un{display:block;margin-top:2px;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--acc2);transition:color .15s,text-shadow .15s}
+.tl .un{display:block;margin-top:2px;font-size:11.5px;white-space:nowrap;color:var(--acc2);transition:color .15s,text-shadow .15s}
 .tl.lk:hover .un,.tl.lk:active .un,.tl.lk:focus-visible .un{color:#fff;text-shadow:0 0 10px #9b5cffcc}
 .tr .btn.o,.lesson{transition:background .15s,color .15s,box-shadow .15s}
 .tr .btn.o:active{background:var(--card2);border-color:var(--acc)}
