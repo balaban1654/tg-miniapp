@@ -183,7 +183,7 @@ main{flex:1;padding:6px 16px 96px;display:grid;gap:12px;align-content:start}
 .tr{display:grid;gap:8px}
 .back{background:none;border:0;color:var(--acc2);padding:4px 0;cursor:pointer;font-size:13px;text-align:left}
 ol.steps{margin:0;padding-left:20px;display:grid;gap:8px}
-.toast{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);background:rgba(37,24,71,.96);border:1px solid var(--acc);box-shadow:0 14px 44px rgba(0,0,0,.55),0 0 24px rgba(155,92,255,.22);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);padding:14px 22px;border-radius:16px;z-index:99;max-width:86%;text-align:center;font-weight:600;line-height:1.4;pointer-events:none;animation:toastIn .18s ease-out,toastOut .7s ease-in 1.3s forwards}
+.toast{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);background:rgba(37,24,71,.96);border:1px solid var(--acc);box-shadow:0 14px 44px rgba(0,0,0,.55),0 0 24px rgba(155,92,255,.22);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);padding:9px 26px;border-radius:14px;z-index:99;width:max-content;max-width:92%;text-align:center;font-weight:600;line-height:1.35;pointer-events:none;animation:toastIn .18s ease-out,toastOut .7s ease-in 1.3s forwards}
 @keyframes toastIn{from{opacity:0;transform:translate(-50%,-46%) scale(.96)}to{opacity:1;transform:translate(-50%,-50%) scale(1)}}
 @keyframes toastOut{0%{opacity:1}40%{opacity:.6}100%{opacity:0}}
 svg{max-width:100%}

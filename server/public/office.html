@@ -77,7 +77,7 @@ code{font-family:var(--fm);font-size:12px;color:var(--acc2)}
 .pv .k{display:grid;gap:4px;margin-top:8px}.pv .k span{background:#ffffff14;border-radius:8px;text-align:center;padding:6px;font-weight:600;font-size:12px;color:var(--acc2)}
 textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;width:100%;font:inherit;color:inherit;min-height:110px;resize:vertical}
 .ok-msg{color:var(--ok)}
-.toast{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);background:rgba(37,24,71,.96);border:1px solid var(--acc);box-shadow:0 14px 44px rgba(0,0,0,.55),0 0 24px rgba(155,92,255,.22);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);padding:14px 22px;border-radius:16px;z-index:99;max-width:86%;text-align:center;font-weight:600;line-height:1.4;pointer-events:none;animation:toastIn .18s ease-out,toastOut .7s ease-in 1.3s forwards}
+.toast{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);background:rgba(37,24,71,.96);border:1px solid var(--acc);box-shadow:0 14px 44px rgba(0,0,0,.55),0 0 24px rgba(155,92,255,.22);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);padding:9px 26px;border-radius:14px;z-index:99;width:max-content;max-width:92%;text-align:center;font-weight:600;line-height:1.35;pointer-events:none;animation:toastIn .18s ease-out,toastOut .7s ease-in 1.3s forwards}
 @keyframes toastIn{from{opacity:0;transform:translate(-50%,-46%) scale(.96)}to{opacity:1;transform:translate(-50%,-50%) scale(1)}}
 @keyframes toastOut{0%{opacity:1}40%{opacity:.6}100%{opacity:0}}
 .chat-thread{display:grid;grid-template-rows:auto 1fr auto;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--bg2);min-width:0}
