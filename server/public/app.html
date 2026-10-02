@@ -550,15 +550,16 @@ function lesson1(n=1){
   const entryTt=()=>st.round===2?15:45;
   const until=()=>Math.max(0,st.tt-entryTt());
   const curSC=()=>SC==='redo'?(st.round===2?'win':'loss'):SC==='redo3'?(st.round===2?'win':'draw'):SC;
+  const wantSum=()=>n===2&&st.round===2?60:30;   // урок 2, шаг 2: сумма вдвое больше, чтобы перекрыть минус
   const target=()=>{
     if(st.view!=='term'||st.result||st.won)return null;
     if(st.trade)return 'wait';
     if(!st.popup&&!st.timer&&st.type==='line')return 'dots';
     if(!st.timer)return 'timer';if(st.type!=='candles')return 'candles';if(st.iv!=='M5')return 'M5';
-    if(TIMES[st.ti]!==5)return 'time';if(st.sum!==30)return 'sum';if(!st.paired)return 'pair';
+    if(TIMES[st.ti]!==5)return 'time';if(st.sum!==wantSum())return 'sum';if(!st.paired)return 'pair';
     return 'buy';
   };
-  const needMsg={dots:'Нажми ••• рядом с парой',timer:'Включи «Показывать таймер»',candles:'Выбери тип графика «Свечи»',M5:'Выбери интервал M5',time:'Нажми «−», пока время не станет 00:00:05',sum:'Нажми «+», пока сумма не станет 30 $',pair:'Нажми на пару из сигнала',buy:'Нажми «Купить» точно на нужной секунде таймера',wait:'Сделка идёт, дождитесь результата'};
+  const needMsg={dots:'Нажми ••• рядом с парой',timer:'Включи «Показывать таймер»',candles:'Выбери тип графика «Свечи»',M5:'Выбери интервал M5',time:'Нажми «−», пока время не станет 00:00:05',get sum(){return 'Нажми «+», пока сумма не станет '+wantSum()+' $'},pair:'Нажми на пару из сигнала',buy:'Нажми «Купить» точно на нужной секунде таймера',wait:'Сделка идёт, дождитесь результата'};
   const buzz=()=>{try{if(tg&&tg.HapticFeedback)tg.HapticFeedback.impactOccurred('light');else if(navigator.vibrate)navigator.vibrate(12)}catch{}};
   const guard=(name,fn)=>()=>{const t=target();if(t===name){buzz();fn()}else if(t)toast(needMsg[t])};
 
@@ -638,7 +639,7 @@ function lesson1(n=1){
       const E=entryTt(),ets='0:'+String(E).padStart(2,'0'),inWin=st.tt<=E&&st.tt>=E-3;
       if(nEl)nEl.textContent=inWin?'!':String(n);
       if(bigEl)bigEl.textContent=inWin?'Сейчас! Жми «Купить»':'секунд до входа. На '+ets+' жми «Купить»';
-      if(tipEl)tipEl.textContent=(st.round===2?(n===3?'Цена вернулась к точке входа, ставка возвращена. ':'Сделка ушла в минус. '):'')+(inWin?'Таймер свечи показывает '+ets+' — жми «Купить»':'Жди: через '+n+' '+plS(n)+' таймер свечи покажет '+ets+' — тогда жми «Купить»');
+      if(tipEl)tipEl.textContent=(st.round===2?(n===3?'Цена вернулась к точке входа, ставка возвращена. ':'Сделка ушла в минус, удваиваем сумму до 60 $. '):'')+(inWin?'Таймер свечи показывает '+ets+' — жми «Купить»':'Жди: через '+n+' '+plS(n)+' таймер свечи покажет '+ets+' — тогда жми «Купить»');
     }
     if(t==='wait'&&st.trade&&tipEl)tipEl.textContent='Сделка открыта — ждём '+st.trade.left+' '+plS(st.trade.left);
   }
@@ -661,7 +662,7 @@ function lesson1(n=1){
     timers.push(setTimeout(()=>{
       if((SC==='redo'||SC==='redo3')&&st.round===1){
         // после минуса ждём 30 секунд и заходим снова на 0:15, сумма та же
-        st.r1=st.result;st.round=2;st.won=false;st.trade=null;st.result=null;st.tt=45;st.armed=true;termView();
+        st.r1=st.result;st.s1=st.sum;st.round=2;st.won=false;st.trade=null;st.result=null;st.tt=45;st.armed=n!==2;termView();
       }else resultView();
     },2800));
   }
@@ -714,7 +715,7 @@ function lesson1(n=1){
       choice('Захожу ещё раз прямо сейчас, пока не остыл',false,'Входы «на эмоциях» чаще всего заканчиваются новыми минусами.'),
       el('div',{class:'note'},'Заранее решите дневной лимит потерь (например, 3–5% депозита) и остановитесь, когда он достигнут.'));
     const notes={1:'Это учебная сделка: график смоделирован так, чтобы показать, как выглядит плюс. В реальной торговле итог может быть любым, и минус тоже бывает. Об этом следующий урок.',
-      2:'Это учебная серия: график смоделирован. Выплата меньше 100% (здесь 92%), поэтому один плюс на ту же сумму не покрывает один минус, и итог серии остаётся отрицательным. В реальной торговле вторая сделка тоже может закончиться минусом, поэтому не пытайтесь «отыграться» и не увеличивайте сумму.',
+      2:'Это учебная серия: график смоделирован. После минуса мы зашли повторно на 0:15 с суммой вдвое больше (60 $). Выплата 92% от 60 $ — это 55,20 $, она перекрывает минус 30 $ и серия закрывается в плюс. Но будьте осторожны: если бы и вторая сделка ушла в минус, потери выросли бы до 90 $. Поэтому увеличивайте сумму только по правилам и в пределах риска, и не больше одного раза подряд.',
       3:'Это учебная серия: график смоделирован. Первая сделка закрылась на уровне входа — это возврат: ставка вернулась на баланс в полном объёме. Чтобы получить возврат, свеча должна вернуться к точке входа и ненадолго остановиться на ней. Затем мы зашли на ту же сумму на 0:15, и вторая сделка закрылась в плюс. В реальной торговле итог второй сделки может быть любым.'};
     const nextLabel=n===1?'Урок 2 · '+(lessons&&lessons[1]?lessons[1].title:'Перекрытие'):n===2?'Урок 3 · '+(lessons&&lessons[2]?lessons[2].title:'Возврат'):'К списку уроков';
     const rowS=(t1,t2,c,v)=>el('div',{class:'row'},el('div',{},el('b',{},t1),el('div',{class:'sm'},t2)),el('b',{style:'color:'+c},v));
@@ -722,7 +723,7 @@ function lesson1(n=1){
       el('div',{},el('div',{class:'sm',style:'font-size:14px'},n===2?'Урок 2 · Перекрытие':n===3?'Урок 3 · Возврат':(w?'Сделка закрыта в плюс':l?'Сделка закрыта в минус':'Цена закрылась на уровне входа')),el('div',{style:'font:800 42px/1.1 var(--fd);color:'+(n>1?(series<0?'var(--bad)':'var(--ok)'):col)},n>1?sAmt:(amt))),
       el('div',{class:'card',style:'padding:14px 16px;display:grid;gap:10px'},
         n===3?[rowS('Шаг 1 · вход на 0:45',st.sum+' $ · Возврат, ставка вернулась','var(--warn)',usd(st.sum).replace(',00 $',' $')),rowS('Шаг 2 · повторный вход на 0:15',st.sum+' $ · Плюс · выплата 92%','var(--ok)','+'+usd(st.sum*.92))]
-        :n===2?[rowS('Шаг 1 · вход на 0:45',st.sum+' $ · 3% депозита · Минус','var(--bad)','−'+usd(st.sum)),rowS('Шаг 2 · повторный вход на 0:15',st.sum+' $ · Плюс · выплата 92%','var(--ok)','+'+usd(st.sum*.92))]
+        :n===2?[rowS('Шаг 1 · вход на 0:45',st.s1+' $ · 3% депозита · Минус','var(--bad)','−'+usd(st.s1)),rowS('Шаг 2 · повторный вход на 0:15',st.sum+' $ · Плюс · выплата 92%','var(--ok)','+'+usd(st.sum*.92))]
           :el('div',{class:'row'},el('div',{},el('b',{},'Вход на 0:45'),el('div',{class:'sm'},st.sum+' $ · 3% депозита · '+word+(r.res==='draw'?'':' · выплата 92%'))),el('b',{style:'color:'+col},amt)),
         el('div',{style:'border-top:1px solid var(--line)'}),
         el('div',{class:'row'},el('b',{},'Итого'),el('b',{style:'color:'+(n>1?(series<0?'var(--bad)':'var(--ok)'):col)},n===2?sAmt:(amt)))),
@@ -790,11 +791,11 @@ function lesson1(n=1){
       stepBtn('+','Больше времени',()=>toast(needMsg[target()]||'')))),5);
     const sumF=mark('sum',el('div',{class:'fld'},el('div',{},el('label',{},'Сумма'),el('span',{class:'val'+(st.flash==='sum'?' bump':'')},st.sum+' $')),el('div',{style:'display:flex;gap:6px'},
       stepBtn('−','Меньше',()=>toast(needMsg[target()]||'')),
-      stepBtn('+','Больше',()=>{if(target()==='sum'){buzz();st.sum=Math.min(30,st.sum+10);st.flash='sum';termView()}else toast(needMsg[target()]||'')}))),6);
+      stepBtn('+','Больше',()=>{if(target()==='sum'){buzz();st.sum=Math.min(wantSum(),st.sum+10);st.flash='sum';termView()}else toast(needMsg[target()]||'')}))),6);
     if(t!=='time')dim(timeF);if(t!=='sum')dim(sumF);
     st.flash=null;
     const ctl=el('div',{class:'ctl'},timeF,sumF);
-    const hintTxt=t==='time'?el('span',{},el('b',{},'5 · Время: '),'00:00:05 — жми «−», чтобы выставить'):t==='sum'?el('span',{},el('b',{},'6 · Сумма: '),'1–3% от 1 000 $ = 10–30 $. Здесь ставим ',el('b',{},'30 $'),' — жми «+»'):null;
+    const hintTxt=t==='time'?el('span',{},el('b',{},'5 · Время: '),'00:00:05 — жми «−», чтобы выставить'):t==='sum'?el('span',{},el('b',{},'6 · Сумма: '),n===2&&st.round===2?'Чтобы перекрыть минус, ставим вдвое больше: ':'1–3% от 1 000 $ = 10–30 $. Здесь ставим ',el('b',{},wantSum()+' $'),' — жми «+»'):null;
     const ctlw=el('div',{style:'position:relative'},ctl,hintTxt?el('div',{class:'hint',style:'left:0;right:0;max-width:none;bottom:calc(100% + 8px)'},hintTxt):null);
     const pl=dim(el('div',{class:'pl'},el('span',{},'Выплата '+usd(st.sum*1.92)),el('span',{class:'pay'},'+92%'),el('span',{},'Прибыль +'+usd(st.sum*.92))));
     const buy=mark('buy',el('button',{class:'buy',type:'button',onclick:guard('buy',()=>{
