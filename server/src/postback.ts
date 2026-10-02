@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { db } from './db.js';
 import { config } from './config.js';
+import { InlineKeyboard } from 'grammy';
 import { bot } from './bot.js';
 
 type Ev = 'reg' | 'ftd' | 'dep' | 'wd' | 'comm';
@@ -36,7 +37,8 @@ async function log(event: string, q: Record<string, string>, tgId: number | null
 async function notify(tgId: number, text: string) {
   if (config.disableBot) return;
   try {
-    await bot.api.sendMessage(tgId, text);
+    const kb = config.miniAppUrl ? new InlineKeyboard().webApp('Открыть кабинет', config.miniAppUrl) : undefined;
+    await bot.api.sendMessage(tgId, text, kb ? { reply_markup: kb } : undefined);
   } catch {
     /* человек мог заблокировать бота, это не ошибка постбека */
   }
@@ -110,7 +112,7 @@ export async function postbackRoutes(app: FastifyInstance): Promise<void> {
     if (event === 'ftd' || (event === 'dep' && !['ftd', 'active'].includes(cur.status))) {
       // Первый депозит: открываем анализ
       await db.query(`UPDATE leads SET status = 'ftd', access = TRUE WHERE tg_id = $1`, [tgId]);
-      if (!cur.access) await notify(tgId, 'Депозит получен. Доступ к анализу открыт, откройте кабинет и запустите первый сигнал.');
+      if (!cur.access) await notify(tgId, 'Депозит получен. Доступ открыт. Откройте кабинет: там сделки, тренажёр и материалы клуба.');
     } else if (event === 'dep') {
       await db.query(`UPDATE leads SET status = 'active' WHERE tg_id = $1 AND status = 'ftd'`, [tgId]);
     }
