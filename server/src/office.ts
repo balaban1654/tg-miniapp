@@ -590,7 +590,6 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
   // Сигналы. Публикует человек. Случайный режим есть только для тестов и виден только тестовым аккаунтам
   const PAIR = /^[A-Za-z0-9]{2,8}\/[A-Za-z0-9]{2,8}( OTC)?$/;
   const EXPIRY = [1, 2, 3, 5, 10, 15];
-  const tfmt = (d: Date) => new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digit', timeZone: config.pushTz }).format(d);
 
   async function publishSignal(o: { pair: string; direction: 'up' | 'down'; expiry: number; enterIn: number; note: string | null; source: 'analyst' | 'test' | 'engine'; isTest: boolean; by: number; push: boolean }) {
     const entryAt = new Date(Date.now() + o.enterIn * 60_000);
@@ -600,7 +599,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     );
     let pushed = 0;
     if (o.push) {
-      const text = `${o.isTest ? 'ТЕСТ. Не для торговли.\n' : ''}Новый сигнал: ${o.pair}, ${o.direction === 'up' ? 'вверх' : 'вниз'}, экспирация ${o.expiry} мин.\nВход в ${tfmt(entryAt)} (МСК). Откройте кабинет.`;
+      const text = `${o.isTest ? 'ТЕСТ. Не для торговли.\n' : ''}Новый сигнал: ${o.pair}, ${o.direction === 'up' ? 'вверх' : 'вниз'}, экспирация ${o.expiry} мин.\nВход в {время:${entryAt.getTime()}}. Откройте кабинет.`;
       const r = await createBroadcast({ text, buttons: [{ label: 'Открыть кабинет', type: 'miniapp' }], segment: o.isTest ? 'testers' : 'access', createdBy: o.by });
       pushed = r.total;
     }

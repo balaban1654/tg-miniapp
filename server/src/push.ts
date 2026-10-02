@@ -36,6 +36,7 @@ interface Target {
   po_promo: string | null;
   po_link: string | null;
   po_link_ru: string | null;
+  tz: string | null;
 }
 
 /** В тестах (DISABLE_BOT=1) сообщения не уходят в Telegram, а складываются сюда. */
@@ -45,8 +46,22 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 // ---------- Тексты и кнопки ----------
 
-export function renderText(text: string, t: Pick<Target, 'first_name' | 'username' | 'owner_name' | 'po_promo'>): string {
+/** Время вида «13:30» в часовом поясе клиента. Если пояс неизвестен, берём Киев и добавляем пометку */
+export function clockFor(ms: number, tz: string | null | undefined): string {
+  const fmt = (zone: string) => new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digit', timeZone: zone }).format(new Date(ms));
+  if (tz) {
+    try {
+      return fmt(tz);
+    } catch {
+      /* неизвестный пояс, падаем в Киев */
+    }
+  }
+  return `${fmt(config.pushTz)} (Киев)`;
+}
+
+export function renderText(text: string, t: Pick<Target, 'first_name' | 'username' | 'owner_name' | 'po_promo'> & { tz?: string | null }): string {
   return text
+    .replace(/\{время:(\d{10,14})\}/g, (_m, ms) => clockFor(Number(ms), t.tz))
     .replaceAll('{имя}', t.first_name || t.username || 'друг')
     .replaceAll('{стример}', t.owner_name || 'наша команда')
     .replaceAll('{промокод}', t.po_promo || '');
@@ -97,7 +112,7 @@ export function buildKeyboard(buttons: Button[], t: Target): InlineKeyboard | un
 
 export async function loadTarget(tgId: number | string): Promise<Target> {
   const r = await db.query(
-    `SELECT d.tg_id, d.first_name, d.username, d.region, o.name AS owner_name, o.po_promo, o.po_link, o.po_link_ru
+    `SELECT d.tg_id, d.first_name, d.username, d.region, d.tz, o.name AS owner_name, o.po_promo, o.po_link, o.po_link_ru
        FROM leads d LEFT JOIN staff o ON o.id = d.owner_id WHERE d.tg_id = $1`,
     [tgId],
   );
@@ -155,7 +170,7 @@ async function dueTargets(rule: Rule, limit: number, tgId?: string): Promise<Tar
     only = `AND d.tg_id = $5`;
   }
   const r = await db.query(
-    `SELECT d.tg_id, d.first_name, d.username, d.region, o.name AS owner_name, o.po_promo, o.po_link, o.po_link_ru
+    `SELECT d.tg_id, d.first_name, d.username, d.region, d.tz, o.name AS owner_name, o.po_promo, o.po_link, o.po_link_ru
        FROM leads d LEFT JOIN staff o ON o.id = d.owner_id
       WHERE d.bot_started AND NOT d.bot_blocked AND ${COND[rule.trigger]}
         AND (${t}) + ($1 || ' minutes')::interval <= now()
@@ -252,7 +267,7 @@ export async function createBroadcast(b: { text: string; buttons: Button[]; segm
 
 async function runBroadcasts(): Promise<boolean> {
   const jobs = await db.query(
-    `SELECT j.broadcast_id, j.tg_id, b.text, b.buttons, d.first_name, d.username, d.region,
+    `SELECT j.broadcast_id, j.tg_id, b.text, b.buttons, d.first_name, d.username, d.region, d.tz,
             o.name AS owner_name, o.po_promo, o.po_link, o.po_link_ru
        FROM broadcast_jobs j
        JOIN broadcasts b ON b.id = j.broadcast_id

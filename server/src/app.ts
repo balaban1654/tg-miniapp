@@ -154,6 +154,16 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
     req.tg = user;
     // Если человек открыл приложение, не нажимая /start, всё равно заводим лида
     await attachLead(user.id, user.username, user.first_name, null);
+    // Часовой пояс устройства клиента: по нему показываем время сигналов в пушах
+    const tzHeader = String(req.headers['x-tz'] ?? '');
+    if (tzHeader && tzHeader.length < 60) {
+      try {
+        new Intl.DateTimeFormat('ru-RU', { timeZone: tzHeader });
+        await db.query('UPDATE leads SET tz = $2 WHERE tg_id = $1 AND tz IS DISTINCT FROM $2', [user.id, tzHeader]);
+      } catch {
+        /* неизвестный пояс, игнорируем */
+      }
+    }
     await db.query(`UPDATE leads SET last_seen_at = now() WHERE tg_id = $1 AND (last_seen_at IS NULL OR last_seen_at < now() - interval '10 minutes')`, [user.id]);
   };
 

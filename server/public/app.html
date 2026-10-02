@@ -195,7 +195,7 @@ const dmy=v=>new Date(v).toLocaleDateString('ru-RU',{day:'numeric',month:'long',
 const hm=v=>new Date(v).toLocaleString('ru-RU',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
 
 async function api(path,opts={}){
-  const r=await fetch('/api/app'+path,{method:opts.method||'GET',headers:{'content-type':'application/json',authorization:'tma '+(tg?tg.initData:'')},body:opts.body?JSON.stringify(opts.body):(opts.method&&opts.method!=='GET'?'{}':undefined)});
+  const r=await fetch('/api/app'+path,{method:opts.method||'GET',headers:{'content-type':'application/json',authorization:'tma '+(tg?tg.initData:''),'x-tz':(()=>{try{return Intl.DateTimeFormat().resolvedOptions().timeZone||''}catch{return ''}})()},body:opts.body?JSON.stringify(opts.body):(opts.method&&opts.method!=='GET'?'{}':undefined)});
   const data=await r.json().catch(()=>({}));
   if(!r.ok)throw new Error(data.error||'Ошибка '+r.status);
   return data;

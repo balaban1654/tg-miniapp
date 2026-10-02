@@ -203,3 +203,6 @@ BEGIN
     INSERT INTO app_flags (key) VALUES ('pre_launch_signals_test');
   END IF;
 END $$;
+
+-- Часовой пояс клиента (из Mini App). Пока он неизвестен, время в пушах показываем по Киеву
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS tz TEXT;

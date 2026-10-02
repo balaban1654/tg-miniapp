@@ -16,7 +16,7 @@ export const config = {
   port: Number(process.env.PORT ?? 3000),
   defaultPoLink: process.env.DEFAULT_PO_LINK ?? '',
   defaultPoLinkRu: process.env.DEFAULT_PO_LINK_RU ?? '',
-  pushTz: process.env.PUSH_TZ ?? 'Europe/Moscow',
+  pushTz: process.env.PUSH_TZ ?? 'Europe/Kyiv',
   pushDayFrom: Number(process.env.PUSH_DAY_FROM ?? 10),
   pushDayTo: Number(process.env.PUSH_DAY_TO ?? 22),
   postbackSecret: process.env.POSTBACK_SECRET ?? '',

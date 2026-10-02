@@ -135,7 +135,7 @@ function el(tag,props={},...kids){
   return e;
 }
 const money=v=>'$'+Number(v||0).toLocaleString('ru-RU',{maximumFractionDigits:2});
-const date=v=>new Date(v).toLocaleDateString('ru-RU',{day:'numeric',month:'short'});
+const date=v=>new Date(v).toLocaleDateString('ru-RU',{timeZone:'Europe/Kyiv',day:'numeric',month:'short'});
 const pill=(st)=>{const[t,c]=STATUS[st]||[st,'p-pur'];return el('span',{class:'pill '+c},t)};
 function table(cols,rows,empty){
   if(!rows.length)return el('div',{class:'card empty'},empty);
@@ -307,7 +307,7 @@ async function viewChats(){
       else if(m.has_file)body.push(el('a',{href:'/api/office/chats/'+d.lead.tg_id+'/file/'+m.id,target:'_blank',rel:'noopener',style:'color:var(--acc2)'},'Открыть файл ('+m.kind+')'));
       else if(!m.text)body.push(el('span',{class:'mut'},'['+m.kind+']'));
       if(m.text)body.push(m.text);
-      body.push(el('small',{},(m.direction==='out'?(m.staff_name||'Команда')+' · ':'')+new Date(m.created_at).toLocaleString('ru-RU',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})));
+      body.push(el('small',{},(m.direction==='out'?(m.staff_name||'Команда')+' · ':'')+new Date(m.created_at).toLocaleString('ru-RU',{timeZone:'Europe/Kyiv',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})));
       return el('div',{class:'bub '+m.direction},body);
     }));
     if(near||!msgs.dataset.init){msgs.scrollTop=msgs.scrollHeight;msgs.dataset.init='1'}
@@ -435,7 +435,7 @@ async function viewPush(){
     el('label',{},'Текст. Подстановки: {имя} {стример} {промокод}',bt),bbe.node,el('div',{},el('div',{class:'mut sm',style:'margin-bottom:6px'},'Так увидит клиент'),bpv),
     el('div',{class:'mut sm'},'Получают только те, кто нажал /start у бота и не заблокировал его. Отправка идёт очередью, примерно 20 сообщений в секунду.'),
     el('div',{},sendBtn),berr);
-  const castT=table(['Когда','Кому','Текст','Всего','Отправлено','Ошибок','В очереди'],casts.map(c=>[td(new Date(c.created_at).toLocaleString('ru-RU',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})),td(SEGL[c.segment]||c.segment),el('td',{style:'max-width:320px;white-space:normal'},c.text.slice(0,80)),td(c.total,'n'),td(c.sent,'n'),td(c.failed,'n'),td(c.pending,'n')]),'Рассылок пока не было.');
+  const castT=table(['Когда','Кому','Текст','Всего','Отправлено','Ошибок','В очереди'],casts.map(c=>[td(new Date(c.created_at).toLocaleString('ru-RU',{timeZone:'Europe/Kyiv',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})),td(SEGL[c.segment]||c.segment),el('td',{style:'max-width:320px;white-space:normal'},c.text.slice(0,80)),td(c.total,'n'),td(c.sent,'n'),td(c.failed,'n'),td(c.pending,'n')]),'Рассылок пока не было.');
   return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Пуши и рассылки'),el('span',{class:'mut sm'},'Каждое правило уходит человеку один раз')),
     el('h3',{style:'font-size:15px'},'Автоматические пуши'),rulesT,form,
     el('h3',{style:'font-size:15px'},'Рассылки'),bform,castT];
@@ -462,8 +462,8 @@ async function viewSignals(){
       me.role==='admin'?el('button',{class:'btn o',type:'button',title:'Создаёт 5 тестовых завершённых сигналов. Их видят только тестовые аккаунты, везде помечено ТЕСТ',onclick:async()=>{err.className='err';err.textContent='';try{await api('/signals/demo-history',{method:'POST'});err.className='ok-msg';err.textContent='Тестовая история создана. Её видят только тестовые аккаунты';setTimeout(render,900)}catch(x){err.textContent=x.message}}},'Тестовая история'):null,
       me.role==='admin'?el('button',{class:'btn o',type:'button',onclick:async()=>{err.className='err';err.textContent='';try{const r=await api('/signals/demo-history',{method:'DELETE'});err.className='ok-msg';err.textContent='Удалено тестовых записей: '+r.removed;setTimeout(render,900)}catch(x){err.textContent=x.message}}},'Убрать тестовую историю'):null,
     err,el('p',{class:'mut sm',style:'margin:0'},'Сигнал публикует человек, система сама клиентам сигналов не выдаёт. Случайный режим есть только для проверки бота: такой сигнал помечен «ТЕСТ» и виден только тестовым аккаунтам (отметьте их в разделе «Лиды»).'));
-  const t=r=>new Date(r).toLocaleString('ru-RU',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
-  const list=table(['Опубликован','Пара','Направление','Экспирация','Вход','Источник','Вошли','Плюс','Минус',''],rows.map(r=>[td(t(r.created_at)),td(r.pair),el('td',{},el('span',{class:'pill '+(r.direction==='up'?'p-ok':'p-bad')},r.direction==='up'?'Вверх':'Вниз')),td(r.expiry_min+' мин'),td(new Date(r.entry_at).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'})),el('td',{},el('span',{class:'pill '+(r.is_test?'p-warn':'p-pur')},r.is_test?'ТЕСТ':(r.author||'Аналитик'))),td(r.taken,'n'),td(r.wins,'n'),td(r.losses,'n'),me.role==='admin'?el('td',{},el('button',{class:'btn o s',type:'button',title:r.is_test?'Вернуть обычным сигналом':'Пометить тестовым: его увидят только тестовые аккаунты',onclick:async()=>{await api('/signals/'+r.id+'/test',{method:'PATCH',body:{is_test:!r.is_test}});render()}},r.is_test?'Сделать обычным':'Сделать тестовым')):td('')]),'Сигналов пока не было.');
+  const t=r=>new Date(r).toLocaleString('ru-RU',{timeZone:'Europe/Kyiv',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
+  const list=table(['Опубликован','Пара','Направление','Экспирация','Вход','Источник','Вошли','Плюс','Минус',''],rows.map(r=>[td(t(r.created_at)),td(r.pair),el('td',{},el('span',{class:'pill '+(r.direction==='up'?'p-ok':'p-bad')},r.direction==='up'?'Вверх':'Вниз')),td(r.expiry_min+' мин'),td(new Date(r.entry_at).toLocaleTimeString('ru-RU',{timeZone:'Europe/Kyiv',hour:'2-digit',minute:'2-digit'})),el('td',{},el('span',{class:'pill '+(r.is_test?'p-warn':'p-pur')},r.is_test?'ТЕСТ':(r.author||'Аналитик'))),td(r.taken,'n'),td(r.wins,'n'),td(r.losses,'n'),me.role==='admin'?el('td',{},el('button',{class:'btn o s',type:'button',title:r.is_test?'Вернуть обычным сигналом':'Пометить тестовым: его увидят только тестовые аккаунты',onclick:async()=>{await api('/signals/'+r.id+'/test',{method:'PATCH',body:{is_test:!r.is_test}});render()}},r.is_test?'Сделать обычным':'Сделать тестовым')):td('')]),'Сигналов пока не было.');
   return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Сигналы')),form,el('h3',{style:'font-size:15px'},'Опубликованные'),list];
 }
 
@@ -501,7 +501,7 @@ async function viewPostbacks(){
     el('button',{class:'btn s',type:'button',onclick:async()=>{await api('/postbacks',{method:'DELETE'});render()}},'Да, удалить'),
     el('button',{class:'btn o s',type:'button',onclick:()=>{sure.hidden=true;askBtn.hidden=false}},'Отмена'));
   clearBox.append(askBtn,sure);
-  const time=v=>new Date(v).toLocaleString('ru-RU',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  const time=v=>new Date(v).toLocaleString('ru-RU',{timeZone:'Europe/Kyiv',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit',second:'2-digit'});
   return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Постбеки'),el('div',{style:'display:flex;gap:8px;align-items:center'},clearBox,el('button',{class:'btn o s',type:'button',onclick:render},'Обновить'))),
     table(['Время','Событие','Telegram ID','Pocket ID','Сумма','Результат'],rows.map(r=>{const qq=r.query||{};return[td(time(r.created_at)),el('td',{},el('span',{class:'pill p-pur'},r.event)),td(r.tg_id||qq.click_id||'—'),td(qq.trader_id||'—'),td(qq.commission||qq.sumdep||qq.wdr_sum||qq.amount||qq.sum||'—','n'),el('td',{},el('span',{class:'pill '+(r.result==='ok'?'p-ok':(r.result.startsWith('дубль')||r.result.startsWith('пропущен'))?'p-warn':'p-bad')},r.result))]}),
       'Постбеков пока нет. Когда партнёрка отправит первый, он появится здесь.')];
