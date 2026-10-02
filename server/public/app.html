@@ -673,7 +673,7 @@ async function viewDeals(){
     if(!d.deals.length){toast('История уже пуста');return}
     confirmBox.replaceChildren(el('div',{class:'card',style:'display:grid;gap:10px'},el('b',{},'Очистить всю историю сделок?'),el('div',{class:'sm'},'Статистика обнулится. Это действие нельзя отменить.'),
       el('div',{class:'two'},el('button',{class:'btn r',type:'button',onclick:async()=>{try{await api('/deals',{method:'DELETE'});await refreshMe().catch(()=>{});toast('История очищена');render()}catch(e){toast(e.message)}}},'Да'),el('button',{class:'btn o',type:'button',onclick:()=>confirmBox.replaceChildren()},'Нет'))))}},svgEl(TRASH));
-  shell('Мои сделки',[el('div',{style:'display:flex;gap:8px;align-items:center'},el('div',{style:'flex:1;min-width:0'},chips),trash),confirmBox,sum,chart,el('b',{},'История'),el('b',{},'Перекрытия'),ovr]);
+  shell('Мои сделки',[el('div',{style:'display:flex;gap:8px;align-items:center'},el('div',{style:'flex:1;min-width:0'},chips),trash),confirmBox,sum,chart,el('b',{},'История'),hist,el('b',{},'Перекрытия'),ovr]);
 }
 
 let lessons=null;
