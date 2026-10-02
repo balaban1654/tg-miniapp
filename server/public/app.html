@@ -408,7 +408,7 @@ function lessonView(l){
 /** Круг с аватаркой из Telegram. Пока не загрузилась или нет фото, показываем первую букву */
 function mediaAva(x,size){
   const n=el('div',{class:'ava',style:size?'width:'+size+'px;height:'+size+'px;flex:none':''},(x.title||'?').slice(0,1).toUpperCase());
-  if(x.photo){const img=new Image();img.alt='';img.loading='lazy';img.onload=()=>n.replaceChildren(img);img.src=x.photo}
+  if(x.photo){const img=new Image();img.alt='';img.onload=()=>n.replaceChildren(img);img.src=x.photo}
   return n;
 }
 async function viewMedia(){
