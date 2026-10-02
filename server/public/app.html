@@ -589,6 +589,7 @@ function lesson1(){
   }
   function finishTrade(){
     // учебный сценарий: после входа график уверенно идёт вверх, сделка закрывается в плюс
+    if(price<=st.trade.entry){price=st.trade.entry+.0003;pts[pts.length-1]=price}
     st.result={res:'win',pnl:st.sum*.92};
     st.bal=Math.round((st.bal+st.sum*1.92)*100)/100;
     st.won=true;termView();
@@ -596,7 +597,8 @@ function lesson1(){
   }
   timers.push(setInterval(()=>{
     step();
-    if(st.trade&&!st.won)price+=.00008+Math.random()*.00002;   // свечи уверенно растут после входа
+    // учебный сценарий: первые 2 секунды после входа цена идёт вниз, потом разворачивается и уверенно растёт
+    if(st.trade&&!st.won)price+=(Date.now()-st.trade.t0<2000?-.00007:.00013)+Math.random()*.00002;
     pushPt();paint();
   },350));
   timers.push(setInterval(()=>{
@@ -696,7 +698,7 @@ function lesson1(){
     const ctlw=el('div',{style:'position:relative'},ctl,hintTxt?el('div',{class:'hint',style:'left:0;right:0;max-width:none;bottom:calc(100% + 8px)'},hintTxt):null);
     const pl=dim(el('div',{class:'pl'},el('span',{},'Выплата '+usd(st.sum*1.92)),el('span',{class:'pay'},'+92%'),el('span',{},'Прибыль +'+usd(st.sum*.92))));
     const buy=mark('buy',el('button',{class:'buy',type:'button',onclick:guard('buy',()=>{
-      if(st.tt<=45&&st.tt>=42){st.trade={entry:price,left:5,gid:Math.floor((base+pts.length-1)/(st.type==='line'?1:IV_G[st.iv]))};st.bal=Math.round((st.bal-st.sum)*100)/100;termView()}
+      if(st.tt<=45&&st.tt>=42){st.trade={entry:price,t0:Date.now(),left:5,gid:Math.floor((base+pts.length-1)/(st.type==='line'?1:IV_G[st.iv]))};st.bal=Math.round((st.bal-st.sum)*100)/100;termView()}
       else toast(st.tt>45?'Рано: ждите, пока таймер дойдёт до 0:45':'Поздно: дождитесь следующего круга таймера')})},'Купить'),8);
     const sell=el('button',{class:'sell',type:'button',onclick:()=>toast('В сигнале указано «Вверх», то есть «Купить»')},'Продать');
     const tb=el('div',{class:'tb'},buy,sell);
