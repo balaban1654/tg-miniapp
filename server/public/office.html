@@ -168,7 +168,7 @@ function showApp(){
   if(me.role==='admin')items.splice(1,0,['signals','Сигналы']);
   if(me.role==='analyst'){items.length=0;items.push(['signals','Сигналы']);if(tab!=='signals')tab='signals'}
   if(me.role==='admin')items.push(['push','Пуши'],['media','Медиа'],['pb','Постбеки']);
-  const nav=$('#nav');nav.replaceChildren(...items.map(([k,t])=>el('button',{type:'button','data-t':k,class:k===tab?'on':'',onclick:()=>{tab=k;showApp();render()}},icon(k),t)));
+  const nav=$('#nav');nav.replaceChildren(...items.map(([k,t])=>el('button',{type:'button','data-t':k,class:k===tab?'on':'',onclick:()=>{tab=k;showApp();render()}},icon(k),el('span',{class:'lbl'},t))));
   render();updateBadge();
 }
 
@@ -274,7 +274,7 @@ let poll=null;
 function stopPoll(){if(poll){clearInterval(poll);poll=null}}
 async function updateBadge(){
   if(!me||!['admin','teamlead','streamer'].includes(me.role))return;
-  try{const c=await api('/chats');const n=c.filter(x=>x.waiting).length;const b=document.querySelector('[data-t=chats]');if(b)b.textContent='Чаты'+(n?' · '+n:'')}catch{}
+  try{const c=await api('/chats');const n=c.filter(x=>x.waiting).length;const b=document.querySelector('[data-t=chats] .lbl');if(b)b.textContent='Чаты '+c.length+(n?' ('+n+')':'')}catch{}
 }
 setInterval(updateBadge,20000);
 
