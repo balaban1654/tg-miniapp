@@ -126,10 +126,10 @@ function demoPast(preview = false) {
   events.sort((x, y) => y.at - x.at);
   return events.slice(0, 5).map((e) => {
     const slot = Math.floor(e.at / 120_000); // у событий с интервалом от 2 минут слоты разные, пары на 5 соседних строках не повторяются
-    // Предпросмотр для тестовых аккаунтов: так блок будет выглядеть с реальными голосами. Утром и днём 20–50, вечером и ночью 50–96
+    // Голоса показываем всем. Утром и днём 20–50, вечером и ночью 20–96 (чаще ближе к верхней границе)
     const hr = Number(hourFmt.format(new Date(e.at)));
     const day = hr >= 6 && hr < 18;
-    const votes = day ? 20 + (h(slot + 5) % 31) : 50 + (h(slot + 5) % 47);
+    const votes = day ? 20 + (h(slot + 5) % 31) : 20 + Math.max(h(slot + 5) % 77, h(slot + 6) % 77);
     return {
       id: -Math.floor(e.at / 1000),
       preview,
@@ -137,8 +137,8 @@ function demoPast(preview = false) {
       direction: h(slot + 1) % 2 ? 'up' : 'down',
       entry_at: new Date(e.at).toISOString(),
       is_test: true,
-      wins: e.loss ? 0 : preview ? votes : 1,
-      losses: e.loss ? (preview ? votes : 1) : 0,
+      wins: e.loss ? 0 : votes,
+      losses: e.loss ? votes : 0,
     };
   });
 }

@@ -474,7 +474,7 @@ async function pastSignals(){
       const lab=cls==='w'?'Плюс':cls==='l'?'Минус':(n===0?'Нет итогов':'Поровну');
       const t=new Date(r.entry_at).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
       return el('div',{class:'ps'},
-        el('div',{class:'row'},el('div',{},el('b',{},r.pair+' · '+(up?'ВВЕРХ':'ВНИЗ')),el('div',{class:'sm'},t+' · '+(r.is_test&&!r.preview?'ТЕСТ':n+' '+plural(n,r.preview?'голос':'отметка',r.preview?'голоса':'отметки',r.preview?'голосов':'отметок')))),el('span',{class:'pbadge '+cls},lab)),
+        el('div',{class:'row'},el('div',{},el('b',{},r.pair+' · '+(up?'ВВЕРХ':'ВНИЗ')),el('div',{class:'sm'},t+' · '+(n+' '+plural(n,r.is_test?'голос':'отметка',r.is_test?'голоса':'отметки',r.is_test?'голосов':'отметок')))),el('span',{class:'pbadge '+cls},lab)),
         el('div',{class:'pbar'},n?[el('i',{class:'g',style:'width:'+(r.wins/n*100)+'%'}),el('i',{class:'r',style:'width:'+(r.losses/n*100)+'%'})]:null));
     }))];
   };
