@@ -124,3 +124,51 @@ CREATE TABLE IF NOT EXISTS messages (
   created_at    TIMESTAMPTZ DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS messages_tg ON messages(tg_id, id);
+
+-- Пуши: бот может писать только тем, кто нажал /start. last_seen_at нужен для «давно не заходил»
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS bot_started BOOLEAN DEFAULT FALSE;
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS bot_blocked BOOLEAN DEFAULT FALSE;
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMPTZ;
+
+-- Автоматические пуши по событиям
+CREATE TABLE IF NOT EXISTS push_rules (
+  id           SERIAL PRIMARY KEY,
+  name         TEXT NOT NULL,
+  trigger      TEXT NOT NULL CHECK (trigger IN ('start','no_reg','no_deposit','ftd','inactive')),
+  delay_min    INT NOT NULL DEFAULT 0,
+  text         TEXT NOT NULL,
+  buttons      JSONB NOT NULL DEFAULT '[]',
+  daytime_only BOOLEAN NOT NULL DEFAULT FALSE,
+  enabled      BOOLEAN NOT NULL DEFAULT TRUE,
+  sort         INT NOT NULL DEFAULT 0,
+  starts_at    TIMESTAMPTZ NOT NULL DEFAULT now(),  -- правило не трогает тех, у кого срок наступил раньше
+  created_at   TIMESTAMPTZ DEFAULT now()
+);
+-- Каждое правило отправляется человеку один раз
+CREATE TABLE IF NOT EXISTS push_log (
+  rule_id INT NOT NULL REFERENCES push_rules(id) ON DELETE CASCADE,
+  tg_id   BIGINT NOT NULL,
+  status  TEXT NOT NULL,
+  error   TEXT,
+  sent_at TIMESTAMPTZ DEFAULT now(),
+  PRIMARY KEY (rule_id, tg_id)
+);
+-- Ручные рассылки
+CREATE TABLE IF NOT EXISTS broadcasts (
+  id         SERIAL PRIMARY KEY,
+  text       TEXT NOT NULL,
+  buttons    JSONB NOT NULL DEFAULT '[]',
+  segment    TEXT NOT NULL,
+  owner_id   INT,
+  created_by INT REFERENCES staff(id),
+  total      INT NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS broadcast_jobs (
+  broadcast_id INT NOT NULL REFERENCES broadcasts(id) ON DELETE CASCADE,
+  tg_id        BIGINT NOT NULL,
+  status       TEXT NOT NULL DEFAULT 'pending',
+  error        TEXT,
+  PRIMARY KEY (broadcast_id, tg_id)
+);
+CREATE INDEX IF NOT EXISTS broadcast_jobs_pending ON broadcast_jobs(status) WHERE status = 'pending';

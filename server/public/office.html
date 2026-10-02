@@ -65,6 +65,11 @@ code{font-family:var(--fm);font-size:12px;color:var(--acc2)}
 .row2{display:flex;justify-content:space-between;align-items:center;gap:8px}
 .dot{width:9px;height:9px;border-radius:50%;background:var(--acc);flex:none}
 .sm{font-size:12px}
+.bt{display:grid;grid-template-columns:1.2fr 1fr 1.4fr auto;gap:8px;align-items:center}
+.pv{background:var(--card2);border-radius:12px;border-top-left-radius:3px;padding:10px 12px;max-width:340px;white-space:pre-wrap;overflow-wrap:anywhere}
+.pv .k{display:grid;gap:4px;margin-top:8px}.pv .k span{background:#ffffff14;border-radius:8px;text-align:center;padding:6px;font-weight:600;font-size:12px;color:var(--acc2)}
+textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;width:100%;font:inherit;color:inherit;min-height:110px;resize:vertical}
+.ok-msg{color:var(--ok)}
 .chat-thread{display:grid;grid-template-rows:auto 1fr auto;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--bg2);min-width:0}
 .thread-head{padding:12px 14px;border-bottom:1px solid var(--line);display:grid;gap:2px}
 .msgs{overflow:auto;padding:14px;display:grid;gap:8px;align-content:start}
@@ -140,7 +145,7 @@ function showApp(){
   const items=[['home','Обзор'],['leads','Лиды'],['links','Ссылки']];
   if(me.role==='admin'||me.role==='teamlead')items.push(['staff',me.role==='admin'?'Люди':'Моя команда']);
   if(['admin','teamlead','streamer'].includes(me.role))items.splice(1,0,['chats','Чаты']);
-  if(me.role==='admin')items.push(['media','Медиа'],['pb','Постбеки']);
+  if(me.role==='admin')items.push(['push','Пуши'],['media','Медиа'],['pb','Постбеки']);
   const nav=$('#nav');nav.replaceChildren(...items.map(([k,t])=>el('button',{type:'button','data-t':k,class:k===tab?'on':'',onclick:()=>{tab=k;showApp();render()}},t)));
   render();updateBadge();
 }
@@ -162,6 +167,7 @@ async function render(){
     else if(tab==='links')m.replaceChildren(...await viewLinks());
     else if(tab==='staff')m.replaceChildren(...await viewStaff());
     else if(tab==='chats')m.replaceChildren(...await viewChats());
+    else if(tab==='push')m.replaceChildren(...await viewPush());
     else if(tab==='media')m.replaceChildren(...await viewMedia());
     else if(tab==='pb')m.replaceChildren(...await viewPostbacks());
   }catch(x){if(x.message!=='auth')m.replaceChildren(el('div',{class:'err'},x.message))}
@@ -294,6 +300,101 @@ async function viewChats(){
   head.replaceChildren(el('span',{class:'mut'},'Выберите чат слева'));
   poll=setInterval(()=>{loadList().catch(()=>{});loadThread().catch(()=>{})},6000);
   return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Чаты поддержки'),el('span',{class:'mut sm'},'Кто первым ответит неразобранному клиенту, тот его и забирает')),el('div',{class:'chat-wrap'},list,thread)];
+}
+
+const TRIG={start:'Нажал /start',no_reg:'Нет регистрации',no_deposit:'Регистрация без депозита',ftd:'Депозит получен',inactive:'Давно не заходил'};
+const BTYPE={miniapp:'Открыть кабинет',support:'Поддержка (чат в боте)',register:'Регистрация',url:'Своя ссылка',acc_no:'Ответ «Нет, создать»',acc_yes:'Ответ «Да, уже есть»'};
+const fmtDelay=m=>m===0?'сразу':m%1440===0?'через '+(m/1440)+' дн.':m%60===0?'через '+(m/60)+' ч':'через '+m+' мин';
+const sample=t=>t.replaceAll('{имя}','Аня').replaceAll('{стример}','Иван').replaceAll('{промокод}','LIO669');
+
+function buttonsEditor(initial){
+  const box=el('div',{style:'display:grid;gap:8px'});
+  const rows=[];
+  const add=(b={})=>{
+    const label=el('input',{placeholder:'Подпись кнопки',maxlength:'40',value:b.label||''});
+    const kind=b.type==='callback'?b.data:(b.type||'miniapp');
+    const type=el('select',{},Object.entries(BTYPE).map(([k,v])=>el('option',{value:k,...(k===kind?{selected:''}:{})},v)));
+    const url=el('input',{placeholder:'https://…',value:b.url||''});
+    const del=el('button',{class:'btn o s',type:'button',onclick:()=>{rows.splice(rows.indexOf(r),1);r.node.remove()}},'Убрать');
+    const sync=()=>{url.hidden=type.value!=='url'};type.addEventListener('change',sync);sync();
+    const r={node:el('div',{class:'bt'},label,type,url,del),label,type,url};
+    rows.push(r);box.append(r.node);
+  };
+  (initial||[]).forEach(add);
+  const addBtn=el('button',{class:'btn o s',type:'button',onclick:()=>{if(rows.length<4)add()}},'+ Кнопка');
+  return{node:el('div',{style:'display:grid;gap:8px'},el('span',{class:'mut sm'},'Кнопки под сообщением (до 4)'),box,addBtn),
+    get:()=>rows.filter(r=>r.label.value.trim()).map(r=>{const k=r.type.value;
+      if(k==='acc_no'||k==='acc_yes')return{label:r.label.value.trim(),type:'callback',data:k};
+      if(k==='url')return{label:r.label.value.trim(),type:'url',url:r.url.value.trim()};
+      return{label:r.label.value.trim(),type:k}})};
+}
+function preview(text,buttons){
+  return el('div',{class:'pv'},sample(text)||'Текст сообщения',buttons.length?el('div',{class:'k'},buttons.map(b=>el('span',{},b.label))):null);
+}
+
+async function viewPush(){
+  const[rules,seg,casts,staff]=await Promise.all([api('/push/rules'),api('/push/segments'),api('/push/broadcasts'),api('/staff')]);
+  // --- правила
+  let editId=null;
+  const f={name:el('input',{required:'',placeholder:'Например: Нет регистрации, через 3 часа'}),
+    trig:el('select',{},Object.entries(TRIG).map(([k,v])=>el('option',{value:k},v))),
+    delay:el('input',{type:'number',min:'0',value:'0',style:'min-width:70px'}),
+    unit:el('select',{},el('option',{value:'1'},'мин'),el('option',{value:'60'},'часов'),el('option',{value:'1440'},'дней')),
+    day:el('input',{type:'checkbox',style:'width:auto'}),
+    text:el('textarea',{class:'big',required:'',placeholder:'Привет, {имя}! …',maxlength:'4000'})};
+  let be=buttonsEditor([]);
+  const bbox=el('div',{});bbox.append(be.node);
+  const pv=el('div',{});
+  const upd=()=>pv.replaceChildren(preview(f.text.value,be.get()));
+  f.text.addEventListener('input',upd);bbox.addEventListener('input',upd);bbox.addEventListener('click',()=>setTimeout(upd,0));
+  const err=el('div',{class:'err',role:'alert'});
+  const formTitle=el('h3',{style:'grid-column:1/-1;font-size:14px'},'Новое правило');
+  const fill=r=>{editId=r?r.id:null;formTitle.textContent=r?'Редактирование: '+r.name:'Новое правило';
+    f.name.value=r?r.name:'';f.trig.value=r?r.trigger:'no_reg';
+    const m=r?r.delay_min:0;const u=m&&m%1440===0?1440:m&&m%60===0?60:1;f.unit.value=String(u);f.delay.value=String(m/u);
+    f.day.checked=r?r.daytime_only:false;f.text.value=r?r.text:'';
+    be=buttonsEditor(r?r.buttons:[]);bbox.replaceChildren(be.node);upd();err.textContent='';};
+  fill(null);
+  const form=el('form',{class:'card',style:'display:grid;gap:12px',onsubmit:async e=>{e.preventDefault();err.textContent='';err.className='err';
+    const body={name:f.name.value,trigger:f.trig.value,delay_min:Number(f.delay.value)*Number(f.unit.value),text:f.text.value,buttons:be.get(),daytime_only:f.day.checked};
+    try{if(editId)await api('/push/rules/'+editId,{method:'PATCH',body});else await api('/push/rules',{method:'POST',body});render()}catch(x){err.textContent=x.message}}},
+    formTitle,
+    el('div',{class:'form'},el('label',{},'Название',f.name),el('label',{},'Когда',f.trig),el('label',{},'Задержка',el('div',{style:'display:flex;gap:6px'},f.delay,f.unit))),
+    el('label',{style:'display:flex;gap:8px;align-items:center'},f.day,'Только днём ('+'10:00–22:00'+' по Москве)'),
+    el('label',{},'Текст. Подстановки: {имя} {стример} {промокод}',f.text),bbox,
+    el('div',{},el('div',{class:'mut sm',style:'margin-bottom:6px'},'Так увидит клиент'),pv),
+    el('div',{style:'display:flex;gap:8px'},el('button',{class:'btn',type:'submit'},'Сохранить'),el('button',{class:'btn o',type:'button',onclick:()=>fill(null)},'Новое правило')),err);
+  const tog=r=>el('button',{class:'btn s'+(r.enabled?'':' o'),type:'button',onclick:async()=>{await api('/push/rules/'+r.id,{method:'PATCH',body:{enabled:!r.enabled}});render()}},r.enabled?'Включено':'Выключено');
+  const rulesT=table(['Правило','Когда','Отправлено','Ошибок','Действия'],rules.map(r=>[el('td',{style:'white-space:normal;min-width:220px;max-width:300px'},el('b',{},r.name),el('div',{class:'mut sm'},r.text.slice(0,70)+(r.text.length>70?'…':''))),
+    el('td',{style:'white-space:normal;min-width:150px'},TRIG[r.trigger]+', '+fmtDelay(r.delay_min)+(r.daytime_only?', днём':'')),td(r.sent,'n'),td(r.failed,'n'),
+    el('td',{style:'display:flex;gap:6px;align-items:center'},tog(r),el('button',{class:'btn o s',type:'button',onclick:()=>{fill(r);form.scrollIntoView({behavior:'smooth'})}},'Изменить'),
+      el('button',{class:'btn o s',type:'button',onclick:async e=>{const b=e.currentTarget;if(b.dataset.s){await api('/push/rules/'+r.id,{method:'DELETE'});render()}else{b.dataset.s='1';b.textContent='Точно удалить?'}}},'Удалить'))]),'Правил пока нет.');
+
+  // --- рассылка
+  const SEGL={all:'Все',new:'Не зарегистрировались',registered:'Зарегистрировались, без депозита',ftd:'С депозитом',access:'С открытым доступом',churned:'Отвалились'};
+  const sel=el('select',{},Object.entries(SEGL).map(([k,v])=>el('option',{value:k},v+' ('+seg[k]+')')));
+  const owner=el('select',{},el('option',{value:''},'Все стримеры'),...staff.filter(x=>['streamer','teamlead','buyer'].includes(x.role)).map(x=>el('option',{value:x.id},x.name)));
+  owner.addEventListener('change',async()=>{const c=await api('/push/segments'+(owner.value?'?owner_id='+owner.value:''));[...sel.options].forEach(o=>o.textContent=SEGL[o.value]+' ('+c[o.value]+')')});
+  const bt=el('textarea',{class:'big',placeholder:'{имя}, у нас новости…',maxlength:'4000'});
+  const bbe=buttonsEditor([]);const bpv=el('div',{});
+  const bupd=()=>bpv.replaceChildren(preview(bt.value,bbe.get()));
+  bt.addEventListener('input',bupd);bbe.node.addEventListener('input',bupd);bbe.node.addEventListener('click',()=>setTimeout(bupd,0));bupd();
+  const berr=el('div',{class:'err',role:'alert'});
+  const sendBtn=el('button',{class:'btn',type:'button'},'Отправить');
+  sendBtn.addEventListener('click',async()=>{
+    berr.className='err';berr.textContent='';
+    if(!sendBtn.dataset.s){const n=(sel.selectedOptions[0].textContent.match(/\((\d+)\)/)||[])[1];sendBtn.dataset.s='1';sendBtn.textContent='Подтвердить отправку '+n+' получателям';return}
+    try{const r=await api('/push/broadcast',{method:'POST',body:{segment:sel.value,owner_id:owner.value||undefined,text:bt.value,buttons:bbe.get()}});berr.className='ok-msg';berr.textContent='Рассылка поставлена в очередь: '+r.total+' получателей';setTimeout(render,1200)}
+    catch(x){berr.textContent=x.message;delete sendBtn.dataset.s;sendBtn.textContent='Отправить'}});
+  const bform=el('div',{class:'card',style:'display:grid;gap:12px'},el('h3',{style:'font-size:14px'},'Рассылка вручную'),
+    el('div',{class:'form'},el('label',{},'Кому',sel),el('label',{},'Стример',owner)),
+    el('label',{},'Текст. Подстановки: {имя} {стример} {промокод}',bt),bbe.node,el('div',{},el('div',{class:'mut sm',style:'margin-bottom:6px'},'Так увидит клиент'),bpv),
+    el('div',{class:'mut sm'},'Получают только те, кто нажал /start у бота и не заблокировал его. Отправка идёт очередью, примерно 20 сообщений в секунду.'),
+    el('div',{},sendBtn),berr);
+  const castT=table(['Когда','Кому','Текст','Всего','Отправлено','Ошибок','В очереди'],casts.map(c=>[td(new Date(c.created_at).toLocaleString('ru-RU',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})),td(SEGL[c.segment]||c.segment),el('td',{style:'max-width:320px;white-space:normal'},c.text.slice(0,80)),td(c.total,'n'),td(c.sent,'n'),td(c.failed,'n'),td(c.pending,'n')]),'Рассылок пока не было.');
+  return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Пуши и рассылки'),el('span',{class:'mut sm'},'Каждое правило уходит человеку один раз')),
+    el('h3',{style:'font-size:15px'},'Автоматические пуши'),rulesT,form,
+    el('h3',{style:'font-size:15px'},'Рассылки'),bform,castT];
 }
 
 async function viewMedia(){

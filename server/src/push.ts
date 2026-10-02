@@ -1,0 +1,302 @@
+import { GrammyError, InlineKeyboard } from 'grammy';
+import { db } from './db.js';
+import { config } from './config.js';
+import { bot } from './tg.js';
+import { withClickId } from './app.js';
+
+export type Trigger = 'start' | 'no_reg' | 'no_deposit' | 'ftd' | 'inactive';
+export interface Button {
+  label: string;
+  type: 'miniapp' | 'url' | 'support' | 'register' | 'callback';
+  url?: string;
+  data?: string;
+}
+export interface Rule {
+  id: number;
+  name: string;
+  trigger: Trigger;
+  delay_min: number;
+  text: string;
+  buttons: Button[];
+  daytime_only: boolean;
+  enabled: boolean;
+  starts_at: Date;
+}
+interface Target {
+  tg_id: string;
+  first_name: string | null;
+  username: string | null;
+  region: string | null;
+  owner_name: string | null;
+  po_promo: string | null;
+  po_link: string | null;
+  po_link_ru: string | null;
+}
+
+/** В тестах (DISABLE_BOT=1) сообщения не уходят в Telegram, а складываются сюда. */
+export const outbox: { tgId: string; text: string; buttons: unknown }[] = [];
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+// ---------- Тексты и кнопки ----------
+
+export function renderText(text: string, t: Pick<Target, 'first_name' | 'username' | 'owner_name' | 'po_promo'>): string {
+  return text
+    .replaceAll('{имя}', t.first_name || t.username || 'друг')
+    .replaceAll('{стример}', t.owner_name || 'наша команда')
+    .replaceAll('{промокод}', t.po_promo || '');
+}
+
+export function registerUrl(t: Target): string | null {
+  const ru = t.po_link_ru || config.defaultPoLinkRu;
+  const ww = t.po_link || config.defaultPoLink;
+  const pick = t.region === 'ru' ? ru || ww : t.region === 'ww' ? ww || ru : '';
+  return pick ? withClickId(pick, t.tg_id) : null;
+}
+
+export function buildKeyboard(buttons: Button[], t: Target): InlineKeyboard | undefined {
+  const kb = new InlineKeyboard();
+  let any = false;
+  for (const b of buttons) {
+    if (b.type === 'callback' && b.data) kb.text(b.label, b.data).row();
+    else if (b.type === 'url' && b.url) kb.url(b.label, b.url).row();
+    else if (b.type === 'support') kb.url(b.label, `https://t.me/${config.botUsername}?start=support`).row();
+    else if (b.type === 'register') {
+      const u = registerUrl(t);
+      // Регион ещё неизвестен: ведём в Mini App, там клиент выберет регион
+      if (u) kb.url(b.label, u).row();
+      else if (config.miniAppUrl) kb.webApp(b.label, config.miniAppUrl).row();
+      else continue;
+    } else if (b.type === 'miniapp' && config.miniAppUrl) kb.webApp(b.label, config.miniAppUrl).row();
+    else continue;
+    any = true;
+  }
+  // .row() оставляет в конце пустую строку, Telegram такое не любит
+  const rows = kb.inline_keyboard as unknown as unknown[][];
+  while (rows.length && !rows[rows.length - 1].length) rows.pop();
+  return any ? kb : undefined;
+}
+
+export async function loadTarget(tgId: number | string): Promise<Target> {
+  const r = await db.query(
+    `SELECT d.tg_id, d.first_name, d.username, d.region, o.name AS owner_name, o.po_promo, o.po_link, o.po_link_ru
+       FROM leads d LEFT JOIN staff o ON o.id = d.owner_id WHERE d.tg_id = $1`,
+    [tgId],
+  );
+  return r.rows[0];
+}
+
+// ---------- Отправка ----------
+
+type Delivery = { ok: true } | { ok: false; retry?: boolean; blocked?: boolean; error: string };
+
+async function deliver(tgId: string, text: string, kb?: InlineKeyboard): Promise<Delivery> {
+  if (config.disableBot) {
+    outbox.push({ tgId, text, buttons: kb ? kb.inline_keyboard.map((r) => r.map((b) => ({ text: b.text, ...('url' in b ? { url: b.url } : {}), ...('callback_data' in b ? { cb: b.callback_data } : {}), ...('web_app' in b ? { web_app: b.web_app.url } : {}) }))) : null });
+    return { ok: true };
+  }
+  try {
+    await bot.api.sendMessage(tgId, text, kb ? { reply_markup: kb } : undefined);
+    return { ok: true };
+  } catch (e) {
+    if (e instanceof GrammyError) {
+      if (e.error_code === 429) return { ok: false, retry: true, error: 'лимит Telegram' };
+      return { ok: false, blocked: e.error_code === 403 && /blocked/i.test(e.description), error: e.description };
+    }
+    return { ok: false, error: String(e) };
+  }
+}
+
+async function markBlocked(tgId: string) {
+  await db.query('UPDATE leads SET bot_blocked = TRUE WHERE tg_id = $1', [tgId]);
+}
+
+// ---------- Автоматические правила ----------
+
+const T: Record<Trigger, string> = {
+  start: 'd.created_at',
+  no_reg: 'd.created_at',
+  no_deposit: `(SELECT min(e.created_at) FROM events e WHERE e.tg_id = d.tg_id AND e.type = 'reg')`,
+  ftd: `(SELECT min(e.created_at) FROM events e WHERE e.tg_id = d.tg_id AND e.type IN ('ftd','dep'))`,
+  inactive: 'coalesce(d.last_seen_at, d.created_at)',
+};
+const COND: Record<Trigger, string> = {
+  start: 'TRUE',
+  no_reg: `d.status = 'new'`,
+  no_deposit: `d.status = 'registered'`,
+  ftd: `d.status IN ('ftd','active')`,
+  inactive: 'd.access',
+};
+
+async function dueTargets(rule: Rule, limit: number, tgId?: string): Promise<Target[]> {
+  const t = T[rule.trigger];
+  const params: unknown[] = [String(rule.delay_min), rule.starts_at, rule.id, limit];
+  let only = '';
+  if (tgId) {
+    params.push(tgId);
+    only = `AND d.tg_id = $5`;
+  }
+  const r = await db.query(
+    `SELECT d.tg_id, d.first_name, d.username, d.region, o.name AS owner_name, o.po_promo, o.po_link, o.po_link_ru
+       FROM leads d LEFT JOIN staff o ON o.id = d.owner_id
+      WHERE d.bot_started AND NOT d.bot_blocked AND ${COND[rule.trigger]}
+        AND (${t}) + ($1 || ' minutes')::interval <= now()
+        AND (${t}) + ($1 || ' minutes')::interval >= $2
+        AND NOT EXISTS (SELECT 1 FROM push_log l WHERE l.rule_id = $3 AND l.tg_id = d.tg_id)
+        ${only}
+      ORDER BY d.tg_id LIMIT $4`,
+    params,
+  );
+  return r.rows;
+}
+
+export function isDaytime(now = new Date()): boolean {
+  const h = Number(new Intl.DateTimeFormat('en-GB', { hour: '2-digit', hour12: false, timeZone: config.pushTz }).format(now)) % 24;
+  return h >= config.pushDayFrom && h < config.pushDayTo;
+}
+
+async function sendRule(rule: Rule, t: Target): Promise<'sent' | 'retry' | 'failed'> {
+  const res = await deliver(t.tg_id, renderText(rule.text, t), buildKeyboard(rule.buttons, t));
+  if (!res.ok && res.retry) return 'retry';
+  await db.query(`INSERT INTO push_log (rule_id, tg_id, status, error) VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING`, [
+    rule.id,
+    t.tg_id,
+    res.ok ? 'sent' : 'failed',
+    res.ok ? null : res.error.slice(0, 200),
+  ]);
+  if (!res.ok && res.blocked) await markBlocked(t.tg_id);
+  return res.ok ? 'sent' : 'failed';
+}
+
+async function enabledRules(): Promise<Rule[]> {
+  return (await db.query('SELECT * FROM push_rules WHERE enabled ORDER BY sort, id')).rows;
+}
+
+/** Отправляет клиенту все правила, срок которых уже наступил. Вызывается сразу после /start и депозита. */
+export async function processLead(tgId: number | string): Promise<number> {
+  let sent = 0;
+  for (const rule of await enabledRules()) {
+    if (rule.daytime_only && !isDaytime()) continue;
+    const [t] = await dueTargets(rule, 1, String(tgId));
+    if (!t) continue;
+    if ((await sendRule(rule, t)) === 'sent') sent++;
+  }
+  return sent;
+}
+
+async function runRules(): Promise<boolean> {
+  for (const rule of await enabledRules()) {
+    if (rule.daytime_only && !isDaytime()) continue;
+    for (const t of await dueTargets(rule, 100)) {
+      if ((await sendRule(rule, t)) === 'retry') return false;
+      await sleep(config.disableBot ? 0 : 40);
+    }
+  }
+  return true;
+}
+
+// ---------- Ручные рассылки ----------
+
+export const SEGMENTS: Record<string, string> = {
+  all: 'TRUE',
+  new: `d.status = 'new'`,
+  registered: `d.status = 'registered'`,
+  ftd: `d.status IN ('ftd','active')`,
+  access: 'd.access',
+  churned: `d.status = 'churned'`,
+};
+
+export function segmentWhere(segment: string, ownerId?: number | null): { sql: string; params: unknown[] } {
+  const params: unknown[] = [];
+  let sql = `d.bot_started AND NOT d.bot_blocked AND ${SEGMENTS[segment] ?? 'FALSE'}`;
+  if (ownerId) {
+    params.push(ownerId);
+    sql += ` AND d.owner_id = $1`;
+  }
+  return { sql, params };
+}
+
+export async function createBroadcast(b: { text: string; buttons: Button[]; segment: string; ownerId?: number | null; createdBy: number }) {
+  const w = segmentWhere(b.segment, b.ownerId);
+  const ins = await db.query(
+    `INSERT INTO broadcasts (text, buttons, segment, owner_id, created_by) VALUES ($1,$2,$3,$4,$5) RETURNING id`,
+    [b.text, JSON.stringify(b.buttons), b.segment, b.ownerId ?? null, b.createdBy],
+  );
+  const id = ins.rows[0].id;
+  const jobs = await db.query(
+    `INSERT INTO broadcast_jobs (broadcast_id, tg_id) SELECT ${id}, d.tg_id FROM leads d WHERE ${w.sql} ON CONFLICT DO NOTHING`,
+    w.params,
+  );
+  await db.query('UPDATE broadcasts SET total = $2 WHERE id = $1', [id, jobs.rowCount ?? 0]);
+  return { id, total: jobs.rowCount ?? 0 };
+}
+
+async function runBroadcasts(): Promise<boolean> {
+  const jobs = await db.query(
+    `SELECT j.broadcast_id, j.tg_id, b.text, b.buttons, d.first_name, d.username, d.region,
+            o.name AS owner_name, o.po_promo, o.po_link, o.po_link_ru
+       FROM broadcast_jobs j
+       JOIN broadcasts b ON b.id = j.broadcast_id
+       JOIN leads d ON d.tg_id = j.tg_id
+       LEFT JOIN staff o ON o.id = d.owner_id
+      WHERE j.status = 'pending' ORDER BY j.broadcast_id, j.tg_id LIMIT 250`,
+  );
+  for (const j of jobs.rows) {
+    const res = await deliver(j.tg_id, renderText(j.text, j), buildKeyboard(j.buttons, j));
+    if (!res.ok && res.retry) return false;
+    await db.query(`UPDATE broadcast_jobs SET status = $3, error = $4 WHERE broadcast_id = $1 AND tg_id = $2`, [
+      j.broadcast_id,
+      j.tg_id,
+      res.ok ? 'sent' : 'failed',
+      res.ok ? null : res.error.slice(0, 200),
+    ]);
+    if (!res.ok && res.blocked) await markBlocked(j.tg_id);
+    await sleep(config.disableBot ? 0 : 45);
+  }
+  return true;
+}
+
+// ---------- Планировщик ----------
+
+let running = false;
+export async function tick(): Promise<void> {
+  if (running) return;
+  running = true;
+  try {
+    if (await runRules()) await runBroadcasts();
+  } catch (e) {
+    console.error('Ошибка планировщика пушей:', e);
+  } finally {
+    running = false;
+  }
+}
+
+export function startScheduler(): void {
+  setInterval(() => void tick(), 20_000);
+}
+
+// ---------- Правила по умолчанию ----------
+
+export async function seedDefaultRules(): Promise<void> {
+  const c = await db.query('SELECT count(*)::int AS n FROM push_rules');
+  if (c.rows[0].n > 0) return;
+  const support: Button = { label: 'Написать в поддержку', type: 'support' };
+  const register: Button = { label: 'Зарегистрироваться', type: 'register' };
+  const cabinet: Button = { label: 'Открыть кабинет', type: 'miniapp' };
+  const rules: [string, Trigger, number, string, Button[], boolean][] = [
+    ['Приветствие', 'start', 0, 'Привет, {имя}! Это Hunter AI. Здесь тренажёр, учёт твоих сделок и материалы клуба. У тебя уже есть аккаунт Pocket Option?', [{ label: 'Нет, создать', type: 'callback', data: 'acc_no' }, { label: 'Да, уже есть', type: 'callback', data: 'acc_yes' }, support], false],
+    ['Нет регистрации, через 1 час', 'no_reg', 60, '{имя}, не вижу твоей регистрации. Если возникли трудности, напиши в поддержку: ответим прямо здесь, в этом чате.', [support, register], false],
+    ['Нет регистрации, через сутки', 'no_reg', 1440, '{имя}, регистрация в Pocket Option занимает пару минут. После неё и пополнения счёта в приложении откроется доступ. Если что-то непонятно, напиши нам.', [register, support], true],
+    ['Нет депозита, через 2 часа', 'no_deposit', 120, '{имя}, регистрация есть. Осталось пополнить счёт, и доступ откроется автоматически. Рекомендуем от 100 $. Если не получается, напиши сюда, подскажем.', [cabinet, support], true],
+    ['Нет депозита, через сутки', 'no_deposit', 1440, '{имя}, ждём твой первый депозит. Как только он поступит, мы сразу откроем доступ. Если нужна помощь, напиши нам.', [cabinet, support], true],
+    ['Депозит получен', 'ftd', 0, 'Депозит получен. Доступ открыт. Откройте кабинет: там сделки, тренажёр и материалы клуба.', [cabinet], false],
+    ['Давно не заходил, через 7 дней', 'inactive', 10080, '{имя}, давно не виделись. В кабинете тренажёр и материалы клуба, заглядывай.', [cabinet], true],
+  ];
+  let i = 0;
+  for (const [name, trigger, delay, text, buttons, day] of rules) {
+    await db.query(
+      `INSERT INTO push_rules (name, trigger, delay_min, text, buttons, daytime_only, sort) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+      [name, trigger, delay, text, JSON.stringify(buttons), day, i++],
+    );
+  }
+}

@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { db } from './db.js';
 import { bot } from './bot.js';
 import { config } from './config.js';
+import { createBroadcast, segmentWhere, SEGMENTS, type Button } from './push.js';
 import {
   type Staff,
   type Role,
@@ -381,6 +382,141 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     }
     await db.query(`INSERT INTO messages (tg_id, direction, staff_id, kind, text, tg_message_id) VALUES ($1,'out',$2,'text',$3,$4)`, [tgId, me.id, text, tgMessageId]);
     return { ok: true };
+  });
+
+  // Пуши и рассылки (только админ)
+  const TRIGGERS = ['start', 'no_reg', 'no_deposit', 'ftd', 'inactive'];
+  function cleanButtons(v: unknown): Button[] | string {
+    if (v === undefined || v === null) return [];
+    if (!Array.isArray(v) || v.length > 4) return 'Кнопок не больше четырёх';
+    const out: Button[] = [];
+    for (const raw of v) {
+      const b = (raw ?? {}) as Record<string, unknown>;
+      const label = str(b.label, 40);
+      const type = str(b.type, 12);
+      if (!label) return 'У кнопки нужна подпись';
+      if (type === 'url') {
+        const url = str(b.url, 400);
+        if (!/^https:\/\/[^\s]+$/.test(url)) return 'Ссылка кнопки должна начинаться с https://';
+        out.push({ label, type, url });
+      } else if (type === 'callback') {
+        const data = str(b.data, 20);
+        if (!['acc_no', 'acc_yes'].includes(data)) return 'Неизвестное действие кнопки';
+        out.push({ label, type, data });
+      } else if (['miniapp', 'support', 'register'].includes(type)) out.push({ label, type: type as Button['type'] });
+      else return 'Неизвестный тип кнопки';
+    }
+    return out;
+  }
+
+  app.get('/push/rules', { preHandler: need('admin') }, async () => {
+    const r = await db.query(
+      `SELECT r.id, r.name, r.trigger, r.delay_min, r.text, r.buttons, r.daytime_only, r.enabled,
+              (SELECT count(*)::int FROM push_log l WHERE l.rule_id = r.id AND l.status = 'sent') AS sent,
+              (SELECT count(*)::int FROM push_log l WHERE l.rule_id = r.id AND l.status = 'failed') AS failed
+         FROM push_rules r ORDER BY r.sort, r.id`,
+    );
+    return r.rows;
+  });
+
+  async function readRule(b: Record<string, unknown>, partial: boolean) {
+    const out: Record<string, unknown> = {};
+    if (!partial || b.name !== undefined) {
+      out.name = str(b.name, 80);
+      if (!out.name) return { error: 'Укажите название' };
+    }
+    if (!partial || b.trigger !== undefined) {
+      out.trigger = str(b.trigger, 20);
+      if (!TRIGGERS.includes(out.trigger as string)) return { error: 'Неизвестный триггер' };
+    }
+    if (!partial || b.delay_min !== undefined) {
+      const d = Math.trunc(Number(b.delay_min));
+      if (!Number.isFinite(d) || d < 0 || d > 43200) return { error: 'Задержка от 0 до 30 дней' };
+      out.delay_min = d;
+    }
+    if (!partial || b.text !== undefined) {
+      out.text = str(b.text, 4000);
+      if (!out.text) return { error: 'Введите текст' };
+    }
+    if (!partial || b.buttons !== undefined) {
+      const bt = cleanButtons(b.buttons);
+      if (typeof bt === 'string') return { error: bt };
+      out.buttons = JSON.stringify(bt);
+    }
+    if (b.daytime_only !== undefined) out.daytime_only = Boolean(b.daytime_only);
+    if (b.enabled !== undefined) out.enabled = Boolean(b.enabled);
+    return { values: out };
+  }
+
+  app.post('/push/rules', { preHandler: need('admin') }, async (req, reply) => {
+    const r = await readRule((req.body ?? {}) as Record<string, unknown>, false);
+    if (r.error) return reply.code(400).send({ error: r.error });
+    const v = r.values!;
+    const ins = await db.query(
+      `INSERT INTO push_rules (name, trigger, delay_min, text, buttons, daytime_only, sort)
+       VALUES ($1,$2,$3,$4,$5,$6,(SELECT coalesce(max(sort),0)+1 FROM push_rules)) RETURNING id`,
+      [v.name, v.trigger, v.delay_min, v.text, v.buttons ?? '[]', v.daytime_only ?? false],
+    );
+    return { id: ins.rows[0].id };
+  });
+
+  app.patch<{ Params: { id: string } }>('/push/rules/:id', { preHandler: need('admin') }, async (req, reply) => {
+    const r = await readRule((req.body ?? {}) as Record<string, unknown>, true);
+    if (r.error) return reply.code(400).send({ error: r.error });
+    const v = r.values!;
+    const sets: string[] = [];
+    const vals: unknown[] = [];
+    for (const [k, val] of Object.entries(v)) {
+      vals.push(val);
+      sets.push(`${k} = $${vals.length}`);
+    }
+    if (!sets.length) return reply.code(400).send({ error: 'Нечего менять' });
+    // Любое изменение срока или включение правила начинает отсчёт заново, чтобы не разослать его по старой базе
+    if (v.enabled === true || v.trigger !== undefined || v.delay_min !== undefined) sets.push('starts_at = now()');
+    vals.push(Number(req.params.id));
+    const u = await db.query(`UPDATE push_rules SET ${sets.join(', ')} WHERE id = $${vals.length} RETURNING id`, vals);
+    if (!u.rowCount) return reply.code(404).send({ error: 'Не найдено' });
+    return { ok: true };
+  });
+
+  app.delete<{ Params: { id: string } }>('/push/rules/:id', { preHandler: need('admin') }, async (req) => {
+    await db.query('DELETE FROM push_rules WHERE id = $1', [Number(req.params.id)]);
+    return { ok: true };
+  });
+
+  app.get<{ Querystring: { owner_id?: string } }>('/push/segments', { preHandler: need('admin') }, async (req) => {
+    const owner = req.query.owner_id ? Number(req.query.owner_id) : null;
+    const out: Record<string, number> = {};
+    for (const k of Object.keys(SEGMENTS)) {
+      const w = segmentWhere(k, owner);
+      out[k] = (await db.query(`SELECT count(*)::int AS n FROM leads d WHERE ${w.sql}`, w.params)).rows[0].n;
+    }
+    return out;
+  });
+
+  app.post('/push/broadcast', { preHandler: need('admin') }, async (req, reply) => {
+    const b = (req.body ?? {}) as Record<string, unknown>;
+    const text = str(b.text, 4000);
+    const segment = str(b.segment, 20);
+    const buttons = cleanButtons(b.buttons);
+    if (!text) return reply.code(400).send({ error: 'Введите текст' });
+    if (!(segment in SEGMENTS)) return reply.code(400).send({ error: 'Неизвестный сегмент' });
+    if (typeof buttons === 'string') return reply.code(400).send({ error: buttons });
+    const res = await createBroadcast({ text, buttons, segment, ownerId: b.owner_id ? Number(b.owner_id) : null, createdBy: req.staff!.id });
+    if (!res.total) return reply.code(400).send({ error: 'В этом сегменте нет получателей' });
+    return res;
+  });
+
+  app.get('/push/broadcasts', { preHandler: need('admin') }, async () => {
+    const r = await db.query(
+      `SELECT b.id, b.text, b.segment, b.total, b.created_at,
+              count(*) FILTER (WHERE j.status = 'sent')::int AS sent,
+              count(*) FILTER (WHERE j.status = 'failed')::int AS failed,
+              count(*) FILTER (WHERE j.status = 'pending')::int AS pending
+         FROM broadcasts b LEFT JOIN broadcast_jobs j ON j.broadcast_id = b.id
+        GROUP BY b.id ORDER BY b.id DESC LIMIT 30`,
+    );
+    return r.rows;
   });
 
   // Журнал постбеков для админа

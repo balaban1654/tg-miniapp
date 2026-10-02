@@ -10,12 +10,14 @@ import { ensureAdmin } from './auth.js';
 import { officeRoutes } from './office.js';
 import { postbackRoutes } from './postback.js';
 import { appRoutes } from './app.js';
+import { seedDefaultRules, startScheduler } from './push.js';
 
 const app = Fastify({ logger: true, trustProxy: true });
 await app.register(cookie);
 
 await migrate();
 await ensureAdmin();
+await seedDefaultRules();
 
 // Интерфейс Hunter Office и его API
 const officeHtml = readFileSync(resolve(process.cwd(), 'public/office.html'), 'utf8');
@@ -43,6 +45,7 @@ app.get<{ Params: { kind: string; slug: string } }>('/:kind(s|b)/:slug', async (
 
 await app.listen({ port: config.port, host: '0.0.0.0' });
 if (process.env.DISABLE_BOT !== '1') {
+  startScheduler();
   bot
     .start({ onStart: (me) => app.log.info(`Бот @${me.username} запущен`) })
     .catch((e) => app.log.error(e, 'Бот не запустился. Проверьте BOT_TOKEN'));

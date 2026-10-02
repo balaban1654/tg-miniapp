@@ -98,6 +98,7 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
     req.tg = user;
     // Если человек открыл приложение, не нажимая /start, всё равно заводим лида
     await attachLead(user.id, user.username, user.first_name, null);
+    await db.query(`UPDATE leads SET last_seen_at = now() WHERE tg_id = $1 AND (last_seen_at IS NULL OR last_seen_at < now() - interval '10 minutes')`, [user.id]);
   };
 
   app.get('/me', { preHandler: auth }, async (req) => {
