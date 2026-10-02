@@ -110,3 +110,17 @@ CREATE TABLE IF NOT EXISTS media_items (
   sort     INT DEFAULT 0,
   active   BOOLEAN DEFAULT TRUE
 );
+
+-- Чат поддержки через бота: сообщения клиентов и ответы команды
+CREATE TABLE IF NOT EXISTS messages (
+  id            BIGSERIAL PRIMARY KEY,
+  tg_id         BIGINT NOT NULL REFERENCES leads(tg_id),
+  direction     TEXT NOT NULL CHECK (direction IN ('in','out')),
+  staff_id      INT REFERENCES staff(id),
+  kind          TEXT NOT NULL DEFAULT 'text',
+  text          TEXT,
+  file_id       TEXT,
+  tg_message_id BIGINT,
+  created_at    TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS messages_tg ON messages(tg_id, id);

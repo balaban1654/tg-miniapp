@@ -15,7 +15,6 @@ export const config = {
   port: Number(process.env.PORT ?? 3000),
   defaultPoLink: process.env.DEFAULT_PO_LINK ?? '',
   defaultPoLinkRu: process.env.DEFAULT_PO_LINK_RU ?? '',
-  supportUrl: process.env.SUPPORT_URL ?? '',
   postbackSecret: process.env.POSTBACK_SECRET ?? '',
   disableBot: process.env.DISABLE_BOT === '1',
   adminLogin: process.env.ADMIN_LOGIN ?? '',

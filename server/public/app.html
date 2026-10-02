@@ -107,6 +107,7 @@ function openLink(u){
   }catch{}
   window.open(u,'_blank');
 }
+function support(){openLink('https://t.me/'+me.botUsername+'?start=support')}
 function clearTimers(){timers.forEach(clearInterval);timers.forEach(clearTimeout);timers=[]}
 
 const ICON={home:'<path d="M3 11l9-8 9 8v9a1 1 0 01-1 1h-5v-6H9v6H4a1 1 0 01-1-1z"/>',deals:'<path d="M4 5h16v2H4zm0 6h16v2H4zm0 6h16v2H4z"/>',trainer:'<path d="M3 3h8v8H3zm10 0h8v8h-8zM3 13h8v8H3zm10 0h8v8h-8z"/>',media:'<path d="M3 5h18v14H3zm7 3v8l6-4z"/>'};
@@ -117,7 +118,7 @@ function shell(title,body){
   root.replaceChildren(
     el('div',{class:'hd'},
       el('div',{class:'brand'},el('div',{class:'logo'},'H'),title||'Hunter AI'),
-      el('div',{class:'hr'},me.supportUrl?el('button',{class:'pillb',type:'button',onclick:()=>openLink(me.supportUrl)},'Поддержка'):null,
+      el('div',{class:'hr'},el('button',{class:'pillb',type:'button',onclick:support},'Поддержка'),
         el('button',{class:'avb',type:'button','aria-label':'Профиль',onclick:()=>go('profile')},init))),
     el('main',{},body),
     el('nav',{class:'tabs'},el('div',{},TABS.map(([k,t])=>el('button',{type:'button',class:k===tab?'on':'',onclick:()=>go(k)},svgEl('<svg viewBox="0 0 24 24" fill="currentColor">'+ICON[k]+'</svg>'),t)))));
@@ -159,7 +160,7 @@ async function viewHome(){
       el('button',{type:'button',class:region==='ru'?'on':'',onclick:()=>{region='ru';drawSeg();drawBtn()}},'Россия и СНГ'),
       el('button',{type:'button',class:region==='ww'?'on':'',onclick:()=>{region='ww';drawSeg();drawBtn()}},'Европа и другие страны'))};
     const btnBox=el('div',{});
-    const drawBtn=()=>{btnBox.replaceChildren(url()?el('button',{class:'btn',type:'button',onclick:async()=>{try{await api('/region',{method:'POST',body:{region}})}catch{}openLink(url())}},'Зарегистрироваться'):el('div',{class:'sm'},'Ссылка регистрации пока не настроена. Напишите в поддержку.'))};
+    const drawBtn=()=>{btnBox.replaceChildren(url()?el('button',{class:'btn',type:'button',onclick:async()=>{try{await api('/region',{method:'POST',body:{region}})}catch{}openLink(url())}},'Зарегистрироваться'):el('div',{class:'sm'},'Ссылка регистрации пока не настроена. Напишите нам через кнопку «Поддержка».'))};
     drawSeg();drawBtn();
     const check=el('button',{class:'btn o',type:'button',onclick:async()=>{await refreshMe();if(me.access){toast('Доступ открыт');render()}else toast('Пока нет депозита. Это может занять несколько минут.')}},'Я пополнил счёт, проверить доступ');
     shell('Hunter AI',[profileCard(),stats4({deals:0,wins:0,losses:0,rate:null}),
@@ -269,7 +270,7 @@ function viewProfile(){
   shell('Профиль',[el('div',{class:'card row',style:'justify-content:flex-start;gap:12px'},el('div',{class:'ava'},(me.name||'?').trim().slice(0,1).toUpperCase()),el('div',{},el('b',{style:'font:700 16px var(--fd)'},me.name),el('div',{class:'sm'},me.username?'@'+me.username:''))),
     el('div',{class:'card',style:'display:grid;gap:10px'},rows.map(([k,v])=>el('div',{class:'row'},el('span',{class:'sm'},k),el('b',{class:'mono'},String(v))))),
     me.promo?el('div',{class:'card row'},el('span',{class:'sm'},'Промокод'),el('b',{class:'mono'},me.promo)):null,
-    me.supportUrl?el('button',{class:'btn o',type:'button',onclick:()=>openLink(me.supportUrl)},'Написать в поддержку'):null,
+    el('button',{class:'btn o',type:'button',onclick:support},'Написать в поддержку'),
     el('button',{class:'back',type:'button',onclick:()=>go('home')},'‹ На главную')]);
 }
 

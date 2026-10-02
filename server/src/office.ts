@@ -1,5 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { db } from './db.js';
+import { bot } from './bot.js';
+import { config } from './config.js';
 import {
   type Staff,
   type Role,
@@ -33,6 +35,16 @@ function ownerScope(me: Staff, col: string): string {
   }
   if (me.role === 'analyst') return 'FALSE';
   return `${col} = ${me.id}`;
+}
+
+/** Чаты видят: админ все; тимлидер и стример неразобранные и свои (тимлидер ещё и команды). */
+function chatScope(me: Staff, col: string): string {
+  if (me.role === 'admin') return 'TRUE';
+  if (me.role === 'teamlead') {
+    return `(${col} IS NULL OR ${col} = ${me.id} OR ${col} IN (SELECT id FROM staff WHERE parent_id = ${me.id}))`;
+  }
+  if (me.role === 'streamer') return `(${col} IS NULL OR ${col} = ${me.id})`;
+  return 'FALSE';
 }
 
 const str = (v: unknown, max = 200): string => (typeof v === 'string' ? v.trim().slice(0, max) : '');
@@ -284,6 +296,91 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
       if (e.code === '23505') return reply.code(409).send({ error: 'Такой адрес уже занят' });
       throw e;
     }
+  });
+
+  // Чаты поддержки
+  app.get('/chats', { preHandler: auth }, async (req) => {
+    const me = req.staff!;
+    const r = await db.query(
+      `SELECT d.tg_id, d.username, d.first_name, d.owner_id, o.name AS owner_name,
+              m.direction AS last_dir, m.kind AS last_kind, m.text AS last_text, m.created_at AS last_at
+         FROM leads d
+         JOIN LATERAL (SELECT direction, kind, text, created_at FROM messages WHERE tg_id = d.tg_id ORDER BY id DESC LIMIT 1) m ON TRUE
+         LEFT JOIN staff o ON o.id = d.owner_id
+        WHERE ${chatScope(me, 'd.owner_id')}
+        ORDER BY (m.direction = 'in') DESC, m.created_at DESC LIMIT 200`,
+    );
+    return r.rows.map((x) => ({ ...x, waiting: x.last_dir === 'in' }));
+  });
+
+  app.get<{ Params: { tgId: string } }>('/chats/:tgId', { preHandler: auth }, async (req, reply) => {
+    const me = req.staff!;
+    const tgId = Number(req.params.tgId);
+    const lead = await db.query(
+      `SELECT d.tg_id, d.username, d.first_name, d.owner_id, d.status, d.trader_id, o.name AS owner_name
+         FROM leads d LEFT JOIN staff o ON o.id = d.owner_id WHERE d.tg_id = $1 AND ${chatScope(me, 'd.owner_id')}`,
+      [tgId],
+    );
+    if (!lead.rowCount) return reply.code(404).send({ error: 'Чат не найден' });
+    const msgs = await db.query(
+      `SELECT m.id, m.direction, m.kind, m.text, m.created_at, (m.file_id IS NOT NULL) AS has_file, s.name AS staff_name
+         FROM messages m LEFT JOIN staff s ON s.id = m.staff_id WHERE m.tg_id = $1 ORDER BY m.id DESC LIMIT 200`,
+      [tgId],
+    );
+    return { lead: lead.rows[0], messages: msgs.rows.reverse() };
+  });
+
+  app.get<{ Params: { tgId: string; msgId: string } }>('/chats/:tgId/file/:msgId', { preHandler: auth }, async (req, reply) => {
+    const me = req.staff!;
+    const r = await db.query(
+      `SELECT m.file_id, m.kind FROM messages m JOIN leads d ON d.tg_id = m.tg_id
+        WHERE m.id = $1 AND m.tg_id = $2 AND m.file_id IS NOT NULL AND ${chatScope(me, 'd.owner_id')}`,
+      [Number(req.params.msgId), Number(req.params.tgId)],
+    );
+    if (!r.rowCount) return reply.code(404).send({ error: 'Файл не найден' });
+    try {
+      const f = await bot.api.getFile(r.rows[0].file_id);
+      const resp = await fetch(`https://api.telegram.org/file/bot${config.botToken}/${f.file_path}`);
+      if (!resp.ok) throw new Error('telegram');
+      const ext = (f.file_path ?? '').split('.').pop()?.toLowerCase() ?? '';
+      const types: Record<string, string> = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', mp4: 'video/mp4', ogg: 'audio/ogg', oga: 'audio/ogg', pdf: 'application/pdf' };
+      return reply
+        .header('Cache-Control', 'private, max-age=3600')
+        .header('X-Content-Type-Options', 'nosniff')
+        .type(types[ext] ?? 'application/octet-stream')
+        .send(Buffer.from(await resp.arrayBuffer()));
+    } catch {
+      return reply.code(502).send({ error: 'Не удалось получить файл из Telegram' });
+    }
+  });
+
+  app.post<{ Params: { tgId: string } }>('/chats/:tgId/reply', { preHandler: auth }, async (req, reply) => {
+    const me = req.staff!;
+    const tgId = Number(req.params.tgId);
+    const text = str((req.body as any)?.text, 4000);
+    if (!text) return reply.code(400).send({ error: 'Введите сообщение' });
+    const lead = await db.query(`SELECT d.owner_id FROM leads d WHERE d.tg_id = $1 AND ${chatScope(me, 'd.owner_id')}`, [tgId]);
+    if (!lead.rowCount) return reply.code(404).send({ error: 'Чат не найден' });
+
+    // Кто первым ответил, тот и забирает лида. Админ лидов не забирает.
+    if (lead.rows[0].owner_id === null && (me.role === 'streamer' || me.role === 'teamlead')) {
+      const claim = await db.query('UPDATE leads SET owner_id = $2 WHERE tg_id = $1 AND owner_id IS NULL RETURNING tg_id', [tgId, me.id]);
+      if (!claim.rowCount) {
+        const o = await db.query('SELECT o.id, o.name FROM leads d JOIN staff o ON o.id = d.owner_id WHERE d.tg_id = $1', [tgId]);
+        if (o.rows[0]?.id !== me.id) return reply.code(409).send({ error: `Этого клиента уже взял ${o.rows[0]?.name ?? 'другой стример'}` });
+      }
+    }
+
+    let tgMessageId: number | null = null;
+    if (!config.disableBot) {
+      try {
+        tgMessageId = (await bot.api.sendMessage(tgId, text)).message_id;
+      } catch {
+        return reply.code(502).send({ error: 'Telegram не принял сообщение. Возможно, клиент заблокировал бота.' });
+      }
+    }
+    await db.query(`INSERT INTO messages (tg_id, direction, staff_id, kind, text, tg_message_id) VALUES ($1,'out',$2,'text',$3,$4)`, [tgId, me.id, text, tgMessageId]);
+    return { ok: true };
   });
 
   // Журнал постбеков для админа

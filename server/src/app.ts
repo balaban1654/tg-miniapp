@@ -134,7 +134,7 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
         ru: withClickId(l.po_link_ru || config.defaultPoLinkRu || l.po_link || config.defaultPoLink, u.id),
         ww: withClickId(l.po_link || config.defaultPoLink || l.po_link_ru || config.defaultPoLinkRu, u.id),
       },
-      supportUrl: config.supportUrl || null,
+      botUsername: config.botUsername,
       stats: { deals: s.deals, wins: s.wins, losses: s.losses, rate: s.deals ? Math.round((s.wins / s.deals) * 100) : null },
     };
   });
