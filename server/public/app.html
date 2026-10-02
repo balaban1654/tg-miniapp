@@ -531,8 +531,7 @@ function signalLive(sg,skew,cfg){
       el('div',{class:'r'},el('span',{},'Направление'),el('b',{style:'color:var(--'+(up?'ok':'bad')+')'},up?'ВВЕРХ (BUY)':'ВНИЗ (SELL)')),
       row('Время сделки',sg.expiry_sec?fmtDur(sg.expiry_sec):sg.expiry_min+' мин'),row('Ставка',cfg.stakeLabel),
       el('button',{class:'btn',type:'button',style:'margin-top:8px',onclick:pocket},'Открыть Pocket Option')),
-    el('div',{class:'sig'},status,list,rateBox,
-      cfg.warning?el('div',{style:'margin-top:10px;color:var(--warn);font-weight:700;font-size:13px;line-height:1.45'},cfg.warning):null));
+    el('div',{class:'sig'},status,list,rateBox));
 }
 /** После оценки: запросить новый анализ или завершить торговлю */
 function signalRated(sg,result,step){

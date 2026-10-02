@@ -501,7 +501,6 @@ async function signalConfigBlock(){
       el('div',{class:'form'},el('label',{},'Секунда входа в минуте (15 = таймер 0:45)',f.es),el('label',{},'Интервал перекрытий, сек',f.gap),el('label',{},'Событий всего (вход + перекрытия)',f.mx),el('label',{},'Сумма перекрытия, ×',f.mult)),
       el('h3',{style:'font-size:13px;margin:4px 0 0'},'Карточка сигнала (что видит клиент)'),
       el('div',{class:'form'},el('label',{},'Точка входа',f.el_),el('label',{},'Ставка',f.sl),el('label',{},'Ссылка «Открыть Pocket Option» (пусто = ссылка регистрации)',f.pocket)),
-      el('label',{},'Жёлтое предупреждение внизу карточки',f.warn),
       isAdmin?el('div',{},el('button',{class:'btn',type:'button',onclick:save},'Сохранить настройки')):null,err),
     el('h3',{style:'font-size:13px;margin:4px 0 0'},'Экспирации на выбор клиенту (от 3 секунд до 4 часов)'),
     expBlock,
