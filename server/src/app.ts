@@ -273,8 +273,17 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
          FROM deals WHERE tg_id = $1 AND created_at > now() - interval '7 days' GROUP BY 1 ORDER BY 1`,
       [req.tg!.id],
     );
+    // Плюсы по шагам: 0 = вход, 1.. = перекрытия; период тот же, что у списка
+    const st = await db.query(
+      `SELECT step, count(*)::int AS c FROM deals
+        WHERE tg_id = $1 AND result = 'win' AND step IS NOT NULL AND created_at > now() - ($2 || ' days')::interval GROUP BY step`,
+      [req.tg!.id, String(days)],
+    );
+    const maxEv = Number((await db.query('SELECT max_events FROM signal_settings WHERE id = 1')).rows[0]?.max_events) || 4;
+    const winSteps = Array.from({ length: maxEv }, (_, i) => Number(st.rows.find((r) => r.step === i)?.c || 0));
     return {
       deals: rows,
+      winSteps,
       wins: rows.filter((x) => x.result === 'win').length,
       losses: rows.filter((x) => x.result === 'loss').length,
       total: rows.filter((x) => x.result && x.result !== 'skip').length,
