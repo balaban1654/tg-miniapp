@@ -95,6 +95,7 @@ main{flex:1;padding:6px 16px 96px;display:grid;gap:12px;align-content:start}
 .opts{display:grid;gap:8px}.opts.c4{grid-template-columns:repeat(4,1fr)}.opts.c5{grid-template-columns:repeat(5,1fr)}
 .opt{border:0;border-radius:11px;background:var(--card);padding:12px 4px;font:700 13px var(--fd);color:var(--fg);cursor:pointer}
 .opt.on{background:#4b2f8f}
+.live{position:absolute;left:10px;bottom:10px;background:#0d0817dd;border:1.5px solid var(--ok);border-radius:12px;padding:8px 18px;font:800 20px var(--fd)}
 .cd{position:absolute;z-index:6;left:50%;top:84px;transform:translateX(-50%);display:grid;justify-items:center;gap:6px;text-align:center;background:#16322aee;border:1px solid var(--ok);border-radius:16px;padding:14px 18px;box-shadow:0 8px 28px #000a;pointer-events:none}
 .cdc{width:62px;height:62px;border-radius:50%;border:3px solid var(--ok);display:grid;place-items:center}
 .fin{border:1px solid var(--ok);background:#12301f;border-radius:18px;padding:16px;display:grid;gap:10px}
@@ -503,12 +504,13 @@ function fsShell(pill,body){
 }
 const TIMES=[5,10,15,30,60,120,300];
 const hms=n=>'00:'+String(Math.floor(n/60)).padStart(2,'0')+':'+String(n%60).padStart(2,'0');
+const plS=n=>n%10===1&&n%100!==11?'секунду':[2,3,4].includes(n%10)&&![12,13,14].includes(n%100)?'секунды':'секунд';
 const usd=n=>n.toLocaleString('ru-RU',{minimumFractionDigits:2,maximumFractionDigits:2}).replace(/ /g,' ')+' $';
 function lesson1(){
   clearTimers();
   const st={view:'pairs',pair:PAIRS[0],popup:false,timer:false,type:'line',iv:'M1',tt:60,ti:4,sum:10,paired:false,trade:null,result:null,bal:1000};
   let price=1.0795,pts=[];for(let i=0;i<130;i++){price+=(Math.random()-.5)*.0003;pts.push(price)}
-  let svg=null,ttag=null,nEl=null,tipEl=null,bigEl=null;
+  let svg=null,ttag=null,nEl=null,tipEl=null,bigEl=null,liveEl=null;
   const fmtT=n=>Math.floor(n/60)+':'+String(n%60).padStart(2,'0');
   const until=()=>((st.tt-45)+60)%60;
   const target=()=>{
@@ -539,34 +541,63 @@ function lesson1(){
       h+='<line x1="'+x.toFixed(1)+'" x2="'+x.toFixed(1)+'" y1="'+Y(u.h).toFixed(1)+'" y2="'+Y(u.l).toFixed(1)+'" stroke="'+col+'"/><rect x="'+(x-dx*.32).toFixed(1)+'" y="'+Math.min(Y(u.o),Y(u.c)).toFixed(1)+'" width="'+(dx*.64).toFixed(1)+'" height="'+Math.max(1.5,Math.abs(Y(u.o)-Y(u.c))).toFixed(1)+'" fill="'+col+'"/>'});
     const last=units[n-1].c;
     h+='<line x1="0" x2="'+X1+'" y1="'+Y(last).toFixed(1)+'" y2="'+Y(last).toFixed(1)+'" stroke="#6ee0a8" stroke-opacity=".5" stroke-dasharray="3 3"/>';
-    if(st.trade)h+='<line x1="0" x2="'+X1+'" y1="'+Y(st.trade.entry).toFixed(1)+'" y2="'+Y(st.trade.entry).toFixed(1)+'" stroke="#fff" stroke-opacity=".8" stroke-width="1.3"/><text x="4" y="'+(Y(st.trade.entry)-4).toFixed(1)+'" fill="#fff" font-size="10" font-weight="700" font-family="Montserrat,sans-serif">вход</text>';
+    if(st.trade){const ey=Y(st.trade.entry);h+='<line x1="0" x2="'+X1+'" y1="'+ey.toFixed(1)+'" y2="'+ey.toFixed(1)+'" stroke="#7be3b0" stroke-opacity=".8" stroke-width="1.2"/><rect x="150" y="'+(ey-21).toFixed(1)+'" width="116" height="17" rx="6" fill="#7be3b0"/><text x="208" y="'+(ey-9).toFixed(1)+'" text-anchor="middle" fill="#06210f" font-size="10.5" font-weight="700" font-family="Montserrat,sans-serif">Вход 0:45 · '+st.sum+' $</text>'}
     for(let i=0;i<4;i++){const v=hi-(hi-lo)*i/3;h+='<text x="'+(X1+6)+'" y="'+(Y(v)+3).toFixed(1)+'" fill="#8d82ab" font-size="10" font-family="Montserrat,sans-serif">'+v.toFixed(5)+'</text>'}
     h+='<rect x="'+(X1+2)+'" y="'+(Y(last)-8).toFixed(1)+'" width="58" height="16" rx="4" fill="#1f8f4e"/><text x="'+(X1+6)+'" y="'+(Y(last)+4).toFixed(1)+'" fill="#fff" font-size="10.5" font-weight="700" font-family="Montserrat,sans-serif">'+last.toFixed(5)+'</text>';
     return h;
   }
-  function paint(){if(svg)svg.innerHTML=chart();if(ttag){ttag.hidden=!st.timer;ttag.textContent=fmtT(st.tt)}}
+  function paint(){if(svg)svg.innerHTML=chart();if(ttag){ttag.hidden=!st.timer;ttag.textContent=st.iv+' · '+fmtT(st.tt)}
+    if(liveEl&&st.trade){const d=price-st.trade.entry;const v=d>0?st.sum*.92:d<0?-st.sum:0;liveEl.hidden=false;liveEl.textContent=(v>0?'+':v<0?'−':'')+usd(Math.abs(v)).replace(',00 $',' $');liveEl.style.color=v>0?'var(--ok)':v<0?'var(--bad)':'var(--warn)';liveEl.style.borderColor=liveEl.style.color}}
   function liveText(){
     const t=target(),n=until(),now=n===0||n>=58||n<=0;
     if(t==='buy'){
       const inWin=st.tt>=42&&st.tt<=48;
       if(nEl)nEl.textContent=inWin?'!':String(n);
       if(bigEl)bigEl.textContent=inWin?'Сейчас! Жми «Купить»':'секунд до входа. На 0:45 жми «Купить»';
-      if(tipEl)tipEl.textContent=inWin?'Таймер свечи показывает 0:45 — жми «Купить»':'Жди: через '+n+' '+(n%10===1&&n!==11?'секунду':[2,3,4].includes(n%10)&&![12,13,14].includes(n)?'секунды':'секунд')+' таймер свечи покажет 0:45 — тогда жми «Купить»';
+      if(tipEl)tipEl.textContent=inWin?'Таймер свечи показывает 0:45 — жми «Купить»':'Жди: через '+n+' '+plS(n)+' таймер свечи покажет 0:45 — тогда жми «Купить»';
     }
-    if(t==='wait'&&st.trade){if(nEl)nEl.textContent=String(st.trade.left);if(tipEl)tipEl.textContent='Сделка открыта: до конца '+st.trade.left+' с'}
+    if(t==='wait'&&st.trade){if(tipEl)tipEl.textContent='Сделка открыта — ждём '+st.trade.left+' '+plS(st.trade.left)}
   }
   function finishTrade(){
     const tr=st.trade,diff=price-tr.entry;
     const res=diff>0?'win':diff<0?'loss':'draw';
     st.result={res,pnl:res==='win'?st.sum*.92:res==='loss'?-st.sum:0};
-    st.bal=Math.round((st.bal+st.result.pnl)*100)/100;st.trade=null;termView();
+    st.bal=Math.round((st.bal+(res==='win'?st.sum*1.92:res==='draw'?st.sum:0))*100)/100;st.trade=null;resultView();
   }
   timers.push(setInterval(()=>{price+=(Math.random()-.5)*.0003;pts.push(price);if(pts.length>400)pts.shift();paint()},700));
   timers.push(setInterval(()=>{
-    st.tt=st.tt<=0?60:st.tt-1;if(ttag)ttag.textContent=fmtT(st.tt);
+    st.tt=st.tt<=0?60:st.tt-1;if(ttag)ttag.textContent=st.iv+' · '+fmtT(st.tt);
     if(st.trade){st.trade.left--;if(st.trade.left<=0)return finishTrade()}
     liveText();
   },1000));
+
+  const resultView=()=>{
+    clearTimers();
+    const r=st.result,w=r.res==='win',l=r.res==='loss';
+    const col=w?'var(--ok)':l?'var(--bad)':'var(--warn)';
+    const word=w?'Плюс':l?'Минус':'Возврат';
+    const amt=(w?'+':l?'−':'')+usd(Math.abs(r.pnl)).replace(',00 $',' $');
+    let marked=null;
+    const mkBtn=(k,t,c)=>{const b=el('button',{type:'button',style:'border:1.5px solid '+c+';background:var(--card);border-radius:14px;padding:15px;font:700 15px var(--fd);cursor:pointer;color:var(--fg)',onclick:()=>{
+      marked=k;toast(k===r.res?'Верно: так вы отмечаете итог в разделе «Сделки»':'В этой сделке был «'+word+'». В «Сделках» отмечайте то, что видите на платформе')}},t);return b};
+    const body=[
+      el('div',{},el('div',{class:'sm',style:'font-size:14px'},w?'Сделка закрыта в плюс':l?'Сделка закрыта в минус':'Цена закрылась на уровне входа'),el('div',{style:'font:800 42px/1.1 var(--fd);color:'+col},amt)),
+      el('div',{class:'card',style:'padding:14px 16px;display:grid;gap:10px'},
+        el('div',{class:'row'},el('div',{},el('b',{},'Вход на 0:45'),el('div',{class:'sm'},st.sum+' $ · 3% депозита · '+word+' · выплата 92%')),el('b',{style:'color:'+col},amt)),
+        el('div',{style:'border-top:1px solid var(--line)'}),
+        el('div',{class:'row'},el('b',{},'Итого'),el('b',{style:'color:'+col},amt))),
+      el('div',{},'Ты прошёл весь путь: сигнал → настройка → вход → результат.'),
+      el('div',{class:'note'},'Учебная сделка на смоделированном графике: исход случайный. В реальной торговле сигнал тоже не гарантирует плюс.'),
+      el('div',{style:'font-weight:700'},'Отметь результат — с реальными сигналами ты будешь делать так же:'),
+      el('div',{class:'tb'},mkBtn('win','Плюс','var(--ok)'),mkBtn('loss','Минус','var(--bad)')),
+      me.access?null:el('button',{class:'btn',type:'button',onclick:()=>go('home')},'Зарегистрироваться'),
+      el('button',{class:'btn o',type:'button',onclick:async()=>{try{await api('/trainer/1/done',{method:'POST'})}catch{}viewTrainer(2)}},'Урок 2 · '+(lessons&&lessons[1]?lessons[1].title:'Сделка ушла в минус'))];
+    const pillTxt='Урок 1 · итог';
+    root.replaceChildren(
+      el('div',{class:'hd fs-hd'},el('div',{class:'brand'},el('button',{class:'xbtn',type:'button','aria-label':'Закрыть урок',onclick:async()=>{try{await api('/trainer/1/done',{method:'POST'})}catch{}tab='trainer';render()}},'✕'),el('b',{},'Тренажёр')),
+        el('div',{class:'hr'},el('button',{class:'pillb',type:'button',onclick:support},svgEl(CHAT_ICON),'Поддержка'),el('span',{class:'steppill'},pillTxt))),
+      el('main',{class:'fs-main'},body));
+  };
 
   const pairsView=()=>{
     fsShell('Шаг 1 · сигнал',[
@@ -601,8 +632,8 @@ function lesson1(){
     const dots=mark('dots',el('button',{class:'dots',type:'button','aria-label':'Настройки графика',onclick:guard('dots',()=>{st.popup=true;termView()})},'•••'),1);
     if(t!=='dots')dim(dots);
     svg=svgEl('<svg viewBox="0 0 360 215" role="img" aria-label="Учебный график"></svg>');
-    ttag=el('div',{class:'ttag',hidden:''});
-    const cv=el('div',{class:'cv'},svg,ttag);
+    ttag=el('div',{class:'ttag',hidden:''});liveEl=el('div',{class:'live',hidden:''});
+    const cv=el('div',{class:'cv'},svg,ttag,liveEl);
     if(t!=='buy'&&t!=='wait'&&!st.result)dim(cv);
     const chip=mark('pair',el('div',{class:'chip',style:'cursor:pointer',role:'button',tabindex:'0',onclick:guard('pair',()=>{st.paired=true;termView()})},st.pair,el('span',{class:'pay'},'+92%')),7);
     if(t!=='pair')dim(chip);
@@ -622,7 +653,7 @@ function lesson1(){
     const ctlw=el('div',{style:'position:relative'},ctl,hintTxt?el('div',{class:'hint',style:'left:0;right:0;max-width:none;bottom:calc(100% + 8px)'},hintTxt):null);
     const pl=dim(el('div',{class:'pl'},el('span',{},'Выплата '+usd(st.sum*1.92)),el('span',{class:'pay'},'+92%'),el('span',{},'Прибыль +'+usd(st.sum*.92))));
     const buy=mark('buy',el('button',{class:'buy',type:'button',onclick:guard('buy',()=>{
-      if(st.tt>=42&&st.tt<=48){st.trade={entry:price,left:5};termView()}
+      if(st.tt>=42&&st.tt<=48){st.trade={entry:price,left:5};st.bal=Math.round((st.bal-st.sum)*100)/100;termView()}
       else toast(st.tt>48?'Рано: подождите, пока таймер дойдёт до 0:45':'Поздно: дождитесь следующего круга таймера')})},'Купить'),8);
     const sell=el('button',{class:'sell',type:'button',onclick:()=>toast('В сигнале указано «Вверх», то есть «Купить»')},'Продать');
     const tb=el('div',{class:'tb'},buy,sell);
@@ -637,7 +668,7 @@ function lesson1(){
     }
     if(t==='dots')termBody.append(el('div',{class:'hint',style:'left:40px;top:92px'},el('b',{},'1 · Настройки графика:'),el('br'),'нажми •••'));
     if(t==='pair')termBody.append(el('div',{class:'hint',style:'left:0;top:54px'},el('b',{},'7 · Пара: '),st.pair+', как в сигнале. Нажми на неё'));
-    if(t==='buy'||t==='wait'){
+    if(t==='buy'){
       nEl=el('b',{style:'font:800 34px var(--fd)'});bigEl=el('span',{style:'font-size:12.5px;max-width:170px'});
       termBody.append(el('div',{class:'cd'},el('div',{class:'cdc'},nEl),bigEl));
     }
