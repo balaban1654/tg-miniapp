@@ -250,7 +250,7 @@ async function viewHome(){
   if(!me.access){
     // Сначала одна кнопка «Зарегистрироваться». Регион спрашиваем после нажатия
     let asking=false;
-    const REG={ru:'Россия и СНГ',ww:'Европа и другие страны'};
+    const REG={ru:'РФ и СНГ',ww:'Европа и мир'};
     const go=async r=>{
       const url=me.registerUrl[r];
       if(!url){toast('Ссылка регистрации для этого региона пока не настроена. Напишите нам через «Поддержка».');return}
@@ -261,17 +261,14 @@ async function viewHome(){
     const drawBtn=()=>{
       if(!me.registerUrl.ru&&!me.registerUrl.ww){btnBox.replaceChildren(el('div',{class:'sm'},'Ссылка регистрации пока не настроена. Напишите нам через кнопку «Поддержка».'));return}
       if(asking){
+        // Кнопка «Зарегистрироваться» превращается в две кнопки выбора региона
         const first=me.regionGuess==='ww'?'ww':'ru',second=first==='ru'?'ww':'ru';
         btnBox.replaceChildren(
-          el('div',{class:'sm',style:'color:var(--fg);font-weight:600'},'Где вы находитесь?'),
           el('button',{class:'btn',type:'button',onclick:()=>go(first)},REG[first]),
-          el('button',{class:'btn o',type:'button',onclick:()=>go(second)},REG[second]),
-          el('button',{class:'back',type:'button',style:'text-align:center',onclick:()=>{asking=false;drawBtn()}},'Назад'));
+          el('button',{class:'btn o',type:'button',onclick:()=>go(second)},REG[second]));
         return;
       }
-      btnBox.replaceChildren(
-        el('button',{class:'btn',type:'button',onclick:()=>{if(me.region&&me.registerUrl[me.region])go(me.region);else{asking=true;drawBtn()}}},'Зарегистрироваться'),
-        me.region?el('div',{class:'sm',style:'text-align:center'},'Регион: '+REG[me.region]+' · ',el('button',{class:'back',type:'button',style:'display:inline;padding:0',onclick:()=>{asking=true;drawBtn()}},'изменить')):null);
+      btnBox.replaceChildren(el('button',{class:'btn',type:'button',onclick:()=>{asking=true;drawBtn()}},'Зарегистрироваться'));
     };
     drawBtn();
     const check=el('button',{class:'btn o',type:'button',onclick:async()=>{await refreshMe();if(me.access){toast('Доступ открыт');render()}else toast('Пока нет депозита. Это может занять несколько минут.')}},'Я пополнил счёт, проверить доступ');
