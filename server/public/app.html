@@ -668,8 +668,13 @@ function lesson1(){
     const word=w?'Плюс':l?'Минус':'Возврат';
     const amt=(w?'+':l?'−':'')+usd(Math.abs(r.pnl)).replace(',00 $',' $');
     let marked=null;
+    const buzz2=()=>{try{if(tg&&tg.HapticFeedback)tg.HapticFeedback.notificationOccurred('success');else if(navigator.vibrate)navigator.vibrate(15)}catch{}};
+    const markBox=el('div',{style:'display:grid;gap:14px'});
     const mkBtn=(k,t,c)=>{const b=el('button',{type:'button',style:'border:1.5px solid '+c+';background:var(--card);border-radius:14px;padding:15px;font:700 15px var(--fd);cursor:pointer;color:var(--fg)',onclick:()=>{
-      marked=k;toast(k===r.res?'Верно: так вы отмечаете итог в разделе «Сделки»':'Здесь был «'+word+'». В «Сделках» отмечайте то, что видите на платформе')}},t);return b};
+      marked=k;
+      if(k===r.res){buzz2();markBox.remove();toast('Верно, вы правильно отметили результат')}
+      else toast('Здесь был «'+word+'». В «Сделках» отмечайте то, что видите на платформе')}},t);return b};
+    markBox.append(el('div',{style:'font-weight:700'},'Отметь результат — с реальными сигналами ты будешь делать так же:'),el('div',{class:'tb'},mkBtn('win','Плюс','var(--ok)'),mkBtn('loss','Минус','var(--bad)')));
     const body=[
       el('div',{},el('div',{class:'sm',style:'font-size:14px'},w?'Сделка закрыта в плюс':l?'Сделка закрыта в минус':'Цена закрылась на уровне входа'),el('div',{style:'font:800 42px/1.1 var(--fd);color:'+col},amt)),
       el('div',{class:'card',style:'padding:14px 16px;display:grid;gap:10px'},
@@ -678,9 +683,7 @@ function lesson1(){
         el('div',{class:'row'},el('b',{},'Итого'),el('b',{style:'color:'+col},amt))),
       el('div',{},'Ты прошёл весь путь: сигнал → настройка → вход → результат.'),
       el('div',{class:'note'},'Это учебная сделка: график смоделирован так, чтобы показать, как выглядит плюс. В реальной торговле итог может быть любым, и минус тоже бывает. Об этом следующий урок.'),
-      el('div',{style:'font-weight:700'},'Отметь результат — с реальными сигналами ты будешь делать так же:'),
-      el('div',{class:'tb'},mkBtn('win','Плюс','var(--ok)'),mkBtn('loss','Минус','var(--bad)')),
-      !needReg()?null:el('button',{class:'btn',type:'button',onclick:()=>go('home')},'Зарегистрироваться'),
+      markBox,
       el('button',{class:'btn o',type:'button',onclick:async()=>{try{await api('/trainer/1/done',{method:'POST'})}catch{}viewTrainer(2)}},'Урок 2 · '+(lessons&&lessons[1]?lessons[1].title:'Сделка ушла в минус'))];
     const pillTxt='Урок 1 · итог';
     root.replaceChildren(
