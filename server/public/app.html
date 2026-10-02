@@ -689,7 +689,7 @@ function fsShell(pill,body){
   root.replaceChildren(
     el('div',{class:'hd fs-hd'},el('div',{class:'brand'},el('button',{class:'xbtn',type:'button','aria-label':'Закрыть урок',onclick:()=>{tab='trainer';render()}},'✕'),el('b',{},'Тренажёр')),
       el('div',{class:'hr'},el('button',{class:'pillb',type:'button',onclick:support},svgEl(CHAT_ICON),'Поддержка'),el('span',{class:'steppill'},pill))),
-    el('main',{class:'fs-main'},body),bottom);
+    el('main',{class:'fs-main'},body),...(bottom?[bottom]:[]));
 }
 const TIMES=[5,10,15,30,60,120,300];
 const hms=n=>'00:'+String(Math.floor(n/60)).padStart(2,'0')+':'+String(n%60).padStart(2,'0');
