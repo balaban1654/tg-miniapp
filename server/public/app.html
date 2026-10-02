@@ -212,7 +212,7 @@ async function viewHome(){
     const check=el('button',{class:'btn o',type:'button',onclick:async()=>{await refreshMe();if(me.access){toast('Доступ открыт');render()}else toast('Пока нет депозита. Это может занять несколько минут.')}},'Я пополнил счёт, проверить доступ');
     shell('Hunter AI',[profileCard(),stats4({deals:0,wins:0,losses:0,rate:null}),
       el('div',{class:'card hero'},CANDLES.cloneNode(true),
-        el('h2',{style:'font-size:17px'},'Анализ откроется после регистрации'),
+        el('h2',{style:'font-size:17px'},'Доступ откроется после регистрации'),
         el('p',{class:'sm',style:'margin:0'},'Создайте аккаунт Pocket Option по нашей ссылке и пополните счёт — доступ откроется автоматически. Рекомендуем пополнять от 100 $, так проще соблюдать риск-менеджмент.'),
         el('div',{class:'sm'},'Где вы находитесь?'),seg,
         me.promo?el('div',{class:'row card',style:'padding:10px 12px'},el('div',{},el('div',{class:'sm'},'Промокод'),el('b',{class:'mono'},me.promo)),el('button',{class:'pillb',type:'button',onclick:async()=>{try{await navigator.clipboard.writeText(me.promo);toast('Промокод скопирован')}catch{toast('Выделите промокод вручную')}}},'Копировать')):null,
