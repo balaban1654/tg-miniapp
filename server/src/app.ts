@@ -173,7 +173,7 @@ const photoCache = new Map<string, { until: number; data: Buffer | null; type: s
 async function scrapeTgPhoto(handle: string): Promise<{ data: Buffer; type: string } | null> {
   const page = await fetch(`https://t.me/${handle}`, { signal: AbortSignal.timeout(5000) });
   if (!page.ok) return null;
-  const m = /<meta property="og:image" content="([^"]+)"/.exec(await page.text());
+  const m = /<meta[^>]+property="og:image"[^>]+content="([^"]+)"/.exec(await page.text());
   if (!m) return null;
   const u = new URL(m[1].replaceAll('&amp;', '&'));
   if (u.protocol !== 'https:' || !/(^|\.)(telegram\.org|telesco\.pe|t\.me)$/.test(u.hostname) || u.pathname.includes('/img/t_logo')) return null;
@@ -364,7 +364,7 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
         const info = handle ? await Promise.race([tgInfo(handle), new Promise<null>((ok) => setTimeout(() => ok(null), 3000))]) : null;
         const contact = x.contact_url ? tgHandle(x.contact_url) : null;
         // Аватарка трейдера: его личный аккаунт, если ссылка указана, иначе канал
-        return { ...x, contact_url: undefined, contact: contact ? { handle: contact, url: x.contact_url } : null, photo: handle || contact ? `/api/app/media/${x.id}/photo` : null, channelTitle: info?.title ?? null, members: info?.members ?? null };
+        return { ...x, contact_url: undefined, contact: contact ? { handle: contact, url: x.contact_url } : null, photo: handle || contact ? `/api/app/media/${x.id}/photo?v=${contact ?? handle}` : null, channelTitle: info?.title ?? null, members: info?.members ?? null };
       }),
     );
     return { traders: rows.filter((x) => x.kind === 'trader'), channels: rows.filter((x) => x.kind === 'channel') };
@@ -399,7 +399,7 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
             if (s) {
               hit.data = s.data;
               hit.type = s.type;
-            }
+            } else req.log.warn({ handle }, 'avatar: на t.me/имя нет фото (возможно скрыто настройками приватности)');
           }
         }
       } catch (e) {
