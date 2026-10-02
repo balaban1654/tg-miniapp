@@ -502,8 +502,10 @@ let lessons=null;
 const PAIRS=['EUR/USD OTC','GBP/USD OTC','AUD/CHF OTC','AUD/USD OTC','USD/JPY OTC','EUR/JPY OTC'];
 const IVS=['S5','S10','S15','S30','M1','M2','M3','M5','M10','M15'];
 const IV_G={S5:2,S10:2,S15:2,S30:2,M1:3,M2:4,M3:5,M5:6,M10:8,M15:10};
+/** Кнопки регистрации нужны только тем, кто ещё не зарегистрировался по нашей ссылке */
+const needReg=()=>!me.access&&(me.status||'new')==='new';
 function fsShell(pill,body){
-  const bottom=me.access?null:el('div',{class:'fs-bottom'},el('button',{class:'btn o',type:'button',onclick:()=>go('home')},'Всё понятно — регистрация'));
+  const bottom=!needReg()?null:el('div',{class:'fs-bottom'},el('button',{class:'btn o',type:'button',onclick:()=>go('home')},'Всё понятно — регистрация'));
   root.replaceChildren(
     el('div',{class:'hd fs-hd'},el('div',{class:'brand'},el('button',{class:'xbtn',type:'button','aria-label':'Закрыть урок',onclick:()=>{tab='trainer';render()}},'✕'),el('b',{},'Тренажёр')),
       el('div',{class:'hr'},el('button',{class:'pillb',type:'button',onclick:support},svgEl(CHAT_ICON),'Поддержка'),el('span',{class:'steppill'},pill))),
@@ -615,7 +617,7 @@ function lesson1(){
       el('div',{class:'note'},'Это учебная сделка: график смоделирован так, чтобы показать, как выглядит плюс. В реальной торговле итог может быть любым, и минус тоже бывает. Об этом следующий урок.'),
       el('div',{style:'font-weight:700'},'Отметь результат — с реальными сигналами ты будешь делать так же:'),
       el('div',{class:'tb'},mkBtn('win','Плюс','var(--ok)'),mkBtn('loss','Минус','var(--bad)')),
-      me.access?null:el('button',{class:'btn',type:'button',onclick:()=>go('home')},'Зарегистрироваться'),
+      !needReg()?null:el('button',{class:'btn',type:'button',onclick:()=>go('home')},'Зарегистрироваться'),
       el('button',{class:'btn o',type:'button',onclick:async()=>{try{await api('/trainer/1/done',{method:'POST'})}catch{}viewTrainer(2)}},'Урок 2 · '+(lessons&&lessons[1]?lessons[1].title:'Сделка ушла в минус'))];
     const pillTxt='Урок 1 · итог';
     root.replaceChildren(
