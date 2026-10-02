@@ -551,19 +551,33 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
   app.get('/media', { preHandler: need('admin') }, async () => {
     return (await db.query('SELECT id, kind, title, subtitle, url, sort, active FROM media_items ORDER BY kind DESC, sort, id')).rows;
   });
-  app.post('/media', { preHandler: need('admin') }, async (req, reply) => {
-    const b = (req.body ?? {}) as Record<string, unknown>;
+  function cleanMedia(b: Record<string, unknown>) {
     const kind = str(b.kind, 10);
     const title = str(b.title, 80);
     const url = str(b.url, 300);
-    if (!['trader', 'channel'].includes(kind)) return reply.code(400).send({ error: 'Неверный тип' });
-    if (!title) return reply.code(400).send({ error: 'Укажите название' });
-    if (!/^https:\/\/[^\s]+$/.test(url)) return reply.code(400).send({ error: 'Ссылка должна начинаться с https://' });
+    if (!['trader', 'channel'].includes(kind)) return 'Неверный тип';
+    if (!title) return 'Укажите название';
+    if (!/^https:\/\/[^\s]+$/.test(url)) return 'Ссылка должна начинаться с https://';
+    return { kind, title, url, subtitle: str(b.subtitle, 80) || null, sort: Math.trunc(num(b.sort)) };
+  }
+  app.post('/media', { preHandler: need('admin') }, async (req, reply) => {
+    const m = cleanMedia((req.body ?? {}) as Record<string, unknown>);
+    if (typeof m === 'string') return reply.code(400).send({ error: m });
     const r = await db.query(
       'INSERT INTO media_items (kind, title, subtitle, url, sort) VALUES ($1,$2,$3,$4,$5) RETURNING id',
-      [kind, title, str(b.subtitle, 80) || null, url, Math.trunc(num(b.sort))],
+      [m.kind, m.title, m.subtitle, m.url, m.sort],
     );
     return { id: r.rows[0].id };
+  });
+  app.put<{ Params: { id: string } }>('/media/:id', { preHandler: need('admin') }, async (req, reply) => {
+    const m = cleanMedia((req.body ?? {}) as Record<string, unknown>);
+    if (typeof m === 'string') return reply.code(400).send({ error: m });
+    const r = await db.query(
+      'UPDATE media_items SET kind=$2, title=$3, subtitle=$4, url=$5, sort=$6 WHERE id=$1',
+      [Number(req.params.id), m.kind, m.title, m.subtitle, m.url, m.sort],
+    );
+    if (!r.rowCount) return reply.code(404).send({ error: 'Запись не найдена' });
+    return { ok: true };
   });
   app.delete<{ Params: { id: string } }>('/media/:id', { preHandler: need('admin') }, async (req) => {
     await db.query('DELETE FROM media_items WHERE id = $1', [Number(req.params.id)]);
