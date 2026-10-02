@@ -526,8 +526,10 @@ const plS=n=>n%10===1&&n%100!==11?'секунду':[2,3,4].includes(n%10)&&![12,
 const usd=n=>n.toLocaleString('ru-RU',{minimumFractionDigits:2,maximumFractionDigits:2}).replace(/ /g,' ')+' $';
 function lesson1(n=1){
   clearTimers();
-  const SC=n===2?'loss':n===3?'draw':'win';   // учебный сценарий сделки: плюс, минус или возврат
-  const st={view:'pairs',pair:PAIRS[0],popup:false,timer:n>1,type:n>1?'candles':'line',iv:n>1?'M5':'M1',tt:60,ti:n>1?0:4,sum:n>1?30:10,paired:false,armed:false,trade:null,won:false,result:null,bal:1000};
+  const SC=n===2?'redo':n===3?'draw':'win';   // урок 2: первая сделка в минус, через 30 секунд повторный вход той же суммой   // учебный сценарий сделки: плюс, минус или возврат
+  const savedPair=(()=>{try{const v=localStorage.getItem('train_pair');return PAIRS.includes(v)?v:null}catch{return null}})();
+  // в уроках 2 и 3 пара остаётся той, что выбрана в первом уроке, и они сразу начинаются с графика
+  const st={view:'pairs',pair:n>1&&savedPair?savedPair:PAIRS[0],popup:false,timer:n>1,type:n>1?'candles':'line',iv:n>1?'M5':'M1',tt:60,ti:n>1?0:4,sum:n>1?30:10,paired:false,round:1,r1:null,armed:false,trade:null,won:false,result:null,bal:1000};
   // плавный случайный ход цены: небольшая инерция, без резких скачков
   let price=1.0795,mom=0,base=0,pts=[];
   let vm=1;
@@ -545,7 +547,9 @@ function lesson1(n=1){
   const pushPt=()=>{pts.push(price);addGid();if(pts.length>600){pts.shift();gids.shift();base++}};
   let svg=null,ttag=null,nEl=null,tipEl=null,bigEl=null,liveEl=null;
   const fmtT=n=>Math.floor(n/60)+':'+String(n%60).padStart(2,'0');
-  const until=()=>Math.max(0,st.tt-45);
+  const entryTt=()=>st.round===2?15:45;
+  const until=()=>Math.max(0,st.tt-entryTt());
+  const curSC=()=>SC==='redo'?(st.round===2?'win':'loss'):SC;
   const target=()=>{
     if(st.view!=='term'||st.result||st.won)return null;
     if(st.trade)return 'wait';
@@ -554,7 +558,7 @@ function lesson1(n=1){
     if(TIMES[st.ti]!==5)return 'time';if(st.sum!==30)return 'sum';if(!st.paired)return 'pair';
     return 'buy';
   };
-  const needMsg={dots:'Нажми ••• рядом с парой',timer:'Включи «Показывать таймер»',candles:'Выбери тип графика «Свечи»',M5:'Выбери интервал M5',time:'Нажми «−», пока время не станет 00:00:05',sum:'Нажми «+», пока сумма не станет 30 $',pair:'Нажми на пару из сигнала',buy:'Нажми «Купить» на 0:45 таймера',wait:'Сделка идёт, дождитесь результата'};
+  const needMsg={dots:'Нажми ••• рядом с парой',timer:'Включи «Показывать таймер»',candles:'Выбери тип графика «Свечи»',M5:'Выбери интервал M5',time:'Нажми «−», пока время не станет 00:00:05',sum:'Нажми «+», пока сумма не станет 30 $',pair:'Нажми на пару из сигнала',buy:'Нажми «Купить» точно на нужной секунде таймера',wait:'Сделка идёт, дождитесь результата'};
   const buzz=()=>{try{if(tg&&tg.HapticFeedback)tg.HapticFeedback.impactOccurred('light');else if(navigator.vibrate)navigator.vibrate(12)}catch{}};
   const guard=(name,fn)=>()=>{const t=target();if(t===name){buzz();fn()}else if(t)toast(needMsg[t])};
 
@@ -631,20 +635,21 @@ function lesson1(n=1){
   function liveText(){
     const t=target(),n=until();
     if(t==='buy'){
-      const inWin=st.tt<=45&&st.tt>=42;
+      const E=entryTt(),ets='0:'+String(E).padStart(2,'0'),inWin=st.tt<=E&&st.tt>=E-3;
       if(nEl)nEl.textContent=inWin?'!':String(n);
-      if(bigEl)bigEl.textContent=inWin?'Сейчас! Жми «Купить»':'секунд до входа. На 0:45 жми «Купить»';
-      if(tipEl)tipEl.textContent=inWin?'Таймер свечи показывает 0:45 — жми «Купить»':'Жди: через '+n+' '+plS(n)+' таймер свечи покажет 0:45 — тогда жми «Купить»';
+      if(bigEl)bigEl.textContent=inWin?'Сейчас! Жми «Купить»':'секунд до входа. На '+ets+' жми «Купить»';
+      if(tipEl)tipEl.textContent=(st.round===2?'Сделка ушла в минус. ':'')+(inWin?'Таймер свечи показывает '+ets+' — жми «Купить»':'Жди: через '+n+' '+plS(n)+' таймер свечи покажет '+ets+' — тогда жми «Купить»');
     }
     if(t==='wait'&&st.trade&&tipEl)tipEl.textContent='Сделка открыта — ждём '+st.trade.left+' '+plS(st.trade.left);
   }
   function finishTrade(){
-    // учебный сценарий: плюс (урок 1), минус (урок 2) или возврат (урок 3)
-    if(SC==='win'){
+    // учебный сценарий: плюс (урок 1), минус и повторный вход (урок 2) или возврат (урок 3)
+    const sc=curSC();
+    if(sc==='win'){
       if(price<=st.trade.entry){price=st.trade.entry+.0003;pts[pts.length-1]=price}
       st.result={res:'win',pnl:st.sum*.92};
       st.bal=Math.round((st.bal+st.sum*1.92)*100)/100;
-    }else if(SC==='loss'){
+    }else if(sc==='loss'){
       if(price>=st.trade.entry){price=st.trade.entry-.0003;pts[pts.length-1]=price}
       st.result={res:'loss',pnl:-st.sum};
     }else{
@@ -653,7 +658,12 @@ function lesson1(n=1){
       st.bal=Math.round((st.bal+st.sum)*100)/100;
     }
     st.won=true;termView();
-    timers.push(setTimeout(()=>resultView(),2800));
+    timers.push(setTimeout(()=>{
+      if(SC==='redo'&&st.round===1){
+        // после минуса ждём 30 секунд и заходим снова на 0:15, сумма та же
+        st.r1=st.result;st.round=2;st.won=false;st.trade=null;st.result=null;st.tt=45;st.armed=true;termView();
+      }else resultView();
+    },2800));
   }
   timers.push(setInterval(()=>{
     prevPrice=pts[pts.length-1];lastTick=performance.now();
@@ -662,8 +672,9 @@ function lesson1(n=1){
     if(st.trade&&!st.won){
       const e=(Date.now()-st.trade.t0)/1000;
       const dip=e<2?-.00028*(1-Math.cos(Math.PI*e/2))/2:null;
-      const f=SC==='win'?(dip!==null?dip:-.00028+.0006*(1-Math.cos(Math.PI*Math.min(1,Math.max(0,(e-2.2)/2.8))))/2)
-        :SC==='loss'?(dip!==null?dip:-.00028-.00032*(1-Math.cos(Math.PI*Math.min(1,(e-2)/3)))/2)
+      const sc=curSC();
+      const f=sc==='win'?(dip!==null?dip:-.00028+.0006*(1-Math.cos(Math.PI*Math.min(1,Math.max(0,(e-2.2)/2.8))))/2)
+        :sc==='loss'?(dip!==null?dip:-.00028-.00032*(1-Math.cos(Math.PI*Math.min(1,(e-2)/3)))/2)
         :-.0003*Math.sin(Math.PI*Math.min(1,e/5));
       price=st.trade.entry+f+(Math.random()-.5)*.000006;
     }
@@ -671,7 +682,7 @@ function lesson1(n=1){
   },TICK));
   timers.push(setInterval(paint,33));
   timers.push(setInterval(()=>{
-    if(target()==='buy'&&!st.trade){if(!st.armed){st.armed=true;st.tt=55}else{st.tt--;if(st.tt<42)st.tt=55}}
+    if(target()==='buy'&&!st.trade){if(!st.armed){st.armed=true;st.tt=entryTt()+10}else{st.tt--;if(st.tt<entryTt()-3)st.tt=entryTt()+10}}
     else st.tt=st.tt<=0?60:st.tt-1;
     if(st.trade&&!st.won){st.trade.left--;if(st.trade.left<=0){paint();return finishTrade()}}
     paint();liveText();
@@ -683,6 +694,8 @@ function lesson1(n=1){
     const col=w?'var(--ok)':l?'var(--bad)':'var(--warn)';
     const word=w?'Плюс':l?'Минус':'Возврат';
     const amt=(w?'+':l?'−':'')+usd(Math.abs(r.pnl)).replace(',00 $',' $');
+    const series=n===2&&st.r1?st.r1.pnl+r.pnl:null;
+    const sAmt=series===null?'':(series>0?'+':series<0?'−':'')+usd(Math.abs(series));
     const buzz2=()=>{try{if(tg&&tg.HapticFeedback)tg.HapticFeedback.notificationOccurred('success');else if(navigator.vibrate)navigator.vibrate(15)}catch{}};
     const markBox=el('div',{style:'display:grid;gap:14px'});
     const mkBtn=(k,t,c)=>el('button',{type:'button',style:'border:1.5px solid '+c+';background:var(--card);border-radius:14px;padding:15px;font:700 15px var(--fd);cursor:pointer;color:var(--fg)',onclick:()=>{
@@ -700,18 +713,20 @@ function lesson1(n=1){
       choice('Захожу ещё раз прямо сейчас, пока не остыл',false,'Входы «на эмоциях» чаще всего заканчиваются новыми минусами.'),
       el('div',{class:'note'},'Заранее решите дневной лимит потерь (например, 3–5% депозита) и остановитесь, когда он достигнут.'));
     const notes={1:'Это учебная сделка: график смоделирован так, чтобы показать, как выглядит плюс. В реальной торговле итог может быть любым, и минус тоже бывает. Об этом следующий урок.',
-      2:'Это учебная сделка: график смоделирован так, чтобы показать, как выглядит минус. Минус в серии сделок — обычная часть торговли, к нему нужно быть готовым.',
+      2:'Это учебная серия: график смоделирован. Выплата меньше 100% (здесь 92%), поэтому один плюс на ту же сумму не покрывает один минус, и итог серии остаётся отрицательным. В реальной торговле вторая сделка тоже может закончиться минусом, поэтому не пытайтесь «отыграться» и не увеличивайте сумму.',
       3:'Это учебная сделка: график смоделирован так, чтобы цена закрылась ровно на уровне входа. Обычно ставка возвращается, но точные условия уточняйте в правилах платформы.'};
     const nextLabel=n===1?'Урок 2 · '+(lessons&&lessons[1]?lessons[1].title:'Сделка ушла в минус'):n===2?'Урок 3 · '+(lessons&&lessons[2]?lessons[2].title:'Возврат'):'К списку уроков';
+    const rowS=(t1,t2,c,v)=>el('div',{class:'row'},el('div',{},el('b',{},t1),el('div',{class:'sm'},t2)),el('b',{style:'color:'+c},v));
     const body=[
-      el('div',{},el('div',{class:'sm',style:'font-size:14px'},w?'Сделка закрыта в плюс':l?'Сделка закрыта в минус':'Цена закрылась на уровне входа'),el('div',{style:'font:800 42px/1.1 var(--fd);color:'+col},r.res==='draw'?'0 $':amt)),
+      el('div',{},el('div',{class:'sm',style:'font-size:14px'},n===2?'Урок 2 · Сделка ушла в минус':(w?'Сделка закрыта в плюс':l?'Сделка закрыта в минус':'Цена закрылась на уровне входа')),el('div',{style:'font:800 42px/1.1 var(--fd);color:'+(n===2?(series<0?'var(--bad)':'var(--ok)'):col)},n===2?sAmt:(r.res==='draw'?'0 $':amt))),
       el('div',{class:'card',style:'padding:14px 16px;display:grid;gap:10px'},
-        el('div',{class:'row'},el('div',{},el('b',{},'Вход на 0:45'),el('div',{class:'sm'},st.sum+' $ · 3% депозита · '+word+(r.res==='draw'?'':' · выплата 92%'))),el('b',{style:'color:'+col},r.res==='draw'?'0 $':amt)),
+        n===2?[rowS('Шаг 1 · вход на 0:45',st.sum+' $ · 3% депозита · Минус','var(--bad)','−'+usd(st.sum)),rowS('Шаг 2 · повторный вход на 0:15',st.sum+' $ · Плюс · выплата 92%','var(--ok)','+'+usd(st.sum*.92))]
+          :el('div',{class:'row'},el('div',{},el('b',{},'Вход на 0:45'),el('div',{class:'sm'},st.sum+' $ · 3% депозита · '+word+(r.res==='draw'?'':' · выплата 92%'))),el('b',{style:'color:'+col},r.res==='draw'?'0 $':amt)),
         el('div',{style:'border-top:1px solid var(--line)'}),
-        el('div',{class:'row'},el('b',{},'Итого'),el('b',{style:'color:'+col},r.res==='draw'?'0 $':amt))),
+        el('div',{class:'row'},el('b',{},'Итого'),el('b',{style:'color:'+(n===2?(series<0?'var(--bad)':'var(--ok)'):col)},n===2?sAmt:(r.res==='draw'?'0 $':amt)))),
       el('div',{},'Ты прошёл весь путь: сигнал → настройка → вход → результат.'),
       el('div',{class:'note'},notes[n]),
-      n===2?decBox:markBox,
+      markBox,
       el('button',{class:'btn o',type:'button',onclick:async()=>{try{await api('/trainer/'+n+'/done',{method:'POST'})}catch{}if(n<3)viewTrainer(n+1);else{tab='trainer';render()}}},nextLabel)];
     root.replaceChildren(
       el('div',{class:'hd fs-hd'},el('div',{class:'brand'},el('button',{class:'xbtn',type:'button','aria-label':'Закрыть урок',onclick:async()=>{try{await api('/trainer/'+n+'/done',{method:'POST'})}catch{}tab='trainer';render()}},'✕'),el('b',{},'Тренажёр')),
@@ -744,18 +759,18 @@ function lesson1(n=1){
     fsShell('Шаг 1 · сигнал',[
       el('div',{class:'fs-tip'},'Выбери валютную пару — получишь учебный сигнал'),
       el('div',{class:'ptabs'},el('button',{type:'button',class:'on'},'Валюты OTC'),el('button',{type:'button',disabled:''},'Крипта · скоро'),el('button',{type:'button',disabled:''},'Акции · скоро')),
-      PAIRS.map(p=>el('button',{class:'prow',type:'button',onclick:()=>{st.pair=p;st.view='prep';prepView()}},el('span',{},p),el('span',{class:'pay'},'+92%'))),
+      PAIRS.map(p=>el('button',{class:'prow',type:'button',onclick:()=>{st.pair=p;try{localStorage.setItem('train_pair',p)}catch{}st.view='prep';prepView()}},el('span',{},p),el('span',{class:'pay'},'+92%'))),
       el('div',{class:'note'},'Перед началом торговли проверяйте процент выплаты на платформе Pocket Option — он может меняться.')]);
   };
   const termView=()=>{
     let t=target();
-    if(t==='buy'&&!st.armed){st.armed=true;st.tt=55}
+    if(t==='buy'&&!st.armed){st.armed=true;st.tt=entryTt()+10}
     nEl=tipEl=bigEl=null;
     const mark=(name,node,n)=>{if(t===name){node.classList.add('tg');node.setAttribute('data-n',n)}return node};
     const dim=n=>{n.classList.add('off');return n};
     const tips={dots:'Сначала настроим график. Нажми на три точки ••• рядом с парой',timer:'2 — включи таймер, 3 — выбери «Свечи», 4 — интервал M5',candles:'2 — включи таймер, 3 — выбери «Свечи», 4 — интервал M5',M5:'2 — включи таймер, 3 — выбери «Свечи», 4 — интервал M5',
       time:'5 — время сделки 5 секунд, 6 — сумма 3% от депозита, 7 — пара из сигнала',sum:'5 — время сделки 5 секунд, 6 — сумма 3% от депозита, 7 — пара из сигнала',pair:n>1?'Проверь пару: она должна совпадать с сигналом':'5 — время сделки 5 секунд, 6 — сумма 3% от депозита, 7 — пара из сигнала'};
-    const pills={dots:'Урок '+n+' · шаг 1',timer:'Урок '+n+' · шаги 2–4',candles:'Урок '+n+' · шаги 2–4',M5:'Урок '+n+' · шаги 2–4',time:'Урок '+n+' · шаги 5–7',sum:'Урок '+n+' · шаги 5–7',pair:'Урок '+n+' · шаги 5–7',buy:'Урок '+n+' · вход',wait:'Урок '+n+' · сделка'};
+    const pills={dots:'Урок '+n+' · шаг 1',timer:'Урок '+n+' · шаги 2–4',candles:'Урок '+n+' · шаги 2–4',M5:'Урок '+n+' · шаги 2–4',time:'Урок '+n+' · шаги 5–7',sum:'Урок '+n+' · шаги 5–7',pair:'Урок '+n+' · шаги 5–7',buy:'Урок '+n+(st.round===2?' · повторный вход':' · вход'),wait:'Урок '+n+' · сделка'};
     const pill=st.won?'Урок '+n+' · сделка':pills[t];
     const dots=mark('dots',el('button',{class:'dots',type:'button','aria-label':'Настройки графика',onclick:guard('dots',()=>{st.popup=true;termView()})},'•••'),1);
     if(t!=='dots')dim(dots);
@@ -781,8 +796,8 @@ function lesson1(n=1){
     const ctlw=el('div',{style:'position:relative'},ctl,hintTxt?el('div',{class:'hint',style:'left:0;right:0;max-width:none;bottom:calc(100% + 8px)'},hintTxt):null);
     const pl=dim(el('div',{class:'pl'},el('span',{},'Выплата '+usd(st.sum*1.92)),el('span',{class:'pay'},'+92%'),el('span',{},'Прибыль +'+usd(st.sum*.92))));
     const buy=mark('buy',el('button',{class:'buy',type:'button',onclick:guard('buy',()=>{
-      if(st.tt<=45&&st.tt>=42){st.trade={entry:price,t0:Date.now(),left:5,abs:base+pts.length-1};forceBreak=true;st.bal=Math.round((st.bal-st.sum)*100)/100;termView()}
-      else toast(st.tt>45?'Рано: ждите, пока таймер дойдёт до 0:45':'Поздно: дождитесь следующего круга таймера')})},'Купить'),8);
+      if(st.tt<=entryTt()&&st.tt>=entryTt()-3){st.trade={entry:price,t0:Date.now(),left:5,abs:base+pts.length-1};forceBreak=true;st.bal=Math.round((st.bal-st.sum)*100)/100;termView()}
+      else toast(st.tt>entryTt()?'Рано: ждите, пока таймер дойдёт до 0:'+String(entryTt()).padStart(2,'0'):'Поздно: дождитесь следующего круга таймера')})},'Купить'),8);
     const sell=el('button',{class:'sell',type:'button',onclick:()=>toast('В сигнале указано «Вверх», то есть «Купить»')},'Продать');
     const tb=el('div',{class:'tb'},buy,sell);
     if(t!=='buy')dim(tb);
@@ -808,9 +823,8 @@ function lesson1(n=1){
     fsShell(pill,body);
     paint();liveText();
   };
-  pairsView();
+  if(n>1){st.view='term';st.paired=true;termView()}else pairsView();
 }
-
 async function viewTrainer(sel){
   if(!me)await refreshMe();
   lessons=await api('/trainer');
