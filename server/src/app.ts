@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { db, attachLead } from './db.js';
+import { bot } from './bot.js';
 import { config } from './config.js';
 
 export interface TgUser {
@@ -88,6 +89,13 @@ export const LESSONS = [
     ],
   },
 ];
+
+const photoCache = new Map<number, { until: number; data: Buffer | null; type: string }>();
+/** @имя из ссылки https://t.me/имя. Приватные приглашения (+...) и ссылки на посты не подходят */
+function tgHandle(url: string): string | null {
+  const m = /^https:\/\/t\.me\/([A-Za-z][A-Za-z0-9_]{3,31})\/?(?:\?.*)?$/.exec(url);
+  return m ? m[1] : null;
+}
 
 export async function appRoutes(app: FastifyInstance): Promise<void> {
   const auth = async (req: FastifyRequest, reply: FastifyReply) => {
@@ -240,6 +248,38 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
 
   app.get('/media', { preHandler: auth }, async () => {
     const r = await db.query(`SELECT id, kind, title, subtitle, url FROM media_items WHERE active ORDER BY sort, id`);
-    return { traders: r.rows.filter((x) => x.kind === 'trader'), channels: r.rows.filter((x) => x.kind === 'channel') };
+    const rows = r.rows.map((x) => ({ ...x, photo: tgHandle(x.url) ? `/api/app/media/${x.id}/photo` : null }));
+    return { traders: rows.filter((x) => x.kind === 'trader'), channels: rows.filter((x) => x.kind === 'channel') };
+  });
+
+  // Аватарки каналов и трейдеров берём из Telegram. Картинка публичная, отдаём без авторизации, чтобы работал <img>
+  app.get<{ Params: { id: string } }>('/media/:id/photo', async (req, reply) => {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) return reply.code(404).send();
+    let hit = photoCache.get(id);
+    if (!hit || hit.until < Date.now()) {
+      hit = { until: Date.now() + 3600_000, data: null, type: 'image/jpeg' };
+      try {
+        const m = await db.query('SELECT url FROM media_items WHERE id = $1 AND active', [id]);
+        const handle = m.rowCount ? tgHandle(m.rows[0].url) : null;
+        if (handle && !config.disableBot) {
+          const chat = await bot.api.getChat('@' + handle);
+          const fid = chat.photo?.small_file_id;
+          if (fid) {
+            const f = await bot.api.getFile(fid);
+            const resp = await fetch(`https://api.telegram.org/file/bot${config.botToken}/${f.file_path}`);
+            if (resp.ok) {
+              hit.data = Buffer.from(await resp.arrayBuffer());
+              if (f.file_path?.endsWith('.png')) hit.type = 'image/png';
+            }
+          }
+        }
+      } catch {
+        hit.until = Date.now() + 300_000;
+      }
+      photoCache.set(id, hit);
+    }
+    if (!hit.data) return reply.code(404).send();
+    return reply.header('Cache-Control', 'public, max-age=3600').header('X-Content-Type-Options', 'nosniff').type(hit.type).send(hit.data);
   });
 }
