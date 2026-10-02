@@ -209,9 +209,29 @@ CREATE TABLE IF NOT EXISTS signal_pairs (
   direction_at TIMESTAMPTZ,
   direction_by INT REFERENCES staff(id)
 );
-INSERT INTO signal_pairs (pair, sort) VALUES
-  ('EUR/USD OTC',1),('GBP/USD OTC',2),('AUD/CHF OTC',3),('AUD/USD OTC',4),('USD/JPY OTC',5),('EUR/JPY OTC',6)
-  ON CONFLICT DO NOTHING;
+CREATE TABLE IF NOT EXISTS app_flags (key TEXT PRIMARY KEY, set_at TIMESTAMPTZ DEFAULT now());
+-- Стартовый набор пар и экспираций кладём один раз, чтобы удалённые в Office не возвращались при каждом старте
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM app_flags WHERE key = 'signal_pairs_seeded') THEN
+    INSERT INTO signal_pairs (pair, sort) VALUES
+      ('EUR/USD OTC',1),('GBP/USD OTC',2),('AUD/CHF OTC',3),('AUD/USD OTC',4),('USD/JPY OTC',5),('EUR/JPY OTC',6)
+      ON CONFLICT DO NOTHING;
+    INSERT INTO app_flags (key) VALUES ('signal_pairs_seeded');
+  END IF;
+END $$;
+-- Экспирации на выбор клиенту: от 3 секунд до 4 часов, список ведётся в Office
+CREATE TABLE IF NOT EXISTS signal_expiries (sec INT PRIMARY KEY CHECK (sec BETWEEN 3 AND 14400));
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM app_flags WHERE key = 'signal_expiries_seeded') THEN
+    INSERT INTO signal_expiries (sec) VALUES (5),(15),(30),(60),(180),(300),(900),(1800),(3600),(14400) ON CONFLICT DO NOTHING;
+    INSERT INTO app_flags (key) VALUES ('signal_expiries_seeded');
+  END IF;
+END $$;
+ALTER TABLE signals ADD COLUMN IF NOT EXISTS expiry_sec INT;
+-- На каком шаге зашёл плюс: 0 = со входа, 1..3 = с перекрытия
+ALTER TABLE deals ADD COLUMN IF NOT EXISTS step INT;
 CREATE TABLE IF NOT EXISTS signal_settings (
   id                INT PRIMARY KEY DEFAULT 1 CHECK (id = 1),
   enabled           BOOLEAN NOT NULL DEFAULT FALSE,

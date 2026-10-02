@@ -445,18 +445,24 @@ async function viewPush(){
 async function signalConfigBlock(){
   const cfg=await api('/signal-config');
   const S=cfg.settings,isAdmin=me.role==='admin';
-  const f={on:el('input',{type:'checkbox',style:'width:auto'}),exp:el('select',{},[1,2,3,5,10,15].map(n=>el('option',{value:n},n+' мин'))),enter:el('input',{type:'number',min:'30',max:'600'}),ttl:el('input',{type:'number',min:'1',max:'240'}),cd:el('input',{type:'number',min:'0',max:'3600'}),
-    es:el('input',{type:'number',min:'0',max:'59'}),gap:el('input',{type:'number',min:'10',max:'300'}),mx:el('input',{type:'number',min:'1',max:'6'}),ts:el('input',{type:'number',min:'1',max:'60'}),mult:el('input',{type:'number',min:'1',max:'5'}),
-    el_:el('input',{maxlength:'40'}),tl:el('input',{maxlength:'40'}),sl:el('input',{maxlength:'60'}),warn:el('textarea',{class:'big',maxlength:'300',rows:'2'}),pocket:el('input',{placeholder:'https://pocketoption.com/...'})};
-  f.on.checked=S.enabled;f.exp.value=S.expiry_min;f.enter.value=S.enter_in_sec;f.ttl.value=S.direction_ttl_min;f.cd.value=S.cooldown_sec;f.es.value=S.entry_second;f.gap.value=S.overlap_gap_sec;f.mx.value=S.max_events;f.ts.value=S.trade_sec;f.mult.value=S.overlap_mult;f.el_.value=S.entry_label;f.tl.value=S.trade_label;f.sl.value=S.stake_label;f.warn.value=S.warning_text;f.pocket.value=S.pocket_url;
+  const f={on:el('input',{type:'checkbox',style:'width:auto'}),enter:el('input',{type:'number',min:'30',max:'600'}),ttl:el('input',{type:'number',min:'1',max:'240'}),cd:el('input',{type:'number',min:'0',max:'3600'}),
+    es:el('input',{type:'number',min:'0',max:'59'}),gap:el('input',{type:'number',min:'10',max:'300'}),mx:el('input',{type:'number',min:'1',max:'6'}),mult:el('input',{type:'number',min:'1',max:'5'}),
+    el_:el('input',{maxlength:'40'}),sl:el('input',{maxlength:'60'}),warn:el('textarea',{class:'big',maxlength:'300',rows:'2'}),pocket:el('input',{placeholder:'https://pocketoption.com/...'})};
+  f.on.checked=S.enabled;f.enter.value=S.enter_in_sec;f.ttl.value=S.direction_ttl_min;f.cd.value=S.cooldown_sec;f.es.value=S.entry_second;f.gap.value=S.overlap_gap_sec;f.mx.value=S.max_events;f.mult.value=S.overlap_mult;f.el_.value=S.entry_label;f.sl.value=S.stake_label;f.warn.value=S.warning_text;f.pocket.value=S.pocket_url;
   if(!isAdmin)Object.values(f).forEach(i=>i.disabled=true);
   const err=el('div',{class:'err',role:'alert'});
   const flash=m=>{err.className='ok-msg';err.textContent=m};
   const fail=x=>{err.className='err';err.textContent=x.message};
-  const save=async()=>{try{await api('/signal-config',{method:'PUT',body:{enabled:f.on.checked,expiry_min:Number(f.exp.value),enter_in_sec:Number(f.enter.value),direction_ttl_min:Number(f.ttl.value),cooldown_sec:Number(f.cd.value),entry_second:Number(f.es.value),overlap_gap_sec:Number(f.gap.value),max_events:Number(f.mx.value),trade_sec:Number(f.ts.value),overlap_mult:Number(f.mult.value),entry_label:f.el_.value,trade_label:f.tl.value,stake_label:f.sl.value,warning_text:f.warn.value,pocket_url:f.pocket.value}});flash('Настройки сохранены')}catch(x){fail(x)}};
+  const save=async()=>{try{await api('/signal-config',{method:'PUT',body:{enabled:f.on.checked,enter_in_sec:Number(f.enter.value),direction_ttl_min:Number(f.ttl.value),cooldown_sec:Number(f.cd.value),entry_second:Number(f.es.value),overlap_gap_sec:Number(f.gap.value),max_events:Number(f.mx.value),overlap_mult:Number(f.mult.value),entry_label:f.el_.value,stake_label:f.sl.value,warning_text:f.warn.value,pocket_url:f.pocket.value}});flash('Настройки сохранены')}catch(x){fail(x)}};
   const setDir=async(pair,direction)=>{try{await api('/signal-pairs/direction',{method:'POST',body:{pair,direction}});render()}catch(x){fail(x)}};
   const left=p=>{const m=Math.max(0,Math.round((Date.parse(p.direction_at)+S.direction_ttl_min*60000-Date.now())/60000));return p.fresh?'ещё '+m+' мин':'устарело'};
   const dirBtn=(p,d,t)=>el('button',{class:'btn s '+(p.direction===d&&p.fresh?'':'o'),type:'button',style:'margin-right:6px',onclick:()=>setDir(p.pair,d)},t);
+  const fmtSec=n=>n>=3600&&n%3600===0?n/3600+' ч':n>=60&&n%60===0?n/60+' мин':n+' сек';
+  const expBlock=el('div',{style:'display:flex;flex-wrap:wrap;gap:8px;align-items:center'},
+    cfg.expiries.map(sec=>el('span',{class:'pill p-pur',style:'display:inline-flex;gap:8px;align-items:center'},fmtSec(sec),isAdmin?el('button',{type:'button','aria-label':'Убрать',style:'background:none;border:0;color:inherit;cursor:pointer;padding:0',onclick:async()=>{try{await api('/signal-expiries?sec='+sec,{method:'DELETE'});render()}catch(x){fail(x)}}},'✕'):null)),
+    isAdmin?(()=>{const v=el('input',{type:'number',min:'1',placeholder:'10',style:'width:80px'}),u=el('select',{style:'width:90px'},el('option',{value:'1'},'сек'),el('option',{value:'60'},'мин'),el('option',{value:'3600'},'ч'));
+      return el('span',{style:'display:inline-flex;gap:6px'},v,u,el('button',{class:'btn o s',type:'button',onclick:async()=>{try{await api('/signal-expiries',{method:'POST',body:{sec:Number(v.value)*Number(u.value)}});render()}catch(x){fail(x)}}},'Добавить'))})():null);
+  const bulk=el('textarea',{class:'big',rows:'4',placeholder:'EUR/USD OTC 92\nGBP/USD OTC 90'});
   const newPair=el('input',{placeholder:'EUR/USD OTC',style:'max-width:200px'});
   const pairRows=cfg.pairs.map(p=>{
     const en=el('input',{type:'checkbox',style:'width:auto',disabled:!isAdmin});en.checked=p.enabled;
@@ -471,17 +477,22 @@ async function signalConfigBlock(){
   return el('div',{style:'display:grid;gap:12px'},
     el('h3',{style:'font-size:15px'},'Сигналы по запросу клиента'),
     el('div',{class:'card',style:'display:grid;gap:12px'},
-      el('p',{class:'mut sm',style:'margin:0'},'Клиент с открытым доступом нажимает «Получить сигнал», выбирает пару, видит анализ и карточку с обратным отсчётом до входа. Направление по паре ставит аналитик ниже: клиент получит именно его, пока оно не устарело. Если направления нет, пара для клиента недоступна.'),
+      el('p',{class:'mut sm',style:'margin:0'},'Клиент с открытым доступом нажимает «Получить анализ», выбирает пару и экспирацию из списков ниже, видит анализ и карточку сигнала с отсчётом до входа, а потом оценивает результат (плюс со входа или с перекрытия №, либо минус): это идёт в статистику. Направление по паре ставит аналитик ниже: клиент получит именно его, пока оно не устарело. Если направления нет, пара для клиента недоступна.'),
       el('label',{style:'display:flex;gap:8px;align-items:center'},f.on,'Включить выдачу сигналов по запросу'),
-      el('div',{class:'form'},el('label',{},'Экспирация',f.exp),el('label',{},'До входа, сек (120 = 2 мин)',f.enter),el('label',{},'Направление действует, мин',f.ttl),el('label',{},'Пауза между запросами клиента, сек',f.cd)),
+      el('div',{class:'form'},el('label',{},'Вход не раньше чем через, сек (120 = 2 мин)',f.enter),el('label',{},'Направление действует, мин',f.ttl),el('label',{},'Пауза между запросами клиента, сек',f.cd)),
       el('h3',{style:'font-size:13px;margin:4px 0 0'},'Расписание (по обычным часам)'),
       el('p',{class:'mut sm',style:'margin:0'},'Вход, например, в 23:42:15 (это 45 секунда таймера свечи), перекрытие через каждые N секунд: 23:42:45, 23:43:15, 23:43:45. Клиент после каждого события отмечает плюс или минус и получает подсказку, идти ли в перекрытие.'),
-      el('div',{class:'form'},el('label',{},'Секунда входа в минуте (15 = таймер 0:45)',f.es),el('label',{},'Интервал перекрытий, сек',f.gap),el('label',{},'Событий всего (вход + перекрытия)',f.mx),el('label',{},'Длительность сделки, сек',f.ts),el('label',{},'Сумма перекрытия, ×',f.mult)),
+      el('div',{class:'form'},el('label',{},'Секунда входа в минуте (15 = таймер 0:45)',f.es),el('label',{},'Интервал перекрытий, сек',f.gap),el('label',{},'Событий всего (вход + перекрытия)',f.mx),el('label',{},'Сумма перекрытия, ×',f.mult)),
       el('h3',{style:'font-size:13px;margin:4px 0 0'},'Карточка сигнала (что видит клиент)'),
-      el('div',{class:'form'},el('label',{},'Точка входа',f.el_),el('label',{},'Время сделки',f.tl),el('label',{},'Ставка',f.sl),el('label',{},'Ссылка «Открыть Pocket Option» (пусто = ссылка регистрации)',f.pocket)),
+      el('div',{class:'form'},el('label',{},'Точка входа',f.el_),el('label',{},'Ставка',f.sl),el('label',{},'Ссылка «Открыть Pocket Option» (пусто = ссылка регистрации)',f.pocket)),
       el('label',{},'Жёлтое предупреждение внизу карточки',f.warn),
       isAdmin?el('div',{},el('button',{class:'btn',type:'button',onclick:save},'Сохранить настройки')):null,err),
+    el('h3',{style:'font-size:13px;margin:4px 0 0'},'Экспирации на выбор клиенту (от 3 секунд до 4 часов)'),
+    expBlock,
     table(['Пара','Доступна','Выплата','Направление сейчас','Состояние',''],pairRows,'Пар пока нет'),
+    isAdmin?el('div',{class:'card',style:'display:grid;gap:8px'},el('b',{style:'font-size:13px'},'Загрузить список пар'),
+      el('div',{class:'mut sm'},'По одной паре в строке, после неё можно указать выплату. Уже существующие пары обновят выплату.'),bulk,
+      el('div',{},el('button',{class:'btn o s',type:'button',onclick:async()=>{try{const r=await api('/signal-pairs/bulk',{method:'POST',body:{text:bulk.value}});bulk.value='';flash('Загружено пар: '+r.count);setTimeout(render,700)}catch(x){fail(x)}}},'Загрузить'))):null,
     isAdmin?el('div',{style:'display:flex;gap:8px;align-items:center'},newPair,el('button',{class:'btn o s',type:'button',onclick:async()=>{try{await api('/signal-pairs',{method:'POST',body:{pair:newPair.value}});render()}catch(x){fail(x)}}},'Добавить пару')):null);
 }
 async function viewSignals(){
@@ -507,7 +518,7 @@ async function viewSignals(){
       me.role==='admin'?el('button',{class:'btn o',type:'button',onclick:async()=>{err.className='err';err.textContent='';try{const r=await api('/signals/demo-history',{method:'DELETE'});err.className='ok-msg';err.textContent='Удалено тестовых записей: '+r.removed;setTimeout(render,900)}catch(x){err.textContent=x.message}}},'Убрать тестовую историю'):null,
     err,el('p',{class:'mut sm',style:'margin:0'},'Общий сигнал публикует человек. Сигналы по запросу клиента выдаются из настроек выше (направление ставит аналитик). Случайный режим есть только для проверки бота: такой сигнал помечен «ТЕСТ» и виден только тестовым аккаунтам (отметьте их в разделе «Лиды»).'));
   const t=r=>new Date(r).toLocaleString('ru-RU',{timeZone:'Europe/Kyiv',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
-  const list=table(['Опубликован','Пара','Направление','Экспирация','Вход','Источник','Вошли','Плюс','Минус',''],rows.map(r=>[td(t(r.created_at)),td(r.pair),el('td',{},el('span',{class:'pill '+(r.direction==='up'?'p-ok':'p-bad')},r.direction==='up'?'Вверх':'Вниз')),td(r.expiry_min+' мин'),td(new Date(r.entry_at).toLocaleTimeString('ru-RU',{timeZone:'Europe/Kyiv',hour:'2-digit',minute:'2-digit'})),el('td',{},el('span',{class:'pill '+(r.is_test?'p-warn':'p-pur')},r.is_test?'ТЕСТ':(r.author||'Аналитик'))),td(r.taken,'n'),td(r.wins,'n'),td(r.losses,'n'),me.role==='admin'?el('td',{},el('button',{class:'btn o s',type:'button',title:r.is_test?'Вернуть обычным сигналом':'Пометить тестовым: его увидят только тестовые аккаунты',onclick:async()=>{await api('/signals/'+r.id+'/test',{method:'PATCH',body:{is_test:!r.is_test}});render()}},r.is_test?'Сделать обычным':'Сделать тестовым')):td('')]),'Сигналов пока не было.');
+  const list=table(['Опубликован','Пара','Направление','Экспирация','Вход','Источник','Вошли','Плюс','Минус',''],rows.map(r=>[td(t(r.created_at)),td(r.pair),el('td',{},el('span',{class:'pill '+(r.direction==='up'?'p-ok':'p-bad')},r.direction==='up'?'Вверх':'Вниз')),td(r.expiry_sec?(r.expiry_sec>=3600&&r.expiry_sec%3600===0?r.expiry_sec/3600+' ч':r.expiry_sec>=60&&r.expiry_sec%60===0?r.expiry_sec/60+' мин':r.expiry_sec+' сек'):r.expiry_min+' мин'),td(new Date(r.entry_at).toLocaleTimeString('ru-RU',{timeZone:'Europe/Kyiv',hour:'2-digit',minute:'2-digit'})),el('td',{},el('span',{class:'pill '+(r.is_test?'p-warn':'p-pur')},r.is_test?'ТЕСТ':(r.requested?'По запросу':(r.author||'Аналитик')))),td(r.taken,'n'),td(r.wins+(Object.keys(r.win_steps||{}).length?' ('+Object.entries(r.win_steps).map(([k,v])=>(k==1?'вход':'пер.'+(k-1))+' '+v).join(', ')+')':''),'n'),td(r.losses,'n'),me.role==='admin'?el('td',{},el('button',{class:'btn o s',type:'button',title:r.is_test?'Вернуть обычным сигналом':'Пометить тестовым: его увидят только тестовые аккаунты',onclick:async()=>{await api('/signals/'+r.id+'/test',{method:'PATCH',body:{is_test:!r.is_test}});render()}},r.is_test?'Сделать обычным':'Сделать тестовым')):td('')]),'Сигналов пока не было.');
   return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Сигналы')),cfgBlock,form,el('h3',{style:'font-size:15px'},'Опубликованные'),list];
 }
 
