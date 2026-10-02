@@ -164,7 +164,8 @@ async function viewLeads(){
 
 function goUrl(slug){return 'https://'+location.host.replace(/^crm\./,'go.')+'/s/'+slug}
 async function viewLinks(){
-  const [rows,staff]=await Promise.all([api('/links'),(me.role==='admin'||me.role==='teamlead')?api('/staff'):Promise.resolve([])]);
+  const [rows,staff,sources]=await Promise.all([api('/links'),(me.role==='admin'||me.role==='teamlead')?api('/staff'):Promise.resolve([]),api('/sources')]);
+  const adm=me.role==='admin';
   const slug=el('input',{id:'nSlug',placeholder:'ivan-instagram',required:'',pattern:'[a-z0-9][a-z0-9_\\-]{1,39}',title:'a-z, 0-9, - и _'});
   const src=el('input',{id:'nSrc',placeholder:'Instagram'});
   const owner=el('select',{id:'nOwner'},el('option',{value:''},'Я сам'),...staff.filter(s=>s.id!==me.id&&['streamer','buyer'].includes(s.role)).map(s=>el('option',{value:s.id},s.name+' · '+ROLE[s.role])));
@@ -175,8 +176,11 @@ async function viewLinks(){
     (me.role==='admin'||me.role==='teamlead')?el('label',{},'Владелец',owner):el('span'),
     el('button',{class:'btn',type:'submit'},'Создать'),err);
   const copyBtn=u=>{const b=el('button',{class:'btn o s',type:'button',onclick:async()=>{try{await navigator.clipboard.writeText(u);b.textContent='Скопировано'}catch{b.textContent='Выделите вручную'}setTimeout(()=>b.textContent='Копировать',1500)}},'Копировать');return b};
+  const srcTable=table(['Источник','Ссылок','Клики','Старты','Регистрации','FTD','Депозиты',...(adm?['Комиссия']:[])],sources.map(x=>[td(x.source),td(x.links,'n'),td(x.clicks,'n'),td(x.starts,'n'),td(x.regs,'n'),td(x.ftds,'n'),td(money(x.deposits),'n'),...(adm?[td(money(x.commission),'n')]:[])]),'Данные по источникам появятся, когда придут первые лиды.');
   return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Ссылки')),form,
-    table(['Ссылка','Источник','Владелец','Клики','Старты',''],rows.map(r=>{const u=goUrl(r.slug);return[el('td',{},el('code',{},u)),td(r.source||'—'),td(r.owner_name),td(r.clicks,'n'),td(r.starts,'n'),el('td',{},copyBtn(u))]}),
+    el('h3',{style:'font-size:15px'},'По источникам'),srcTable,
+    el('h3',{style:'font-size:15px'},'По ссылкам'),
+    table(['Ссылка','Источник','Владелец','Клики','Старты','Рег','FTD','Депозиты',...(adm?['Комиссия']:[]),''],rows.map(r=>{const u=goUrl(r.slug);return[el('td',{},el('code',{},u)),td(r.source||'—'),td(r.owner_name),td(r.clicks,'n'),td(r.starts,'n'),td(r.regs,'n'),td(r.ftds,'n'),td(money(r.deposits),'n'),...(adm?[td(money(r.commission),'n')]:[]),el('td',{},copyBtn(u))]}),
       'Ссылок пока нет. Создайте первую выше.')];
 }
 
