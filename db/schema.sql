@@ -72,3 +72,10 @@ CREATE INDEX IF NOT EXISTS leads_trader ON leads(trader_id);
 -- Добавляем тип события comm: комиссия, которую платит Pocket Option
 ALTER TABLE events DROP CONSTRAINT IF EXISTS events_type_check;
 ALTER TABLE events ADD CONSTRAINT events_type_check CHECK (type IN ('start','reg','ftd','dep','wd','comm'));
+
+-- Своя кампания в Pocket Option у каждого стримера: код (ac), промокод и ссылки регистрации
+ALTER TABLE staff ADD COLUMN IF NOT EXISTS po_campaign TEXT;
+ALTER TABLE staff ADD COLUMN IF NOT EXISTS po_promo    TEXT;
+ALTER TABLE staff ADD COLUMN IF NOT EXISTS po_link     TEXT;
+ALTER TABLE staff ADD COLUMN IF NOT EXISTS po_link_ru  TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS staff_po_campaign ON staff (lower(po_campaign)) WHERE po_campaign IS NOT NULL;

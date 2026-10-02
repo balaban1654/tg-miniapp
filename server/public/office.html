@@ -199,8 +199,19 @@ async function viewStaff(){
     el('button',{class:'btn',type:'submit'},'Добавить'),err);
   const parentName=id=>(rows.find(s=>s.id===id)||{}).name||'—';
   const toggle=r=>isAdmin&&r.id!==me.id?el('button',{class:'btn o s',type:'button',onclick:async()=>{await api('/staff/'+r.id,{method:'PATCH',body:{active:!r.active}});render()}},r.active?'Отключить':'Включить'):'';
-  return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},isAdmin?'Люди':'Моя команда')),form,
-    table(['Имя','Логин','Роль','Тимлидер','За FTD','Процент','Статус',''],rows.map(r=>[td(r.name),td(r.login),el('td',{},el('span',{class:'pill p-pur'},ROLE[r.role])),td(parentName(r.parent_id)),td(money(r.rate_ftd),'n'),td(Number(r.rate_percent)+'%','n'),el('td',{},el('span',{class:'pill '+(r.active?'p-ok':'p-bad')},r.active?'активен':'отключён')),el('td',{},toggle(r))]),'Пока никого нет.')];
+  const pickP=el('select',{},...rows.filter(s=>['streamer','teamlead','buyer'].includes(s.role)).map(s=>el('option',{value:s.id},s.name+' · '+ROLE[s.role])));
+  const po={c:el('input',{placeholder:'daria'}),p:el('input',{placeholder:'LIO669'}),l:el('input',{placeholder:'https://…/register?…&ac=daria&cid=…'}),r:el('input',{placeholder:'https://… (необязательно)'})};
+  const fill=()=>{const r=rows.find(x=>String(x.id)===pickP.value)||{};po.c.value=r.po_campaign||'';po.p.value=r.po_promo||'';po.l.value=r.po_link||'';po.r.value=r.po_link_ru||''};
+  pickP.addEventListener('change',fill);fill();
+  const perr=el('div',{class:'err',role:'alert'});
+  const poForm=isAdmin?el('form',{class:'card form',onsubmit:async e=>{e.preventDefault();perr.textContent='';
+    try{await api('/staff/'+pickP.value,{method:'PATCH',body:{po_campaign:po.c.value,po_promo:po.p.value,po_link:po.l.value,po_link_ru:po.r.value}});perr.textContent='Сохранено';perr.className='err ok';setTimeout(render,600)}catch(x){perr.className='err';perr.textContent=x.message}}},
+    el('h3',{style:'grid-column:1/-1;font-size:14px'},'Кампания в Pocket Option'),
+    el('label',{},'Человек',pickP),el('label',{},'Код кампании (ac)',po.c),el('label',{},'Промокод',po.p),
+    el('label',{style:'grid-column:1/-1'},'Ссылка регистрации (WW)',po.l),el('label',{style:'grid-column:1/-1'},'Ссылка регистрации (RU)',po.r),
+    el('button',{class:'btn',type:'submit'},'Сохранить'),perr):el('span');
+  return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},isAdmin?'Люди':'Моя команда')),form,poForm,
+    table(['Имя','Логин','Роль','Тимлидер','Кампания PO','Промокод','За FTD','Процент','Статус',''],rows.map(r=>[td(r.name),td(r.login),el('td',{},el('span',{class:'pill p-pur'},ROLE[r.role])),td(parentName(r.parent_id)),td(r.po_campaign||'—'),td(r.po_promo||'—'),td(money(r.rate_ftd),'n'),td(Number(r.rate_percent)+'%','n'),el('td',{},el('span',{class:'pill '+(r.active?'p-ok':'p-bad')},r.active?'активен':'отключён')),el('td',{},toggle(r))]),'Пока никого нет.')];
 }
 
 async function viewPostbacks(){

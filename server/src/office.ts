@@ -112,7 +112,8 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     const scope =
       me.role === 'admin' ? 'TRUE' : me.role === 'teamlead' ? `(id = ${me.id} OR parent_id = ${me.id})` : `id = ${me.id}`;
     const r = await db.query(
-      `SELECT id, login, name, role, parent_id, rate_ftd, rate_percent, active, created_at
+      `SELECT id, login, name, role, parent_id, rate_ftd, rate_percent, active, created_at,
+              po_campaign, po_promo, po_link, po_link_ru
          FROM staff WHERE ${scope} ORDER BY id`,
     );
     return r.rows;
@@ -167,13 +168,40 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     if (b.rate_ftd !== undefined) add('rate_ftd', num(b.rate_ftd));
     if (b.rate_percent !== undefined) add('rate_percent', num(b.rate_percent));
     if (b.parent_id !== undefined) add('parent_id', b.parent_id ? Number(b.parent_id) : null);
+    const link = (v: unknown): string | null | undefined => {
+      if (v === undefined) return undefined;
+      const t = str(v, 600);
+      if (!t) return null;
+      return /^https:\/\/[^\s]+$/.test(t) ? t : undefined;
+    };
+    if (b.po_campaign !== undefined) {
+      const c = str(b.po_campaign, 40);
+      if (c && !/^[a-zA-Z0-9_-]{1,40}$/.test(c)) return reply.code(400).send({ error: 'Код кампании: латиница, цифры, - и _' });
+      add('po_campaign', c || null);
+    }
+    if (b.po_promo !== undefined) {
+      const c = str(b.po_promo, 30);
+      if (c && !/^[a-zA-Z0-9]{1,30}$/.test(c)) return reply.code(400).send({ error: 'Промокод: латиница и цифры' });
+      add('po_promo', c || null);
+    }
+    for (const k of ['po_link', 'po_link_ru'] as const) {
+      const v = link(b[k]);
+      if (b[k] !== undefined && v === undefined) return reply.code(400).send({ error: 'Ссылка должна начинаться с https://' });
+      if (v !== undefined) add(k, v);
+    }
     if (typeof b.password === 'string' && b.password) {
       if (b.password.length < 8) return reply.code(400).send({ error: 'Пароль не короче 8 символов' });
       add('password_hash', await hashPassword(b.password));
     }
     if (!sets.length) return reply.code(400).send({ error: 'Нечего менять' });
     vals.push(id);
-    const r = await db.query(`UPDATE staff SET ${sets.join(', ')} WHERE id = $${vals.length} RETURNING id`, vals);
+    let r;
+    try {
+      r = await db.query(`UPDATE staff SET ${sets.join(', ')} WHERE id = $${vals.length} RETURNING id`, vals);
+    } catch (e: any) {
+      if (e.code === '23505') return reply.code(409).send({ error: 'Такой код кампании уже у другого человека' });
+      throw e;
+    }
     if (!r.rowCount) return reply.code(404).send({ error: 'Не найден' });
     if (b.active === false || b.password) await db.query('DELETE FROM sessions WHERE staff_id = $1', [id]);
     return { ok: true };

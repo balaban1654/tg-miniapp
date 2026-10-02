@@ -58,10 +58,10 @@ export async function postbackRoutes(app: FastifyInstance): Promise<void> {
     let tgId = Number(pick(q, ID_KEYS));
     let lead: { rowCount: number | null; rows: any[] } = { rowCount: 0, rows: [] };
     if (Number.isSafeInteger(tgId) && tgId > 0) {
-      lead = await db.query('SELECT tg_id, status, access, trader_id FROM leads WHERE tg_id = $1', [tgId]);
+      lead = await db.query('SELECT tg_id, status, access, trader_id, owner_id FROM leads WHERE tg_id = $1', [tgId]);
     }
     if (!lead.rowCount && traderId) {
-      lead = await db.query('SELECT tg_id, status, access, trader_id FROM leads WHERE trader_id = $1 LIMIT 1', [traderId]);
+      lead = await db.query('SELECT tg_id, status, access, trader_id, owner_id FROM leads WHERE trader_id = $1 LIMIT 1', [traderId]);
       if (lead.rowCount) tgId = Number(lead.rows[0].tg_id);
     }
     if (!lead.rowCount) {
@@ -71,6 +71,11 @@ export async function postbackRoutes(app: FastifyInstance): Promise<void> {
     }
     if (traderId && !lead.rows[0].trader_id) {
       await db.query('UPDATE leads SET trader_id = $2 WHERE tg_id = $1 AND trader_id IS NULL', [tgId, traderId]);
+    }
+    // Лид без владельца (пришёл не через нашу ссылку): закрепляем по коду кампании {ac}
+    if (!lead.rows[0].owner_id && q.ac) {
+      const o = await db.query('SELECT id FROM staff WHERE lower(po_campaign) = lower($1) AND active', [q.ac]);
+      if (o.rowCount) await db.query('UPDATE leads SET owner_id = $2 WHERE tg_id = $1 AND owner_id IS NULL', [tgId, o.rows[0].id]);
     }
     const amount = Math.abs(Number(pick(q, AMOUNT_KEYS))) || null;
 
