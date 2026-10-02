@@ -131,7 +131,7 @@ function demoPast(preview = false) {
     const hr = Number(hourFmt.format(new Date(e.at)));
     const day = hr >= 6 && hr < 18;
     const [lo, span] = day ? [20, 31] : [20, 77];
-    let votes = day ? lo + (h(slot + 5) % span) : lo + Math.max(h(slot + 5) % span, h(slot + 6) % span);
+    let votes = day ? lo + (h(slot + 5) % span) : lo + Math.max(h(slot + 5) % span, h(slot * 7 + 90001) % span);
     while (used.has(votes)) votes = lo + ((votes - lo + 1) % span);
     used.add(votes);
     return {
