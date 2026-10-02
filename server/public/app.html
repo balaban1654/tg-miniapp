@@ -649,10 +649,7 @@ async function viewDeals(){
   if(!me)await refreshMe();
   const d=await api('/deals?period='+period);
   const chips=el('div',{class:'chips'},[['7','7 дней'],['30','30 дней'],['all','Всё время']].map(([k,t])=>el('button',{type:'button',class:'chip'+(k===period?' on':''),onclick:()=>{period=k;render()}},t)));
-  const sum=el('div',{class:'stats s3'},
-    el('div',{class:'stat'},el('b',{},d.total),el('span',{class:'sm'},'сделок')),
-    el('div',{class:'stat'},el('b',{class:'ok'},d.wins),el('span',{class:'sm'},'плюс')),
-    el('div',{class:'stat'},el('b',{class:'bad'},d.losses),el('span',{class:'sm'},'минус')));
+  const sum=stats4({deals:d.total,wins:d.wins,losses:d.losses,rate:d.wins+d.losses?Math.round(d.wins/(d.wins+d.losses)*100):null});
   const days=[];for(let i=6;i>=0;i--){const t=new Date(Date.now()-i*864e5);days.push(t.toISOString().slice(0,10))}
   const byDay=Object.fromEntries(d.byDay.map(x=>[x.day,x]));
   const max=Math.max(1,...days.map(k=>(byDay[k]?.wins||0)+(byDay[k]?.losses||0)));
