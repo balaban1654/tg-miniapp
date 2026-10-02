@@ -6,7 +6,7 @@
 <title>Hunter AI</title>
 <meta name="description" content="Анализ рынка и сигналы — прямо в Telegram. Сайт скоро откроется, а пока всё уже работает в нашем боте.">
 <meta name="theme-color" content="#0b0614">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='16' fill='%239b5cff'/%3E%3Ctext x='16' y='22' font-size='18' font-weight='700' text-anchor='middle' fill='white' font-family='Arial'%3EH%3C/text%3E%3C/svg%3E">
+<link rel="icon" type="image/png" href="/img/favicon.png">
 <style>
 @font-face{font-family:Montserrat;font-weight:500;font-display:swap;src:url(/fonts/Montserrat-Medium.woff2) format('woff2')}
 @font-face{font-family:Montserrat;font-weight:700;font-display:swap;src:url(/fonts/Montserrat-Bold.woff2) format('woff2')}
@@ -15,17 +15,27 @@
 *{box-sizing:border-box;margin:0}
 html,body{height:100%}
 body{background:radial-gradient(900px 600px at 50% 28%,#2a1659 0%,#150b2b 45%,var(--bg) 100%);color:var(--fg);font-family:Montserrat,system-ui,sans-serif;display:grid;grid-template-rows:1fr auto;overflow:hidden;position:relative}
-main{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:32px 20px;position:relative;z-index:1}
+main{overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:32px 20px;position:relative;z-index:1}
 .rain{position:fixed;inset:0;pointer-events:none;overflow:hidden}
 .rain i{position:absolute;top:-60px;width:5px;border-radius:2px;opacity:.5;animation:fall linear infinite}
 .rain i::before{content:"";position:absolute;left:50%;top:-10px;bottom:-10px;width:1px;background:inherit;transform:translateX(-50%)}
 @keyframes fall{to{transform:translateY(calc(100vh + 140px))}}
-.logo{position:relative;width:200px;height:200px;margin-bottom:34px;display:grid;place-items:center}
-.logo .ring{position:absolute;inset:0;border-radius:50%;border:1px solid #9b5cff40}
-.logo .ring.r2{inset:-26px;border-color:#9b5cff22}
-.logo .core{width:150px;height:150px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#3b1d7a,#150b2b 70%);border:3px solid var(--acc);box-shadow:0 0 40px #9b5cff66,inset 0 0 30px #9b5cff44;display:grid;place-items:center;animation:glow 4s ease-in-out infinite}
-.logo svg{width:84px;height:84px}
-@keyframes glow{50%{box-shadow:0 0 64px #9b5cffaa,inset 0 0 36px #9b5cff66}}
+.logo{position:relative;width:min(290px,56vw);aspect-ratio:1;margin-bottom:30px;display:grid;place-items:center;perspective:800px}
+.logo>*{position:absolute}
+.ring{inset:0;border-radius:50%}
+.ring.thin{border:1px solid #9b5cff38}
+.ring.r1{inset:-9%}
+.ring.r2{inset:-21%;border-color:#9b5cff1c}
+.arc{border-radius:50%;background:conic-gradient(from 0deg,transparent 0 62%,#c9a6ff 100%);-webkit-mask:radial-gradient(farthest-side,transparent calc(100% - 3px),#000 calc(100% - 2px));mask:radial-gradient(farthest-side,transparent calc(100% - 3px),#000 calc(100% - 2px));animation:spin 7s linear infinite}
+.arc.a1{inset:-9%}
+.arc.a2{inset:-21%;background:conic-gradient(from 180deg,transparent 0 70%,#9b5cffaa 100%);animation-duration:16s;animation-direction:reverse}
+.orbit{inset:-30%;width:160%;height:160%;overflow:visible;pointer-events:none}
+.orbit ellipse{fill:none;stroke:#9b5cff55;stroke-width:1}
+.orbit circle{fill:#d9bfff;filter:drop-shadow(0 0 6px #b98cff)}
+.core{position:relative;width:76%;aspect-ratio:1;border-radius:50%;overflow:hidden;border:3px solid var(--acc);background:#000;box-shadow:0 0 44px #9b5cff77,inset 0 0 30px #9b5cff55;transform-style:preserve-3d;will-change:transform;animation:glow 4s ease-in-out infinite}
+.core img{width:100%;height:100%;object-fit:cover;display:block;transform:scale(1.14);will-change:transform;user-select:none;-webkit-user-drag:none}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes glow{50%{box-shadow:0 0 70px #9b5cffb0,inset 0 0 36px #9b5cff77}}
 h1{font-weight:800;font-size:clamp(30px,6vw,58px);line-height:1.1;letter-spacing:-.01em;max-width:900px}
 h1 span{color:var(--acc)}
 p{color:var(--mut);font-weight:500;font-size:clamp(14px,2vw,17px);line-height:1.6;max-width:520px;margin-top:20px}
@@ -35,17 +45,21 @@ p{color:var(--mut);font-weight:500;font-size:clamp(14px,2vw,17px);line-height:1.
 .btn:focus-visible{outline:2px solid var(--acc2);outline-offset:3px}
 footer a{color:inherit;text-decoration:underline;text-underline-offset:2px}
 footer{position:relative;z-index:1;text-align:center;color:#8f82b3;font-size:12px;padding:0 20px 22px;line-height:1.6}
-@media (prefers-reduced-motion:reduce){.rain i,.logo .core{animation:none}}
+@media (prefers-reduced-motion:reduce){.rain i,.core,.arc{animation:none}}
 </style>
 </head>
 <body>
 <div class="rain" id="rain" aria-hidden="true"></div>
 <main>
-  <div class="logo" aria-hidden="true">
-    <div class="ring r2"></div><div class="ring"></div>
-    <div class="core">
-      <svg viewBox="0 0 64 64" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 12v40M48 12v40M16 32h32"/></svg>
-    </div>
+  <div class="logo" id="logo" aria-hidden="true">
+    <div class="ring thin r2"></div>
+    <div class="ring thin r1"></div>
+    <div class="arc a2"></div>
+    <div class="arc a1"></div>
+    <svg class="orbit" viewBox="-200 -200 400 400" id="orbit">
+      <g transform="rotate(-14)"><ellipse rx="190" ry="62"/><circle r="4.5"><animateMotion dur="9s" repeatCount="indefinite" path="M190,0 A190,62 0 1,1 -190,0 A190,62 0 1,1 190,0"/></circle></g>
+    </svg>
+    <div class="core" id="core"><img id="face" src="/img/hunter.webp" width="720" height="720" alt="" draggable="false"></div>
   </div>
   <h1>Добро пожаловать<br>в <span>Hunter AI</span></h1>
   <p>Анализ рынка и сигналы — прямо в Telegram. Сайт скоро откроется, а пока всё уже работает в нашем боте.</p>
@@ -56,6 +70,20 @@ footer{position:relative;z-index:1;text-align:center;color:#8f82b3;font-size:12p
 </main>
 <footer>© Hunter AI · <a href="/terms">Условия использования</a></footer>
 <script>
+(function(){
+  var core=document.getElementById('core'),face=document.getElementById('face');
+  if(matchMedia('(prefers-reduced-motion:reduce)').matches){try{document.getElementById('orbit').pauseAnimations()}catch(e){}return}
+  var tx=0,ty=0,cx=0,cy=0;
+  function aim(x,y){tx=(x/innerWidth-.5)*2;ty=(y/innerHeight-.5)*2}
+  addEventListener('pointermove',function(e){aim(e.clientX,e.clientY)},{passive:true});
+  document.addEventListener('pointerleave',function(){tx=0;ty=0});
+  (function tick(){
+    cx+=(tx-cx)*.08;cy+=(ty-cy)*.08;
+    face.style.transform='translate('+(cx*9).toFixed(2)+'px,'+(cy*9).toFixed(2)+'px) scale(1.14)';
+    core.style.transform='rotateY('+(cx*9).toFixed(2)+'deg) rotateX('+(-cy*9).toFixed(2)+'deg)';
+    requestAnimationFrame(tick);
+  })();
+})();
 (function(){
   var rain=document.getElementById('rain');
   if(matchMedia('(prefers-reduced-motion:reduce)').matches)return;

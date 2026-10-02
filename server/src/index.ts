@@ -34,6 +34,15 @@ app.get<{ Params: { name: string } }>('/fonts/:name', async (req, reply) => {
   return reply.type('font/woff2').header('Cache-Control', 'public, max-age=31536000, immutable').send(f);
 });
 
+// Картинки сайта (логотип), только из белого списка
+const imgDir = resolve(process.cwd(), 'public/img');
+const imgs = new Map(readdirSync(imgDir).map((f) => [f, readFileSync(resolve(imgDir, f))]));
+app.get<{ Params: { name: string } }>('/img/:name', async (req, reply) => {
+  const f = imgs.get(req.params.name);
+  if (!f) return reply.code(404).send('Не найдено');
+  return reply.type(req.params.name.endsWith('.png') ? 'image/png' : 'image/webp').header('Cache-Control', 'public, max-age=86400').send(f);
+});
+
 // Заглушка для корня домена, пока основного сайта нет
 const siteHtml = readFileSync(resolve(process.cwd(), 'public/site.html'), 'utf8').replaceAll('{{BOT}}', config.botUsername);
 app.get('/site', async (_req, reply) => reply.type('text/html; charset=utf-8').header('Cache-Control', 'public, max-age=300').send(siteHtml));
