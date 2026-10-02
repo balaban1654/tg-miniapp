@@ -33,7 +33,15 @@ button{font:inherit;color:inherit}
 .avb{overflow:hidden;width:32px;height:32px;border-radius:50%;border:2px solid var(--acc);background:var(--card2);color:var(--acc2);font:700 12px var(--fd);cursor:pointer;display:grid;place-items:center;padding:0}
 main{flex:1;padding:6px 16px 96px;display:grid;gap:12px;align-content:start}
 .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;min-width:0}
-.card.hero{border-color:var(--acc);background:linear-gradient(180deg,#2a1857,var(--card));display:grid;gap:10px}
+.card.hero{border-color:var(--acc);display:grid;gap:10px;position:relative;overflow:hidden;
+  background:linear-gradient(180deg,#2a1857dd,var(--card) 70%),repeating-linear-gradient(0deg,transparent 0 23px,#ffffff08 23px 24px),repeating-linear-gradient(90deg,transparent 0 23px,#ffffff08 23px 24px)}
+.card.hero>*{position:relative}
+.hero-art{margin:-14px -14px 0;display:block;width:calc(100% + 28px);max-width:none;height:auto}
+.onl{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--ok);white-space:nowrap}
+.onl i{width:7px;height:7px;border-radius:50%;background:var(--ok);box-shadow:0 0 8px var(--ok)}
+.since{display:flex;align-items:center;gap:6px}.since svg{width:13px;height:13px;flex:none}
+.ic svg{width:44px;height:44px;color:var(--acc2)}
+@media(max-width:379px){.onl span{display:none}}
 .card.grad{background:linear-gradient(135deg,var(--acc3),#3a1c8a);border:0}
 .row{display:flex;justify-content:space-between;align-items:center;gap:10px}
 .sm{font-size:12px;color:var(--mut)} .mut{color:var(--mut)} .mono{font-family:var(--fm)}
@@ -56,7 +64,7 @@ main{flex:1;padding:6px 16px 96px;display:grid;gap:12px;align-content:start}
 .tabs{position:fixed;left:0;right:0;bottom:0;z-index:6;background:#0b0616;border-top:1px solid var(--line);padding:8px 8px calc(8px + env(safe-area-inset-bottom,0px))}
 .tabs div{max-width:480px;margin:0 auto;display:grid;grid-template-columns:repeat(4,1fr)}
 .tabs button{background:none;border:0;display:grid;justify-items:center;gap:2px;font-size:11px;color:var(--mut);padding:4px;cursor:pointer}
-.tabs button.on{color:var(--acc2)} .tabs svg{width:22px;height:22px}
+.tabs button.on{color:var(--acc2);font-weight:700} .tabs svg{width:24px;height:24px}
 .pill{display:inline-block;border-radius:99px;padding:2px 10px;font:600 11px var(--fm)}
 .p-ok{background:#3ddc9722;color:var(--ok)}.p-bad{background:#ff6b8a22;color:var(--bad)}.p-pur{background:#9b5cff33;color:var(--acc2)}.p-warn{background:#ffb84d22;color:var(--warn)}
 .bars{display:flex;gap:6px;align-items:flex-end;height:80px}
@@ -66,7 +74,7 @@ main{flex:1;padding:6px 16px 96px;display:grid;gap:12px;align-content:start}
 .days{display:flex;gap:6px;color:var(--mut);font-size:10px}.days span{flex:1;text-align:center}
 .ava{overflow:hidden;width:48px;height:48px;border-radius:50%;border:2px solid var(--acc);background:var(--card2);color:var(--acc2);font:700 18px var(--fd);display:grid;place-items:center;flex:none}
 .empty{text-align:center;padding:26px 10px;display:grid;gap:8px;justify-items:center}
-.empty .ic{font-size:34px}
+
 .lesson{display:flex;gap:12px;align-items:center;cursor:pointer;width:100%;text-align:left;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:13px;color:inherit}
 .num{width:34px;height:34px;border-radius:50%;background:var(--card2);display:grid;place-items:center;font:700 14px var(--fm);flex:none;color:var(--acc2)}
 .num.done{background:var(--ok);color:#06210f}
@@ -127,7 +135,7 @@ const CHAT_ICON='<svg viewBox="0 0 24 24" width="14" height="14" fill="currentCo
 function support(){openLink('https://t.me/'+me.botUsername+'?start=support')}
 function clearTimers(){timers.forEach(clearInterval);timers.forEach(clearTimeout);timers=[]}
 
-const ICON={home:'<path d="M3 11l9-8 9 8v9a1 1 0 01-1 1h-5v-6H9v6H4a1 1 0 01-1-1z"/>',deals:'<path d="M4 5h16v2H4zm0 6h16v2H4zm0 6h16v2H4z"/>',trainer:'<path d="M3 3h8v8H3zm10 0h8v8h-8zM3 13h8v8H3zm10 0h8v8h-8z"/>',media:'<path d="M3 5h18v14H3zm7 3v8l6-4z"/>'};
+const ICON={home:'<path d="M3 11l9-8 9 8"/><path d="M5 9.5V20h14V9.5"/><path d="M10 20v-6h4v6"/>',deals:'<path d="M8 6h12M8 12h12M8 18h12"/><path d="M4 6h.01M4 12h.01M4 18h.01"/>',trainer:'<rect x="3" y="3" width="7.5" height="7.5" rx="1.8"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.8"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.8"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.8"/>',media:'<rect x="3" y="5" width="18" height="14" rx="3.5"/><path d="M10 9.2l5 2.8-5 2.8z"/>'};
 const TABS=[['home','Главная'],['deals','Сделки'],['trainer','Тренажёр'],['media','Медиа']];
 
 function shell(title,body){
@@ -135,10 +143,10 @@ function shell(title,body){
   root.replaceChildren(
     el('div',{class:'hd'},
       el('div',{class:'brand'},el('div',{class:'logo'},'H'),title||'Hunter AI'),
-      el('div',{class:'hr'},el('button',{class:'pillb',type:'button',onclick:support},svgEl(CHAT_ICON),'Поддержка'),
+      el('div',{class:'hr'},el('button',{class:'pillb',type:'button',onclick:support},svgEl(CHAT_ICON),'Поддержка'),el('span',{class:'onl'},el('i'),el('span',{},'онлайн')),
         withPhoto(el('button',{class:'avb',type:'button','aria-label':'Профиль',onclick:()=>go('profile')},init)))),
     el('main',{},body),
-    el('nav',{class:'tabs'},el('div',{},TABS.map(([k,t])=>el('button',{type:'button',class:k===tab?'on':'',onclick:()=>go(k)},svgEl('<svg viewBox="0 0 24 24" fill="currentColor">'+ICON[k]+'</svg>'),t)))));
+    el('nav',{class:'tabs'},el('div',{},TABS.map(([k,t])=>el('button',{type:'button',class:k===tab?'on':'',onclick:()=>go(k)},svgEl('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">'+ICON[k]+'</svg>'),t)))));
 }
 function go(t){tab=t;render()}
 
@@ -161,9 +169,16 @@ const stats4=s=>el('div',{class:'stats'},
 
 const profileCard=()=>el('div',{class:'card row',style:'justify-content:flex-start;gap:12px'},
   withPhoto(el('div',{class:'ava'},(me.name||'?').trim().slice(0,1).toUpperCase())),
-  el('div',{},el('b',{style:'font:700 15px var(--fd)'},me.name),el('div',{class:'sm'},'В команде с '+dmy(me.since))));
+  el('div',{},el('b',{style:'font:700 15px var(--fd)'},me.name),el('div',{class:'sm since'},svgEl('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>'),'В команде с '+dmy(me.since))));
 
-const CANDLES=svgEl(`<svg viewBox="0 0 260 70" aria-hidden="true" style="height:70px;width:100%"><g stroke="#c9a6ff" stroke-width="2"><line x1="20" y1="30" x2="20" y2="62"/><line x1="55" y1="38" x2="55" y2="60"/><line x1="90" y1="26" x2="90" y2="56"/><line x1="125" y1="36" x2="125" y2="56"/><line x1="160" y1="22" x2="160" y2="50"/><line x1="195" y1="28" x2="195" y2="52"/><line x1="230" y1="8" x2="230" y2="40"/></g><rect x="15" y="38" width="10" height="20" rx="2" fill="#9b5cff"/><rect x="50" y="42" width="10" height="12" rx="2" fill="#ff6b8a"/><rect x="85" y="32" width="10" height="18" rx="2" fill="#9b5cff"/><rect x="120" y="40" width="10" height="12" rx="2" fill="#ff6b8a"/><rect x="155" y="26" width="10" height="18" rx="2" fill="#9b5cff"/><rect x="190" y="32" width="10" height="14" rx="2" fill="#ff6b8a"/><rect x="225" y="12" width="10" height="24" rx="2" fill="#9b5cff"/></svg>`);
+const CANDLES=svgEl(`<svg class="hero-art" viewBox="0 0 320 120" aria-hidden="true">
+<g fill="none" stroke="#c9a6ff" opacity=".22"><circle cx="262" cy="46" r="20"/><circle cx="262" cy="46" r="38"/><circle cx="262" cy="46" r="58"/></g>
+<line x1="288" y1="6" x2="288" y2="118" stroke="#9b5cff" stroke-width="1.5" opacity=".7"/>
+<g stroke-width="2" stroke-linecap="round"><line x1="34" y1="58" x2="34" y2="98" stroke="#3ddc97"/><line x1="66" y1="66" x2="66" y2="92" stroke="#ff6b8a"/><line x1="98" y1="48" x2="98" y2="86" stroke="#3ddc97"/><line x1="130" y1="62" x2="130" y2="88" stroke="#ff6b8a"/><line x1="162" y1="38" x2="162" y2="76" stroke="#3ddc97"/><line x1="194" y1="50" x2="194" y2="78" stroke="#ff6b8a"/><line x1="226" y1="22" x2="226" y2="62" stroke="#3ddc97"/></g>
+<rect x="28" y="66" width="12" height="26" rx="3" fill="#3ddc97"/><rect x="60" y="70" width="12" height="16" rx="3" fill="#ff6b8a"/><rect x="92" y="56" width="12" height="24" rx="3" fill="#3ddc97"/><rect x="124" y="66" width="12" height="16" rx="3" fill="#ff6b8a"/><rect x="156" y="46" width="12" height="24" rx="3" fill="#3ddc97"/><rect x="188" y="56" width="12" height="16" rx="3" fill="#ff6b8a"/><rect x="220" y="30" width="12" height="26" rx="3" fill="#3ddc97"/>
+<polyline points="34,78 66,78 98,68 130,74 162,58 194,64 226,42 262,40" fill="none" stroke="#c9a6ff" stroke-width="2" stroke-dasharray="3 5" stroke-linecap="round"/>
+<circle cx="262" cy="40" r="6" fill="#0d0817" stroke="#c9a6ff" stroke-width="2"/><circle cx="262" cy="40" r="2.5" fill="#c9a6ff"/>
+</svg>`);
 
 async function refreshMe(){me=await api('/me');return me}
 
@@ -200,7 +215,7 @@ async function viewHome(){
       el('div',{class:'two'},el('button',{class:'btn g',type:'button',onclick:()=>mark('win')},'Плюс'),el('button',{class:'btn r',type:'button',onclick:()=>mark('loss')},'Минус')),
       el('button',{class:'btn o',type:'button',onclick:()=>mark('skip')},'Не входил')));
   }else{
-    items.push(el('div',{class:'card empty'},el('div',{class:'ic'},'📡'),el('b',{},'Сейчас нет активного сигнала'),
+    items.push(el('div',{class:'card empty'},el('div',{class:'ic'},svgEl('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.9 19.1a10 10 0 010-14.2M19.1 4.9a10 10 0 010 14.2M8.1 15.9a5.5 5.5 0 010-7.8M15.9 8.1a5.5 5.5 0 010 7.8"/><circle cx="12" cy="12" r="1.6"/></svg>')),el('b',{},'Сейчас нет активного сигнала'),
       el('div',{class:'sm'},'Когда появится новый сигнал, мы пришлём сообщение в Telegram. А пока можно потренироваться.'),
       el('button',{class:'btn o',type:'button',onclick:()=>go('trainer')},'Открыть тренажёр')));
   }
@@ -225,7 +240,7 @@ async function viewDeals(){
     el('div',{class:'days',style:'margin-top:4px'},days.map(k=>el('span',{},new Date(k+'T12:00:00').toLocaleDateString('ru-RU',{weekday:'short'})))));
   const hist=d.deals.length?el('div',{style:'display:grid;gap:8px'},d.deals.map(x=>el('div',{class:'card row'},el('div',{},el('b',{},x.pair),el('div',{class:'sm'},(x.direction==='up'?'Вверх':'Вниз')+' · '+x.expiry_min+' мин · '+hm(x.created_at))),
     x.result==='win'?el('span',{class:'pill p-ok'},'плюс'):x.result==='loss'?el('span',{class:'pill p-bad'},'минус'):x.result==='skip'?el('span',{class:'pill p-pur'},'не входил'):el('span',{class:'pill p-warn'},'ждёт итога')))):
-    el('div',{class:'card empty'},el('div',{class:'ic'},'📈'),el('b',{},'Сделок пока нет'),el('div',{class:'sm'},'Когда вы отметите результат первой сделки, она появится здесь.'));
+    el('div',{class:'card empty'},el('div',{class:'ic'},svgEl('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 17l5-5 4 4 8-9"/><path d="M15 7h5v5"/></svg>')),el('b',{},'Сделок пока нет'),el('div',{class:'sm'},'Когда вы отметите результат первой сделки, она появится здесь.'));
   shell('Мои сделки',[chips,sum,chart,el('b',{},'История'),hist]);
 }
 
