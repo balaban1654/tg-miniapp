@@ -5,15 +5,18 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <meta name="theme-color" content="#0d0817">
 <title>Hunter AI</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap">
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
+@font-face{font-family:'Montserrat';font-weight:400;font-style:normal;font-display:swap;src:url('/fonts/Montserrat-Regular.woff2') format('woff2')}
+@font-face{font-family:'Montserrat';font-weight:500;font-style:normal;font-display:swap;src:url('/fonts/Montserrat-Medium.woff2') format('woff2')}
+@font-face{font-family:'Montserrat';font-weight:600;font-style:normal;font-display:swap;src:url('/fonts/Montserrat-SemiBold.woff2') format('woff2')}
+@font-face{font-family:'Montserrat';font-weight:700;font-style:normal;font-display:swap;src:url('/fonts/Montserrat-Bold.woff2') format('woff2')}
+@font-face{font-family:'Montserrat';font-weight:800;font-style:normal;font-display:swap;src:url('/fonts/Montserrat-ExtraBold.woff2') format('woff2')}
 :root{--bg:#0d0817;--bg2:#150d26;--card:#1c1233;--card2:#251847;--line:#34255c;--fg:#f1ebff;--mut:#a89cc8;--acc:#9b5cff;--acc2:#c9a6ff;--acc3:#6a2fe0;--ok:#3ddc97;--warn:#ffb84d;--bad:#ff6b8a;
---fd:'Unbounded',system-ui,sans-serif;--fb:'Manrope',system-ui,sans-serif;--fm:'JetBrains Mono',ui-monospace,monospace;color-scheme:dark}
+--fd:'Montserrat',system-ui,sans-serif;--fb:'Montserrat',system-ui,sans-serif;--fm:'Montserrat',system-ui,sans-serif;color-scheme:dark}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;height:100%}
-body{background:linear-gradient(180deg,#1a0f33,#0d0817 45%) fixed,var(--bg);color:var(--fg);font:14px/1.5 var(--fb);overscroll-behavior:none}
+body{font-variant-numeric:tabular-nums;background:linear-gradient(180deg,#1a0f33,#0d0817 45%) fixed,var(--bg);color:var(--fg);font:14px/1.5 var(--fb);overscroll-behavior:none}
 h1,h2,h3{font-family:var(--fd);margin:0;line-height:1.25}
 button{font:inherit;color:inherit}
 [hidden]{display:none!important}
@@ -22,8 +25,9 @@ button{font:inherit;color:inherit}
 .brand{display:flex;gap:8px;align-items:center;font:700 15px var(--fd)}
 .logo{width:28px;height:28px;border-radius:50%;background:var(--acc);display:grid;place-items:center;font:700 12px var(--fd)}
 .hr{display:flex;gap:8px;align-items:center}
-.pillb{border:1px solid var(--line);background:none;border-radius:99px;padding:6px 12px;font-size:12px;color:var(--mut);cursor:pointer}
-.avb{width:32px;height:32px;border-radius:50%;border:2px solid var(--acc);background:var(--card2);color:var(--acc2);font:700 12px var(--fd);cursor:pointer;display:grid;place-items:center;padding:0}
+.ava img,.avb img{width:100%;height:100%;object-fit:cover;display:block;border-radius:50%}
+.pillb{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:none;border-radius:99px;padding:6px 12px;font-size:12px;color:var(--mut);cursor:pointer}
+.avb{overflow:hidden;width:32px;height:32px;border-radius:50%;border:2px solid var(--acc);background:var(--card2);color:var(--acc2);font:700 12px var(--fd);cursor:pointer;display:grid;place-items:center;padding:0}
 main{flex:1;padding:6px 16px 96px;display:grid;gap:12px;align-content:start}
 .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;min-width:0}
 .card.hero{border-color:var(--acc);background:linear-gradient(180deg,#2a1857,var(--card));display:grid;gap:10px}
@@ -31,8 +35,8 @@ main{flex:1;padding:6px 16px 96px;display:grid;gap:12px;align-content:start}
 .row{display:flex;justify-content:space-between;align-items:center;gap:10px}
 .sm{font-size:12px;color:var(--mut)} .mut{color:var(--mut)} .mono{font-family:var(--fm)}
 .ok{color:var(--ok)} .bad{color:var(--bad)}
-.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
-.stats.s3{grid-template-columns:repeat(3,1fr)}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.stats>*{min-width:0}
+.stats.s3{grid-template-columns:repeat(3,minmax(0,1fr))}
 .stat{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 12px}
 .stat b{display:block;font:700 20px var(--fm)}
 .btn{display:block;width:100%;text-align:center;background:var(--acc);color:#fff;border:0;border-radius:14px;padding:13px;font-weight:700;font-size:14px;cursor:pointer}
@@ -56,7 +60,7 @@ main{flex:1;padding:6px 16px 96px;display:grid;gap:12px;align-content:start}
 .bars i{display:block;border-radius:3px}.bars i.has{min-height:3px}
 .bars .w{background:var(--ok)}.bars .l{background:var(--bad)}
 .days{display:flex;gap:6px;color:var(--mut);font-size:10px}.days span{flex:1;text-align:center}
-.ava{width:48px;height:48px;border-radius:50%;border:2px solid var(--acc);background:var(--card2);color:var(--acc2);font:700 18px var(--fd);display:grid;place-items:center;flex:none}
+.ava{overflow:hidden;width:48px;height:48px;border-radius:50%;border:2px solid var(--acc);background:var(--card2);color:var(--acc2);font:700 18px var(--fd);display:grid;place-items:center;flex:none}
 .empty{text-align:center;padding:26px 10px;display:grid;gap:8px;justify-items:center}
 .empty .ic{font-size:34px}
 .lesson{display:flex;gap:12px;align-items:center;cursor:pointer;width:100%;text-align:left;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:13px;color:inherit}
@@ -69,6 +73,7 @@ ol.steps{margin:0;padding-left:20px;display:grid;gap:8px}
 .toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:var(--card2);border:1px solid var(--acc);padding:10px 16px;border-radius:12px;z-index:9;max-width:90%;text-align:center}
 svg{max-width:100%}
 .err{color:var(--bad)}
+@media(max-width:350px){.stat{padding:8px 6px}.stat b{font-size:17px}.stat span{font-size:10px}main{padding-inline:12px}.hd{padding-inline:12px}}
 @media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
 </head>
@@ -107,6 +112,14 @@ function openLink(u){
   }catch{}
   window.open(u,'_blank');
 }
+const photoUrl=()=>{try{return tg.initDataUnsafe.user.photo_url||''}catch{return ''}};
+/** Ставит аватарку Telegram в круг. Пока картинка не загрузилась, остаётся буква. */
+function withPhoto(node){
+  const u=photoUrl();
+  if(u){const img=new Image();img.alt='';img.referrerPolicy='no-referrer';img.onload=()=>node.replaceChildren(img);img.src=u}
+  return node;
+}
+const CHAT_ICON='<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M4 4h16a1 1 0 011 1v11a1 1 0 01-1 1H8l-4 4V5a1 1 0 011-1z"/></svg>';
 function support(){openLink('https://t.me/'+me.botUsername+'?start=support')}
 function clearTimers(){timers.forEach(clearInterval);timers.forEach(clearTimeout);timers=[]}
 
@@ -118,8 +131,8 @@ function shell(title,body){
   root.replaceChildren(
     el('div',{class:'hd'},
       el('div',{class:'brand'},el('div',{class:'logo'},'H'),title||'Hunter AI'),
-      el('div',{class:'hr'},el('button',{class:'pillb',type:'button',onclick:support},'Поддержка'),
-        el('button',{class:'avb',type:'button','aria-label':'Профиль',onclick:()=>go('profile')},init))),
+      el('div',{class:'hr'},el('button',{class:'pillb',type:'button',onclick:support},svgEl(CHAT_ICON),'Поддержка'),
+        withPhoto(el('button',{class:'avb',type:'button','aria-label':'Профиль',onclick:()=>go('profile')},init)))),
     el('main',{},body),
     el('nav',{class:'tabs'},el('div',{},TABS.map(([k,t])=>el('button',{type:'button',class:k===tab?'on':'',onclick:()=>go(k)},svgEl('<svg viewBox="0 0 24 24" fill="currentColor">'+ICON[k]+'</svg>'),t)))));
 }
@@ -143,8 +156,8 @@ const stats4=s=>el('div',{class:'stats'},
   el('div',{class:'stat'},el('b',{},s.rate===null?'—':s.rate+'%'),el('span',{class:'sm'},'успешных')));
 
 const profileCard=()=>el('div',{class:'card row',style:'justify-content:flex-start;gap:12px'},
-  el('div',{class:'ava'},(me.name||'?').trim().slice(0,1).toUpperCase()),
-  el('div',{},el('b',{style:'font:700 15px var(--fd)'},me.name),el('div',{class:'sm'},'В клубе с '+dmy(me.since))));
+  withPhoto(el('div',{class:'ava'},(me.name||'?').trim().slice(0,1).toUpperCase())),
+  el('div',{},el('b',{style:'font:700 15px var(--fd)'},me.name),el('div',{class:'sm'},'В команде с '+dmy(me.since))));
 
 const CANDLES=svgEl(`<svg viewBox="0 0 260 70" aria-hidden="true" style="height:70px;width:100%"><g stroke="#c9a6ff" stroke-width="2"><line x1="20" y1="30" x2="20" y2="62"/><line x1="55" y1="38" x2="55" y2="60"/><line x1="90" y1="26" x2="90" y2="56"/><line x1="125" y1="36" x2="125" y2="56"/><line x1="160" y1="22" x2="160" y2="50"/><line x1="195" y1="28" x2="195" y2="52"/><line x1="230" y1="8" x2="230" y2="40"/></g><rect x="15" y="38" width="10" height="20" rx="2" fill="#9b5cff"/><rect x="50" y="42" width="10" height="12" rx="2" fill="#ff6b8a"/><rect x="85" y="32" width="10" height="18" rx="2" fill="#9b5cff"/><rect x="120" y="40" width="10" height="12" rx="2" fill="#ff6b8a"/><rect x="155" y="26" width="10" height="18" rx="2" fill="#9b5cff"/><rect x="190" y="32" width="10" height="14" rx="2" fill="#ff6b8a"/><rect x="225" y="12" width="10" height="24" rx="2" fill="#9b5cff"/></svg>`);
 
@@ -267,7 +280,7 @@ async function viewMedia(){
 
 function viewProfile(){
   const rows=[['Telegram ID',me.tgId],['Pocket ID',me.pocketId||'ещё нет'],['Статус',({new:'новый',registered:'зарегистрирован',ftd:'пополнил счёт',active:'активен',churned:'неактивен'})[me.status]||me.status],['Менеджер',me.manager||'не назначен'],['Доступ',me.access?'открыт':'закрыт']];
-  shell('Профиль',[el('div',{class:'card row',style:'justify-content:flex-start;gap:12px'},el('div',{class:'ava'},(me.name||'?').trim().slice(0,1).toUpperCase()),el('div',{},el('b',{style:'font:700 16px var(--fd)'},me.name),el('div',{class:'sm'},me.username?'@'+me.username:''))),
+  shell('Профиль',[el('div',{class:'card row',style:'justify-content:flex-start;gap:12px'},withPhoto(el('div',{class:'ava'},(me.name||'?').trim().slice(0,1).toUpperCase())),el('div',{},el('b',{style:'font:700 16px var(--fd)'},me.name),el('div',{class:'sm'},me.username?'@'+me.username:''))),
     el('div',{class:'card',style:'display:grid;gap:10px'},rows.map(([k,v])=>el('div',{class:'row'},el('span',{class:'sm'},k),el('b',{class:'mono'},String(v))))),
     me.promo?el('div',{class:'card row'},el('span',{class:'sm'},'Промокод'),el('b',{class:'mono'},me.promo)):null,
     el('button',{class:'btn o',type:'button',onclick:support},'Написать в поддержку'),

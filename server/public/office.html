@@ -5,14 +5,17 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0d0817">
 <title>Hunter Office</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap">
 <style>
+@font-face{font-family:'Montserrat';font-weight:400;font-style:normal;font-display:swap;src:url('/fonts/Montserrat-Regular.woff2') format('woff2')}
+@font-face{font-family:'Montserrat';font-weight:500;font-style:normal;font-display:swap;src:url('/fonts/Montserrat-Medium.woff2') format('woff2')}
+@font-face{font-family:'Montserrat';font-weight:600;font-style:normal;font-display:swap;src:url('/fonts/Montserrat-SemiBold.woff2') format('woff2')}
+@font-face{font-family:'Montserrat';font-weight:700;font-style:normal;font-display:swap;src:url('/fonts/Montserrat-Bold.woff2') format('woff2')}
+@font-face{font-family:'Montserrat';font-weight:800;font-style:normal;font-display:swap;src:url('/fonts/Montserrat-ExtraBold.woff2') format('woff2')}
 :root{--bg:#0d0817;--bg2:#150d26;--card:#1c1233;--card2:#251847;--line:#34255c;--fg:#f1ebff;--mut:#a89cc8;--acc:#9b5cff;--acc2:#c9a6ff;--acc3:#6a2fe0;--ok:#3ddc97;--warn:#ffb84d;--bad:#ff6b8a;
---fd:'Unbounded',system-ui,sans-serif;--fb:'Manrope',system-ui,sans-serif;--fm:'JetBrains Mono',ui-monospace,monospace;color-scheme:dark}
+--fd:'Montserrat',system-ui,sans-serif;--fb:'Montserrat',system-ui,sans-serif;--fm:'Montserrat',system-ui,sans-serif;color-scheme:dark}
 *{box-sizing:border-box}
 html,body{margin:0;min-height:100%}
-body{background:var(--bg);color:var(--fg);font:14px/1.5 var(--fb)}
+body{font-variant-numeric:tabular-nums;background:var(--bg);color:var(--fg);font:14px/1.5 var(--fb)}
 h1,h2,h3{font-family:var(--fd);margin:0;line-height:1.2}
 button,input,select{font:inherit;color:inherit}
 [hidden]{display:none!important}

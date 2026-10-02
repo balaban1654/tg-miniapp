@@ -3,7 +3,7 @@ import { config } from './config.js';
 import { db } from './db.js';
 import { bot } from './bot.js';
 import cookie from '@fastify/cookie';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { migrate } from './migrate.js';
 import { ensureAdmin } from './auth.js';
@@ -24,6 +24,15 @@ const officeHtml = readFileSync(resolve(process.cwd(), 'public/office.html'), 'u
 app.get('/office', async (_req, reply) => reply.type('text/html; charset=utf-8').header('Cache-Control', 'no-store').send(officeHtml));
 await app.register(officeRoutes, { prefix: '/api/office' });
 await app.register(postbackRoutes);
+
+// Шрифт Montserrat отдаём со своего сервера, чтобы он не зависел от Google
+const fontsDir = resolve(process.cwd(), 'public/fonts');
+const fonts = new Map(readdirSync(fontsDir).filter((f) => f.endsWith('.woff2')).map((f) => [f, readFileSync(resolve(fontsDir, f))]));
+app.get<{ Params: { name: string } }>('/fonts/:name', async (req, reply) => {
+  const f = fonts.get(req.params.name);
+  if (!f) return reply.code(404).send('Не найдено');
+  return reply.type('font/woff2').header('Cache-Control', 'public, max-age=31536000, immutable').send(f);
+});
 
 // Клиентский Mini App
 const appHtml = readFileSync(resolve(process.cwd(), 'public/app.html'), 'utf8');
