@@ -47,6 +47,57 @@ main{flex:1;padding:6px 16px 96px;display:grid;gap:12px;align-content:start}
 .hero-art{margin:-14px -14px 0;display:block;width:calc(100% + 28px);max-width:none;height:auto}
 
 /* Живой график главной карточки рисуется скриптом (heroArt): свечи идут справа налево, линия-сканер иногда подсвечивает пару свечей */
+
+/* Полноэкранный учебный терминал (урок 1) */
+.fs-hd{gap:6px}.fs-hd .brand b{font:700 15px var(--fd)}
+.xbtn{background:none;border:0;color:var(--mut);font-size:20px;line-height:1;padding:4px 8px 4px 0;cursor:pointer}
+.steppill{border:1px solid var(--acc);color:var(--acc2);border-radius:99px;padding:6px 11px;font-size:11.5px;font-weight:700;white-space:nowrap}
+.fs-main{flex:1;padding:6px 16px 28px;display:grid;gap:14px;align-content:start}
+.fs-bottom{position:sticky;bottom:0;padding:12px 16px calc(14px + env(safe-area-inset-bottom));background:#0d0817f2;border-top:1px solid var(--line)}
+.fs-tip{font:700 15px/1.4 var(--fd)}
+.ptabs{display:flex;gap:8px}.ptabs button{flex:1;border:0;border-radius:12px;padding:11px 6px;background:var(--card);color:var(--mut);font-weight:700;font-size:13px;white-space:nowrap}
+.ptabs button.on{background:var(--acc);color:#fff}.ptabs button:disabled{opacity:.7}
+.prow{display:flex;justify-content:space-between;align-items:center;width:100%;border:0;border-radius:14px;background:var(--card);padding:18px 16px;color:var(--fg);font:700 15px var(--fd);cursor:pointer;text-align:left}
+.prow:active{transform:scale(.99);background:var(--card2)}
+.pay{background:#3ddc9722;color:var(--ok);border-radius:8px;padding:3px 8px;font-size:11.5px;font-weight:700}
+.note{color:var(--mut);font-size:12.5px;line-height:1.5}
+.sig{border:1px solid var(--acc);border-radius:20px;padding:16px;background:var(--card);display:grid;gap:2px}
+.sig h3{font-size:20px;margin-bottom:6px}
+.sig .r{display:flex;justify-content:space-between;gap:12px;padding:13px 0;border-bottom:1px solid var(--line);font-size:14px}.sig .r:last-of-type{border-bottom:0}
+.sig .r span{color:var(--mut)}.sig .r b{text-align:right}
+.demo{display:inline-block;border:1px dashed var(--warn);color:var(--warn);border-radius:8px;padding:3px 8px;font-size:11px;font-weight:700;margin-bottom:6px}
+.term{display:grid;gap:12px;position:relative}
+.trow{display:flex;gap:10px;align-items:center;justify-content:space-between}
+.chip{background:var(--card);border-radius:12px;padding:10px 12px;font-weight:700;font-size:13px;display:flex;gap:8px;align-items:center}
+.dots{background:var(--card);border:0;border-radius:12px;width:46px;height:40px;font-size:18px;font-weight:700;color:var(--fg);cursor:pointer;letter-spacing:1px}
+.bal{text-align:right;font-size:11px;color:var(--mut)}.bal b{display:block;font:700 18px var(--fd);color:var(--fg)}
+.cv{position:relative;background:#120a24;border-radius:14px;overflow:hidden}
+.cv svg{display:block;width:100%;height:auto}
+.ttag{position:absolute;right:8px;bottom:8px;background:#ffffff1c;border-radius:6px;padding:2px 7px;font:700 12px var(--fm)}
+.ctl{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.fld{background:var(--card);border-radius:12px;padding:8px 10px;display:flex;justify-content:space-between;align-items:center;gap:6px;font:600 15px var(--fm)}
+.fld label{display:block;font:500 11px var(--fb);color:var(--mut);margin-bottom:4px}
+.fld button{width:30px;height:30px;border-radius:8px;border:0;background:var(--card2);font-weight:800;font-size:16px;color:var(--fg)}
+.pl{display:flex;justify-content:space-between;color:var(--mut);font-size:12.5px;align-items:center}
+.tb{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.tb button{border:0;border-radius:14px;padding:16px;font:700 16px var(--fd);color:#fff;cursor:pointer}
+.buy{background:#1f8f4e}.sell{background:#c23b4f}
+.off{opacity:.38;pointer-events:none;filter:saturate(.7)}
+.tg{position:relative;outline:2px solid var(--ok);outline-offset:2px;border-radius:14px;animation:tgp 1.4s ease-in-out infinite}
+.tg::before{content:attr(data-n);position:absolute;top:-10px;left:-8px;width:20px;height:20px;border-radius:50%;background:var(--ok);color:#06210f;font:800 11px/20px var(--fd);text-align:center;z-index:3}
+@keyframes tgp{50%{outline-color:#3ddc9755}}
+.hint{position:absolute;z-index:6;background:#16322a;border:1px solid var(--ok);border-radius:12px;padding:10px 12px;font-size:13px;line-height:1.4;max-width:230px;box-shadow:0 8px 24px #0008}
+.pop{position:absolute;z-index:5;left:0;right:0;top:46px;background:#1b1233;border:1px solid var(--line);border-radius:18px;padding:12px;display:grid;gap:10px;box-shadow:0 14px 40px #000a}
+.pop h4{margin:2px 0 0;font:600 12.5px var(--fb);color:var(--mut)}
+.srow{display:flex;justify-content:space-between;align-items:center;background:var(--card);border-radius:12px;padding:14px;font:700 14px var(--fd);border:0;width:100%;color:var(--fg);cursor:pointer}
+.sw{width:46px;height:26px;border-radius:99px;background:#ffffff26;position:relative;transition:.2s}.sw::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:.2s}
+.sw.on{background:var(--ok)}.sw.on::after{left:23px}
+.opts{display:grid;gap:8px}.opts.c4{grid-template-columns:repeat(4,1fr)}.opts.c5{grid-template-columns:repeat(5,1fr)}
+.opt{border:0;border-radius:11px;background:var(--card);padding:12px 4px;font:700 13px var(--fd);color:var(--fg);cursor:pointer}
+.opt.on{background:#4b2f8f}
+.cd{position:absolute;z-index:6;left:50%;top:84px;transform:translateX(-50%);display:grid;justify-items:center;gap:6px;text-align:center;background:#16322aee;border:1px solid var(--ok);border-radius:16px;padding:14px 18px;box-shadow:0 8px 28px #000a;pointer-events:none}
+.cdc{width:62px;height:62px;border-radius:50%;border:3px solid var(--ok);display:grid;place-items:center}
+.fin{border:1px solid var(--ok);background:#12301f;border-radius:18px;padding:16px;display:grid;gap:10px}
 .pshead{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-top:6px}
 .pshead b{font:700 16px var(--fd);white-space:nowrap}
 .pshead span{font-size:11px;text-align:right}
@@ -438,9 +489,182 @@ async function viewDeals(){
 }
 
 let lessons=null;
+
+/* ---------- Урок 1: учебный терминал ---------- */
+const PAIRS=['EUR/USD OTC','GBP/USD OTC','AUD/CHF OTC','AUD/USD OTC','USD/JPY OTC','EUR/JPY OTC'];
+const IVS=['S5','S10','S15','S30','M1','M2','M3','M5','M10','M15'];
+const IV_G={S5:2,S10:2,S15:2,S30:2,M1:3,M2:4,M3:5,M5:6,M10:8,M15:10};
+function fsShell(pill,body){
+  const bottom=me.access?null:el('div',{class:'fs-bottom'},el('button',{class:'btn o',type:'button',onclick:()=>go('home')},'Всё понятно — регистрация'));
+  root.replaceChildren(
+    el('div',{class:'hd fs-hd'},el('div',{class:'brand'},el('button',{class:'xbtn',type:'button','aria-label':'Закрыть урок',onclick:()=>{tab='trainer';render()}},'✕'),el('b',{},'Тренажёр')),
+      el('div',{class:'hr'},el('button',{class:'pillb',type:'button',onclick:support},svgEl(CHAT_ICON),'Поддержка'),el('span',{class:'steppill'},pill))),
+    el('main',{class:'fs-main'},body),bottom);
+}
+const TIMES=[5,10,15,30,60,120,300];
+const hms=n=>'00:'+String(Math.floor(n/60)).padStart(2,'0')+':'+String(n%60).padStart(2,'0');
+const usd=n=>n.toLocaleString('ru-RU',{minimumFractionDigits:2,maximumFractionDigits:2}).replace(/ /g,' ')+' $';
+function lesson1(){
+  clearTimers();
+  const st={view:'pairs',pair:PAIRS[0],popup:false,timer:false,type:'line',iv:'M1',tt:60,ti:4,sum:10,paired:false,trade:null,result:null,bal:1000};
+  let price=1.0795,pts=[];for(let i=0;i<130;i++){price+=(Math.random()-.5)*.0003;pts.push(price)}
+  let svg=null,ttag=null,nEl=null,tipEl=null,bigEl=null;
+  const fmtT=n=>Math.floor(n/60)+':'+String(n%60).padStart(2,'0');
+  const until=()=>((st.tt-45)+60)%60;
+  const target=()=>{
+    if(st.view!=='term'||st.result)return null;
+    if(st.trade)return 'wait';
+    if(!st.popup&&!st.timer&&st.type==='line')return 'dots';
+    if(!st.timer)return 'timer';if(st.type!=='candles')return 'candles';if(st.iv!=='M5')return 'M5';
+    if(TIMES[st.ti]!==5)return 'time';if(st.sum!==30)return 'sum';if(!st.paired)return 'pair';
+    return 'buy';
+  };
+  const needMsg={dots:'Нажми ••• рядом с парой',timer:'Включи «Показывать таймер»',candles:'Выбери тип графика «Свечи»',M5:'Выбери интервал M5',time:'Нажми «−», пока время не станет 00:00:05',sum:'Нажми «+», пока сумма не станет 30 $',pair:'Нажми на пару из сигнала',buy:'Нажми «Купить» на 0:45 таймера',wait:'Сделка идёт, дождитесь результата'};
+  const guard=(name,fn)=>()=>{const t=target();if(t===name)fn();else if(t)toast(needMsg[t])};
+
+  function chart(){
+    const W=360,H=215,X1=300,top=12,bot=H-14;
+    const seen=pts.slice(-96);
+    let units;
+    if(st.type==='line')units=seen.map(v=>({o:v,c:v,h:v,l:v}));
+    else{const g=IV_G[st.iv];units=[];for(let i=0;i+g<=seen.length;i+=g){const a=seen.slice(i,i+g);units.push({o:a[0],c:a[a.length-1],h:Math.max(...a),l:Math.min(...a)})}units=units.slice(-26)}
+    let lo=Math.min(...units.map(u=>u.l)),hi=Math.max(...units.map(u=>u.h));
+    if(st.trade){lo=Math.min(lo,st.trade.entry);hi=Math.max(hi,st.trade.entry)}
+    const r=(hi-lo)||1e-4;
+    const Y=v=>bot-((v-lo)/r)*(bot-top-6)-3;
+    let h='<g stroke="#fff" stroke-opacity=".06">'+[0,1,2,3].map(i=>'<line x1="0" x2="'+X1+'" y1="'+(top+i*(bot-top)/3)+'" y2="'+(top+i*(bot-top)/3)+'"/>').join('')+'</g>';
+    const n=units.length,dx=X1/(n+(st.type==='line'?0:1));
+    if(st.type==='line'){h+='<polyline fill="none" stroke="#6ee0a8" stroke-width="1.8" points="'+units.map((u,i)=>(i*dx).toFixed(1)+','+Y(u.c).toFixed(1)).join(' ')+'"/>'}
+    else units.forEach((u,i)=>{const x=(i+.5)*dx,up=u.c>=u.o,col=up?'#43b82f':'#ff3b1d';
+      h+='<line x1="'+x.toFixed(1)+'" x2="'+x.toFixed(1)+'" y1="'+Y(u.h).toFixed(1)+'" y2="'+Y(u.l).toFixed(1)+'" stroke="'+col+'"/><rect x="'+(x-dx*.32).toFixed(1)+'" y="'+Math.min(Y(u.o),Y(u.c)).toFixed(1)+'" width="'+(dx*.64).toFixed(1)+'" height="'+Math.max(1.5,Math.abs(Y(u.o)-Y(u.c))).toFixed(1)+'" fill="'+col+'"/>'});
+    const last=units[n-1].c;
+    h+='<line x1="0" x2="'+X1+'" y1="'+Y(last).toFixed(1)+'" y2="'+Y(last).toFixed(1)+'" stroke="#6ee0a8" stroke-opacity=".5" stroke-dasharray="3 3"/>';
+    if(st.trade)h+='<line x1="0" x2="'+X1+'" y1="'+Y(st.trade.entry).toFixed(1)+'" y2="'+Y(st.trade.entry).toFixed(1)+'" stroke="#fff" stroke-opacity=".8" stroke-width="1.3"/><text x="4" y="'+(Y(st.trade.entry)-4).toFixed(1)+'" fill="#fff" font-size="10" font-weight="700" font-family="Montserrat,sans-serif">вход</text>';
+    for(let i=0;i<4;i++){const v=hi-(hi-lo)*i/3;h+='<text x="'+(X1+6)+'" y="'+(Y(v)+3).toFixed(1)+'" fill="#8d82ab" font-size="10" font-family="Montserrat,sans-serif">'+v.toFixed(5)+'</text>'}
+    h+='<rect x="'+(X1+2)+'" y="'+(Y(last)-8).toFixed(1)+'" width="58" height="16" rx="4" fill="#1f8f4e"/><text x="'+(X1+6)+'" y="'+(Y(last)+4).toFixed(1)+'" fill="#fff" font-size="10.5" font-weight="700" font-family="Montserrat,sans-serif">'+last.toFixed(5)+'</text>';
+    return h;
+  }
+  function paint(){if(svg)svg.innerHTML=chart();if(ttag){ttag.hidden=!st.timer;ttag.textContent=fmtT(st.tt)}}
+  function liveText(){
+    const t=target(),n=until(),now=n===0||n>=58||n<=0;
+    if(t==='buy'){
+      const inWin=st.tt>=42&&st.tt<=48;
+      if(nEl)nEl.textContent=inWin?'!':String(n);
+      if(bigEl)bigEl.textContent=inWin?'Сейчас! Жми «Купить»':'секунд до входа. На 0:45 жми «Купить»';
+      if(tipEl)tipEl.textContent=inWin?'Таймер свечи показывает 0:45 — жми «Купить»':'Жди: через '+n+' '+(n%10===1&&n!==11?'секунду':[2,3,4].includes(n%10)&&![12,13,14].includes(n)?'секунды':'секунд')+' таймер свечи покажет 0:45 — тогда жми «Купить»';
+    }
+    if(t==='wait'&&st.trade){if(nEl)nEl.textContent=String(st.trade.left);if(tipEl)tipEl.textContent='Сделка открыта: до конца '+st.trade.left+' с'}
+  }
+  function finishTrade(){
+    const tr=st.trade,diff=price-tr.entry;
+    const res=diff>0?'win':diff<0?'loss':'draw';
+    st.result={res,pnl:res==='win'?st.sum*.92:res==='loss'?-st.sum:0};
+    st.bal=Math.round((st.bal+st.result.pnl)*100)/100;st.trade=null;termView();
+  }
+  timers.push(setInterval(()=>{price+=(Math.random()-.5)*.0003;pts.push(price);if(pts.length>400)pts.shift();paint()},700));
+  timers.push(setInterval(()=>{
+    st.tt=st.tt<=0?60:st.tt-1;if(ttag)ttag.textContent=fmtT(st.tt);
+    if(st.trade){st.trade.left--;if(st.trade.left<=0)return finishTrade()}
+    liveText();
+  },1000));
+
+  const pairsView=()=>{
+    fsShell('Шаг 1 · сигнал',[
+      el('div',{class:'fs-tip'},'Выбери валютную пару — получишь учебный сигнал'),
+      el('div',{class:'ptabs'},el('button',{type:'button',class:'on'},'Валюты OTC'),el('button',{type:'button',disabled:''},'Крипта · скоро'),el('button',{type:'button',disabled:''},'Акции · скоро')),
+      PAIRS.map(p=>el('button',{class:'prow',type:'button',onclick:()=>{st.pair=p;st.view='signal';signalView()}},el('span',{},p),el('span',{class:'pay'},'+92%'))),
+      el('div',{class:'note'},'Перед началом торговли проверяйте процент выплаты на платформе Pocket Option — он может меняться.')]);
+  };
+  const signalView=()=>{
+    const d=new Date(),hh=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+    fsShell('Шаг 1 · сигнал',[
+      el('div',{class:'fs-tip'},'Учебный сигнал по '+st.pair),
+      el('div',{class:'sig'},el('span',{class:'demo'},'Учебный пример · не для торговли'),el('h3',{},'Сигнал готов'),
+        el('div',{class:'r'},el('span',{},'Время'),el('b',{},hh)),
+        el('div',{class:'r'},el('span',{},'Пара'),el('b',{},st.pair)),
+        el('div',{class:'r'},el('span',{},'Направление'),el('b',{style:'color:var(--ok)'},'ВВЕРХ (BUY)')),
+        el('div',{class:'r'},el('span',{},'Настройки'),el('b',{},'Свечи · M5 · сделка 5 сек')),
+        el('div',{class:'r'},el('span',{},'Вход'),el('b',{},'на 0:45')),
+        el('div',{class:'r'},el('span',{},'Ставка'),el('b',{},'1–3% от депозита')),
+        el('button',{class:'btn',type:'button',style:'margin-top:8px',onclick:()=>{st.view='term';termView()}},'Открыть терминал')),
+      el('div',{class:'note'},'Это пример для обучения: он не основан на анализе рынка. Настоящие сигналы приходят в боте и в разделе «Главная» после открытия доступа.')]);
+  };
+  const termView=()=>{
+    const t=target();
+    nEl=tipEl=bigEl=null;
+    const mark=(name,node,n)=>{if(t===name){node.classList.add('tg');node.setAttribute('data-n',n)}return node};
+    const dim=n=>{n.classList.add('off');return n};
+    const tips={dots:'Сначала настроим график. Нажми на три точки ••• рядом с парой',timer:'2 — включи таймер, 3 — выбери «Свечи», 4 — интервал M5',candles:'2 — включи таймер, 3 — выбери «Свечи», 4 — интервал M5',M5:'2 — включи таймер, 3 — выбери «Свечи», 4 — интервал M5',
+      time:'5 — время сделки 5 секунд, 6 — сумма 3% от депозита, 7 — пара из сигнала',sum:'5 — время сделки 5 секунд, 6 — сумма 3% от депозита, 7 — пара из сигнала',pair:'5 — время сделки 5 секунд, 6 — сумма 3% от депозита, 7 — пара из сигнала'};
+    const pills={dots:'Урок 1 · шаг 1',timer:'Урок 1 · шаги 2–4',candles:'Урок 1 · шаги 2–4',M5:'Урок 1 · шаги 2–4',time:'Урок 1 · шаги 5–7',sum:'Урок 1 · шаги 5–7',pair:'Урок 1 · шаги 5–7',buy:'Урок 1 · вход',wait:'Урок 1 · сделка'};
+    const pill=st.result?'Урок 1 · итог':pills[t];
+    const dots=mark('dots',el('button',{class:'dots',type:'button','aria-label':'Настройки графика',onclick:guard('dots',()=>{st.popup=true;termView()})},'•••'),1);
+    if(t!=='dots')dim(dots);
+    svg=svgEl('<svg viewBox="0 0 360 215" role="img" aria-label="Учебный график"></svg>');
+    ttag=el('div',{class:'ttag',hidden:''});
+    const cv=el('div',{class:'cv'},svg,ttag);
+    if(t!=='buy'&&t!=='wait'&&!st.result)dim(cv);
+    const chip=mark('pair',el('div',{class:'chip',style:'cursor:pointer',role:'button',tabindex:'0',onclick:guard('pair',()=>{st.paired=true;termView()})},st.pair,el('span',{class:'pay'},'+92%')),7);
+    if(t!=='pair')dim(chip);
+    const bal=el('div',{class:'bal'},'Учебный баланс',el('b',{},usd(st.bal).replace(',00 $',' $')));
+    dim(bal);
+    // время и сумма
+    const stepBtn=(txt,label,fn)=>el('button',{type:'button','aria-label':label,onclick:fn},txt);
+    const timeF=mark('time',el('div',{class:'fld'},el('div',{},el('label',{},'Время'),hms(TIMES[st.ti])),el('div',{style:'display:flex;gap:6px'},
+      stepBtn('−','Меньше времени',()=>{if(target()==='time'){st.ti=Math.max(0,st.ti-1);termView()}else toast(needMsg[target()]||'')}),
+      stepBtn('+','Больше времени',()=>toast(needMsg[target()]||'')))),5);
+    const sumF=mark('sum',el('div',{class:'fld'},el('div',{},el('label',{},'Сумма'),st.sum+' $'),el('div',{style:'display:flex;gap:6px'},
+      stepBtn('−','Меньше',()=>toast(needMsg[target()]||'')),
+      stepBtn('+','Больше',()=>{if(target()==='sum'){st.sum=Math.min(30,st.sum+10);termView()}else toast(needMsg[target()]||'')}))),6);
+    if(t!=='time')dim(timeF);if(t!=='sum')dim(sumF);
+    const ctl=el('div',{class:'ctl'},timeF,sumF);
+    const hintTxt=t==='time'?el('span',{},el('b',{},'5 · Время: '),'00:00:05 — жми «−», чтобы выставить'):t==='sum'?el('span',{},el('b',{},'6 · Сумма: '),'1–3% от 1 000 $ = 10–30 $. Здесь ставим ',el('b',{},'30 $'),' — жми «+»'):null;
+    const ctlw=el('div',{style:'position:relative'},ctl,hintTxt?el('div',{class:'hint',style:'left:0;right:0;max-width:none;bottom:calc(100% + 8px)'},hintTxt):null);
+    const pl=dim(el('div',{class:'pl'},el('span',{},'Выплата '+usd(st.sum*1.92)),el('span',{class:'pay'},'+92%'),el('span',{},'Прибыль +'+usd(st.sum*.92))));
+    const buy=mark('buy',el('button',{class:'buy',type:'button',onclick:guard('buy',()=>{
+      if(st.tt>=42&&st.tt<=48){st.trade={entry:price,left:5};termView()}
+      else toast(st.tt>48?'Рано: подождите, пока таймер дойдёт до 0:45':'Поздно: дождитесь следующего круга таймера')})},'Купить'),8);
+    const sell=el('button',{class:'sell',type:'button',onclick:()=>toast('В сигнале указано «Вверх», то есть «Купить»')},'Продать');
+    const tb=el('div',{class:'tb'},buy,sell);
+    if(t!=='buy')dim(tb);
+    const row0=el('div',{class:'trow'},el('div',{class:'trow',style:'gap:8px;position:relative'},chip,dots),bal);
+    const termBody=el('div',{class:'term'},row0,cv,ctlw,pl,tb);
+    if(st.popup&&!st.result&&!st.trade){
+      const tsw=mark('timer',el('button',{class:'srow',type:'button',onclick:guard('timer',()=>{st.timer=true;termView()})},'Показывать таймер',el('span',{class:'sw'+(st.timer?' on':'')})),2);
+      const types=[['line','Линия'],['candles','Свечи'],['bars','Бары'],['heikin','Heikin']].map(([k,n])=>{const b=el('button',{class:'opt'+(st.type===k?' on':''),type:'button',onclick:k==='candles'?guard('candles',()=>{st.type='candles';termView()}):()=>{if(k!==st.type)toast(needMsg[target()]||'')}},n);return k==='candles'?mark('candles',b,3):b});
+      const ivs=IVS.map(k=>{const b=el('button',{class:'opt'+(st.iv===k?' on':''),type:'button',onclick:k==='M5'?guard('M5',()=>{st.iv='M5';st.popup=false;termView()}):()=>{if(k!==st.iv)toast(needMsg[target()]||'')}},k);return k==='M5'?mark('M5',b,4):b});
+      termBody.append(el('div',{class:'pop'},tsw,el('h4',{},'Тип графика'),el('div',{class:'opts c4'},types),el('h4',{},'Интервал'),el('div',{class:'opts c5'},ivs)));
+    }
+    if(t==='dots')termBody.append(el('div',{class:'hint',style:'left:40px;top:92px'},el('b',{},'1 · Настройки графика:'),el('br'),'нажми •••'));
+    if(t==='pair')termBody.append(el('div',{class:'hint',style:'left:0;top:54px'},el('b',{},'7 · Пара: '),st.pair+', как в сигнале. Нажми на неё'));
+    if(t==='buy'||t==='wait'){
+      nEl=el('b',{style:'font:800 34px var(--fd)'});bigEl=el('span',{style:'font-size:12.5px;max-width:170px'});
+      termBody.append(el('div',{class:'cd'},el('div',{class:'cdc'},nEl),bigEl));
+    }
+    let tipNode;
+    if(st.result){
+      const r=st.result;
+      tipNode=el('div',{class:'fs-tip'},r.res==='win'?'Сделка закрылась в плюс':r.res==='loss'?'Сделка закрылась в минус':'Цена закрылась на уровне входа');
+    }else tipNode=el('div',{class:'fs-tip'},tips[t]||'');
+    if(t==='buy'||t==='wait'){tipEl=tipNode;}
+    const body=[tipNode,termBody];
+    if(st.result){
+      const r=st.result,col=r.res==='win'?'var(--ok)':r.res==='loss'?'var(--bad)':'var(--warn)';
+      body.push(el('div',{class:'fin',style:'border-color:'+col},
+        el('b',{style:'font:700 18px var(--fd);color:'+col},r.res==='win'?'+'+usd(r.pnl):r.res==='loss'?'−'+usd(-r.pnl):'Возврат: 0 $'),
+        el('div',{class:'sm'},'Это учебный результат: график смоделирован, и исход получился случайным. В реальной торговле сигнал тоже не гарантирует плюс, поэтому ставка не больше 1–3% от депозита. Учебный баланс: '+usd(st.bal).replace(',00 $',' $')+'.'),
+        el('button',{class:'btn',type:'button',onclick:async()=>{try{await api('/trainer/1/done',{method:'POST'})}catch{}tab='trainer';render()}},'Завершить урок')));
+    }
+    fsShell(pill,body);
+    paint();liveText();
+  };
+  pairsView();
+}
+
 async function viewTrainer(sel){
   if(!me)await refreshMe();
   lessons=await api('/trainer');
+  if(sel===1)return lesson1();
   if(sel){return lessonView(lessons.find(l=>l.id===sel))}
   const next=lessons.find(l=>!l.done)||lessons[0];
   shell('Тренажёр',[el('div',{},el('h2',{style:'font-size:20px'},'Тренажёр'),
