@@ -168,7 +168,7 @@ function showApp(){
   if(me.role==='admin')items.splice(1,0,['signals','Сигналы']);
   if(me.role==='analyst'){items.length=0;items.push(['signals','Сигналы']);if(tab!=='signals')tab='signals'}
   if(me.role==='admin')items.push(['push','Пуши'],['media','Медиа'],['pb','Постбеки']);
-  const nav=$('#nav');nav.replaceChildren(...items.map(([k,t])=>el('button',{type:'button','data-t':k,class:k===tab?'on':'',onclick:()=>{tab=k;showApp();render()}},icon(k),el('span',{class:'lbl'},t))));
+  const nav=$('#nav');nav.replaceChildren(...items.map(([k,t])=>el('button',{type:'button','data-t':k,class:k===tab?'on':'',onclick:()=>{tab=k;showApp();render()}},icon(k),el('span',{class:'lbl'},k==='chats'?chatsLabel:t))));
   render();updateBadge();
 }
 
@@ -272,9 +272,10 @@ async function viewStaff(){
 
 let poll=null;
 function stopPoll(){if(poll){clearInterval(poll);poll=null}}
+let chatsLabel='Чаты';
 async function updateBadge(){
   if(!me||!['admin','teamlead','streamer'].includes(me.role))return;
-  try{const c=await api('/chats');const n=c.filter(x=>x.waiting).length;const b=document.querySelector('[data-t=chats] .lbl');if(b)b.textContent='Чаты '+c.length+(n?' ('+n+')':'')}catch{}
+  try{const c=await api('/chats');const n=c.filter(x=>x.waiting).length;chatsLabel='Чаты '+c.length+(n?' ('+n+')':'');const b=document.querySelector('[data-t=chats] .lbl');if(b&&b.textContent!==chatsLabel)b.textContent=chatsLabel}catch{}
 }
 setInterval(updateBadge,20000);
 
