@@ -265,16 +265,19 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
         if (handle && !config.disableBot) {
           const chat = await bot.api.getChat('@' + handle);
           const fid = chat.photo?.small_file_id;
+          if (!fid) req.log.warn({ handle }, 'avatar: у чата нет фото или бот его не видит');
           if (fid) {
             const f = await bot.api.getFile(fid);
             const resp = await fetch(`https://api.telegram.org/file/bot${config.botToken}/${f.file_path}`);
+            if (!resp.ok) req.log.warn({ handle, status: resp.status }, 'avatar: Telegram не отдал файл');
             if (resp.ok) {
               hit.data = Buffer.from(await resp.arrayBuffer());
               if (f.file_path?.endsWith('.png')) hit.type = 'image/png';
             }
           }
         }
-      } catch {
+      } catch (e) {
+        req.log.warn({ err: String(e) }, 'avatar: ошибка запроса к Telegram');
         hit.until = Date.now() + 300_000;
       }
       photoCache.set(id, hit);
