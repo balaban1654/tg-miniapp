@@ -156,9 +156,9 @@ async function viewLeads(){
   const rows=await api('/leads');
   const showOwner=me.role==='admin'||me.role==='teamlead';
   const showComm=me.role==='admin';
-  const cols=['Лид','Статус',...(showOwner?['Владелец']:[]),'Ссылка','Пришёл','Депозиты',...(showComm?['Комиссия']:[])];
+  const cols=['Лид','Telegram ID','Pocket ID','Статус',...(showOwner?['Владелец']:[]),'Ссылка','Пришёл','Депозиты',...(showComm?['Комиссия']:[])];
   return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Лиды'),el('span',{class:'mut'},rows.length+' всего')),
-    table(cols,rows.map(r=>[td(r.username?'@'+r.username:(r.first_name||r.tg_id)),el('td',{},pill(r.status)),...(showOwner?[td(r.owner_name||'не закреплён')]:[]),td(r.link_slug||'—'),td(date(r.created_at)),td(money(r.deposits),'n'),...(showComm?[td(money(r.commission),'n')]:[])]),
+    table(cols,rows.map(r=>[td(r.username?'@'+r.username:(r.first_name||r.tg_id)),td(r.tg_id,'n'),td(r.trader_id||'—','n'),el('td',{},pill(r.status)),...(showOwner?[td(r.owner_name||'не закреплён')]:[]),td(r.link_slug||'—'),td(date(r.created_at)),td(money(r.deposits),'n'),...(showComm?[td(money(r.commission),'n')]:[])]),
       'Лидов пока нет. Они появятся, когда люди перейдут по вашим ссылкам и нажмут «Старт» в боте.')];
 }
 

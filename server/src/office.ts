@@ -311,7 +311,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
       extra = ` AND d.status = $1`;
     }
     const r = await db.query(
-      `SELECT d.tg_id, d.username, d.first_name, d.status, d.access, d.created_at, d.owner_id,
+      `SELECT d.tg_id, d.trader_id, d.username, d.first_name, d.status, d.access, d.created_at, d.owner_id,
               s.name AS owner_name, l.slug AS link_slug,
               coalesce((SELECT sum(amount) FROM events e WHERE e.tg_id = d.tg_id AND e.type IN ('ftd','dep')),0) AS deposits,
               coalesce((SELECT sum(amount) FROM events e WHERE e.tg_id = d.tg_id AND e.type = 'comm'),0) AS commission
