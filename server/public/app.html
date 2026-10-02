@@ -16,6 +16,9 @@
 --fd:'Montserrat',system-ui,sans-serif;--fb:'Montserrat',system-ui,sans-serif;--fm:'Montserrat',system-ui,sans-serif;color-scheme:dark}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;height:100%}
+/* Полосу прокрутки не показываем, листать экран можно как обычно */
+html{scrollbar-width:none;-ms-overflow-style:none}
+html::-webkit-scrollbar,body::-webkit-scrollbar,*::-webkit-scrollbar{display:none;width:0;height:0}
 body{font-variant-numeric:tabular-nums;background:linear-gradient(180deg,#1a0f33,#0d0817 45%) fixed,var(--bg);color:var(--fg);font:14px/1.5 var(--fb);overscroll-behavior:none}
 h1,h2,h3{font-family:var(--fd);margin:0;line-height:1.25}
 button{font:inherit;color:inherit}
@@ -37,7 +40,8 @@ main{flex:1;padding:6px 16px 96px;display:grid;gap:12px;align-content:start}
 .ok{color:var(--ok)} .bad{color:var(--bad)}
 .stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.stats>*{min-width:0}
 .stats.s3{grid-template-columns:repeat(3,minmax(0,1fr))}
-.stat{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 12px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 8px 10px 12px}
+.stat span{font-size:11px}
 .stat b{display:block;font:700 20px var(--fm)}
 .btn{display:block;width:100%;text-align:center;background:var(--acc);color:#fff;border:0;border-radius:14px;padding:13px;font-weight:700;font-size:14px;cursor:pointer}
 .btn:active{transform:scale(.98)}.btn.o{background:none;border:1px solid var(--acc);color:var(--acc2)}.btn:disabled{opacity:.45}
