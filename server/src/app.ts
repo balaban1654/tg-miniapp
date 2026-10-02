@@ -96,7 +96,7 @@ export const LESSONS = [
  * Днём новая строка появляется каждые 5–7 минут, вечером (с 18:00) каждые 2–4 минуты, старая уходит.
  * Пары идут разные, минус редкий. Всё считается от времени, поэтому у всех клиентов одинаково.
  */
-function demoPast() {
+function demoPast(preview = false) {
   const pairs = ['EUR/USD', 'GBP/USD', 'AUD/CHF', 'EUR/GBP', 'AUD/USD', 'USD/JPY', 'EUR/JPY', 'GBP/JPY', 'AUD/CAD', 'EUR/CAD', 'CAD/JPY', 'CHF/JPY', 'NZD/USD', 'USD/CAD', 'USD/CHF', 'GBP/CHF', 'EUR/CHF'].map((p) => p + ' OTC');
   const h = (n: number) => {
     let x = Math.imul(n ^ 0x9e3779b9, 0x85ebca6b);
@@ -126,14 +126,19 @@ function demoPast() {
   events.sort((x, y) => y.at - x.at);
   return events.slice(0, 5).map((e) => {
     const slot = Math.floor(e.at / 120_000); // у событий с интервалом от 2 минут слоты разные, пары на 5 соседних строках не повторяются
+    // Предпросмотр для тестовых аккаунтов: так блок будет выглядеть с реальными голосами. Утром и днём 20–50, вечером и ночью 50–96
+    const hr = Number(hourFmt.format(new Date(e.at)));
+    const day = hr >= 6 && hr < 18;
+    const votes = day ? 20 + (h(slot + 5) % 31) : 50 + (h(slot + 5) % 47);
     return {
       id: -Math.floor(e.at / 1000),
+      preview,
       pair: pairs[(slot * 5) % pairs.length],
       direction: h(slot + 1) % 2 ? 'up' : 'down',
       entry_at: new Date(e.at).toISOString(),
       is_test: true,
-      wins: e.loss ? 0 : 1,
-      losses: e.loss ? 1 : 0,
+      wins: e.loss ? 0 : preview ? votes : 1,
+      losses: e.loss ? (preview ? votes : 1) : 0,
     };
   });
 }
@@ -292,7 +297,8 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
       [],
     );
     if (r.rowCount) return r.rows;
-    return demoPast();
+    const t = await db.query('SELECT is_tester FROM leads WHERE tg_id = $1', [req.tg!.id]);
+    return demoPast(Boolean(t.rows[0]?.is_tester));
   });
 
   // Клиент отмечает, что вошёл в сделку по сигналу. Дальше он отмечает итог

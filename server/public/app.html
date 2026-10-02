@@ -466,7 +466,7 @@ async function pastSignals(){
   const wrap=el('div',{});
   const build=rows=>{
     const allTest=rows.length>0&&rows.every(r=>r.is_test);
-    const head=el('div',{class:'pshead'},el('b',{},'Прошедшие сигналы'),allTest?null:el('span',{class:'sm'},'по отметкам участников'));
+    const head=el('div',{class:'pshead'},el('b',{},'Прошедшие сигналы'),allTest?(rows[0].preview?el('span',{class:'sm',style:'color:var(--warn);font-weight:700'},'Предпросмотр, видите только вы'):null):el('span',{class:'sm'},'по отметкам участников'));
     if(!rows.length)return[head,el('div',{class:'card sm'},'Завершённых сигналов пока нет.')];
     return[head,el('div',{class:'pslist'},rows.map(r=>{
       const n=r.wins+r.losses,up=r.direction==='up';
@@ -474,7 +474,7 @@ async function pastSignals(){
       const lab=cls==='w'?'Плюс':cls==='l'?'Минус':(n===0?'Нет итогов':'Поровну');
       const t=new Date(r.entry_at).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
       return el('div',{class:'ps'},
-        el('div',{class:'row'},el('div',{},el('b',{},r.pair+' · '+(up?'ВВЕРХ':'ВНИЗ')),el('div',{class:'sm'},t+' · '+(r.is_test?'ТЕСТ':n+' '+plural(n,'отметка','отметки','отметок')))),el('span',{class:'pbadge '+cls},lab)),
+        el('div',{class:'row'},el('div',{},el('b',{},r.pair+' · '+(up?'ВВЕРХ':'ВНИЗ')),el('div',{class:'sm'},t+' · '+(r.is_test&&!r.preview?'ТЕСТ':n+' '+plural(n,r.preview?'голос':'отметка',r.preview?'голоса':'отметки',r.preview?'голосов':'отметок')))),el('span',{class:'pbadge '+cls},lab)),
         el('div',{class:'pbar'},n?[el('i',{class:'g',style:'width:'+(r.wins/n*100)+'%'}),el('i',{class:'r',style:'width:'+(r.losses/n*100)+'%'})]:null));
     }))];
   };
