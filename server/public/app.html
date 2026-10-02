@@ -514,7 +514,7 @@ function signalLive(sg,skew,cfg){
   paint();timers.push(setInterval(paint,500));
   const pocket=()=>{const u=cfg.pocketUrl||(me&&me.registerUrl&&(me.registerUrl.ru||me.registerUrl.ww))||'https://pocketoption.com/';openLink(u)};
   return el('div',{class:'sig rise'},el('h3',{},'Сигнал готов'),
-    sg.is_test?el('div',{class:'sm',style:'color:var(--warn)'},'Тестовый сигнал. Не для торговли.'):null,
+    sg.is_test?el('div',{class:'sm',style:'color:var(--warn);font-weight:700'},sg.source==='test'?'ТЕСТОВЫЙ СИГНАЛ: направление выбрано случайно, это не анализ. Не для торговли.':'Тестовый сигнал. Не для торговли.'):null,
     row('Время',hms(entry)),row('Точка входа',cfg.entryLabel),row('Пара',sg.pair),
     el('div',{class:'r'},el('span',{},'Направление'),el('b',{style:'color:var(--'+(up?'ok':'bad')+')'},up?'ВВЕРХ (BUY)':'ВНИЗ (SELL)')),
     row('Время сделки',sg.expiry_sec?fmtDur(sg.expiry_sec):sg.expiry_min+' мин'),row('Ставка',cfg.stakeLabel),

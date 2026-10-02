@@ -469,8 +469,8 @@ async function signalConfigBlock(){
     const upd=async()=>{try{await api('/signal-pairs',{method:'PUT',body:{pair:p.pair,enabled:en.checked,sort:p.sort}});flash('Сохранено')}catch(x){fail(x)}};
     en.onchange=upd;
     return[td(p.pair),el('td',{},en),
-      el('td',{style:'white-space:nowrap'},dirBtn(p,'up','Вверх'),dirBtn(p,'down','Вниз'),el('button',{class:'btn s '+(p.auto?'':'o'),type:'button',title:'Тест: направление каждую минуту разное, выдаётся только тестовым аккаунтам с пометкой ТЕСТ',style:'margin-right:6px',onclick:()=>setDir(p.pair,'auto')},'Авто'),el('button',{class:'btn o s',type:'button',onclick:()=>setDir(p.pair,'')},'Сброс')),
-      td(p.auto?'Авто · только тестовые аккаунты':p.direction?(p.direction==='up'?'Вверх':'Вниз')+' · '+left(p)+(p.direction_by?' · '+p.direction_by:''):'не задано'),
+      el('td',{style:'white-space:nowrap'},dirBtn(p,'up','Вверх'),dirBtn(p,'down','Вниз'),el('button',{class:'btn s '+(p.auto?'':'o'),type:'button',title:'Тест: направление случайное, каждую минуту своё. Выдаётся всем, но карточка помечена как тестовая',style:'margin-right:6px',onclick:()=>setDir(p.pair,'auto')},'Авто'),el('button',{class:'btn o s',type:'button',onclick:()=>setDir(p.pair,'')},'Сброс')),
+      td(p.auto?'Авто · тест, случайное направление':p.direction?(p.direction==='up'?'Вверх':'Вниз')+' · '+left(p)+(p.direction_by?' · '+p.direction_by:''):'не задано'),
       el('td',{},isAdmin?el('button',{class:'btn o s',type:'button',onclick:async()=>{try{await api('/signal-pairs?pair='+encodeURIComponent(p.pair),{method:'DELETE'});render()}catch(x){fail(x)}}},'Удалить'):null)];
   });
   return el('div',{style:'display:grid;gap:12px'},

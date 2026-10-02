@@ -311,7 +311,7 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
   // Сигнал по запросу остаётся у клиента, пока он его не оценит
   const ACTIVE = `((s.requested_by IS NULL AND now() <= s.entry_at + interval '3 minutes' AND s.created_at > now() - interval '2 hours')
        OR (s.requested_by = d.tg_id AND NOT EXISTS (SELECT 1 FROM signal_steps t WHERE t.signal_id = s.id AND t.tg_id = d.tg_id)))
-     AND ((NOT s.is_test AND d.access) OR (s.is_test AND d.is_tester))
+     AND ((NOT s.is_test AND d.access) OR (s.is_test AND d.is_tester) OR s.requested_by = d.tg_id)
      AND (s.requested_by IS NULL OR s.requested_by = d.tg_id)`;
   app.get('/signals/active', { preHandler: auth }, async (req) => {
     const r = await db.query(
@@ -369,11 +369,11 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
     if (!allowed) return { enabled: false, pairs: [], cooldownLeft: 0, enterInSec: set.enter_in_sec, expiryMin: set.expiry_min, cfg: cfgOf(set) };
     const pairs = (
       await db.query(
-        // «Авто» доступно только тестовым аккаунтам, обычным клиентам такая пара недоступна
-        `SELECT pair, (CASE WHEN auto THEN $2::boolean ELSE (direction IS NOT NULL AND direction_at > now() - ($1 || ' minutes')::interval) END) AS available
+        // «Авто» доступно всем, у кого открыта выдача, но такой сигнал всегда тестовый
+        `SELECT pair, (CASE WHEN auto THEN TRUE ELSE (direction IS NOT NULL AND direction_at > now() - ($1 || ' minutes')::interval) END) AS available
            FROM signal_pairs WHERE enabled
           ORDER BY (SELECT count(*) FROM signals q WHERE q.pair = signal_pairs.pair AND q.requested_by IS NOT NULL AND q.created_at > now() - interval '30 days') DESC, sort, pair`,
-        [String(set.direction_ttl_min), Boolean(lead?.is_tester)],
+        [String(set.direction_ttl_min)],
       )
     ).rows;
     const expiries = (await db.query('SELECT sec FROM signal_expiries ORDER BY sec')).rows.map((x) => x.sec);
@@ -392,9 +392,8 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
         [String(req.body?.pair ?? ''), String(set.direction_ttl_min)],
       )
     ).rows[0];
-    // Авто: направление считается от текущей минуты, у всех в одну минуту одинаковое. Только для тестовых аккаунтов
+    // Авто (до подключения движка): направление случайное от текущей минуты, у всех в одну минуту одинаковое. Сигнал всегда тестовый
     if (p?.auto) {
-      if (!lead.is_tester) return reply.code(409).send({ error: 'По этой паре сейчас нет подходящего входа. Попробуйте другую пару или чуть позже.' });
       p.direction = createHash('sha256').update(`${p.pair}:${Math.floor(Date.now() / 60_000)}`).digest()[0] % 2 ? 'up' : 'down';
     }
     if (!p) return reply.code(409).send({ error: 'По этой паре сейчас нет подходящего входа. Попробуйте другую пару или чуть позже.' });
@@ -406,7 +405,7 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
     const entryMs = Math.ceil((Date.now() + set.enter_in_sec * 1000 - es) / 60_000) * 60_000 + es;
     const ins = await db.query(
       `INSERT INTO signals (pair, direction, expiry_min, expiry_sec, entry_at, note, source, is_test, created_by, requested_by)
-       VALUES ($1,$2,$3,$4,$5,NULL,'analyst',$6,$7,$8) RETURNING id, pair, direction, expiry_min, expiry_sec, entry_at, is_test, requested_by`,
+       VALUES ($1,$2,$3,$4,$5,NULL,CASE WHEN $6 THEN 'test' ELSE 'analyst' END,$6,$7,$8) RETURNING id, pair, direction, expiry_min, expiry_sec, entry_at, is_test, source, requested_by`,
       [p.pair, p.direction, Math.max(1, Math.ceil(expirySec / 60)), expirySec, new Date(entryMs), !lead.access || Boolean(p.auto), p.direction_by, req.tg!.id],
     );
     return { signal: { ...ins.rows[0], taken: false }, steps: [], cfg: cfgOf(set), now: new Date().toISOString() };
