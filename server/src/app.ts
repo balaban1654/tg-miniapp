@@ -371,7 +371,8 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
       await db.query(
         // «Авто» доступно только тестовым аккаунтам, обычным клиентам такая пара недоступна
         `SELECT pair, (CASE WHEN auto THEN $2::boolean ELSE (direction IS NOT NULL AND direction_at > now() - ($1 || ' minutes')::interval) END) AS available
-           FROM signal_pairs WHERE enabled ORDER BY sort, pair`,
+           FROM signal_pairs WHERE enabled
+          ORDER BY (SELECT count(*) FROM signals q WHERE q.pair = signal_pairs.pair AND q.requested_by IS NOT NULL AND q.created_at > now() - interval '30 days') DESC, sort, pair`,
         [String(set.direction_ttl_min), Boolean(lead?.is_tester)],
       )
     ).rows;

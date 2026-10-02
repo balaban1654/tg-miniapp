@@ -433,16 +433,27 @@ async function signalPairs(){
   clearTimers();
   let o;try{o=await api('/signals/request')}catch(e){toast(e.message);return}
   if(!o.enabled){toast('Анализ пока недоступен');render();return}
-  shell('Анализ',[el('button',{class:'back',type:'button',onclick:()=>{tab='home';render()}},'‹ Назад'),
-    el('div',{class:'fs-tip'},o.expiries.length===1?'Выберите валютную пару · экспирация '+fmtDur(o.expiries[0]):'Шаг 1 из 2 · выберите валютную пару'),
-    o.pairs.length?o.pairs.map(p=>el('button',{class:'prow',type:'button',disabled:!p.available,style:p.available?'':'opacity:.5',onclick:()=>o.expiries.length===1?signalPrep(p.pair,o.expiries[0]):signalExpiry(p.pair,o)},el('span',{},p.pair),el('span',{class:'pay'},p.available?'':'нет входа'))):el('div',{class:'card sm'},'Пары скоро появятся.'),
+  // Пары приходят отсортированными по популярности: первые 5 — топ, дальше остальные
+  const pairs=o.pairs.map(p=>p.pair),TOP=5;
+  const SHOWN=[3,5,15,30],opts=[...new Set([...SHOWN,...o.expiries])].sort((a,b)=>a-b);
+  let pair=null,sec=o.expiries.includes(5)?5:(o.expiries[0]||null),open=false;
+  const box=el('div',{style:'display:grid;gap:14px'});
+  const go=el('button',{class:'btn',type:'button',onclick:()=>{if(pair&&sec)signalPrep(pair,sec)}},'Получить анализ');
+  const paint=()=>{
+    go.disabled=!(pair&&sec);
+    const head=el('button',{type:'button',class:'lesson',style:'justify-content:space-between;font-weight:700',onclick:()=>{open=!open;paint()}},
+      el('span',{style:pair?'':'color:var(--mut);font-weight:600'},pair||'Выберите валютную пару'),el('span',{style:'color:var(--acc2)'},open?'▴':'▾'));
+    const item=p=>el('button',{type:'button',class:'prow',style:p===pair?'border-color:var(--acc)':'',onclick:()=>{pair=p;open=false;paint()}},el('span',{},p),p===pair?el('span',{class:'pay'},'✓'):null);
+    const list=open?el('div',{style:'display:grid;gap:8px;max-height:46vh;overflow:auto'},
+      pairs.length?[el('div',{class:'sm',style:'padding:0 4px'},'Популярные'),...pairs.slice(0,TOP).map(item),pairs.length>TOP?el('div',{class:'sm',style:'padding:4px 4px 0'},'Остальные'):null,...pairs.slice(TOP).map(item)]:el('div',{class:'card sm'},'Пары скоро появятся.')):null;
+    const exp=el('div',{style:'display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px'},opts.map(n=>{
+      const on=o.expiries.includes(n);
+      return el('button',{type:'button',class:'lesson',disabled:!on,style:'justify-content:center;font-weight:700;'+(!on?'opacity:.4;':n===sec?'border-color:var(--acc);background:var(--card2);':''),onclick:()=>{sec=n;paint()}},fmtDur(n))}));
+    box.replaceChildren(el('div',{class:'fs-tip'},'Валютная пара'),head,list,el('div',{class:'fs-tip',style:'margin-top:4px'},'Время экспирации'),exp);
+  };
+  paint();
+  shell('Анализ',[el('button',{class:'back',type:'button',onclick:()=>{tab='home';render()}},'‹ Назад'),box,go,
     el('div',{class:'note'},'Перед началом торговли проверяйте процент выплаты на платформе Pocket Option: он может меняться.')]);
-}
-function signalExpiry(pair,o){
-  clearTimers();
-  shell('Анализ',[el('button',{class:'back',type:'button',onclick:()=>signalPairs()},'‹ Назад к парам'),
-    el('div',{class:'fs-tip'},'Шаг 2 из 2 · '+pair+': выберите время экспирации'),
-    o.expiries.length?el('div',{style:'display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px'},o.expiries.map(sec=>el('button',{class:'lesson',type:'button',style:'justify-content:center;font-weight:700',onclick:()=>signalPrep(pair,sec)},fmtDur(sec)))):el('div',{class:'card sm'},'Время экспирации пока не настроено.')]);
 }
 async function signalPrep(pair,sec){
   clearTimers();
