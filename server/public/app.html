@@ -105,6 +105,8 @@ main{flex:1;padding:6px 16px 96px;display:grid;gap:12px;align-content:start}
 .spin{width:28px;height:28px;border-radius:50%;border:3px solid #ffffff22;border-top-color:var(--acc2);animation:rot .8s linear infinite;flex:none}
 .tick{width:28px;height:28px;border-radius:50%;background:var(--ok);color:#06210f;display:grid;place-items:center;font-weight:800;flex:none;animation:bump .4s ease-out}
 @keyframes rot{to{transform:rotate(360deg)}}
+.rise{animation:riseIn .5s cubic-bezier(.2,.7,.2,1) backwards}
+@keyframes riseIn{from{opacity:0;transform:translateY(14px)}}
 .fin{border:1px solid var(--ok);background:#12301f;border-radius:18px;padding:16px;display:grid;gap:10px}
 .pshead{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-top:6px}
 .pshead b{font:700 16px var(--fd);white-space:nowrap}
@@ -626,15 +628,26 @@ function lesson1(){
       el('main',{class:'fs-main'},body));
   };
 
+  const sigCard=()=>{
+    const d=new Date(Date.now()+60000),hh=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+    return el('div',{class:'sig rise'},el('h3',{},'Сигнал готов'),
+      el('div',{class:'r'},el('span',{},'Время'),el('b',{},hh)),
+      el('div',{class:'r'},el('span',{},'Точка входа'),el('b',{},'45')),
+      el('div',{class:'r'},el('span',{},'Пара'),el('b',{},st.pair)),
+      el('div',{class:'r'},el('span',{},'Направление'),el('b',{style:'color:var(--ok)'},'ВВЕРХ (BUY)')),
+      el('div',{class:'r'},el('span',{},'Настройки'),el('b',{},'5 SEC · M5')),
+      el('div',{class:'r'},el('span',{},'Ставка'),el('b',{},'1–3% от депозита')),
+      el('button',{class:'btn',type:'button',style:'margin-top:8px',onclick:()=>{st.view='term';termView()}},'Открыть терминал'));
+  };
   const prepView=()=>{
     const labels=['Пара из списка','Настройки терминала','Время входа'];
     const rows=labels.map(l=>{const ic=el('span',{class:'spin'}),st2=el('span',{class:'sm'},'…');return{l,ic,st2,node:el('div',{class:'i'},ic,el('b',{style:'flex:1'},l),st2)}});
+    const holder=el('div',{});
     fsShell('Шаг 1 · сигнал',[
-      el('div',{class:'fs-tip'},'Готовим учебный сигнал по '+st.pair+'…'),
-      el('div',{class:'ck'},rows.map(r=>r.node)),
-      el('div',{class:'note'},'Это обучающий пример: рынок здесь не анализируется, мы только показываем, как выглядит путь от сигнала до сделки.')]);
+      el('div',{class:'fs-tip'},'Готовим сигнал по '+st.pair+'…'),
+      el('div',{class:'ck'},rows.map(r=>r.node)),holder]);
     rows.forEach((r,i)=>timers.push(setTimeout(()=>{r.ic.className='tick';r.ic.textContent='✓';r.st2.textContent='готово';r.st2.style.color='var(--ok)';buzz()},(i+1)*2000)));
-    timers.push(setTimeout(()=>{st.view='signal';signalView()},6800));
+    timers.push(setTimeout(()=>{holder.append(sigCard());buzz()},6300));
   };
   const pairsView=()=>{
     fsShell('Шаг 1 · сигнал',[
@@ -642,20 +655,6 @@ function lesson1(){
       el('div',{class:'ptabs'},el('button',{type:'button',class:'on'},'Валюты OTC'),el('button',{type:'button',disabled:''},'Крипта · скоро'),el('button',{type:'button',disabled:''},'Акции · скоро')),
       PAIRS.map(p=>el('button',{class:'prow',type:'button',onclick:()=>{st.pair=p;st.view='prep';prepView()}},el('span',{},p),el('span',{class:'pay'},'+92%'))),
       el('div',{class:'note'},'Перед началом торговли проверяйте процент выплаты на платформе Pocket Option — он может меняться.')]);
-  };
-  const signalView=()=>{
-    const d=new Date(),hh=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
-    fsShell('Шаг 1 · сигнал',[
-      el('div',{class:'fs-tip'},'Учебный сигнал по '+st.pair),
-      el('div',{class:'sig'},el('span',{class:'demo'},'Учебный пример · не для торговли'),el('h3',{},'Сигнал готов'),
-        el('div',{class:'r'},el('span',{},'Время'),el('b',{},hh)),
-        el('div',{class:'r'},el('span',{},'Пара'),el('b',{},st.pair)),
-        el('div',{class:'r'},el('span',{},'Направление'),el('b',{style:'color:var(--ok)'},'ВВЕРХ (BUY)')),
-        el('div',{class:'r'},el('span',{},'Настройки'),el('b',{},'Свечи · M5 · сделка 5 сек')),
-        el('div',{class:'r'},el('span',{},'Вход'),el('b',{},'на 0:45')),
-        el('div',{class:'r'},el('span',{},'Ставка'),el('b',{},'1–3% от депозита')),
-        el('button',{class:'btn',type:'button',style:'margin-top:8px',onclick:()=>{st.view='term';termView()}},'Открыть терминал')),
-      el('div',{class:'note'},'Это пример для обучения: он не основан на анализе рынка. Настоящие сигналы приходят в боте и в разделе «Главная» после открытия доступа.')]);
   };
   const termView=()=>{
     let t=target();
