@@ -462,16 +462,15 @@ async function signalConfigBlock(){
     cfg.expiries.map(sec=>el('span',{class:'pill p-pur',style:'display:inline-flex;gap:8px;align-items:center'},fmtSec(sec),isAdmin?el('button',{type:'button','aria-label':'Убрать',style:'background:none;border:0;color:inherit;cursor:pointer;padding:0',onclick:async()=>{try{await api('/signal-expiries?sec='+sec,{method:'DELETE'});render()}catch(x){fail(x)}}},'✕'):null)),
     isAdmin?(()=>{const v=el('input',{type:'number',min:'1',placeholder:'10',style:'width:80px'}),u=el('select',{style:'width:90px'},el('option',{value:'1'},'сек'),el('option',{value:'60'},'мин'),el('option',{value:'3600'},'ч'));
       return el('span',{style:'display:inline-flex;gap:6px'},v,u,el('button',{class:'btn o s',type:'button',onclick:async()=>{try{await api('/signal-expiries',{method:'POST',body:{sec:Number(v.value)*Number(u.value)}});render()}catch(x){fail(x)}}},'Добавить'))})():null);
-  const bulk=el('textarea',{class:'big',rows:'4',placeholder:'EUR/USD OTC 92\nGBP/USD OTC 90'});
+  const bulk=el('textarea',{class:'big',rows:'4',placeholder:'EUR/USD OTC\nGBP/USD OTC'});
   const newPair=el('input',{placeholder:'EUR/USD OTC',style:'max-width:200px'});
   const pairRows=cfg.pairs.map(p=>{
     const en=el('input',{type:'checkbox',style:'width:auto',disabled:!isAdmin});en.checked=p.enabled;
-    const pay=el('input',{type:'number',min:'1',max:'100',value:p.payout,style:'width:70px',disabled:!isAdmin});
-    const upd=async()=>{try{await api('/signal-pairs',{method:'PUT',body:{pair:p.pair,enabled:en.checked,payout:Number(pay.value),sort:p.sort}});flash('Сохранено')}catch(x){fail(x)}};
-    en.onchange=upd;pay.onchange=upd;
-    return[td(p.pair),el('td',{},en),el('td',{},pay,' %'),
-      el('td',{style:'white-space:nowrap'},dirBtn(p,'up','Вверх'),dirBtn(p,'down','Вниз'),el('button',{class:'btn o s',type:'button',onclick:()=>setDir(p.pair,'')},'Сброс')),
-      td(p.direction?(p.direction==='up'?'Вверх':'Вниз')+' · '+left(p)+(p.direction_by?' · '+p.direction_by:''):'не задано'),
+    const upd=async()=>{try{await api('/signal-pairs',{method:'PUT',body:{pair:p.pair,enabled:en.checked,sort:p.sort}});flash('Сохранено')}catch(x){fail(x)}};
+    en.onchange=upd;
+    return[td(p.pair),el('td',{},en),
+      el('td',{style:'white-space:nowrap'},dirBtn(p,'up','Вверх'),dirBtn(p,'down','Вниз'),el('button',{class:'btn s '+(p.auto?'':'o'),type:'button',title:'Тест: направление каждую минуту разное, выдаётся только тестовым аккаунтам с пометкой ТЕСТ',style:'margin-right:6px',onclick:()=>setDir(p.pair,'auto')},'Авто'),el('button',{class:'btn o s',type:'button',onclick:()=>setDir(p.pair,'')},'Сброс')),
+      td(p.auto?'Авто · только тестовые аккаунты':p.direction?(p.direction==='up'?'Вверх':'Вниз')+' · '+left(p)+(p.direction_by?' · '+p.direction_by:''):'не задано'),
       el('td',{},isAdmin?el('button',{class:'btn o s',type:'button',onclick:async()=>{try{await api('/signal-pairs?pair='+encodeURIComponent(p.pair),{method:'DELETE'});render()}catch(x){fail(x)}}},'Удалить'):null)];
   });
   return el('div',{style:'display:grid;gap:12px'},
@@ -489,9 +488,9 @@ async function signalConfigBlock(){
       isAdmin?el('div',{},el('button',{class:'btn',type:'button',onclick:save},'Сохранить настройки')):null,err),
     el('h3',{style:'font-size:13px;margin:4px 0 0'},'Экспирации на выбор клиенту (от 3 секунд до 4 часов)'),
     expBlock,
-    table(['Пара','Доступна','Выплата','Направление сейчас','Состояние',''],pairRows,'Пар пока нет'),
+    table(['Пара','Доступна','Направление сейчас','Состояние',''],pairRows,'Пар пока нет'),
     isAdmin?el('div',{class:'card',style:'display:grid;gap:8px'},el('b',{style:'font-size:13px'},'Загрузить список пар'),
-      el('div',{class:'mut sm'},'По одной паре в строке, после неё можно указать выплату. Уже существующие пары обновят выплату.'),bulk,
+      el('div',{class:'mut sm'},'По одной паре в строке, например EUR/USD OTC. Процент выплаты не нужен: клиент видит его у брокера.'),bulk,
       el('div',{},el('button',{class:'btn o s',type:'button',onclick:async()=>{try{const r=await api('/signal-pairs/bulk',{method:'POST',body:{text:bulk.value}});bulk.value='';flash('Загружено пар: '+r.count);setTimeout(render,700)}catch(x){fail(x)}}},'Загрузить'))):null,
     isAdmin?el('div',{style:'display:flex;gap:8px;align-items:center'},newPair,el('button',{class:'btn o s',type:'button',onclick:async()=>{try{await api('/signal-pairs',{method:'POST',body:{pair:newPair.value}});render()}catch(x){fail(x)}}},'Добавить пару')):null);
 }

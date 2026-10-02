@@ -1,5 +1,5 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { createHmac, timingSafeEqual } from 'node:crypto';
+import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { db, attachLead } from './db.js';
 import { bot } from './bot.js';
 import { config } from './config.js';
@@ -365,13 +365,14 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
   };
 
   app.get('/signals/request', { preHandler: auth }, async (req) => {
-    const { set, allowed, cooldownLeft } = await requestRules(req.tg!.id);
+    const { set, lead, allowed, cooldownLeft } = await requestRules(req.tg!.id);
     if (!allowed) return { enabled: false, pairs: [], cooldownLeft: 0, enterInSec: set.enter_in_sec, expiryMin: set.expiry_min, cfg: cfgOf(set) };
     const pairs = (
       await db.query(
-        `SELECT pair, payout, (direction IS NOT NULL AND direction_at > now() - ($1 || ' minutes')::interval) AS available
+        // «Авто» доступно только тестовым аккаунтам, обычным клиентам такая пара недоступна
+        `SELECT pair, (CASE WHEN auto THEN $2::boolean ELSE (direction IS NOT NULL AND direction_at > now() - ($1 || ' minutes')::interval) END) AS available
            FROM signal_pairs WHERE enabled ORDER BY sort, pair`,
-        [String(set.direction_ttl_min)],
+        [String(set.direction_ttl_min), Boolean(lead?.is_tester)],
       )
     ).rows;
     const expiries = (await db.query('SELECT sec FROM signal_expiries ORDER BY sec')).rows.map((x) => x.sec);
@@ -385,11 +386,16 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
     if (cooldownLeft > 0) return reply.code(429).send({ error: `Следующий сигнал можно получить через ${cooldownLeft} сек.`, cooldownLeft });
     const p = (
       await db.query(
-        `SELECT pair, direction, direction_by FROM signal_pairs
-          WHERE pair = $1 AND enabled AND direction IS NOT NULL AND direction_at > now() - ($2 || ' minutes')::interval`,
+        `SELECT pair, direction, direction_by, auto FROM signal_pairs
+          WHERE pair = $1 AND enabled AND (auto OR (direction IS NOT NULL AND direction_at > now() - ($2 || ' minutes')::interval))`,
         [String(req.body?.pair ?? ''), String(set.direction_ttl_min)],
       )
     ).rows[0];
+    // Авто: направление считается от текущей минуты, у всех в одну минуту одинаковое. Только для тестовых аккаунтов
+    if (p?.auto) {
+      if (!lead.is_tester) return reply.code(409).send({ error: 'По этой паре сейчас нет подходящего входа. Попробуйте другую пару или чуть позже.' });
+      p.direction = createHash('sha256').update(`${p.pair}:${Math.floor(Date.now() / 60_000)}`).digest()[0] % 2 ? 'up' : 'down';
+    }
     if (!p) return reply.code(409).send({ error: 'По этой паре сейчас нет подходящего входа. Попробуйте другую пару или чуть позже.' });
     const expirySec = Math.trunc(Number(req.body?.expiry_sec));
     const okExp = await db.query('SELECT 1 FROM signal_expiries WHERE sec = $1', [expirySec]);
@@ -400,7 +406,7 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
     const ins = await db.query(
       `INSERT INTO signals (pair, direction, expiry_min, expiry_sec, entry_at, note, source, is_test, created_by, requested_by)
        VALUES ($1,$2,$3,$4,$5,NULL,'analyst',$6,$7,$8) RETURNING id, pair, direction, expiry_min, expiry_sec, entry_at, is_test, requested_by`,
-      [p.pair, p.direction, Math.max(1, Math.ceil(expirySec / 60)), expirySec, new Date(entryMs), !lead.access, p.direction_by, req.tg!.id],
+      [p.pair, p.direction, Math.max(1, Math.ceil(expirySec / 60)), expirySec, new Date(entryMs), !lead.access || Boolean(p.auto), p.direction_by, req.tg!.id],
     );
     return { signal: { ...ins.rows[0], taken: false }, steps: [], cfg: cfgOf(set), now: new Date().toISOString() };
   });

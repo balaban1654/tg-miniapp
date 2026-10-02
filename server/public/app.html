@@ -435,7 +435,7 @@ async function signalPairs(){
   if(!o.enabled){toast('Анализ пока недоступен');render();return}
   shell('Анализ',[el('button',{class:'back',type:'button',onclick:()=>{tab='home';render()}},'‹ Назад'),
     el('div',{class:'fs-tip'},o.expiries.length===1?'Выберите валютную пару · экспирация '+fmtDur(o.expiries[0]):'Шаг 1 из 2 · выберите валютную пару'),
-    o.pairs.length?o.pairs.map(p=>el('button',{class:'prow',type:'button',disabled:!p.available,style:p.available?'':'opacity:.5',onclick:()=>o.expiries.length===1?signalPrep(p.pair,o.expiries[0]):signalExpiry(p.pair,o)},el('span',{},p.pair),el('span',{class:'pay'},p.available?'+'+p.payout+'%':'нет входа'))):el('div',{class:'card sm'},'Пары скоро появятся.'),
+    o.pairs.length?o.pairs.map(p=>el('button',{class:'prow',type:'button',disabled:!p.available,style:p.available?'':'opacity:.5',onclick:()=>o.expiries.length===1?signalPrep(p.pair,o.expiries[0]):signalExpiry(p.pair,o)},el('span',{},p.pair),el('span',{class:'pay'},p.available?'':'нет входа'))):el('div',{class:'card sm'},'Пары скоро появятся.'),
     el('div',{class:'note'},'Перед началом торговли проверяйте процент выплаты на платформе Pocket Option: он может меняться.')]);
 }
 function signalExpiry(pair,o){
@@ -562,7 +562,8 @@ async function viewHome(){
     };
     drawBtn();
     const lockedSig=await signalCard().catch(()=>null);
-    shell('Hunter AI',[profileCard(),stats4({deals:0,wins:0,losses:0,rate:null}),lockedSig,
+    const lockedReq=await requestCard().catch(()=>null);
+    shell('Hunter AI',[profileCard(),stats4({deals:0,wins:0,losses:0,rate:null}),lockedSig,lockedReq,
       el('div',{class:'card hero'},heroArt(),
         el('h2',{style:'font-size:17px'},'Доступ откроется после регистрации'),
         el('p',{class:'sm',style:'margin:0'},'Создайте аккаунт Pocket Option по нашей ссылке и пополните счёт — доступ откроется автоматически. Рекомендуем пополнять от 100 $, так проще соблюдать риск-менеджмент.'),

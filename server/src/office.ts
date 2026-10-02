@@ -641,7 +641,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     const settings = (await db.query('SELECT * FROM signal_settings WHERE id = 1')).rows[0];
     const pairs = (
       await db.query(
-        `SELECT p.pair, p.enabled, p.sort, p.payout, p.direction, p.direction_at, st.name AS direction_by,
+        `SELECT p.pair, p.enabled, p.sort, p.auto, p.direction, p.direction_at, st.name AS direction_by,
                 (p.direction IS NOT NULL AND p.direction_at > now() - ($1 || ' minutes')::interval) AS fresh
            FROM signal_pairs p LEFT JOIN staff st ON st.id = p.direction_by ORDER BY p.sort, p.pair`,
         [String(settings.direction_ttl_min)],
@@ -683,10 +683,11 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     if (!lines.length || lines.length > 100) return reply.code(400).send({ error: 'Вставьте от 1 до 100 строк' });
     const parsed: { pair: string; payout: number }[] = [];
     for (const line of lines) {
+      // Выплату в строке (если вписали по привычке) игнорируем: клиент видит её у брокера
       const m = /^(.+?)(?:\s*[;,\t]\s*|\s+)(\d{1,3})\s*%?$/.exec(line);
       const pair = (m ? m[1] : line).trim().toUpperCase();
-      const payout = m ? Number(m[2]) : 92;
-      if (!PAIR.test(pair) || payout < 1 || payout > PAYOUT_MAX) return reply.code(400).send({ error: `Не понял строку: ${line}` });
+      const payout = 92;
+      if (!PAIR.test(pair)) return reply.code(400).send({ error: `Не понял строку: ${line}` });
       parsed.push({ pair, payout });
     }
     for (const x of parsed) {
@@ -717,9 +718,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
   });
   app.put('/signal-pairs', { preHandler: need('admin') }, async (req, reply) => {
     const b = (req.body ?? {}) as Record<string, unknown>;
-    const payout = Math.trunc(Number(b.payout));
-    if (!(payout >= 1 && payout <= PAYOUT_MAX)) return reply.code(400).send({ error: 'Выплата 1–100%' });
-    const r = await db.query('UPDATE signal_pairs SET enabled=$2, payout=$3, sort=$4 WHERE pair=$1', [str(b.pair, 20), Boolean(b.enabled), payout, Math.trunc(num(b.sort))]);
+    const r = await db.query('UPDATE signal_pairs SET enabled=$2, sort=$3 WHERE pair=$1', [str(b.pair, 20), Boolean(b.enabled), Math.trunc(num(b.sort))]);
     if (!r.rowCount) return reply.code(404).send({ error: 'Пара не найдена' });
     return { ok: true };
   });
@@ -731,8 +730,8 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
   app.post('/signal-pairs/direction', { preHandler: need('admin', 'analyst') }, async (req, reply) => {
     const d = str((req.body as any)?.direction, 4);
     const pair = str((req.body as any)?.pair, 20);
-    if (d && !['up', 'down'].includes(d)) return reply.code(400).send({ error: 'Неверное направление' });
-    const r = await db.query('UPDATE signal_pairs SET direction=$2, direction_at=CASE WHEN $2::text IS NULL THEN NULL ELSE now() END, direction_by=CASE WHEN $2::text IS NULL THEN NULL ELSE $3::int END WHERE pair=$1', [pair, d || null, req.staff!.id]);
+    if (d && !['up', 'down', 'auto'].includes(d)) return reply.code(400).send({ error: 'Неверное направление' });
+    const r = await db.query('UPDATE signal_pairs SET auto = coalesce($2::text = \'auto\', false), direction=CASE WHEN $2::text IN (\'up\',\'down\') THEN $2 END, direction_at=CASE WHEN $2::text IN (\'up\',\'down\') THEN now() END, direction_by=CASE WHEN $2::text IN (\'up\',\'down\') THEN $3::int END WHERE pair=$1', [pair, d || null, req.staff!.id]);
     if (!r.rowCount) return reply.code(404).send({ error: 'Пара не найдена' });
     return { ok: true };
   });

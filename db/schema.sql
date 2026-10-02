@@ -277,6 +277,9 @@ CREATE TABLE IF NOT EXISTS signal_steps (
   PRIMARY KEY (signal_id, tg_id, step)
 );
 
+-- Режим «Авто» по паре: направление меняется каждую минуту, сигналы только для тестовых аккаунтов и с пометкой ТЕСТ
+ALTER TABLE signal_pairs ADD COLUMN IF NOT EXISTS auto BOOLEAN NOT NULL DEFAULT FALSE;
+
 -- Разовая пометка: все сигналы, созданные до запуска, считаются тестовыми (их можно вернуть кнопкой «Сделать обычным» в Office)
 CREATE TABLE IF NOT EXISTS app_flags (key TEXT PRIMARY KEY, set_at TIMESTAMPTZ DEFAULT now());
 DO $$
