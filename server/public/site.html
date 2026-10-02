@@ -20,12 +20,15 @@ main{overflow-x:clip;display:flex;flex-direction:column;align-items:center;justi
 .rain i{position:absolute;top:-60px;width:5px;border-radius:2px;opacity:.5;animation:fall linear infinite}
 .rain i::before{content:"";position:absolute;left:50%;top:-10px;bottom:-10px;width:1px;background:inherit;transform:translateX(-50%)}
 @keyframes fall{to{transform:translateY(calc(100vh + 140px))}}
-.logo{position:relative;width:min(500px,100%);aspect-ratio:500/340;margin-bottom:18px}
+.logo{position:relative;width:min(640px,100%);aspect-ratio:500/340;margin-bottom:-5%;perspective:1000px}
+h1,p,.btn{position:relative;z-index:4}
 .logo svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none}
 .logo .back{z-index:1}.logo .front{z-index:3}
-.planet{position:absolute;z-index:2;left:29%;top:50%;width:42%;aspect-ratio:1;margin-top:-21%;perspective:700px}
-.core{position:relative;width:100%;height:100%;border-radius:50%;overflow:hidden;border:3px solid var(--acc);background:#000;box-shadow:0 0 44px #9b5cff77,inset 0 0 30px #9b5cff55;will-change:transform;animation:glow 4s ease-in-out infinite}
-.core img{width:100%;height:100%;object-fit:cover;display:block;transform:scale(1.14);will-change:transform;user-select:none;-webkit-user-drag:none}
+.planet{position:absolute;z-index:2;left:27%;top:50%;width:46%;aspect-ratio:1;margin-top:-23%;transform-style:preserve-3d;will-change:transform}
+.edge{position:absolute;inset:0;border-radius:50%;background:linear-gradient(135deg,#7a3df0,#2a0f63)}
+.core{position:absolute;inset:0;border-radius:50%;overflow:hidden;border:3px solid var(--acc);background:#000;box-shadow:0 0 44px #9b5cff77,inset 0 0 30px #9b5cff55;animation:glow 4s ease-in-out infinite}
+.core img{width:100%;height:100%;object-fit:cover;display:block;user-select:none;-webkit-user-drag:none}
+.core::before{content:"";position:absolute;inset:0;z-index:2;border-radius:50%;background:radial-gradient(circle at var(--lx,50%) var(--ly,30%),rgba(255,255,255,.3),transparent 46%);mix-blend-mode:screen;pointer-events:none}
 .core::after{content:"";position:absolute;inset:0;border-radius:50%;background:linear-gradient(112deg,transparent 38%,rgba(255,255,255,.38) 50%,transparent 62%);mix-blend-mode:screen;transform:translateX(-130%);animation:shine 5.5s ease-in-out infinite}
 @keyframes glow{50%{box-shadow:0 0 70px #9b5cffb0,inset 0 0 36px #9b5cff77}}
 @keyframes shine{0%,55%{transform:translateX(-130%)}100%{transform:translateX(130%)}}
@@ -38,7 +41,8 @@ p{color:var(--mut);font-weight:500;font-size:clamp(14px,2vw,17px);line-height:1.
 .btn:focus-visible{outline:2px solid var(--acc2);outline-offset:3px}
 footer a{color:inherit;text-decoration:underline;text-underline-offset:2px}
 footer{position:relative;z-index:1;text-align:center;color:#8f82b3;font-size:12px;padding:0 20px 22px;line-height:1.6}
-@media (prefers-reduced-motion:reduce){.rain i,.core,.core::after{animation:none}}
+@media (prefers-reduced-motion:reduce){.rain i,.core,.core::before{content:"";position:absolute;inset:0;z-index:2;border-radius:50%;background:radial-gradient(circle at var(--lx,50%) var(--ly,30%),rgba(255,255,255,.3),transparent 46%);mix-blend-mode:screen;pointer-events:none}
+.core::after{animation:none}}
 </style>
 </head>
 <body>
@@ -46,7 +50,7 @@ footer{position:relative;z-index:1;text-align:center;color:#8f82b3;font-size:12p
 <main>
   <div class="logo" id="logo" aria-hidden="true">
     <svg class="back" id="back" viewBox="-250 -170 500 340"></svg>
-    <div class="planet" id="planet"><div class="core" id="core"><img id="face" src="/img/hunter.webp" width="720" height="720" alt="" draggable="false"></div></div>
+    <div class="planet" id="planet"><i class="edge" style="transform:translateZ(-2px)"></i><i class="edge" style="transform:translateZ(-4px)"></i><i class="edge" style="transform:translateZ(-6px)"></i><i class="edge" style="transform:translateZ(-8px)"></i><i class="edge" style="transform:translateZ(-10px)"></i><div class="core" id="core"><img id="face" src="/img/hunter.webp" width="720" height="720" alt="" draggable="false"></div></div>
     <svg class="front" id="front" viewBox="-250 -170 500 340"></svg>
   </div>
   <h1>Добро пожаловать<br>в <span>Hunter AI</span></h1>
@@ -60,7 +64,7 @@ footer{position:relative;z-index:1;text-align:center;color:#8f82b3;font-size:12p
 <script>
 (function(){
   var NS='http://www.w3.org/2000/svg',still=matchMedia('(prefers-reduced-motion:reduce)').matches;
-  var core=document.getElementById('core'),face=document.getElementById('face');
+  var core=document.getElementById('core'),planet=document.getElementById('planet');
   var back=document.getElementById('back'),front=document.getElementById('front');
   function mk(tag,attrs,parent){var n=document.createElementNS(NS,tag);for(var k in attrs)n.setAttribute(k,attrs[k]);if(parent)parent.appendChild(n);return n}
   // Орбиты: заднюю половину рисуем под аватаркой, переднюю поверх неё
@@ -88,8 +92,8 @@ footer{position:relative;z-index:1;text-align:center;color:#8f82b3;font-size:12p
     })});
     pulses.forEach(function(c,i){var p=((t/3.6)+i*.5)%1;c.setAttribute('r',(106+78*p).toFixed(1));c.setAttribute('stroke-opacity',(.6*Math.pow(1-p,1.6)).toFixed(3));c.setAttribute('stroke-width',(2.4-1.4*p).toFixed(2))});
     cx+=(tx-cx)*.08;cy+=(ty-cy)*.08;
-    face.style.transform='translate('+(cx*9).toFixed(2)+'px,'+(cy*9).toFixed(2)+'px) scale(1.14)';
-    core.style.transform='rotateY('+(cx*9).toFixed(2)+'deg) rotateX('+(-cy*9).toFixed(2)+'deg)';
+    planet.style.transform='rotateY('+(cx*38).toFixed(2)+'deg) rotateX('+(-cy*24).toFixed(2)+'deg)';
+    core.style.setProperty('--lx',(50-cx*38).toFixed(1)+'%');core.style.setProperty('--ly',(32-cy*30).toFixed(1)+'%');
     if(!still)requestAnimationFrame(frame);
   }
   if(!still){
