@@ -528,7 +528,7 @@ function lesson1(){
   const st={view:'pairs',pair:PAIRS[0],popup:false,timer:false,type:'line',iv:'M1',tt:60,ti:4,sum:10,paired:false,armed:false,trade:null,won:false,result:null,bal:1000};
   // плавный случайный ход цены: небольшая инерция, без резких скачков
   let price=1.0795,mom=0,base=0,pts=[];
-  const step=()=>{mom=mom*.85+(Math.random()-.5)*.00003;price+=mom+(Math.random()-.5)*.00002+(1.0795-price)*.01;return price};
+  const step=()=>{mom=mom*.85+(Math.random()-.5)*.00004;price+=mom+(Math.random()-.5)*.00002+(1.0795-price)*.012;return price};
   for(let i=0;i<260;i++)pts.push(step());
   const pushPt=()=>{pts.push(price);if(pts.length>600){pts.shift();base++}};
   let svg=null,ttag=null,nEl=null,tipEl=null,bigEl=null,liveEl=null;
@@ -546,28 +546,49 @@ function lesson1(){
   const buzz=()=>{try{if(tg&&tg.HapticFeedback)tg.HapticFeedback.impactOccurred('light');else if(navigator.vibrate)navigator.vibrate(12)}catch{}};
   const guard=(name,fn)=>()=>{const t=target();if(t===name){buzz();fn()}else if(t)toast(needMsg[t])};
 
-  function chart(){
-    const W=360,H=215,X1=300,top=12,bot=H-14;
-    const g=st.type==='line'?1:IV_G[st.iv];
-    const units=[];let cur=null;
-    for(let i=Math.max(0,pts.length-(st.type==='line'?96:26*g+g));i<pts.length;i++){const gid=Math.floor((base+i)/g),v=pts[i];
-      if(gid!==cur){units.push({gid,o:v,c:v,h:v,l:v});cur=gid}else{const u=units[units.length-1];u.c=v;u.h=Math.max(u.h,v);u.l=Math.min(u.l,v)}}
-    if(st.type!=='line')while(units.length>26)units.shift();
-    let lo=Math.min(...units.map(u=>u.l)),hi=Math.max(...units.map(u=>u.h));
-    if(st.trade){lo=Math.min(lo,st.trade.entry);hi=Math.max(hi,st.trade.entry)}
-    if(hi-lo<.0016){const m=(hi+lo)/2;lo=m-.0008;hi=m+.0008}
+  // Свечи рисуются как на главной: последняя свеча «тикает», всё плавно едет влево
+  const G=12,DXC=22,BWC=15,X1=300,LIVE=X1-22;
+  let lastTick=performance.now(),prevPrice=price,lo=0,hi=1,first=true;
+  function chart(now){
+    const H=215,top=12,bot=H-14;
+    const interp=Math.min(1,(now-lastTick)/350);
+    const shown=pts.slice();
+    const lastV=prevPrice+(pts[pts.length-1]-prevPrice)*interp;   // плавный ход последней точки
+    shown[shown.length-1]=lastV;
+    const lastAbs=base+shown.length-1;
+    let units,xOf,xEntry=null;
+    if(st.type==='line'){
+      const n=96,arr=shown.slice(-n),dxl=X1/(n-1),sh=(1-interp)*dxl;
+      units=arr.map(v=>({o:v,c:v,h:v,l:v}));
+      xOf=i=>(i-(units.length-1))*dxl+X1-sh;
+      if(st.trade)xEntry=xOf(units.length-1-(lastAbs-st.trade.abs));
+    }else{
+      const map=new Map();
+      for(let i=Math.max(0,shown.length-(15*G)),ai=base+i;i<shown.length;i++,ai++){const v=shown[i],k=Math.floor(ai/G);
+        const u=map.get(k);if(!u)map.set(k,{k,o:v,c:v,h:v,l:v});else{u.c=v;u.h=Math.max(u.h,v);u.l=Math.min(u.l,v)}}
+      units=[...map.values()].slice(-14);
+      const kLast=units[units.length-1].k,frac=((lastAbs%G)+interp)/G;
+      xOf=k=>LIVE+(k-kLast)*DXC-frac*DXC;
+      units.forEach(u=>{u.x=xOf(u.k)});
+      if(st.trade)xEntry=xOf(Math.floor(st.trade.abs/G));
+    }
+    let mn=Math.min(...units.map(u=>u.l)),mx=Math.max(...units.map(u=>u.h));
+    if(st.trade){mn=Math.min(mn,st.trade.entry);mx=Math.max(mx,st.trade.entry)}
+    if(mx-mn<.001){const m=(mx+mn)/2;mn=m-.0005;mx=m+.0005}
+    const pad=(mx-mn)*.12;mn-=pad;mx+=pad;
+    if(first){lo=mn;hi=mx;first=false}else{lo+=(mn-lo)*.08;hi+=(mx-hi)*.08}
     const r=(hi-lo)||1e-4;
-    const Y=v=>bot-((v-lo)/r)*(bot-top-6)-3;
+    const Y=v=>bot-((v-lo)/r)*(bot-top);
     let h='<g stroke="#fff" stroke-opacity=".06">'+[0,1,2,3].map(i=>'<line x1="0" x2="'+X1+'" y1="'+(top+i*(bot-top)/3)+'" y2="'+(top+i*(bot-top)/3)+'"/>').join('')+'</g>';
-    const n=units.length,dx=X1/(n+(st.type==='line'?0:1));
-    if(st.type==='line'){h+='<polyline fill="none" stroke="#6ee0a8" stroke-width="1.8" points="'+units.map((u,i)=>(i*dx).toFixed(1)+','+Y(u.c).toFixed(1)).join(' ')+'"/>'}
-    else units.forEach((u,i)=>{const x=(i+.5)*dx,up=u.c>=u.o,col=up?'#43b82f':'#ff3b1d';
-      h+='<line x1="'+x.toFixed(1)+'" x2="'+x.toFixed(1)+'" y1="'+Y(u.h).toFixed(1)+'" y2="'+Y(u.l).toFixed(1)+'" stroke="'+col+'"/><rect x="'+(x-dx*.32).toFixed(1)+'" y="'+Math.min(Y(u.o),Y(u.c)).toFixed(1)+'" width="'+(dx*.64).toFixed(1)+'" height="'+Math.max(1.5,Math.abs(Y(u.o)-Y(u.c))).toFixed(1)+'" fill="'+col+'"/>'});
-    const last=units[n-1].c;
+    if(st.type==='line'){
+      h+='<polyline fill="none" stroke="#6ee0a8" stroke-width="1.8" points="'+units.map((u,i)=>xOf(i).toFixed(1)+','+Y(u.c).toFixed(1)).join(' ')+'"/>';
+    }else units.forEach(u=>{const up=u.c>=u.o,col=up?'#43b82f':'#ff3b1d';
+      h+='<line x1="'+u.x.toFixed(1)+'" x2="'+u.x.toFixed(1)+'" y1="'+Y(u.h).toFixed(1)+'" y2="'+Y(u.l).toFixed(1)+'" stroke="'+col+'" stroke-width="1.3"/><rect x="'+(u.x-BWC/2).toFixed(1)+'" y="'+Math.min(Y(u.o),Y(u.c)).toFixed(1)+'" width="'+BWC+'" height="'+Math.max(1.5,Math.abs(Y(u.o)-Y(u.c))).toFixed(1)+'" fill="'+col+'"/>'});
+    const last=lastV;
     h+='<line x1="0" x2="'+X1+'" y1="'+Y(last).toFixed(1)+'" y2="'+Y(last).toFixed(1)+'" stroke="#6ee0a8" stroke-opacity=".5" stroke-dasharray="3 3"/>';
     if(st.trade){
-      const ey=Y(st.trade.entry),k=units.findIndex(u=>u.gid===st.trade.gid),xe=Math.min(X1-62,Math.max(62,(k<0?0:(st.type==='line'?k*dx:(k+.5)*dx))));
-      h+='<line x1="0" x2="'+X1+'" y1="'+ey.toFixed(1)+'" y2="'+ey.toFixed(1)+'" stroke="#7be3b0" stroke-opacity=".7" stroke-width="1.1"/><circle cx="'+xe.toFixed(1)+'" cy="'+ey.toFixed(1)+'" r="5" fill="#0d0817" stroke="#fff" stroke-width="2"/>';
+      const ey=Y(st.trade.entry),xe=Math.min(X1-62,Math.max(62,xEntry==null?62:xEntry));
+      h+='<line x1="0" x2="'+X1+'" y1="'+ey.toFixed(1)+'" y2="'+ey.toFixed(1)+'" stroke="#7be3b0" stroke-opacity=".7" stroke-width="1.1"/><circle cx="'+(xEntry==null?xe:Math.min(X1,Math.max(0,xEntry))).toFixed(1)+'" cy="'+ey.toFixed(1)+'" r="5" fill="#0d0817" stroke="#fff" stroke-width="2"/>';
       if(st.won)h+='<rect x="'+(xe-46).toFixed(1)+'" y="'+(ey-34).toFixed(1)+'" width="92" height="24" rx="8" fill="#0d0817" stroke="#3ddc97" stroke-width="1.6"/><text x="'+xe.toFixed(1)+'" y="'+(ey-17).toFixed(1)+'" text-anchor="middle" fill="#3ddc97" font-size="14" font-weight="800" font-family="Montserrat,sans-serif">+'+usd(st.sum*.92)+'</text>';
       else h+='<rect x="'+(xe-58).toFixed(1)+'" y="'+(ey-26).toFixed(1)+'" width="116" height="17" rx="6" fill="#7be3b0"/><text x="'+xe.toFixed(1)+'" y="'+(ey-14).toFixed(1)+'" text-anchor="middle" fill="#06210f" font-size="10.5" font-weight="700" font-family="Montserrat,sans-serif">Вход 0:45 · '+st.sum+' $</text>';
     }
@@ -576,7 +597,7 @@ function lesson1(){
     h+='<rect x="'+(X1+2)+'" y="'+(Y(last)-8).toFixed(1)+'" width="58" height="16" rx="4" fill="#1f8f4e"/><text x="'+(X1+6)+'" y="'+(Y(last)+4).toFixed(1)+'" fill="#fff" font-size="10.5" font-weight="700" font-family="Montserrat,sans-serif">'+last.toFixed(5)+'</text>';
     return h;
   }
-  function paint(){if(svg)svg.innerHTML=chart()}
+  function paint(){if(svg)svg.innerHTML=chart(performance.now())}
   function liveText(){
     const t=target(),n=until();
     if(t==='buy'){
@@ -596,11 +617,17 @@ function lesson1(){
     timers.push(setTimeout(()=>resultView(),2800));
   }
   timers.push(setInterval(()=>{
+    prevPrice=pts[pts.length-1];lastTick=performance.now();
     step();
-    // учебный сценарий: первые 2 секунды после входа цена идёт вниз, потом разворачивается и уверенно растёт
-    if(st.trade&&!st.won)price+=(Date.now()-st.trade.t0<2000?-.00007:.00013)+Math.random()*.00002;
-    pushPt();paint();
+    // учебный сценарий: первые 2 секунды после входа цена идёт вниз, потом плавно разворачивается и растёт
+    if(st.trade&&!st.won){
+      const e=(Date.now()-st.trade.t0)/1000;
+      const f=e<2?-.0005*Math.sin(Math.PI*e/4):-.0005+.0013*(1-Math.cos(Math.PI*Math.min(1,(e-2)/3)))/2;
+      price=st.trade.entry+f+(Math.random()-.5)*.00002;
+    }
+    pushPt();
   },350));
+  timers.push(setInterval(paint,33));
   timers.push(setInterval(()=>{
     if(target()==='buy'&&!st.trade){if(!st.armed){st.armed=true;st.tt=55}else{st.tt--;if(st.tt<42)st.tt=55}}
     else st.tt=st.tt<=0?60:st.tt-1;
@@ -698,7 +725,7 @@ function lesson1(){
     const ctlw=el('div',{style:'position:relative'},ctl,hintTxt?el('div',{class:'hint',style:'left:0;right:0;max-width:none;bottom:calc(100% + 8px)'},hintTxt):null);
     const pl=dim(el('div',{class:'pl'},el('span',{},'Выплата '+usd(st.sum*1.92)),el('span',{class:'pay'},'+92%'),el('span',{},'Прибыль +'+usd(st.sum*.92))));
     const buy=mark('buy',el('button',{class:'buy',type:'button',onclick:guard('buy',()=>{
-      if(st.tt<=45&&st.tt>=42){st.trade={entry:price,t0:Date.now(),left:5,gid:Math.floor((base+pts.length-1)/(st.type==='line'?1:IV_G[st.iv]))};st.bal=Math.round((st.bal-st.sum)*100)/100;termView()}
+      if(st.tt<=45&&st.tt>=42){st.trade={entry:price,t0:Date.now(),left:5,abs:base+pts.length-1};st.bal=Math.round((st.bal-st.sum)*100)/100;termView()}
       else toast(st.tt>45?'Рано: ждите, пока таймер дойдёт до 0:45':'Поздно: дождитесь следующего круга таймера')})},'Купить'),8);
     const sell=el('button',{class:'sell',type:'button',onclick:()=>toast('В сигнале указано «Вверх», то есть «Купить»')},'Продать');
     const tb=el('div',{class:'tb'},buy,sell);
