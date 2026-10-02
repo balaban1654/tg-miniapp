@@ -556,12 +556,15 @@ function lesson1(){
     const lastV=prevPrice+(pts[pts.length-1]-prevPrice)*interp;   // плавный ход последней точки
     shown[shown.length-1]=lastV;
     const lastAbs=base+shown.length-1;
-    let units,xOf,xEntry=null;
+    let units,xOf,xEntry=null,lastV2=null;
     if(st.type==='line'){
-      const n=96,arr=shown.slice(-n),dxl=X1/(n-1),sh=(1-interp)*dxl;
-      units=arr.map(v=>({o:v,c:v,h:v,l:v}));
-      xOf=i=>(i-(units.length-1))*dxl+X1-sh;
-      if(st.trade)xEntry=xOf(units.length-1-(lastAbs-st.trade.abs));
+      // линия едет плавно: «голова» стоит у правого края, прошлые точки уезжают влево, значение головы плавно тянется к новому
+      const n=90,arr=pts.slice(-n),len=arr.length,dxl=X1/(n-2);
+      const hv=arr[len-2]+(arr[len-1]-arr[len-2])*interp;
+      units=arr.slice(0,len-1).map(v=>({o:v,c:v,h:v,l:v}));units.push({o:hv,c:hv,h:hv,l:hv});
+      xOf=i=>i<=len-2?X1-((len-2-i)+interp)*dxl:X1;
+      lastV2=hv;
+      if(st.trade)xEntry=xOf(Math.max(0,len-1-(lastAbs-st.trade.abs)));
     }else{
       const map=new Map();
       for(let i=Math.max(0,shown.length-(15*G)),ai=base+i;i<shown.length;i++,ai++){const v=shown[i],k=Math.floor(ai/G);
@@ -581,10 +584,18 @@ function lesson1(){
     const Y=v=>bot-((v-lo)/r)*(bot-top);
     let h='<g stroke="#fff" stroke-opacity=".06">'+[0,1,2,3].map(i=>'<line x1="0" x2="'+X1+'" y1="'+(top+i*(bot-top)/3)+'" y2="'+(top+i*(bot-top)/3)+'"/>').join('')+'</g>';
     if(st.type==='line'){
-      h+='<polyline fill="none" stroke="#6ee0a8" stroke-width="1.8" points="'+units.map((u,i)=>xOf(i).toFixed(1)+','+Y(u.c).toFixed(1)).join(' ')+'"/>';
+      const pl=units.map((u,i)=>xOf(i).toFixed(1)+','+Y(u.c).toFixed(1)).join(' '),hx=X1,hy=Y(units[units.length-1].c);
+      const ph=(now%1400)/1400;
+      h='<defs><linearGradient id="la" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#5b8fe0" stop-opacity=".38"/><stop offset="1" stop-color="#5b8fe0" stop-opacity="0"/></linearGradient></defs>'
+        +'<path d="M0,'+H+' L0,150 L38,128 L62,140 L104,96 L140,124 L186,84 L226,118 L270,92 L300,112 L300,'+H+'Z" fill="#3a2d6e" fill-opacity=".28"/>'+h
+        +'<path d="M'+pl.split(' ')[0]+' L'+pl.split(' ').join(' L')+' L'+hx+','+(bot)+' L'+pl.split(' ')[0].split(',')[0]+','+bot+'Z" fill="url(#la)"/>'
+        +'<polyline fill="none" stroke="#6aa2e8" stroke-width="1.7" stroke-linejoin="round" points="'+pl+'"/>'
+        +'<line x1="'+hx+'" x2="'+hx+'" y1="0" y2="'+H+'" stroke="#fff" stroke-opacity=".12"/>'
+        +'<circle cx="'+hx+'" cy="'+hy.toFixed(1)+'" r="'+(5+9*ph).toFixed(1)+'" fill="#35b6ff" fill-opacity="'+(.35*(1-ph)).toFixed(2)+'"/>'
+        +'<circle cx="'+hx+'" cy="'+hy.toFixed(1)+'" r="3.6" fill="#35b6ff" fill-opacity="'+(.65+.35*Math.sin(now/260)).toFixed(2)+'"/>';
     }else units.forEach(u=>{const up=u.c>=u.o,col=up?'#43b82f':'#ff3b1d';
       h+='<line x1="'+u.x.toFixed(1)+'" x2="'+u.x.toFixed(1)+'" y1="'+Y(u.h).toFixed(1)+'" y2="'+Y(u.l).toFixed(1)+'" stroke="'+col+'" stroke-width="1.3"/><rect x="'+(u.x-BWC/2).toFixed(1)+'" y="'+Math.min(Y(u.o),Y(u.c)).toFixed(1)+'" width="'+BWC+'" height="'+Math.max(1.5,Math.abs(Y(u.o)-Y(u.c))).toFixed(1)+'" fill="'+col+'"/>'});
-    const last=lastV;
+    const last=lastV2===null?lastV:lastV2;
     h+='<line x1="0" x2="'+X1+'" y1="'+Y(last).toFixed(1)+'" y2="'+Y(last).toFixed(1)+'" stroke="#6ee0a8" stroke-opacity=".5" stroke-dasharray="3 3"/>';
     if(st.trade){
       const ey=Y(st.trade.entry),xe=Math.min(X1-62,Math.max(62,xEntry==null?62:xEntry));
