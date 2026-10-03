@@ -546,12 +546,12 @@ function signalLive(sg,skew,cfg){
   const rateBox=el('div',{style:'display:grid;gap:10px;margin-top:4px'});
   const send=async(result,step)=>{try{await api('/signals/'+sg.id+'/rate',{method:'POST',body:{result,step}});await refreshMe().catch(()=>{});signalRated(sg,result,step)}catch(e){toast(e.message)}};
   const rate=el('button',{class:'btn o',type:'button',onclick:()=>pm()},'Оценить сигнал');
-  // Только для роли «Стример»: пропустить сигнал, он закроется и можно запросить новый
+  // Только для ролей админ, модер, тимлидер и стример: пропустить сигнал, он закроется и можно запросить новый
   const skipBtn=el('button',{class:'btn o',type:'button',onclick:async()=>{
     skipBtn.disabled=true;
     try{await api('/signals/'+sg.id+'/skip',{method:'POST'});toast('Сигнал пропущен');tab='home';render()}
     catch(e){toast(e.message);skipBtn.disabled=false}}},'Пропустить');
-  const idle=me&&me.leadRole==='streamer'?el('div',{class:'two'},rate,skipBtn):rate;
+  const idle=me&&['admin','moder','teamlead','streamer'].includes(me.leadRole)?el('div',{class:'two'},rate,skipBtn):rate;
   const pm=()=>{rateBox.replaceChildren(el('b',{style:'font-size:15px'},'Чем закончился сигнал?'),
     el('div',{class:'two'},el('button',{class:'btn g',type:'button',onclick:()=>steps()},'Плюс'),el('button',{class:'btn r',type:'button',onclick:()=>send('loss')},'Минус')),
     el('button',{class:'back',type:'button',onclick:()=>rateBox.replaceChildren(idle)},'‹ Назад'))};

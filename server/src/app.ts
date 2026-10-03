@@ -471,11 +471,11 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
     return { signal: { ...ins.rows[0], taken: false }, steps: [], cfg: cfgOf(set), now: new Date().toISOString() };
   });
 
-  // Пропустить сигнал: только роль «Стример». Сигнал закрывается без оценки и без статистики, можно запросить новый
+  // Пропустить сигнал: только роли админ, модер, тимлидер и стример. Сигнал закрывается без оценки и без статистики, можно запросить новый
   app.post<{ Params: { id: string } }>('/signals/:id/skip', { preHandler: auth }, async (req, reply) => {
     const id = Number(req.params.id);
     const lead = (await db.query('SELECT lead_role FROM leads WHERE tg_id = $1', [req.tg!.id])).rows[0];
-    if (!lead || lead.lead_role !== 'streamer') return reply.code(403).send({ error: 'Пропуск сигнала недоступен' });
+    if (!lead || !['admin', 'moder', 'teamlead', 'streamer'].includes(lead.lead_role)) return reply.code(403).send({ error: 'Пропуск сигнала недоступен' });
     const sg = (await db.query('SELECT id FROM signals WHERE id = $1 AND requested_by = $2', [id, req.tg!.id])).rows[0];
     if (!sg) return reply.code(404).send({ error: 'Сигнал не найден' });
     if ((await db.query('SELECT 1 FROM signal_steps WHERE signal_id = $1 AND tg_id = $2 LIMIT 1', [id, req.tg!.id])).rowCount) return reply.code(409).send({ error: 'Сигнал уже закрыт' });
