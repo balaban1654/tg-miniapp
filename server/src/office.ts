@@ -31,6 +31,33 @@ declare module 'fastify' {
 }
 
 /** Условие видимости лидов и ссылок по роли. Возвращает SQL-фрагмент для колонки owner. */
+
+/** Способы выплат: позже список переедет в раздел «Бухгалтерия» */
+const PAYOUT_METHODS = ['USDT TRC20', 'USDT ERC20', 'USDT BEP20', 'BTC', 'ETH', 'Банковская карта', 'Другое'];
+const STAFF_CARD_COLS = 'id, login, name, role, tg_username, full_name, to_char(birth_date, \'YYYY-MM-DD\') AS birth_date, city, payout_method, payout_wallet';
+
+/** Разбор полей карточки сотрудника: вернёт колонки для UPDATE или текст ошибки */
+function cardFields(b: Record<string, unknown>): { cols: Record<string, unknown> } | { error: string } {
+  const cols: Record<string, unknown> = {};
+  if (b.full_name !== undefined) cols.full_name = str(b.full_name, 120) || null;
+  if (b.city !== undefined) cols.city = str(b.city, 80) || null;
+  if (b.birth_date !== undefined) {
+    const v = str(b.birth_date, 10);
+    if (v) {
+      const d = new Date(v + 'T00:00:00Z');
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(v) || Number.isNaN(d.getTime()) || d.getTime() > Date.now() || d.getUTCFullYear() < 1900) return { error: 'Дата рождения: укажите корректную дату' };
+    }
+    cols.birth_date = v || null;
+  }
+  if (b.payout_method !== undefined) {
+    const v = str(b.payout_method, 40);
+    if (v && !PAYOUT_METHODS.includes(v)) return { error: 'Неизвестный способ выплаты' };
+    cols.payout_method = v || null;
+  }
+  if (b.payout_wallet !== undefined) cols.payout_wallet = str(b.payout_wallet, 200) || null;
+  return { cols };
+}
+
 function ownerScope(me: Staff, col: string): string {
   if (me.role === 'admin') return 'TRUE';
   if (me.role === 'teamlead') {
@@ -93,6 +120,37 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
   });
 
   app.get('/me', { preHandler: auth }, async (req) => req.staff);
+
+  // Своя карточка: личные данные и реквизиты выплат
+  app.get('/profile', { preHandler: auth }, async (req) => {
+    const r = await db.query(`SELECT ${STAFF_CARD_COLS} FROM staff WHERE id = $1`, [req.staff!.id]);
+    return { ...r.rows[0], payout_methods: PAYOUT_METHODS };
+  });
+  app.patch('/profile', { preHandler: auth }, async (req, reply) => {
+    const f = cardFields((req.body ?? {}) as Record<string, unknown>);
+    if ('error' in f) return reply.code(400).send({ error: f.error });
+    const keys = Object.keys(f.cols);
+    if (!keys.length) return { ok: true };
+    await db.query(`UPDATE staff SET ${keys.map((k, i) => `${k} = $${i + 2}`).join(', ')} WHERE id = $1`, [req.staff!.id, ...keys.map((k) => f.cols[k])]);
+    return { ok: true };
+  });
+  // Смена своего пароля: нужен текущий
+  app.post('/profile/password', { preHandler: auth }, async (req, reply) => {
+    const b = (req.body ?? {}) as Record<string, unknown>;
+    const cur = typeof b.current_password === 'string' ? b.current_password : '';
+    const next = typeof b.new_password === 'string' ? b.new_password : '';
+    if (next.length < 8) return reply.code(400).send({ error: 'Новый пароль не короче 8 символов' });
+    const row = (await db.query('SELECT password_hash FROM staff WHERE id = $1', [req.staff!.id])).rows[0];
+    if (!row || !(await verifyPassword(cur, row.password_hash))) return reply.code(403).send({ error: 'Текущий пароль неверный' });
+    await db.query('UPDATE staff SET password_hash = $2 WHERE id = $1', [req.staff!.id, await hashPassword(next)]);
+    return { ok: true };
+  });
+  // Карточка любого сотрудника для админа
+  app.get<{ Params: { id: string } }>('/staff/:id/card', { preHandler: need('admin') }, async (req, reply) => {
+    const r = await db.query(`SELECT ${STAFF_CARD_COLS} FROM staff WHERE id = $1`, [Number(req.params.id)]);
+    if (!r.rowCount) return reply.code(404).send({ error: 'Сотрудник не найден' });
+    return { ...r.rows[0], payout_methods: PAYOUT_METHODS };
+  });
 
   // Сводка для дашборда
   app.get('/stats', { preHandler: auth }, async (req) => {
@@ -189,6 +247,9 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
       if (!t) return null;
       return /^https:\/\/[^\s]+$/.test(t) ? t : undefined;
     };
+    const cf = cardFields(b);
+    if ('error' in cf) return reply.code(400).send({ error: cf.error });
+    for (const [k, v] of Object.entries(cf.cols)) add(k, v);
     if (b.tg_username !== undefined) {
       const u = str(b.tg_username, 40).replace(/^@/, '');
       if (u && !/^[A-Za-z][A-Za-z0-9_]{3,31}$/.test(u)) return reply.code(400).send({ error: 'Telegram: юзернейм без ссылки, например daria_manager' });

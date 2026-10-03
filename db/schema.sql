@@ -304,3 +304,10 @@ CREATE TABLE IF NOT EXISTS legacy_ids (
   claimed_at TIMESTAMPTZ,
   added_at   TIMESTAMPTZ DEFAULT now()
 );
+
+-- Карточка сотрудника: личные данные и реквизиты для выплат
+ALTER TABLE staff ADD COLUMN IF NOT EXISTS full_name      TEXT;
+ALTER TABLE staff ADD COLUMN IF NOT EXISTS birth_date     DATE;
+ALTER TABLE staff ADD COLUMN IF NOT EXISTS city           TEXT;
+ALTER TABLE staff ADD COLUMN IF NOT EXISTS payout_method  TEXT;
+ALTER TABLE staff ADD COLUMN IF NOT EXISTS payout_wallet  TEXT;

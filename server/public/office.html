@@ -43,6 +43,8 @@ input,select{background:var(--bg2);border:1px solid var(--line);border-radius:10
 .nav{display:grid;gap:3px}
 .nav button{display:flex;align-items:center;gap:10px;text-align:left;white-space:nowrap;background:none;border:0;border-radius:9px;padding:9px 12px;color:var(--mut);font-weight:600;cursor:pointer}
 .nav button.on{background:var(--card2);color:var(--fg)}
+.me-row{display:flex;align-items:center;gap:8px}.gear{background:none;border:0;padding:3px;color:var(--mut);cursor:pointer;display:grid;place-items:center;border-radius:6px}.gear:hover{color:var(--fg);background:var(--card2)}
+.lc-field{display:grid;gap:4px}.lc-field label{font-size:12px;color:var(--mut)}.lc-two{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
 .me{margin-top:auto;padding:10px;color:var(--mut);font-size:12px;display:grid;gap:8px}
 main{padding:22px clamp(14px,3vw,32px);display:grid;gap:18px;align-content:start;min-width:0}
 .head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
@@ -130,7 +132,7 @@ textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10
   <aside class="side">
     <div class="brand"><div class="logo">H</div><b style="font:700 14px var(--fd)">Hunter Office</b></div>
     <nav class="nav" id="nav"></nav>
-    <div class="me"><div id="meName"></div><button class="btn o s" id="logout" type="button">Выйти</button></div>
+    <div class="me"><div class="me-row"><span id="meName"></span><button class="gear" id="meGear" type="button" title="Моя карточка" aria-label="Моя карточка"></button></div><button class="btn o s" id="logout" type="button">Выйти</button></div>
   </aside>
   <main id="main"></main>
 </div>
@@ -179,6 +181,7 @@ const icon=k=>{const s=document.createElementNS('http://www.w3.org/2000/svg','sv
 function showApp(){
   $('#login').hidden=true;$('#app').hidden=false;
   $('#meName').textContent=me.name+' · '+ROLE[me.role];
+  const gb=$('#meGear');if(gb&&!gb.firstChild){gb.append(svgIcon(GEAR,16));gb.onclick=()=>openStaffCard(null)}
   const items=[['home','Дашборд'],['leads','Лиды'],['links','Ссылки']];
   if(me.role==='admin'||me.role==='teamlead')items.push(['staff',me.role==='admin'?'Сотрудники':'Моя команда']);
   if(['admin','teamlead','streamer'].includes(me.role))items.splice(1,0,['chats','Чаты']);
@@ -342,7 +345,7 @@ async function viewStaff(){
     el('label',{style:'grid-column:1/-1'},'Ссылка регистрации (WW)',po.l),el('label',{style:'grid-column:1/-1'},'Ссылка регистрации (RU)',po.r),
     el('button',{class:'btn',type:'submit'},'Сохранить'),perr):el('span');
   return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},isAdmin?'Сотрудники':'Моя команда')),form,poForm,
-    ctrT(table(['Имя','Логин','Роль','Тимлидер','Кампания PO','Промокод','Статус',''],rows.map(r=>[td(r.name),td(r.login),el('td',{},el('span',{class:'pill p-pur'},ROLE[r.role])),td(parentName(r.parent_id)),td(r.po_campaign||'—'),td(r.po_promo||'—'),el('td',{},el('span',{class:'pill '+(r.active?'p-ok':'p-bad')},r.active?'активен':'отключён')),el('td',{},toggle(r))]),'Пока никого нет.'))];
+    ctrT(table(['Имя','Логин','Роль','Тимлидер','Кампания PO','Промокод','Статус',''],rows.map(r=>[el('td',{},el('span',{class:'cp'},r.name,isAdmin?el('button',{type:'button',title:'Карточка сотрудника','aria-label':'Карточка сотрудника',onclick:()=>openStaffCard(r.id)},svgIcon(PERSON)):null)),td(r.login),el('td',{},el('span',{class:'pill p-pur'},ROLE[r.role])),td(parentName(r.parent_id)),td(r.po_campaign||'—'),td(r.po_promo||'—'),el('td',{},el('span',{class:'pill '+(r.active?'p-ok':'p-bad')},r.active?'активен':'отключён')),el('td',{},toggle(r))]),'Пока никого нет.'))];
 }
 
 const ctrT=t=>{t.classList.add('ctr');return t};
@@ -408,6 +411,55 @@ async function openLeadCard(tgId){
     el('div',{class:'lc-actions'},
       ['admin','teamlead','streamer'].includes(me.role)?el('button',{class:'btn',type:'button',onclick:()=>{close();pendingChat=L.tg_id;tab='chats';showApp()}},'Открыть чат'):null,
       el('a',{class:'btn o',href:profileUrl(L),target:'_blank',rel:'noopener',style:'text-decoration:none;display:inline-flex;align-items:center'},'Профиль в Telegram')));
+}
+const GEAR='<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/>';
+/** Карточка сотрудника: id=null это своя (шестерёнка внизу), иначе карточка другого сотрудника для админа */
+async function openStaffCard(id){
+  document.querySelectorAll('.lc-overlay').forEach(x=>x.remove());
+  const self=id===null;
+  const ov=el('div',{class:'lc-overlay',role:'dialog','aria-modal':'true'});
+  const close=()=>{ov.remove();document.removeEventListener('keydown',onKey)};
+  const onKey=e=>{if(e.key==='Escape')close()};
+  document.addEventListener('keydown',onKey);
+  ov.addEventListener('mousedown',e=>{if(e.target===ov)close()});
+  const box=el('div',{class:'lc'},el('div',{class:'mut'},'Загрузка…'));
+  ov.append(box);document.body.append(ov);
+  let d;try{d=await api(self?'/profile':'/staff/'+id+'/card')}catch(x){box.replaceChildren(el('div',{class:'err'},x.message),el('button',{class:'btn o s',type:'button',onclick:close},'Закрыть'));return}
+  const inp=(type,v,ph)=>el('input',{type,value:v||'',placeholder:ph||'',autocomplete:'off'});
+  const f={full:inp('text',d.full_name,'Фамилия Имя Отчество'),birth:inp('date',d.birth_date),city:inp('text',d.city,'Город проживания'),
+    method:el('select',{},el('option',{value:''},'Не выбран'),...d.payout_methods.map(m=>el('option',{value:m},m))),wallet:inp('text',d.payout_wallet,'Адрес кошелька или реквизиты')};
+  f.method.value=d.payout_method||'';
+  f.birth.max=new Date().toISOString().slice(0,10);
+  const fld=(l,i)=>el('div',{class:'lc-field'},el('label',{},l),i);
+  const msg=el('div',{class:'err',role:'alert'});
+  const say=(t,ok)=>{msg.className=ok?'ok-msg':'err';msg.textContent=t};
+  const save=async()=>{try{
+    const body={full_name:f.full.value,birth_date:f.birth.value,city:f.city.value,payout_method:f.method.value,payout_wallet:f.wallet.value};
+    await api(self?'/profile':'/staff/'+id,{method:'PATCH',body});say('',true);toast('Сохранено');if(!self)render({soft:true})}catch(x){say(x.message)}};
+  // Пароль: свой меняем по текущему, чужой админ сбрасывает сам
+  const pw={cur:inp('password','','Текущий пароль'),n1:inp('password','','Новый пароль, от 8 символов'),n2:inp('password','','Повторите новый пароль')};
+  [pw.cur,pw.n1,pw.n2].forEach(i=>i.autocomplete='new-password');
+  const pmsg=el('div',{class:'err',role:'alert'});
+  const psay=(t,ok)=>{pmsg.className=ok?'ok-msg':'err';pmsg.textContent=t};
+  const changePw=async()=>{
+    if(pw.n1.value!==pw.n2.value){psay('Пароли не совпадают');return}
+    try{
+      if(self)await api('/profile/password',{method:'POST',body:{current_password:pw.cur.value,new_password:pw.n1.value}});
+      else await api('/staff/'+id,{method:'PATCH',body:{password:pw.n1.value}});
+      pw.cur.value=pw.n1.value=pw.n2.value='';psay('',true);toast(self?'Пароль изменён':'Пароль сброшен')
+    }catch(x){psay(x.message)}
+  };
+  box.replaceChildren(
+    el('div',{class:'lc-head'},el('div',{},el('h3',{style:'font-size:18px'},d.name),el('div',{class:'mut sm'},'Логин '+d.login+' · '+ROLE[d.role])),
+      el('button',{class:'btn o s',type:'button','aria-label':'Закрыть',onclick:close},'✕')),
+    el('h4',{class:'lc-h'},'Личные данные'),
+    el('div',{class:'lc-two'},fld('ФИО',f.full),fld('Дата рождения',f.birth),fld('Город',f.city)),
+    el('h4',{class:'lc-h'},'Выплаты'),
+    el('div',{class:'lc-two'},fld('Куда выплачивать',f.method),fld('Адрес кошелька / реквизиты',f.wallet)),
+    el('div',{class:'lc-actions'},el('button',{class:'btn',type:'button',onclick:save},'Сохранить'),msg),
+    el('h4',{class:'lc-h'},self?'Сменить пароль':'Сбросить пароль'),
+    el('div',{class:'lc-two'},...(self?[fld('Текущий пароль',pw.cur)]:[]),fld('Новый пароль',pw.n1),fld('Повторите',pw.n2)),
+    el('div',{class:'lc-actions'},el('button',{class:'btn o',type:'button',onclick:changePw},self?'Сменить пароль':'Сбросить пароль'),pmsg));
 }
 let pendingChat=null;
 async function viewChats(){
