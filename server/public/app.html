@@ -130,6 +130,9 @@ main{flex:1;padding:6px 16px 96px;display:grid;gap:12px;align-content:start}
 .stat{background:var(--card);border:0;border-radius:16px;padding:12px 8px 12px 14px}
 .stat span{font-size:11px}
 .stat b{display:block;font:700 20px var(--fm)}
+.btn.pulse{animation:btnPulse 1.6s ease-in-out infinite}
+@keyframes btnPulse{0%,100%{box-shadow:0 0 0 0 rgba(155,92,255,.55),0 0 14px rgba(155,92,255,.35)}50%{box-shadow:0 0 0 9px rgba(155,92,255,0),0 0 26px rgba(155,92,255,.7)}}
+@media (prefers-reduced-motion:reduce){.btn.pulse{animation:none;box-shadow:0 0 0 2px var(--acc2)}}
 .btn{display:block;width:100%;text-align:center;background:var(--acc);color:#fff;border:0;border-radius:14px;padding:13px;font-weight:700;font-size:14px;cursor:pointer}
 .btn:active{transform:scale(.98)}.btn.o{background:none;border:1px solid var(--acc);color:var(--acc2)}.btn:disabled{opacity:.45}
 .btn.g{background:var(--ok);color:#06210f}.btn.r{background:var(--bad);color:#2b0610}
@@ -1021,7 +1024,7 @@ function lesson1(n=1){
       el('div',{class:'r'},el('span',{},'Направление'),el('b',{style:'color:var(--ok)'},'ВВЕРХ (BUY)')),
       el('div',{class:'r'},el('span',{},'Время сделки'),el('b',{},'5 SEC')),
       el('div',{class:'r'},el('span',{},'Ставка'),el('b',{},'1–3% от депозита')),
-      el('button',{class:'btn',type:'button',style:'margin-top:8px',onclick:()=>{st.view='term';termView()}},'Открыть терминал'));
+      el('button',{class:'btn pulse',type:'button',style:'margin-top:8px',onclick:()=>{st.view='term';termView()}},'Открыть терминал'));
   };
   const prepView=()=>{
     const labels=['Пара из списка','Настройки терминала','Время входа'];
@@ -1031,7 +1034,7 @@ function lesson1(n=1){
       el('div',{class:'fs-tip'},'Готовим сигнал по '+st.pair+'…'),
       el('div',{class:'ck'},rows.map(r=>r.node)),holder]);
     rows.forEach((r,i)=>timers.push(setTimeout(()=>{r.ic.className='tick';r.ic.textContent='✓';r.st2.textContent='готово';r.st2.style.color='var(--ok)';buzz()},(i+1)*2000)));
-    timers.push(setTimeout(()=>{holder.append(sigCard());buzz()},6300));
+    timers.push(setTimeout(()=>{const c=sigCard();holder.append(c);buzz();setTimeout(()=>{try{c.scrollIntoView({behavior:'smooth',block:'end'})}catch{}},120)},6300));
   };
   const pairsView=()=>{
     fsShell('Шаг 1 · сигнал',[
