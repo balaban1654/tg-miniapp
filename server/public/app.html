@@ -586,8 +586,31 @@ function signalResult(r){
 
 async function refreshMe(){me=await api('/me');return me}
 
+/** Пока доступ закрыт, раз в 15 секунд спрашиваем статус: регистрация и депозит приходят постбеком, экран обновится сам */
+function watchAccess(){
+  timers.push(setInterval(async()=>{
+    if(tab!=='home')return;
+    try{const prev=me.status+'|'+me.access;await refreshMe();if(me.status+'|'+me.access!==prev)render()}catch{}
+  },15000));
+}
+const cfgPocketUrl=()=>'https://pocketoption.com/';
 async function viewHome(){
   if(!me)await refreshMe();
+  if(!me.access&&me.status==='registered'){
+    // Шаг 2: регистрация уже пришла постбеком, ждём пополнения
+    const min=me.minDeposit||50,got=Number(me.deposited||0);
+    const lockedSig2=await signalCard().catch(()=>null);
+    shell('Hunter AI',[profileCard(),stats4({deals:0,wins:0,losses:0,rate:null}),lockedSig2,
+      el('div',{class:'card hero'},heroArt(),
+        el('h2',{style:'font-size:17px'},'Шаг 2 · Пополните счёт'),
+        el('p',{class:'sm',style:'margin:0'},'Регистрация подтверждена. Чтобы открыть доступ, пополните счёт Pocket Option минимум на '+min+' $. Рекомендуем 100 $ и больше, так проще соблюдать риск-менеджмент. Доступ откроется автоматически.'),
+        got>0?el('p',{class:'sm',style:'margin:0;color:var(--acc2);font-weight:700'},'Пополнено: '+usd(got).replace(',00 $',' $')+' из '+min+' $'):null,
+        el('button',{class:'btn',type:'button',onclick:()=>openLink(cfgPocketUrl())},'Открыть Pocket Option'),
+        el('p',{class:'sm',style:'margin:0'},'Торговля связана с риском потери денег. Сигналы не гарантируют результат.')),
+      ...await pastSignals().catch(()=>[])].filter(Boolean));
+    watchAccess();
+    return;
+  }
   if(!me.access){
     // Сначала одна кнопка «Зарегистрироваться». Регион спрашиваем после нажатия
     let asking=false;
@@ -621,6 +644,7 @@ async function viewHome(){
         btnBox,
         el('p',{class:'sm',style:'margin:0'},'Нажимая «Зарегистрироваться», вы подтверждаете, что вам 18+ и вы понимаете: торговля связана с риском потери денег.')),
       ...await pastSignals().catch(()=>[])]);
+    watchAccess();
     return;
   }
   const d=await api('/deals?period=7');

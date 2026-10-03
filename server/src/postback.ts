@@ -99,11 +99,20 @@ export async function postbackRoutes(app: FastifyInstance): Promise<void> {
     if (event === 'reg' && cur.status === 'new') {
       await db.query(`UPDATE leads SET status = 'registered' WHERE tg_id = $1`, [tgId]);
     }
-    if (event === 'ftd' || (event === 'dep' && !['ftd', 'active'].includes(cur.status))) {
-      // Первый депозит: открываем анализ
-      await db.query(`UPDATE leads SET status = 'ftd', access = TRUE WHERE tg_id = $1`, [tgId]);
-    } else if (event === 'dep') {
-      await db.query(`UPDATE leads SET status = 'active' WHERE tg_id = $1 AND status = 'ftd'`, [tgId]);
+    if (event === 'ftd' || event === 'dep') {
+      // Доступ открывается, когда сумма пополнений достигла минимума. Если партнёрка не прислала сумму, проверить нечем, открываем
+      const tot = Number((await db.query(`SELECT coalesce(sum(amount), 0) AS s FROM events WHERE tg_id = $1 AND type IN ('ftd','dep')`, [tgId])).rows[0].s);
+      const enough = amount === null || tot >= config.minDeposit;
+      if (enough) {
+        if (event === 'ftd' || (event === 'dep' && !['ftd', 'active'].includes(cur.status))) {
+          // Первый достаточный депозит: открываем анализ
+          await db.query(`UPDATE leads SET status = 'ftd', access = TRUE WHERE tg_id = $1`, [tgId]);
+        } else {
+          await db.query(`UPDATE leads SET status = 'active' WHERE tg_id = $1 AND status = 'ftd'`, [tgId]);
+        }
+      } else if (cur.status === 'new') {
+        await db.query(`UPDATE leads SET status = 'registered' WHERE tg_id = $1`, [tgId]);
+      }
     }
 
     // Пуши по событию (например «Депозит получен») уходят сразу. Сбой пуша не должен ломать постбек
