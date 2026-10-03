@@ -386,7 +386,7 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
                 FALSE AS positive
            FROM signals s
           WHERE NOT s.is_test AND s.requested_by IS NULL
-            AND s.entry_at + (s.expiry_min || ' minutes')::interval < now()
+            AND s.entry_at + make_interval(secs => coalesce(s.expiry_sec, s.expiry_min * 60)) < now()
          UNION ALL
          SELECT 'c' || md5(s.pair || s.direction || date_trunc('minute', s.entry_at)::text) AS id, s.pair, s.direction,
                 date_trunc('minute', s.entry_at) AS entry_at, FALSE AS is_test,
@@ -394,8 +394,8 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
                 count(*) FILTER (WHERE d.result = 'loss')::int AS losses,
                 (count(*) FILTER (WHERE d.result = 'win') > 0 AND count(*) FILTER (WHERE d.result = 'loss') > 0) AS positive
            FROM signals s JOIN deals d ON d.signal_id = s.id
-          WHERE s.requested_by IS NOT NULL AND NOT s.is_test
-            AND s.entry_at + (s.expiry_min || ' minutes')::interval < now()
+          WHERE s.requested_by IS NOT NULL
+            AND s.entry_at + make_interval(secs => coalesce(s.expiry_sec, s.expiry_min * 60)) < now()
           GROUP BY s.pair, s.direction, date_trunc('minute', s.entry_at)
        ) q
         WHERE q.wins + q.losses > 0
