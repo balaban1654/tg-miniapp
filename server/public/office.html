@@ -252,7 +252,7 @@ function pocketCell(r){
   show();return td;
 }
 async function viewLeads(){
-  const rows=await api('/leads');
+  const [rows,legacy]=await Promise.all([api('/leads'),me.role==='admin'?api('/legacy').catch(()=>null):Promise.resolve(null)]);
   const showOwner=me.role==='admin'||me.role==='teamlead';
   const showComm=me.role==='admin';
   const cols=['Лид','Telegram ID','Pocket ID','Статус',...(me.role==='admin'?['Доступ']:[]),...(showOwner?['Владелец']:[]),'Ссылка','Пришёл','Депозиты',...(showComm?['Комиссия']:[])];
@@ -271,7 +271,15 @@ async function viewLeads(){
     body.insertBefore(band('Админ состав'),trs[0]);
     if(leadRows.length)body.insertBefore(band('Лиды'),trs[staffRows.length]);
   }
-  return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Лиды'),el('span',{class:'mut'},rows.length+' всего')),tbl];
+  let legacyCard=null;
+  if(me.role==='admin'){
+    const ta=el('textarea',{class:'big',rows:'4',placeholder:'Pocket ID из старого бота, по одному в строке'});
+    legacyCard=el('div',{class:'card',style:'display:grid;gap:8px'},el('b',{style:'font-size:13px'},'Пользователи из старого бота'),
+      el('div',{class:'mut sm'},'Загрузите список Pocket ID. Когда человек введёт свой ID в мини-приложении, ему откроется доступ, ID привяжется к его Telegram ID и он отметится в лидах.'),
+      legacy?el('div',{class:'sm'},'В списке: '+legacy.total+' · подключились: '+legacy.claimed):null,ta,
+      el('div',{},el('button',{class:'btn o s',type:'button',onclick:async()=>{try{const r=await api('/legacy/bulk',{method:'POST',body:{text:ta.value}});ta.value='';toast('Добавлено: '+r.added+(r.skipped?', уже были: '+r.skipped:''));setTimeout(render,700)}catch(x){toast(x.message)}}},'Загрузить')));
+  }
+  return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Лиды'),el('span',{class:'mut'},rows.length+' всего')),tbl,legacyCard].filter(Boolean);
 }
 
 function goUrl(slug){return 'https://'+location.host.replace(/^crm\./,'go.')+'/s/'+slug}
@@ -312,14 +320,14 @@ async function viewStaff(){
   const parentName=id=>(rows.find(s=>s.id===id)||{}).name||'—';
   const toggle=r=>isAdmin&&r.id!==me.id?el('button',{class:'btn o s',type:'button',onclick:async()=>{await api('/staff/'+r.id,{method:'PATCH',body:{active:!r.active}});render()}},r.active?'Отключить':'Включить'):'';
   const pickP=el('select',{},...rows.filter(s=>['streamer','teamlead','buyer'].includes(s.role)).map(s=>el('option',{value:s.id},s.name+' · '+ROLE[s.role])));
-  const po={c:el('input',{placeholder:'daria'}),p:el('input',{placeholder:'LIO669'}),l:el('input',{placeholder:'https://…/register?…&ac=daria&cid=…'}),r:el('input',{placeholder:'https://… (необязательно)'})};
-  const fill=()=>{const r=rows.find(x=>String(x.id)===pickP.value)||{};po.c.value=r.po_campaign||'';po.p.value=r.po_promo||'';po.l.value=r.po_link||'';po.r.value=r.po_link_ru||''};
+  const po={t:el('input',{placeholder:'daria_manager',maxlength:'40'}),c:el('input',{placeholder:'daria'}),p:el('input',{placeholder:'LIO669'}),l:el('input',{placeholder:'https://…/register?…&ac=daria&cid=…'}),r:el('input',{placeholder:'https://… (необязательно)'})};
+  const fill=()=>{const r=rows.find(x=>String(x.id)===pickP.value)||{};po.t.value=r.tg_username||'';po.c.value=r.po_campaign||'';po.p.value=r.po_promo||'';po.l.value=r.po_link||'';po.r.value=r.po_link_ru||''};
   pickP.addEventListener('change',fill);fill();
   const perr=el('div',{class:'err',role:'alert'});
   const poForm=isAdmin?el('form',{class:'card form',onsubmit:async e=>{e.preventDefault();perr.textContent='';
-    try{await api('/staff/'+pickP.value,{method:'PATCH',body:{po_campaign:po.c.value,po_promo:po.p.value,po_link:po.l.value,po_link_ru:po.r.value}});perr.textContent='Сохранено';perr.className='err ok';setTimeout(render,600)}catch(x){perr.className='err';perr.textContent=x.message}}},
+    try{await api('/staff/'+pickP.value,{method:'PATCH',body:{tg_username:po.t.value,po_campaign:po.c.value,po_promo:po.p.value,po_link:po.l.value,po_link_ru:po.r.value}});perr.textContent='Сохранено';perr.className='err ok';setTimeout(render,600)}catch(x){perr.className='err';perr.textContent=x.message}}},
     el('h3',{style:'grid-column:1/-1;font-size:14px'},'Кампания в Pocket Option'),
-    el('label',{},'Человек',pickP),el('label',{},'Код кампании (ac)',po.c),el('label',{},'Промокод',po.p),
+    el('label',{},'Человек',pickP),el('label',{},'Telegram менеджера (для клиента)',po.t),el('label',{},'Код кампании (ac)',po.c),el('label',{},'Промокод',po.p),
     el('label',{style:'grid-column:1/-1'},'Ссылка регистрации (WW)',po.l),el('label',{style:'grid-column:1/-1'},'Ссылка регистрации (RU)',po.r),
     el('button',{class:'btn',type:'submit'},'Сохранить'),perr):el('span');
   return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},isAdmin?'Люди':'Моя команда')),form,poForm,

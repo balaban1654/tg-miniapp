@@ -128,7 +128,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
       me.role === 'admin' ? 'TRUE' : me.role === 'teamlead' ? `(id = ${me.id} OR parent_id = ${me.id})` : `id = ${me.id}`;
     const r = await db.query(
       `SELECT id, login, name, role, parent_id, rate_ftd, rate_percent, active, created_at,
-              po_campaign, po_promo, po_link, po_link_ru
+              po_campaign, po_promo, po_link, po_link_ru, tg_username
          FROM staff WHERE ${scope} ORDER BY id`,
     );
     return r.rows;
@@ -189,6 +189,11 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
       if (!t) return null;
       return /^https:\/\/[^\s]+$/.test(t) ? t : undefined;
     };
+    if (b.tg_username !== undefined) {
+      const u = str(b.tg_username, 40).replace(/^@/, '');
+      if (u && !/^[A-Za-z][A-Za-z0-9_]{3,31}$/.test(u)) return reply.code(400).send({ error: 'Telegram: юзернейм без ссылки, например daria_manager' });
+      add('tg_username', u || null);
+    }
     if (b.po_campaign !== undefined) {
       const c = str(b.po_campaign, 40);
       if (c && !/^[a-zA-Z0-9_-]{1,40}$/.test(c)) return reply.code(400).send({ error: 'Код кампании: латиница, цифры, - и _' });
@@ -796,6 +801,25 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     const r = await db.query('UPDATE leads SET is_tester = $2, lead_role = $3 WHERE tg_id = $1 RETURNING tg_id', [Number(req.params.tgId), on, on ? role : 'lead']);
     if (!r.rowCount) return reply.code(404).send({ error: 'Лид не найден' });
     return { ok: true };
+  });
+
+  // Список Pocket ID из старого бота: по одному в строке (или через запятую/пробел). Дубликаты пропускаются
+  app.post('/legacy/bulk', { preHandler: need('admin') }, async (req, reply) => {
+    const raw = String((req.body as any)?.text ?? '').slice(0, 200_000);
+    const ids = [...new Set(raw.split(/[\s,;]+/).map((x) => x.trim()).filter(Boolean))];
+    const bad = ids.filter((x) => !/^[A-Za-z0-9_-]{1,40}$/.test(x));
+    if (bad.length) return reply.code(400).send({ error: 'Неверный формат: ' + bad.slice(0, 3).join(', ') + (bad.length > 3 ? '…' : '') });
+    if (!ids.length) return reply.code(400).send({ error: 'Список пуст' });
+    const r = await db.query('INSERT INTO legacy_ids (trader_id) SELECT unnest($1::text[]) ON CONFLICT DO NOTHING', [ids]);
+    return { ok: true, added: r.rowCount, skipped: ids.length - (r.rowCount ?? 0) };
+  });
+  app.get('/legacy', { preHandler: need('admin') }, async () => {
+    const r = await db.query('SELECT count(*)::int AS total, count(claimed_by)::int AS claimed FROM legacy_ids');
+    return r.rows[0];
+  });
+  app.delete('/legacy', { preHandler: need('admin') }, async () => {
+    const r = await db.query('DELETE FROM legacy_ids WHERE claimed_by IS NULL');
+    return { ok: true, removed: r.rowCount };
   });
 
   // Pocket ID вручную: админ присваивает его лиду сам (пустое значение сбрасывает)

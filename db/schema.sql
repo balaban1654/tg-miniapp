@@ -78,6 +78,8 @@ ALTER TABLE staff ADD COLUMN IF NOT EXISTS po_campaign TEXT;
 ALTER TABLE staff ADD COLUMN IF NOT EXISTS po_promo    TEXT;
 ALTER TABLE staff ADD COLUMN IF NOT EXISTS po_link     TEXT;
 ALTER TABLE staff ADD COLUMN IF NOT EXISTS po_link_ru  TEXT;
+-- Telegram-юзернейм менеджера: в профиле клиента это кликабельная ссылка
+ALTER TABLE staff ADD COLUMN IF NOT EXISTS tg_username TEXT;
 CREATE UNIQUE INDEX IF NOT EXISTS staff_po_campaign ON staff (lower(po_campaign)) WHERE po_campaign IS NOT NULL;
 
 -- Mini App: регион клиента, сделки, прогресс тренажёра, медиа
@@ -294,3 +296,11 @@ END $$;
 
 -- Часовой пояс клиента (из Mini App). Пока он неизвестен, время в пушах показываем по Киеву
 ALTER TABLE leads ADD COLUMN IF NOT EXISTS tz TEXT;
+
+-- Pocket ID из старого бота: клиент вводит свой в мини-приложении, получает доступ, ID привязывается к его Telegram ID
+CREATE TABLE IF NOT EXISTS legacy_ids (
+  trader_id  TEXT PRIMARY KEY,
+  claimed_by BIGINT,
+  claimed_at TIMESTAMPTZ,
+  added_at   TIMESTAMPTZ DEFAULT now()
+);

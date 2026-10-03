@@ -215,7 +215,7 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
     const u = req.tg!;
     const r = await db.query(
       `SELECT d.status, d.access, d.is_tester, d.lead_role, d.region, d.created_at, d.trader_id, o.name AS manager,
-              o.po_promo, o.po_link, o.po_link_ru
+              o.po_promo, o.po_link, o.po_link_ru, o.tg_username AS manager_tg
          FROM leads d LEFT JOIN staff o ON o.id = d.owner_id WHERE d.tg_id = $1`,
       [u.id],
     );
@@ -241,6 +241,7 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
       leadRole: l.lead_role || 'lead',
       pocketId: l.trader_id,
       manager: l.manager,
+      managerTg: l.manager_tg ?? null,
       promo: l.po_promo,
       region: l.region,
       regionGuess: guess,
@@ -292,6 +293,30 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
       total: rows.filter((x) => x.result && x.result !== 'skip').length,
       byDay: by.rows,
     };
+  });
+
+  // Перенос из старого бота: клиент вводит свой Pocket ID, он есть в загруженном списке, значит доступ открывается сразу
+  const claimTries = new Map<number, { n: number; at: number }>();
+  app.post('/legacy/claim', { preHandler: auth }, async (req, reply) => {
+    const tgId = req.tg!.id;
+    const t = claimTries.get(tgId);
+    const fresh = t && Date.now() - t.at < 3_600_000 ? t : { n: 0, at: Date.now() };
+    if (fresh.n >= 8) return reply.code(429).send({ error: 'Слишком много попыток. Попробуйте через час или напишите в поддержку' });
+    const id = String((req.body as any)?.trader_id ?? '').trim();
+    if (!/^[A-Za-z0-9_-]{1,40}$/.test(id)) return reply.code(400).send({ error: 'Введите Pocket ID: только буквы и цифры' });
+    const fail = (code: number, error: string) => {
+      claimTries.set(tgId, { n: fresh.n + 1, at: fresh.at });
+      return reply.code(code).send({ error });
+    };
+    const row = (await db.query('SELECT claimed_by FROM legacy_ids WHERE trader_id = $1', [id])).rows[0];
+    if (!row) return fail(404, 'Этого Pocket ID нет в списке старого бота. Проверьте номер или напишите в поддержку');
+    if (row.claimed_by && Number(row.claimed_by) !== tgId) return fail(409, 'Этот Pocket ID уже подключён к другому аккаунту');
+    const other = await db.query('SELECT 1 FROM leads WHERE trader_id = $1 AND tg_id <> $2 AND access LIMIT 1', [id, tgId]);
+    if (other.rowCount) return fail(409, 'Этот Pocket ID уже подключён к другому аккаунту');
+    await db.query('UPDATE legacy_ids SET claimed_by = $2, claimed_at = coalesce(claimed_at, now()) WHERE trader_id = $1', [id, tgId]);
+    await db.query(`UPDATE leads SET trader_id = $2, access = TRUE, status = CASE WHEN status IN ('new','registered','ftd') THEN 'active' ELSE status END WHERE tg_id = $1`, [tgId, id]);
+    claimTries.delete(tgId);
+    return { ok: true };
   });
 
   // Очистка истории сделок клиента (его статистика обнуляется)
