@@ -540,14 +540,20 @@ function signalLive(sg,skew,cfg){
   const rateBox=el('div',{style:'display:grid;gap:10px;margin-top:4px'});
   const send=async(result,step)=>{try{await api('/signals/'+sg.id+'/rate',{method:'POST',body:{result,step}});await refreshMe().catch(()=>{});signalRated(sg,result,step)}catch(e){toast(e.message)}};
   const rate=el('button',{class:'btn o',type:'button',onclick:()=>pm()},'Оценить сигнал');
+  // Только для роли «Стример»: пропустить сигнал, он закроется и можно запросить новый
+  const skipBtn=el('button',{class:'btn o',type:'button',onclick:async()=>{
+    skipBtn.disabled=true;
+    try{await api('/signals/'+sg.id+'/skip',{method:'POST'});toast('Сигнал пропущен');tab='home';render()}
+    catch(e){toast(e.message);skipBtn.disabled=false}}},'Пропустить');
+  const idle=me&&me.leadRole==='streamer'?el('div',{class:'two'},rate,skipBtn):rate;
   const pm=()=>{rateBox.replaceChildren(el('b',{style:'font-size:15px'},'Чем закончился сигнал?'),
     el('div',{class:'two'},el('button',{class:'btn g',type:'button',onclick:()=>steps()},'Плюс'),el('button',{class:'btn r',type:'button',onclick:()=>send('loss')},'Минус')),
-    el('button',{class:'back',type:'button',onclick:()=>rateBox.replaceChildren(rate)},'‹ Назад'))};
+    el('button',{class:'back',type:'button',onclick:()=>rateBox.replaceChildren(idle)},'‹ Назад'))};
   const steps=()=>{rateBox.replaceChildren(el('b',{style:'font-size:15px'},'С какого шага зашёл плюс?'),
     el('div',{class:'sm'},'1 — со входа, 2–'+max+' — с перекрытий'),
     el('div',{style:'display:grid;grid-template-columns:repeat('+max+',minmax(0,1fr));gap:8px'},Array.from({length:max},(_,i)=>el('button',{class:'btn g',type:'button',onclick:()=>send('win',i+1)},String(i+1)))),
     el('button',{class:'back',type:'button',onclick:()=>pm()},'‹ Назад'))};
-  rateBox.append(rate);
+  rateBox.append(idle);
   function paint(){
     const now=nowMs();
     let n=0;while(n<max&&at(n)<=now)n++;   // n = первое событие, которое ещё впереди

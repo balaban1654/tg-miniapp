@@ -417,7 +417,8 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
     const set = (await db.query('SELECT * FROM signal_settings WHERE id = 1')).rows[0];
     const lead = (await db.query('SELECT access, is_tester FROM leads WHERE tg_id = $1', [tgId])).rows[0];
     const allowed = Boolean(lead && (lead.access || lead.is_tester) && set.enabled);
-    const last = (await db.query('SELECT extract(epoch FROM now() - created_at)::int AS ago FROM signals WHERE requested_by = $1 ORDER BY id DESC LIMIT 1', [tgId])).rows[0];
+    // Пропущенный сигнал паузу не включает: можно сразу запросить новый
+    const last = (await db.query(`SELECT extract(epoch FROM now() - created_at)::int AS ago FROM signals s WHERE requested_by = $1 AND NOT EXISTS (SELECT 1 FROM signal_steps t WHERE t.signal_id = s.id AND t.tg_id = $1 AND t.result = 'skip') ORDER BY id DESC LIMIT 1`, [tgId])).rows[0];
     const cooldownLeft = last ? Math.max(0, set.cooldown_sec - last.ago) : 0;
     const open = (await db.query('SELECT 1 FROM signals s WHERE s.requested_by = $1 AND NOT EXISTS (SELECT 1 FROM signal_steps t WHERE t.signal_id = s.id AND t.tg_id = $1) LIMIT 1', [tgId])).rowCount;
     return { set, lead, allowed, cooldownLeft, open: Boolean(open) };
@@ -468,6 +469,18 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
       [p.pair, p.direction, Math.max(1, Math.ceil(expirySec / 60)), expirySec, new Date(entryMs), !(lead.access || lead.is_tester) || Boolean(p.auto), p.direction_by, req.tg!.id],
     );
     return { signal: { ...ins.rows[0], taken: false }, steps: [], cfg: cfgOf(set), now: new Date().toISOString() };
+  });
+
+  // Пропустить сигнал: только роль «Стример». Сигнал закрывается без оценки и без статистики, можно запросить новый
+  app.post<{ Params: { id: string } }>('/signals/:id/skip', { preHandler: auth }, async (req, reply) => {
+    const id = Number(req.params.id);
+    const lead = (await db.query('SELECT lead_role FROM leads WHERE tg_id = $1', [req.tg!.id])).rows[0];
+    if (!lead || lead.lead_role !== 'streamer') return reply.code(403).send({ error: 'Пропуск сигнала недоступен' });
+    const sg = (await db.query('SELECT id FROM signals WHERE id = $1 AND requested_by = $2', [id, req.tg!.id])).rows[0];
+    if (!sg) return reply.code(404).send({ error: 'Сигнал не найден' });
+    if ((await db.query('SELECT 1 FROM signal_steps WHERE signal_id = $1 AND tg_id = $2 LIMIT 1', [id, req.tg!.id])).rowCount) return reply.code(409).send({ error: 'Сигнал уже закрыт' });
+    await db.query(`INSERT INTO signal_steps (signal_id, tg_id, step, result) VALUES ($1,$2,0,'skip') ON CONFLICT DO NOTHING`, [id, req.tg!.id]);
+    return { ok: true };
   });
 
   // Клиент оценивает сигнал: минус, либо плюс с номером шага (1 = со входа, 2..4 = с перекрытия). Идёт в статистику
