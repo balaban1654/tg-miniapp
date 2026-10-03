@@ -114,7 +114,7 @@ main{flex:1;padding:6px 16px 96px;display:grid;gap:12px;align-content:start}
 .pshead b{font:700 16px var(--fd);white-space:nowrap}
 .pshead span{font-size:11px;text-align:right}
 .pslist{background:var(--card);border-radius:18px;overflow:hidden}
-.ps{padding:14px 16px;display:grid;gap:8px}.ps+.ps{border-top:1px solid #ffffff10}
+.ps{overflow:hidden;transition:height .45s cubic-bezier(.2,.8,.2,1),opacity .45s ease}.ps-in{padding:14px 16px;display:grid;gap:8px}.ps+.ps{border-top:1px solid #ffffff10}
 .pbadge{border:1px solid;border-radius:8px;padding:4px 12px;font-size:13px;font-weight:600;white-space:nowrap}
 .pbadge.w{color:var(--ok);border-color:var(--ok);background:#3ddc9712}.pbadge.l{color:var(--bad);border-color:var(--bad);background:#ff6b8a12}.pbadge.n{color:var(--mut);border-color:var(--line)}
 .since{display:flex;align-items:baseline;gap:8px;font-size:13px;line-height:18px}.since svg{width:17px;height:17px;flex:none;display:block;transform:translateY(2.1px)}
@@ -673,22 +673,55 @@ const plural=(n,a,b,c)=>{const m=n%100,k=n%10;return m>10&&m<20?c:k===1?a:k>1&&k
 /** Прошедшие сигналы: все завершённые, итог по отметкам клиентов, полоска показывает долю плюсов и минусов */
 async function pastSignals(){
   const wrap=el('div',{});
-  const build=rows=>{
-    const allTest=rows.length>0&&rows.every(r=>r.is_test);
-    const head=el('div',{class:'pshead'},el('b',{},'Прошедшие сигналы'),allTest?null:el('span',{class:'sm'},'по отметкам участников'));
-    if(!rows.length)return[head,el('div',{class:'card sm'},'Завершённых сигналов пока нет.')];
-    return[head,el('div',{class:'pslist'},rows.map(r=>{
-      const n=r.wins+r.losses,up=r.direction==='up';
-      const cls=n===0||r.wins===r.losses?'n':r.wins>r.losses?'w':'l';
-      const lab=cls==='w'?'Плюс':cls==='l'?'Минус':(n===0?'Нет итогов':'Поровну');
-      const t=new Date(r.entry_at).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
-      return el('div',{class:'ps'},
-        el('div',{class:'row'},el('div',{},el('b',{},r.pair+' · ',el('span',{style:'color:var(--'+(up?'ok':'bad')+')'},up?'ВВЕРХ (BUY)':'ВНИЗ (SELL)')),el('div',{class:'sm'},t+' · '+(n+' '+plural(n,r.is_test?'голос':'отметка',r.is_test?'голоса':'отметки',r.is_test?'голосов':'отметок')))),el('span',{class:'pbadge '+cls},lab)));
-    }))];
+  const nodes=new Map();   // ключ сигнала → строка списка, чтобы обновлять список без перерисовки
+  let listEl=null,mode='';
+  const keyOf=r=>String(r.id!==undefined?r.id:r.entry_at+r.pair);
+  const sigOf=r=>r.wins+'/'+r.losses;
+  const inner=r=>{
+    const n=r.wins+r.losses,up=r.direction==='up';
+    const cls=n===0||r.wins===r.losses?'n':r.wins>r.losses?'w':'l';
+    const lab=cls==='w'?'Плюс':cls==='l'?'Минус':(n===0?'Нет итогов':'Поровну');
+    const t=new Date(r.entry_at).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
+    return el('div',{class:'ps-in'},
+      el('div',{class:'row'},el('div',{},el('b',{},r.pair+' · ',el('span',{style:'color:var(--'+(up?'ok':'bad')+')'},up?'ВВЕРХ (BUY)':'ВНИЗ (SELL)')),el('div',{class:'sm'},t+' · '+(n+' '+plural(n,r.is_test?'голос':'отметка',r.is_test?'голоса':'отметки',r.is_test?'голосов':'отметок')))),el('span',{class:'pbadge '+cls},lab)));
   };
-  wrap.replaceChildren(...build(await api('/signals/past')).filter(Boolean));
-  // Раз в минуту обновляем список, пока экран открыт: новый сигнал появляется, самый старый уходит
-  timers.push(setInterval(async()=>{if(!wrap.isConnected)return;try{wrap.replaceChildren(...build(await api('/signals/past')).filter(Boolean))}catch{}},30000));
+  const mkRow=r=>{const d=el('div',{class:'ps'},inner(r));d._sig=sigOf(r);return d};
+  const full=rows=>{
+    nodes.clear();listEl=null;
+    const allTest=rows.length>0&&rows.every(r=>r.is_test);
+    mode=allTest?'t':'r';
+    const head=el('div',{class:'pshead'},el('b',{},'Прошедшие сигналы'),allTest?null:el('span',{class:'sm'},'по отметкам участников'));
+    if(!rows.length){wrap.replaceChildren(head,el('div',{class:'card sm'},'Завершённых сигналов пока нет.'));return}
+    listEl=el('div',{class:'pslist'},rows.map(r=>{const d=mkRow(r);nodes.set(keyOf(r),d);return d}));
+    wrap.replaceChildren(head,listEl);
+  };
+  const enter=d=>{
+    d.style.height='0px';d.style.opacity='0';
+    listEl.offsetHeight;
+    requestAnimationFrame(()=>{d.style.height=d.scrollHeight+'px';d.style.opacity='1';setTimeout(()=>{d.style.height='';d.style.opacity=''},520)});
+  };
+  const leave=d=>{
+    d.style.height=d.offsetHeight+'px';d.style.borderTopWidth='0';
+    d.offsetHeight;
+    requestAnimationFrame(()=>{d.style.height='0px';d.style.opacity='0';setTimeout(()=>d.remove(),520)});
+  };
+  // Новый сигнал выезжает сверху, остальные сдвигаются вниз, самый нижний уходит
+  const update=rows=>{
+    const allTest=rows.length>0&&rows.every(r=>r.is_test);
+    if(!listEl||!rows.length||(allTest?'t':'r')!==mode||!listEl.isConnected){full(rows);return}
+    const keys=rows.map(keyOf);
+    [...nodes].forEach(([k,d])=>{if(!keys.includes(k)){nodes.delete(k);leave(d)}});
+    rows.forEach((r,i)=>{
+      const k=keys[i],cur=nodes.get(k);
+      if(cur){if(cur._sig!==sigOf(r)){cur.replaceChildren(inner(r));cur._sig=sigOf(r)}return}
+      const d=mkRow(r);nodes.set(k,d);
+      let next=null;for(let q=i+1;q<keys.length;q++){if(nodes.has(keys[q])&&keys[q]!==k){next=nodes.get(keys[q]);break}}
+      listEl.insertBefore(d,next);enter(d);
+    });
+  };
+  full(await api('/signals/past'));
+  // Каждые 20 секунд сверяем список: новый сигнал появляется, самый старый уходит
+  timers.push(setInterval(async()=>{if(!wrap.isConnected)return;try{update(await api('/signals/past'))}catch{}},20000));
   return[wrap];
 }
 
