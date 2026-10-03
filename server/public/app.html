@@ -1104,10 +1104,18 @@ async function viewMedia(){
   shell('Медиа',[el('b',{},'Каналы команды'),ch,el('b',{},'Наши трейдеры'),tr,el('b',{},'Новости команды'),el('div',{class:'card',style:'display:grid;gap:6px'},el('b',{style:'font-size:14px'},'Скоро здесь появятся новости'),el('div',{class:'sm',style:'line-height:1.5'},'Обновления тренажёра, итоги недели, новые трейдеры и важные объявления команды. Заглядывайте сюда почаще, чтобы ничего не пропустить.'))]);
 }
 
+const ROLE_NAME={lead:'Лид',moder:'Модер',admin:'Админ',streamer:'Стример',analyst:'Аналитик',buyer:'Медиабайер'};
+const COPY_ICON='<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 012-2h9"/></svg>';
+async function copyText(v){
+  try{await navigator.clipboard.writeText(String(v))}catch{const t=el('textarea',{style:'position:fixed;opacity:0'});t.value=String(v);document.body.append(t);t.select();try{document.execCommand('copy')}catch{}t.remove()}
+  toast('Скопировано: '+v);
+}
 function viewProfile(){
-  const rows=[['Telegram ID',me.tgId],['Pocket ID',me.isTester?'Тестовый аккаунт':(me.pocketId||'ещё нет')],['Статус',({new:'новый',registered:'зарегистрирован',ftd:'пополнил счёт',active:'активен',churned:'неактивен'})[me.status]||me.status],['Менеджер',me.manager||'не назначен'],['Доступ',me.access?'открыт':'закрыт']];
+  const rows=[['Telegram ID',me.tgId,true],['Pocket ID',me.pocketId||'ещё нет',!!me.pocketId],['Роль',ROLE_NAME[me.leadRole]||ROLE_NAME.lead],['Статус',({new:'новый',registered:'зарегистрирован',ftd:'пополнил счёт',active:'активен',churned:'неактивен'})[me.status]||me.status],['Менеджер',me.manager||'не назначен'],['Доступ',me.access?'открыт':'закрыт']];
   shell('Профиль',[el('div',{class:'card row',style:'justify-content:flex-start;gap:12px'},withPhoto(el('div',{class:'ava'},(me.name||'?').trim().slice(0,1).toUpperCase())),el('div',{},el('b',{style:'font:700 16px var(--fd)'},me.name),el('div',{class:'sm'},me.username?'@'+me.username:''))),
-    el('div',{class:'card',style:'display:grid;gap:10px'},rows.map(([k,v])=>el('div',{class:'row'},el('span',{class:'sm'},k),el('b',{class:'mono'},String(v))))),
+    el('div',{class:'card',style:'display:grid;gap:10px'},rows.map(([k,v,cp])=>el('div',{class:'row'},el('span',{class:'sm'},k),
+      el('span',{style:'display:inline-flex;align-items:center;gap:8px'},el('b',{class:'mono'},String(v)),
+        cp?el('button',{type:'button','aria-label':'Копировать',title:'Копировать',style:'background:none;border:0;padding:2px;color:var(--mut);cursor:pointer;display:grid;place-items:center',onclick:()=>copyText(v)},svgEl(COPY_ICON)):null)))),
     me.promo?el('div',{class:'card row'},el('span',{class:'sm'},'Промокод'),el('b',{class:'mono'},me.promo)):null,
     el('button',{class:'btn o',type:'button',onclick:support},'Написать в поддержку'),
     el('button',{class:'back',type:'button',onclick:()=>go('home')},'‹ На главную')]);
