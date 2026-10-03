@@ -5,6 +5,7 @@ import { bot } from './bot.js';
 import { config } from './config.js';
 import { createBroadcast, segmentWhere, SEGMENTS, type Button } from './push.js';
 import { randomInt } from 'node:crypto';
+import { accountingRoutes } from './accounting.js';
 import {
   type Staff,
   type Role,
@@ -956,4 +957,6 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     );
     return r.rows;
   });
+
+  await accountingRoutes(app, { need, str, num });
 }

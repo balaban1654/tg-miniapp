@@ -311,3 +311,96 @@ ALTER TABLE staff ADD COLUMN IF NOT EXISTS birth_date     DATE;
 ALTER TABLE staff ADD COLUMN IF NOT EXISTS city           TEXT;
 ALTER TABLE staff ADD COLUMN IF NOT EXISTS payout_method  TEXT;
 ALTER TABLE staff ADD COLUMN IF NOT EXISTS payout_wallet  TEXT;
+
+-- Бухгалтерия стримеров: KPI, смены и отчёты, бонусы и штрафы, выплаты и авансы
+CREATE TABLE IF NOT EXISTS kpi_settings (
+  id   INT PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+  data JSONB NOT NULL DEFAULT '{}'::jsonb
+);
+INSERT INTO kpi_settings (id, data) VALUES (1, '{}'::jsonb) ON CONFLICT (id) DO NOTHING;
+
+-- Поля формы отчёта о смене: настраивает админ
+CREATE TABLE IF NOT EXISTS report_fields (
+  id           SERIAL PRIMARY KEY,
+  name         TEXT NOT NULL,
+  kind         TEXT NOT NULL DEFAULT 'number' CHECK (kind IN ('number','text','link')),
+  required     BOOLEAN NOT NULL DEFAULT FALSE,
+  on_dashboard BOOLEAN NOT NULL DEFAULT FALSE,
+  active       BOOLEAN NOT NULL DEFAULT TRUE,
+  sort         INT NOT NULL DEFAULT 0
+);
+INSERT INTO report_fields (name, kind, required, on_dashboard, sort)
+  SELECT v.name, 'number', v.req, TRUE, v.sort FROM (VALUES ('Просмотры', TRUE, 1), ('Подписчики', TRUE, 2), ('Комментарии', FALSE, 3), ('Лайки', FALSE, 4)) AS v(name, req, sort)
+   WHERE NOT EXISTS (SELECT 1 FROM report_fields);
+
+-- Смены: стример начинает со ссылкой на эфир, заканчивает отчётом; админ зачитывает
+CREATE TABLE IF NOT EXISTS shift_reports (
+  id              SERIAL PRIMARY KEY,
+  staff_id        INT NOT NULL REFERENCES staff(id) ON DELETE CASCADE,
+  status          TEXT NOT NULL DEFAULT 'live' CHECK (status IN ('live','pending','approved','rejected')),
+  stream_url      TEXT,
+  started_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  ended_at        TIMESTAMPTZ,
+  day             DATE NOT NULL,                 -- день по Киеву, к которому относится смена
+  declared_min    INT,                           -- время, которое указал стример
+  approved_min    INT,                           -- время, которое зачёл админ
+  fields          JSONB NOT NULL DEFAULT '[]'::jsonb,   -- [{name, kind, value}] на момент отправки
+  comment         TEXT,
+  screenshot      BYTEA,
+  screenshot_type TEXT,
+  reviewed_by     INT REFERENCES staff(id),
+  reviewed_at     TIMESTAMPTZ,
+  reject_reason   TEXT,
+  created_at      TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS shift_reports_staff ON shift_reports(staff_id, day);
+CREATE INDEX IF NOT EXISTS shift_reports_status ON shift_reports(status);
+
+-- Бонусы и штрафы: комментарий видит только админ
+CREATE TABLE IF NOT EXISTS staff_adjustments (
+  id         SERIAL PRIMARY KEY,
+  staff_id   INT NOT NULL REFERENCES staff(id) ON DELETE CASCADE,
+  period     TEXT NOT NULL,                      -- 'YYYY-MM'
+  kind       TEXT NOT NULL CHECK (kind IN ('bonus','penalty')),
+  amount     NUMERIC(12,2) NOT NULL CHECK (amount > 0),
+  comment    TEXT,
+  created_by INT REFERENCES staff(id),
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS staff_adjustments_period ON staff_adjustments(staff_id, period);
+
+-- Выплаты и запросы аванса
+CREATE TABLE IF NOT EXISTS staff_payouts (
+  id         SERIAL PRIMARY KEY,
+  staff_id   INT NOT NULL REFERENCES staff(id) ON DELETE CASCADE,
+  period     TEXT NOT NULL,
+  kind       TEXT NOT NULL CHECK (kind IN ('advance','final','extra')),
+  amount     NUMERIC(12,2) NOT NULL CHECK (amount > 0),
+  note       TEXT,
+  created_by INT REFERENCES staff(id),
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS staff_payouts_period ON staff_payouts(staff_id, period);
+CREATE TABLE IF NOT EXISTS advance_requests (
+  id         SERIAL PRIMARY KEY,
+  staff_id   INT NOT NULL REFERENCES staff(id) ON DELETE CASCADE,
+  period     TEXT NOT NULL,
+  amount     NUMERIC(12,2) NOT NULL,
+  status     TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','paid','rejected')),
+  created_at TIMESTAMPTZ DEFAULT now(),
+  decided_by INT REFERENCES staff(id),
+  decided_at TIMESTAMPTZ
+);
+CREATE UNIQUE INDEX IF NOT EXISTS advance_once ON advance_requests(staff_id, period) WHERE status <> 'rejected';
+
+-- Невыполненный план за день: стример пишет причину, админ читает
+CREATE TABLE IF NOT EXISTS shift_shortfalls (
+  id         SERIAL PRIMARY KEY,
+  staff_id   INT NOT NULL REFERENCES staff(id) ON DELETE CASCADE,
+  day        DATE NOT NULL,
+  minutes    INT NOT NULL DEFAULT 0,
+  reason     TEXT,
+  reason_at  TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE (staff_id, day)
+);
