@@ -837,6 +837,40 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     return { ok: true, deleted: r.rowCount };
   });
 
+  // Карточка лида: откуда пришёл, путь (старт, регистрация, депозиты) и суммы
+  app.get<{ Params: { tgId: string } }>('/leads/:tgId', { preHandler: auth }, async (req, reply) => {
+    const me = req.staff!;
+    const tgId = Number(req.params.tgId);
+    if (!Number.isSafeInteger(tgId)) return reply.code(400).send({ error: 'Неверный ID' });
+    const r = await db.query(
+      `SELECT d.tg_id, d.username, d.first_name, d.status, d.access, d.trader_id, d.is_tester, d.lead_role, d.region, d.tz,
+              d.created_at, d.last_seen_at, d.bot_started, d.bot_blocked, d.owner_id,
+              o.name AS owner_name, l.slug AS link_slug, l.source AS link_source, l.campaign AS link_campaign
+         FROM leads d LEFT JOIN staff o ON o.id = d.owner_id LEFT JOIN links l ON l.id = d.link_id
+        WHERE d.tg_id = $1 AND (${ownerScope(me, 'd.owner_id')} OR ${chatScope(me, 'd.owner_id')})`,
+      [tgId],
+    );
+    if (!r.rowCount) return reply.code(404).send({ error: 'Лид не найден' });
+    const ev = await db.query(
+      `SELECT type, amount, created_at, raw->>'country' AS country, raw->>'promo' AS promo, raw->>'ac' AS ac
+         FROM events WHERE tg_id = $1 AND type IN ('start','reg','ftd','dep','wd') ORDER BY created_at, id`,
+      [tgId],
+    );
+    const deposits = ev.rows.filter((e) => e.type === 'ftd' || e.type === 'dep');
+    const sum = (rows: any[]) => rows.reduce((t, e) => t + Number(e.amount || 0), 0);
+    const last = (k: 'country' | 'promo' | 'ac') => [...ev.rows].reverse().find((e) => e[k])?.[k] ?? null;
+    return {
+      lead: r.rows[0],
+      country: last('country'),
+      promo: last('promo'),
+      ac: last('ac'),
+      events: ev.rows,
+      depositsTotal: sum(deposits),
+      depositsCount: deposits.length,
+      withdrawTotal: sum(ev.rows.filter((e) => e.type === 'wd')),
+    };
+  });
+
   // Лиды
   app.get<{ Querystring: { status?: string } }>('/leads', { preHandler: auth }, async (req) => {
     const me = req.staff!;

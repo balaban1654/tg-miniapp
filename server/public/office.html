@@ -58,6 +58,18 @@ tr:last-child td{border-bottom:0}
 td.n{font-family:var(--fm);text-align:right}
 th.n{text-align:right}
 .ctr th,.ctr td,.ctr td.n{text-align:center}
+.lc-overlay{position:fixed;inset:0;background:rgba(5,2,12,.72);z-index:60;display:grid;place-items:center;padding:16px;backdrop-filter:blur(3px)}
+.lc{width:min(720px,100%);max-height:90vh;overflow:auto;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px;display:grid;gap:14px;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+.lc-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
+.lc-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px 18px}
+.lc-kv{display:grid;gap:2px}.lc-kv b{font-weight:600;word-break:break-word}
+.lc-h{font:700 12px var(--fm);letter-spacing:.06em;text-transform:uppercase;color:var(--acc2);margin:4px 0 0}
+.lc-steps{display:grid;gap:10px}.lc-step{display:flex;gap:12px;align-items:flex-start;opacity:.55}.lc-step.done{opacity:1}
+.lc-dot{width:10px;height:10px;border-radius:50%;background:var(--line);margin-top:6px;flex:none}.lc-step.done .lc-dot{background:var(--ok)}
+.lc-total{display:flex;gap:12px;align-items:baseline;flex-wrap:wrap}
+.lc-list{display:grid;gap:6px}.lc-row{display:grid;grid-template-columns:1fr auto auto;gap:12px;align-items:center;padding:8px 12px;border:1px solid var(--line);border-radius:10px}
+.lc-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:4px}
+
 .ctr tr.band td{text-align:left;font:600 11px var(--fm);letter-spacing:.06em;text-transform:uppercase;color:var(--acc2);background:var(--bg2);border-bottom:1px solid var(--line);padding:8px 14px}
 .cp-btn{background:none;border:0;padding:2px;color:var(--mut);cursor:pointer;display:grid;place-items:center;border-radius:6px}.cp-btn:hover{color:var(--fg);background:var(--card2)}
 .cp{display:inline-flex;align-items:center;gap:8px}.cp button{background:none;border:0;padding:2px;color:var(--mut);cursor:pointer;display:grid;place-items:center;border-radius:6px}.cp button:hover{color:var(--fg);background:var(--card2)}
@@ -261,7 +273,7 @@ async function viewLeads(){
   const staffRows=rows.filter(r=>r.lead_role&&r.lead_role!=='lead').sort((a,b)=>(ORDER[a.lead_role]??9)-(ORDER[b.lead_role]??9));
   const leadRows=rows.filter(r=>!(r.lead_role&&r.lead_role!=='lead'));
   const sorted=[...staffRows,...leadRows];
-  const tbl=table(cols,sorted.map(r=>[td(r.username?'@'+r.username:(r.first_name||r.tg_id)),td(r.tg_id,'n'),pocketCell(r),el('td',{},pill(r.status)),...(me.role==='admin'?[accessCell(r)]:[]),...(showOwner?[td(r.owner_name||'не закреплён')]:[]),td(r.link_slug||'—'),td(date(r.created_at)),td(money(r.deposits),'n'),...(showComm?[td(money(r.commission),'n')]:[])]),
+  const tbl=table(cols,sorted.map(r=>[td(r.username?'@'+r.username:(r.first_name||r.tg_id)),el('td',{class:'n'},el('span',{class:'cp'},String(r.tg_id),el('button',{type:'button',title:'Карточка лида','aria-label':'Карточка лида',onclick:()=>openLeadCard(r.tg_id)},svgIcon(PERSON)))),pocketCell(r),el('td',{},pill(r.status)),...(me.role==='admin'?[accessCell(r)]:[]),...(showOwner?[td(r.owner_name||'не закреплён')]:[]),td(r.link_slug||'—'),td(date(r.created_at)),td(money(r.deposits),'n'),...(showComm?[td(money(r.commission),'n')]:[])]),
       'Лидов пока нет. Они появятся, когда люди перейдут по вашим ссылкам и нажмут «Старт» в боте.');
   tbl.classList.add('ctr');
   const body=tbl.querySelector('tbody');
@@ -346,6 +358,58 @@ setInterval(updateBadge,20000);
 const cname=r=>r.first_name||(r.username?'@'+r.username:String(r.tg_id));
 const profileUrl=r=>r.username?'https://t.me/'+r.username:'tg://user?id='+r.tg_id;
 const fileToDataUrl=f=>new Promise((ok,no)=>{const fr=new FileReader();fr.onload=()=>ok(fr.result);fr.onerror=()=>no(new Error('Не удалось прочитать файл'));fr.readAsDataURL(f)});
+const PERSON='<circle cx="12" cy="8" r="3.6"/><path d="M5 20c0-3.6 3.1-6 7-6s7 2.4 7 6"/>';
+const svgIcon=(h,size=15)=>{const s=document.createElementNS('http://www.w3.org/2000/svg','svg');[['viewBox','0 0 24 24'],['width',size],['height',size],['fill','none'],['stroke','currentColor'],['stroke-width','2'],['stroke-linecap','round'],['stroke-linejoin','round']].forEach(([k,v])=>s.setAttribute(k,v));s.innerHTML=h;return s};
+const fmtDT=v=>v?new Date(v).toLocaleString('ru-RU',{timeZone:'Europe/Kyiv',day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}):'—';
+const countryName=c=>{if(!c)return '—';try{return (new Intl.DisplayNames(['ru'],{type:'region'}).of(String(c).toUpperCase().slice(0,2))||c)+' ('+String(c).toUpperCase()+')'}catch{return c}};
+const REGION_NAME={ru:'RU, СНГ',ww:'EU, Мир'};
+/** Карточка лида: откуда пришёл, путь, депозиты, кнопка «Открыть чат» */
+async function openLeadCard(tgId){
+  document.querySelectorAll('.lc-overlay').forEach(x=>x.remove());
+  const ov=el('div',{class:'lc-overlay',role:'dialog','aria-modal':'true'});
+  const close=()=>{ov.remove();document.removeEventListener('keydown',onKey)};
+  const onKey=e=>{if(e.key==='Escape')close()};
+  document.addEventListener('keydown',onKey);
+  ov.addEventListener('mousedown',e=>{if(e.target===ov)close()});
+  const box=el('div',{class:'lc'},el('div',{class:'mut'},'Загрузка…'));
+  ov.append(box);document.body.append(ov);
+  let d;try{d=await api('/leads/'+tgId)}catch(x){box.replaceChildren(el('div',{class:'err'},x.message),el('button',{class:'btn o s',type:'button',onclick:close},'Закрыть'));return}
+  const L=d.lead,name=L.username?'@'+L.username:(L.first_name||String(L.tg_id));
+  const kv=(k,v)=>el('div',{class:'lc-kv'},el('span',{class:'mut sm'},k),el('b',{},v===null||v===undefined||v===''?'—':v));
+  const START=L.created_at;
+  const ev=d.events,first=t=>ev.find(e=>e.type===t);
+  const reg=first('reg'),ftd=first('ftd');
+  const deps=ev.filter(e=>e.type==='ftd'||e.type==='dep');
+  const wds=ev.filter(e=>e.type==='wd');
+  const step=(t,when,extra)=>el('div',{class:'lc-step'+(when?' done':'')},el('span',{class:'lc-dot'}),el('div',{},el('b',{},t),el('div',{class:'mut sm'},when?fmtDT(when)+(extra?' · '+extra:''):'ещё нет')));
+  const origin=[L.link_slug?'ссылка '+L.link_slug:null,L.link_source,L.link_campaign].filter(Boolean).join(' · ')||'не по ссылке';
+  box.replaceChildren(
+    el('div',{class:'lc-head'},el('div',{},el('h3',{style:'font-size:18px'},name),L.first_name&&L.username?el('div',{class:'mut sm'},L.first_name):null),
+      el('div',{style:'display:flex;gap:8px;align-items:center'},pill(L.status),L.access?el('span',{class:'pill p-ok'},'доступ открыт'):el('span',{class:'pill p-pur'},'доступ закрыт'),
+        el('button',{class:'btn o s',type:'button','aria-label':'Закрыть',onclick:close},'✕'))),
+    el('div',{class:'lc-grid'},
+      kv('Telegram ID',L.tg_id),kv('Pocket ID',L.trader_id),
+      kv('Страна',countryName(d.country)),kv('Регион ссылки',REGION_NAME[L.region]||null),
+      kv('Откуда пришёл',origin),kv('Владелец',L.owner_name||'не закреплён'),
+      kv('Промокод',d.promo),kv('Код кампании',d.ac),
+      kv('Часовой пояс',L.tz),kv('Последний визит',fmtDT(L.last_seen_at)),
+      kv('Бот',L.bot_blocked?'заблокировал':(L.bot_started?'запущен':'не запускал'))),
+    el('h4',{class:'lc-h'},'Путь клиента'),
+    el('div',{class:'lc-steps'},
+      step('Нажал «Старт» в боте',START),
+      step('Регистрация',reg&&reg.created_at),
+      step('Первый депозит',ftd&&ftd.created_at,ftd&&ftd.amount!==null?money(ftd.amount):null)),
+    el('h4',{class:'lc-h'},'Депозиты'),
+    el('div',{class:'lc-total'},el('span',{class:'mut sm'},'Всего пополнено'),el('b',{style:'font-size:20px'},money(d.depositsTotal)),el('span',{class:'mut sm'},d.depositsCount+' '+(d.depositsCount%10===1&&d.depositsCount%100!==11?'депозит':(d.depositsCount%10>=2&&d.depositsCount%10<=4&&(d.depositsCount%100<10||d.depositsCount%100>=20)?'депозита':'депозитов')))),
+    deps.length?el('div',{class:'lc-list'},[...deps].reverse().map((e,i,a)=>{
+      const isFirst=e===ftd||(!ftd&&e===deps[0]);
+      return el('div',{class:'lc-row'},el('span',{},fmtDT(e.created_at)),el('span',{class:'pill '+(isFirst?'p-ok':'p-pur')},isFirst?'Первый депозит':'Додеп'),el('b',{},e.amount!==null?money(e.amount):'—'))})):el('div',{class:'mut sm'},'Депозитов пока нет.'),
+    wds.length?[el('h4',{class:'lc-h'},'Выводы · '+money(d.withdrawTotal)),el('div',{class:'lc-list'},wds.map(e=>el('div',{class:'lc-row'},el('span',{},fmtDT(e.created_at)),el('span',{class:'pill p-warn'},'Вывод'),el('b',{},e.amount!==null?money(e.amount):'—'))))]:null,
+    el('div',{class:'lc-actions'},
+      ['admin','teamlead','streamer'].includes(me.role)?el('button',{class:'btn',type:'button',onclick:()=>{close();pendingChat=L.tg_id;tab='chats';showApp()}},'Открыть чат'):null,
+      el('a',{class:'btn o',href:profileUrl(L),target:'_blank',rel:'noopener',style:'text-decoration:none;display:inline-flex;align-items:center'},'Профиль в Telegram')));
+}
+let pendingChat=null;
 async function viewChats(){
   let active=null;
   const list=el('div',{class:'chat-list'});
@@ -410,6 +474,7 @@ async function viewChats(){
   ta.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send()}});
   await loadList();
   head.replaceChildren(el('span',{class:'mut'},'Выберите чат слева'));
+  if(pendingChat){const id=pendingChat;pendingChat=null;await openChat(id)}
   poll=setInterval(()=>{loadList().catch(()=>{});loadThread().catch(()=>{})},6000);
   return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Чаты поддержки'),el('span',{class:'mut sm'},'Кто первым ответит неразобранному клиенту, тот его и забирает')),el('div',{class:'chat-wrap'},list,thread)];
 }
