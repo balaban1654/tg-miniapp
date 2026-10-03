@@ -305,15 +305,26 @@ const profileCard=()=>el('div',{class:'row',style:'justify-content:flex-start;ga
  * Линия-сканер проходит слева направо и ненадолго подсвечивает пару свечей, потом они гаснут до следующего прохода.
  * Это иллюстрация, а не анализ: цены случайные, сигналов и цифр здесь нет.
  */
-// График живёт между перерисовками главной (раз в 20 секунд): берём тот же узел, иначе он каждый раз создаётся заново и «дёргается»
-let heroCache=null;
-function heroArt(){
-  if(heroCache&&!heroCache._dead)return heroCache;
-  heroCache=heroArtBuild();return heroCache;
+// «Фильм» на 5 часов: свечи считаются детерминированным генератором от времени с запуска мини-приложения.
+// У всех одинаковый график, после перерисовки страницы он продолжается с того же кадра, без рывков.
+const HERO_T0=performance.now();
+const HERO={lo:null,hi:null,at:0};
+const heroFilm=[];
+function heroRnd(seed){let a=seed>>>0;return()=>{a=(a+0x6D2B79F5)>>>0;let t=a;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return((t^(t>>>14))>>>0)/4294967296}}
+function heroCandle(k,N){
+  while(heroFilm.length<=k){
+    const i=heroFilm.length,r=heroRnd(i*2654435761+12345);
+    const o=i?heroFilm[i-1].p[N]:100;
+    const big=r()<.2?(r()<.5?-1:1)*(5+r()*4):0;   // иногда свеча выходит длинной
+    const p=new Float32Array(N+1);p[0]=o;let v=o,h=o,l=o;
+    for(let q=1;q<=N;q++){v+=(r()-.5)*1.5+(100-v)*.012+big/N;p[q]=v;if(v>h)h=v;if(v<l)l=v}
+    heroFilm.push({p,h,l});
+  }
+  return heroFilm[k];
 }
-function heroArtBuild(){
+function heroArt(){
   const NSV='http://www.w3.org/2000/svg';
-  const W=380,DX=30,BW=21,LIVE_X=322,TOP=14,BOT=104,T=4.2,TICK=.12,CYCLE=6.4,SWEEP=3.6;
+  const W=380,DX=30,BW=21,LIVE_X=322,TOP=14,BOT=104,T=4.2,TICK=.12,N=Math.round(T/TICK),FILM=5*3600,CYCLE=6.4,SWEEP=3.6;
   const svg=svgEl(`<svg class="hero-art" viewBox="0 0 380 128" aria-hidden="true">
 <defs>
 <linearGradient id="trail" x1="0" x2="1" y1="0" y2="0"><stop offset="0" stop-color="#9b5cff" stop-opacity="0"/><stop offset="1" stop-color="#9b5cff" stop-opacity=".26"/></linearGradient>
@@ -330,95 +341,83 @@ function heroArtBuild(){
   const series=$('.series'),marks=$('.marks'),scan=$('.scan'),vgrid=$('.vgrid');
   const mk=(tag,attrs,parent)=>{const n=document.createElementNS(NSV,tag);for(const k in attrs)n.setAttribute(k,attrs[k]);parent.appendChild(n);return n};
   const reduce=matchMedia('(prefers-reduced-motion:reduce)').matches;
-
-  let price=100,id=0;
-  const walk=(extra=0)=>{price+=(Math.random()-.5)*1.5+(100-price)*.012+extra;return price};
-  // Иногда свеча выходит длинной: на неё накладывается большой толчок, размазанный по её тикам
-  const fresh=o=>({k:id++,o,c:o,h:o,l:o,born:0,el:null,big:Math.random()<.2?(Math.random()<.5?-1:1)*(5+Math.random()*4):0});
-  const tickCandle=c=>{c.c=walk(c.big/Math.round(T/TICK));c.h=Math.max(c.h,c.c);c.l=Math.min(c.l,c.c)};
-  const candles=[];
-  for(let i=0;i<16;i++){const c=fresh(i?candles[i-1].c:price);for(let j=0;j<Math.round(T/TICK);j++)tickCandle(c);candles.push(c)}
-  const gridLines=[];
-  for(let i=0;i<14;i++)gridLines.push(mk('line',{y1:0,y2:128},vgrid));
-
-  let lo=0,hi=1,first=true,tAcc=0,frac=0,last=performance.now(),born=last,cycleStart=-99,picks=[],mark=[];
-  const xOf=c=>LIVE_X+(c.k-candles[candles.length-1].k)*DX-frac*DX;
+  const els=new Map();
+  const gridLines=[];for(let q=0;q<16;q++)gridLines.push(mk('line',{y1:0,y2:128},vgrid));
+  const markEls=[0,1].map(()=>{const g=mk('g',{opacity:0},marks);return{g,ring:mk('circle',{r:9,fill:'none',stroke:'#fff','stroke-opacity':.75,'stroke-width':2},g),dot:mk('circle',{r:2.2,fill:'#fff'},g),rip:mk('circle',{r:9,fill:'none',stroke:'#fff','stroke-width':1.2},g)}});
 
   function draw(now){
-    const t=(now-born)/1000;
-    // масштаб по видимым свечам, плавно
-    let mn=1e9,mx=-1e9;
-    for(const c of candles){if(xOf(c)<-DX)continue;mn=Math.min(mn,c.l);mx=Math.max(mx,c.h)}
-    const pad=Math.max(1,(mx-mn)*.14);mn-=pad;mx+=pad;
-    if(first){lo=mn;hi=mx;first=false}else{lo+=(mn-lo)*.07;hi+=(mx-hi)*.07}
-    const Y=v=>TOP+(hi-v)/(hi-lo)*(BOT-TOP);
-
-    // сканер: проход каждые CYCLE секунд, между проходами его не видно
-    const ph=reduce?-1:(t%CYCLE);
-    const cyc=Math.floor(t/CYCLE);
-    if(!reduce&&cyc!==cycleStart){
-      cycleStart=cyc;
-      const live=candles[candles.length-1].k;
-      const pool=[];for(let k=live-9;k<=live-2;k++)pool.push(k);
-      picks=[];
-      while(picks.length<2&&pool.length){const k=pool.splice(Math.floor(Math.random()*pool.length),1)[0];if(picks.every(p=>Math.abs(p.k-k)>=3))picks.push({k,done:false})}
+    const tt=reduce?40:((now-HERO_T0)/1000)%FILM;
+    const kLive=Math.floor(tt/T)+16,frac=tt/T-Math.floor(tt/T);
+    // видимые свечи: прошлые целиком, живая растёт по записанным тикам
+    const vis=[];
+    for(let k=kLive-15;k<=kLive;k++){
+      const d=heroCandle(k,N);const o=d.p[0];let c,h,l;
+      if(k<kLive){c=d.p[N];h=d.h;l=d.l}
+      else{const pr=frac*N,j=Math.min(N-1,Math.floor(pr)),u=pr-j;c=d.p[j]+(d.p[j+1]-d.p[j])*u;h=o;l=o;for(let q=0;q<=j;q++){if(d.p[q]>h)h=d.p[q];if(d.p[q]<l)l=d.p[q]}h=Math.max(h,c);l=Math.min(l,c)}
+      vis.push({k,o,c,h,l,x:LIVE_X+(k-kLive)*DX-frac*DX});
     }
+    // масштаб по видимым свечам, плавно; состояние общее, поэтому после перерисовки страницы скачка нет
+    let mn=1e9,mx=-1e9;
+    for(const v of vis){if(v.x<-DX)continue;mn=Math.min(mn,v.l);mx=Math.max(mx,v.h)}
+    const pad=Math.max(1,(mx-mn)*.14);mn-=pad;mx+=pad;
+    const dtS=Math.min(.1,Math.max(0,(now-HERO.at)/1000));HERO.at=now;
+    if(HERO.lo===null){HERO.lo=mn;HERO.hi=mx}else{const kk=1-Math.exp(-dtS*3.5);HERO.lo+=(mn-HERO.lo)*kk;HERO.hi+=(mx-HERO.hi)*kk}
+    const lo=HERO.lo,hi=HERO.hi,Y=v=>TOP+(hi-v)/(hi-lo)*(BOT-TOP);
+
+    // сканер: проход каждые CYCLE секунд, между проходами его не видно; какие свечи подсветить, определяется номером прохода
+    const ph=reduce?-1:(tt%CYCLE),cyc=Math.floor(tt/CYCLE);
     const sx=ph>=0&&ph<SWEEP?-14+(ph/SWEEP)*(W+28):null;
     if(sx===null)scan.setAttribute('opacity',0);
     else{scan.setAttribute('opacity',Math.min(1,ph*3,(SWEEP-ph)*3));scan.setAttribute('transform','translate('+(sx-84).toFixed(1)+',0)')}
-
-    // отметки: появляются, когда линия дошла до свечи, и быстро гаснут
-    if(sx!==null)for(const p of picks){
-      if(p.done)continue;const c=candles.find(c=>c.k===p.k);if(!c)continue;
-      if(sx>=xOf(c)){p.done=true;const g=mk('g',{},marks);mark.push({k:p.k,t0:t,g,ring:mk('circle',{r:9,fill:'none',stroke:'#fff','stroke-opacity':.75,'stroke-width':2},g),dot:mk('circle',{r:2.2,fill:'#fff'},g),rip:mk('circle',{r:9,fill:'none',stroke:'#fff','stroke-width':1.2},g)})}
+    const picks=[];
+    if(!reduce){
+      const r=heroRnd(cyc*7919+13),kStart=Math.floor(cyc*CYCLE/T)+16,pool=[];
+      for(let k=kStart-9;k<=kStart-2;k++)pool.push(k);
+      while(picks.length<2&&pool.length){const k=pool.splice(Math.floor(r()*pool.length),1)[0];if(picks.every(p=>Math.abs(p-k)>=3))picks.push(k)}
     }
     const hot=new Set();
-    mark=mark.filter(m=>{
-      const age=t-m.t0,c=candles.find(c=>c.k===m.k);
-      if(!c||age>1.25){m.g.remove();return false}
-      hot.add(m.k);
-      const a=Math.min(1,age/.12)*Math.min(1,(1.25-age)/.4);
-      m.g.setAttribute('transform','translate('+xOf(c).toFixed(1)+','+Y(c.c).toFixed(1)+')');
+    markEls.forEach((m,i)=>{
+      const v=ph>=0?vis.find(v=>v.k===picks[i]):null;
+      let a=0;
+      if(v){
+        const age=ph-(v.x+14)/(W+28)*SWEEP;
+        if(age>=0&&age<=1.25){
+          hot.add(v.k);a=Math.min(1,age/.12)*Math.min(1,(1.25-age)/.4);
+          m.g.setAttribute('transform','translate('+v.x.toFixed(1)+','+Y(v.c).toFixed(1)+')');
+          const pp=Math.min(1,age/1.1);m.rip.setAttribute('r',(9+16*pp).toFixed(1));m.rip.setAttribute('stroke-opacity',(.6*(1-pp)).toFixed(2));
+        }
+      }
       m.g.setAttribute('opacity',a.toFixed(2));
-      const p=Math.min(1,age/1.1);m.rip.setAttribute('r',(9+16*p).toFixed(1));m.rip.setAttribute('stroke-opacity',(.6*(1-p)).toFixed(2));
-      return true;
     });
 
     // свечи
-    for(const c of candles){
-      const x=xOf(c);
-      if(!c.el){c.el={g:mk('g',{},series)};c.el.w=mk('line',{'stroke-width':1.4},c.el.g);c.el.b=mk('rect',{width:BW},c.el.g)}
-      if(x<-DX||x>W+DX){c.el.g.setAttribute('display','none');continue}
-      c.el.g.removeAttribute('display');
-      const up=c.c>=c.o,col=up?'#43b82f':'#ff3b1d';
-      const yo=Y(c.o),yc=Y(c.c);
-      c.el.w.setAttribute('x1',x.toFixed(1));c.el.w.setAttribute('x2',x.toFixed(1));c.el.w.setAttribute('y1',Y(c.h).toFixed(1));c.el.w.setAttribute('y2',Y(c.l).toFixed(1));c.el.w.setAttribute('stroke',col);
-      c.el.b.setAttribute('x',(x-BW/2).toFixed(1));c.el.b.setAttribute('y',Math.min(yo,yc).toFixed(1));c.el.b.setAttribute('height',Math.max(1.6,Math.abs(yo-yc)).toFixed(1));c.el.b.setAttribute('fill',col);
+    for(const [k,e] of els)if(k<kLive-16){e.g.remove();els.delete(k)}
+    for(const v of vis){
+      let e=els.get(v.k);
+      if(!e){e={g:mk('g',{},series)};e.w=mk('line',{'stroke-width':1.4},e.g);e.b=mk('rect',{width:BW},e.g);els.set(v.k,e)}
+      if(v.x<-DX||v.x>W+DX){e.g.setAttribute('display','none');continue}
+      e.g.removeAttribute('display');
+      const up=v.c>=v.o,col=up?'#43b82f':'#ff3b1d',yo=Y(v.o),yc=Y(v.c);
+      e.w.setAttribute('x1',v.x.toFixed(1));e.w.setAttribute('x2',v.x.toFixed(1));e.w.setAttribute('y1',Y(v.h).toFixed(1));e.w.setAttribute('y2',Y(v.l).toFixed(1));e.w.setAttribute('stroke',col);
+      e.b.setAttribute('x',(v.x-BW/2).toFixed(1));e.b.setAttribute('y',Math.min(yo,yc).toFixed(1));e.b.setAttribute('height',Math.max(1.6,Math.abs(yo-yc)).toFixed(1));e.b.setAttribute('fill',col);
       let o=.58;
-      if(hot.has(c.k))o=1;
-      else if(sx!==null&&x<=sx)o=Math.max(o,Math.min(1,.58+.42*(1-(sx-x)/80)));
-      c.el.g.setAttribute('opacity',o.toFixed(2));
+      if(hot.has(v.k))o=1;
+      else if(sx!==null&&v.x<=sx)o=Math.max(o,Math.min(1,.58+.42*(1-(sx-v.x)/80)));
+      e.g.setAttribute('opacity',o.toFixed(2));
     }
-    gridLines.forEach((l,i)=>{const x=LIVE_X+(i-9)*DX-frac*DX+DX/2;l.setAttribute('x1',x.toFixed(1));l.setAttribute('x2',x.toFixed(1))});
+    gridLines.forEach((l,i)=>{const x=LIVE_X+(i-12)*DX-frac*DX+DX/2;l.setAttribute('x1',x.toFixed(1));l.setAttribute('x2',x.toFixed(1))});
   }
 
+  // Рисуем только пока график на странице; если его отцепили надолго, останавливаемся
+  let off=0;
   function loop(now){
-    if(reduce)return;
-    // Пока главную перерисовывают, график недолго живёт вне страницы (карточка ещё собирается): ждём до 4 секунд, потом останавливаемся
-    if(svg.isConnected)svg._off=0;
-    else{if(!svg._off)svg._off=now;if(now-svg._off>4000){svg._dead=true;return}}
-    if(document.hidden){requestAnimationFrame(loop);last=now;return}
-    const dt=Math.min(.1,(now-last)/1000);
-    if(now-last>=30){
-      last=now;tAcc+=dt;frac+=dt/T;
-      while(tAcc>=TICK){tAcc-=TICK;tickCandle(candles[candles.length-1])}
-      if(frac>=1){frac-=1;const prev=candles[candles.length-1];const c=fresh(prev.c);candles.push(c);const old=candles.shift();if(old.el)old.el.g.remove()}
-      draw(now);
-    }
+    if(document.hidden){requestAnimationFrame(loop);return}
+    if(svg.isConnected){off=0;draw(now)}
+    else{if(!off)off=now;if(now-off>30000)return}
     requestAnimationFrame(loop);
   }
-  draw(born);
-  requestAnimationFrame(loop);
+  draw(performance.now());
+  if(!reduce)requestAnimationFrame(loop);
   return svg;
 }
 
@@ -701,7 +700,18 @@ async function viewHome(){
       el('div',{class:'sm'},'Когда появится новый сигнал, мы пришлём сообщение в Telegram. А пока можно потренироваться.'),
       el('button',{class:'btn o',type:'button',onclick:()=>go('trainer')},'Открыть тренажёр')));
   }
-  timers.push(setInterval(()=>{if(tab==='home'&&!liveSignalOn)render()},20000));
+  // Главную не перерисовываем вслепую (это и давало «моргание»): раз в 20 секунд сверяем данные и обновляем страницу, только если что-то изменилось
+  const homeSig=async()=>{
+    const [a,m,dl]=await Promise.all([api('/signals/active'),api('/me'),api('/deals?period=7')]);
+    me=m;
+    return JSON.stringify([a.signal&&a.signal.id,(a.steps||[]).length,m.stats,m.access,m.status,dl.deals.length,dl.deals.some(x=>!x.result)]);
+  };
+  let sig0=null;
+  homeSig().then(x=>{sig0=x}).catch(()=>{});
+  timers.push(setInterval(async()=>{
+    if(tab!=='home'||liveSignalOn)return;
+    try{const x=await homeSig();if(sig0!==null&&x!==sig0)render()}catch{}
+  },20000));
   items.push(...await pastSignals().catch(()=>[]));
   items.push(el('p',{class:'sm',style:'margin:0;text-align:center'},'Торговля бинарными опционами связана с риском потери капитала. Сигналы не гарантируют результат.'));
   shell('Hunter AI',items);
