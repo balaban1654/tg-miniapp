@@ -44,7 +44,8 @@ input,select{background:var(--bg2);border:1px solid var(--line);border-radius:10
 .nav button{display:flex;align-items:center;gap:10px;text-align:left;white-space:nowrap;background:none;border:0;border-radius:9px;padding:9px 12px;color:var(--mut);font-weight:600;cursor:pointer}
 .nav button.on{background:var(--card2);color:var(--fg)}
 .me-row{display:flex;align-items:center;gap:8px}.gear{background:none;border:0;padding:3px;color:var(--mut);cursor:pointer;display:grid;place-items:center;border-radius:6px}.gear:hover{color:var(--fg);background:var(--card2)}
-.lc-field{display:grid;gap:4px}.lc-field label{font-size:12px;color:var(--mut)}.lc-two{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.lc-field{display:grid;gap:4px}.lc-field label{font-size:12px;color:var(--mut)}.lc-tabs{display:flex;gap:6px;border-bottom:1px solid var(--line);flex-wrap:wrap}.lc-tab{background:none;border:0;border-bottom:2px solid transparent;padding:10px 14px;color:var(--mut);font-weight:600;cursor:pointer;margin-bottom:-1px}.lc-tab.on{color:var(--fg);border-bottom-color:var(--acc)}.lc-pane{display:grid;gap:14px;min-height:190px;align-content:start}
+.lc-two{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
 .me{margin-top:auto;padding:10px;color:var(--mut);font-size:12px;display:grid;gap:8px}
 main{padding:22px clamp(14px,3vw,32px);display:grid;gap:18px;align-content:start;min-width:0}
 .head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
@@ -449,17 +450,27 @@ async function openStaffCard(id){
       pw.cur.value=pw.n1.value=pw.n2.value='';psay('',true);toast(self?'Пароль изменён':'Пароль сброшен')
     }catch(x){psay(x.message)}
   };
+  // Вкладки: личные данные, выплаты, безопасность. Поля хранятся все сразу, «Сохранить» отправляет их вместе
+  const saveRow=()=>el('div',{class:'lc-actions'},el('button',{class:'btn',type:'button',onclick:save},'Сохранить'),msg);
+  const panes={
+    personal:()=>[el('div',{class:'lc-two'},fld('ФИО',f.full),fld('Дата рождения',f.birth),fld('Город',f.city)),saveRow()],
+    payout:()=>[el('div',{class:'lc-two'},fld('Куда выплачивать',f.method),fld('Адрес кошелька / реквизиты',f.wallet)),saveRow()],
+    security:()=>[el('div',{class:'lc-two'},...(self?[fld('Текущий пароль',pw.cur)]:[]),fld('Новый пароль',pw.n1),fld('Повторите',pw.n2)),
+      el('div',{class:'lc-actions'},el('button',{class:'btn o',type:'button',onclick:changePw},self?'Сменить пароль':'Сбросить пароль'),pmsg)]
+  };
+  const TABS=[['personal','Личные данные'],['payout','Выплаты'],['security','Безопасность']];
+  let cur='personal';
+  const body=el('div',{class:'lc-pane'});
+  const bar=el('div',{class:'lc-tabs',role:'tablist'});
+  const draw=()=>{
+    bar.replaceChildren(...TABS.map(([k,t])=>el('button',{type:'button',role:'tab','aria-selected':k===cur?'true':'false',class:'lc-tab'+(k===cur?' on':''),onclick:()=>{cur=k;say('',true);psay('',true);draw()}},t)));
+    body.replaceChildren(...panes[cur]());
+  };
   box.replaceChildren(
     el('div',{class:'lc-head'},el('div',{},el('h3',{style:'font-size:18px'},d.name),el('div',{class:'mut sm'},'Логин '+d.login+' · '+ROLE[d.role])),
       el('button',{class:'btn o s',type:'button','aria-label':'Закрыть',onclick:close},'✕')),
-    el('h4',{class:'lc-h'},'Личные данные'),
-    el('div',{class:'lc-two'},fld('ФИО',f.full),fld('Дата рождения',f.birth),fld('Город',f.city)),
-    el('h4',{class:'lc-h'},'Выплаты'),
-    el('div',{class:'lc-two'},fld('Куда выплачивать',f.method),fld('Адрес кошелька / реквизиты',f.wallet)),
-    el('div',{class:'lc-actions'},el('button',{class:'btn',type:'button',onclick:save},'Сохранить'),msg),
-    el('h4',{class:'lc-h'},self?'Сменить пароль':'Сбросить пароль'),
-    el('div',{class:'lc-two'},...(self?[fld('Текущий пароль',pw.cur)]:[]),fld('Новый пароль',pw.n1),fld('Повторите',pw.n2)),
-    el('div',{class:'lc-actions'},el('button',{class:'btn o',type:'button',onclick:changePw},self?'Сменить пароль':'Сбросить пароль'),pmsg));
+    bar,body);
+  draw();
 }
 let pendingChat=null;
 async function viewChats(){
