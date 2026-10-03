@@ -43,6 +43,7 @@ input,select{background:var(--bg2);border:1px solid var(--line);border-radius:10
 .nav{display:grid;gap:3px}
 .nav button{display:flex;align-items:center;gap:10px;text-align:left;white-space:nowrap;background:none;border:0;border-radius:9px;padding:9px 12px;color:var(--mut);font-weight:600;cursor:pointer}
 .nav button.on{background:var(--card2);color:var(--fg)}
+.bell{margin-left:auto;position:relative;background:none;border:0;padding:5px;color:var(--mut);cursor:pointer;display:grid;place-items:center;border-radius:8px}.bell:hover{color:var(--fg);background:var(--card2)}.bell .cnt{position:absolute;top:0;right:0;min-width:15px;height:15px;border-radius:99px;background:var(--bad);color:#fff;font:700 9px var(--fm);display:grid;place-items:center;padding:0 3px}
 .me-row{display:flex;align-items:center;gap:8px}.gear{background:none;border:0;padding:3px;color:var(--mut);cursor:pointer;display:grid;place-items:center;border-radius:6px}.gear:hover{color:var(--fg);background:var(--card2)}
 .lc-field{display:grid;gap:4px}.lc-field label{font-size:12px;color:var(--mut)}.lc-tabs{display:flex;gap:6px;border-bottom:1px solid var(--line);flex-wrap:wrap}.lc-tab{background:none;border:0;border-bottom:2px solid transparent;padding:10px 14px;color:var(--mut);font-weight:600;cursor:pointer;margin-bottom:-1px}.lc-tab.on{color:var(--fg);border-bottom-color:var(--acc)}.lc-pane{display:grid;gap:14px;min-height:190px;align-content:start}
 .lc-two{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
@@ -131,7 +132,7 @@ textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10
 
 <div id="app" hidden>
   <aside class="side">
-    <div class="brand"><div class="logo">H</div><b style="font:700 14px var(--fd)">Hunter Office</b></div>
+    <div class="brand"><div class="logo">H</div><b style="font:700 14px var(--fd)">Hunter Office</b><button class="bell" id="bell" type="button" title="Уведомления" aria-label="Уведомления"></button></div>
     <nav class="nav" id="nav"></nav>
     <div class="me"><div class="me-row"><span id="meName"></span><button class="gear" id="meGear" type="button" title="Моя карточка" aria-label="Моя карточка"></button></div><button class="btn o s" id="logout" type="button">Выйти</button></div>
   </aside>
@@ -177,18 +178,21 @@ const ICONS={
   staff:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.5 3-6 6.5-6s6.5 2.5 6.5 6"/><path d="M16 4.6a3.5 3.5 0 010 6.8M18 14.3c2.2.7 3.5 2.6 3.5 5.7"/>',
   push:'<path d="M6 16V11a6 6 0 1112 0v5l2 2H4z"/><path d="M10 21a2 2 0 004 0"/>',
   media:'<rect x="3" y="5" width="18" height="14" rx="3"/><path d="M10 9.5v5l4.5-2.5z"/>',
-  pb:'<path d="M4 12h5l2-6 3 12 2-6h4"/>'};
+  pb:'<path d="M4 12h5l2-6 3 12 2-6h4"/>',
+  notifs:'<path d="M6 16V11a6 6 0 1112 0v5l1.5 2h-15z"/><path d="M10 21a2 2 0 004 0"/>'};
 const icon=k=>{const s=document.createElementNS('http://www.w3.org/2000/svg','svg');s.setAttribute('viewBox','0 0 24 24');s.setAttribute('width','18');s.setAttribute('height','18');s.setAttribute('fill','none');s.setAttribute('stroke','currentColor');s.setAttribute('stroke-width','2');s.setAttribute('stroke-linecap','round');s.setAttribute('stroke-linejoin','round');s.setAttribute('aria-hidden','true');s.innerHTML=ICONS[k]||'';return s};
 function showApp(){
   $('#login').hidden=true;$('#app').hidden=false;
   $('#meName').textContent=me.name+' · '+ROLE[me.role];
+  const bl=$('#bell');if(bl&&!bl.firstChild){bl.append(svgIcon(ICONS.notifs,18));bl.onclick=()=>{tab='notifs';showApp()}}
   const gb=$('#meGear');if(gb&&!gb.firstChild){gb.append(svgIcon(GEAR,16));gb.onclick=()=>openStaffCard(null)}
   const items=[['home','Дашборд'],['leads','Лиды'],['links','Ссылки']];
   if(me.role==='admin'||me.role==='teamlead')items.push(['staff',me.role==='admin'?'Сотрудники':'Моя команда']);
   if(['admin','teamlead','streamer'].includes(me.role))items.splice(1,0,['chats','Чаты']);
   if(me.role==='admin')items.splice(1,0,['signals','Сигналы']);
-  if(me.role==='analyst'){items.length=0;items.push(['signals','Сигналы']);if(tab!=='signals')tab='signals'}
+  if(me.role==='analyst'){items.length=0;items.push(['signals','Сигналы']);if(tab!=='signals'&&tab!=='notifs')tab='signals'}
   if(me.role==='admin')items.push(['push','Пуши'],['media','Медиа'],['pb','Постбеки']);
+  items.push(['notifs','Уведомления']);
   const nav=$('#nav');nav.replaceChildren(...items.map(([k,t])=>el('button',{type:'button','data-t':k,class:k===tab?'on':'',onclick:()=>{tab=k;showApp();render()}},icon(k),el('span',{class:'lbl'},k==='chats'?chatsLabel:t))));
   render();updateBadge();
 }
@@ -217,8 +221,16 @@ async function render(opt){
     else if(tab==='push')m.replaceChildren(...await viewPush());
     else if(tab==='media')m.replaceChildren(...await viewMedia());
     else if(tab==='pb')m.replaceChildren(...await viewPostbacks());
+    else if(tab==='notifs')m.replaceChildren(...await viewNotifs());
   }catch(x){if(x.message!=='auth')m.replaceChildren(el('div',{class:'err'},x.message))}
   if(soft){window.scrollTo(0,y);m.scrollTop=mt}
+}
+
+/** Уведомления: пока заготовка. Позже здесь копятся события по ролям и настройка, что получать и куда */
+async function viewNotifs(){
+  return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Уведомления')),
+    el('div',{class:'card',style:'display:grid;gap:8px'},el('b',{},'Здесь появятся ваши уведомления'),
+      el('div',{class:'mut sm'},'У каждой роли они копятся свои: новые отчёты на проверку, запросы аванса, отставание от плана, решения по вашим отчётам. Отдельно появится настройка, что и куда получать.'))];
 }
 
 async function viewHome(){
