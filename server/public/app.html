@@ -618,7 +618,6 @@ async function viewHome(){
       el('div',{class:'card hero'},heroArt(),
         el('h2',{style:'font-size:17px'},'Доступ откроется после регистрации'),
         el('p',{class:'sm',style:'margin:0'},'Создайте аккаунт Pocket Option по нашей ссылке и пополните счёт — доступ откроется автоматически. Рекомендуем пополнять от 100 $, так проще соблюдать риск-менеджмент.'),
-        me.promo?el('div',{class:'row card',style:'padding:10px 12px'},el('div',{},el('div',{class:'sm'},'Промокод'),el('b',{class:'mono'},me.promo)),el('button',{class:'pillb',type:'button',onclick:async()=>{try{await navigator.clipboard.writeText(me.promo);toast('Промокод скопирован')}catch{toast('Выделите промокод вручную')}}},'Копировать')):null,
         btnBox,
         el('p',{class:'sm',style:'margin:0'},'Нажимая «Зарегистрироваться», вы подтверждаете, что вам 18+ и вы понимаете: торговля связана с риском потери денег.')),
       ...await pastSignals().catch(()=>[])]);
