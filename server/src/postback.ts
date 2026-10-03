@@ -102,7 +102,8 @@ export async function postbackRoutes(app: FastifyInstance): Promise<void> {
     if (event === 'ftd' || event === 'dep') {
       // Доступ открывается, когда сумма пополнений достигла минимума. Если партнёрка не прислала сумму, проверить нечем, открываем
       const tot = Number((await db.query(`SELECT coalesce(sum(amount), 0) AS s FROM events WHERE tg_id = $1 AND type IN ('ftd','dep')`, [tgId])).rows[0].s);
-      const enough = amount === null || tot >= config.minDeposit;
+      // 10% запас: сумма в постбеке может быть чуть меньше из-за курса в Pocket Option
+      const enough = amount === null || tot >= config.minDeposit * 0.9;
       if (enough) {
         if (event === 'ftd' || (event === 'dep' && !['ftd', 'active'].includes(cur.status))) {
           // Первый достаточный депозит: открываем анализ
