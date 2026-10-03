@@ -117,8 +117,6 @@ main{flex:1;padding:6px 16px 96px;display:grid;gap:12px;align-content:start}
 .ps{padding:14px 16px;display:grid;gap:8px}.ps+.ps{border-top:1px solid #ffffff10}
 .pbadge{border:1px solid;border-radius:8px;padding:4px 12px;font-size:13px;font-weight:600;white-space:nowrap}
 .pbadge.w{color:var(--ok);border-color:var(--ok);background:#3ddc9712}.pbadge.l{color:var(--bad);border-color:var(--bad);background:#ff6b8a12}.pbadge.n{color:var(--mut);border-color:var(--line)}
-.pbar{height:5px;border-radius:9px;background:#ffffff14;overflow:hidden;display:flex}
-.pbar i{display:block;height:100%}.pbar .g{background:var(--ok)}.pbar .r{background:var(--bad)}
 .since{display:flex;align-items:baseline;gap:8px;font-size:13px;line-height:18px}.since svg{width:17px;height:17px;flex:none;display:block;transform:translateY(2.1px)}
 .ic svg{width:44px;height:44px;color:var(--acc2)}
 .card.grad{background:linear-gradient(135deg,var(--acc3),#3a1c8a);border:0}
@@ -685,8 +683,7 @@ async function pastSignals(){
       const lab=cls==='w'?'Плюс':cls==='l'?'Минус':(n===0?'Нет итогов':'Поровну');
       const t=new Date(r.entry_at).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
       return el('div',{class:'ps'},
-        el('div',{class:'row'},el('div',{},el('b',{},r.pair+' · ',el('span',{style:'color:var(--'+(up?'ok':'bad')+')'},up?'ВВЕРХ (BUY)':'ВНИЗ (SELL)')),el('div',{class:'sm'},t+' · '+(n+' '+plural(n,r.is_test?'голос':'отметка',r.is_test?'голоса':'отметки',r.is_test?'голосов':'отметок')))),el('span',{class:'pbadge '+cls},lab)),
-        el('div',{class:'pbar'},n?[el('i',{class:'g',style:'width:'+(r.wins/n*100)+'%'}),el('i',{class:'r',style:'width:'+(r.losses/n*100)+'%'})]:null));
+        el('div',{class:'row'},el('div',{},el('b',{},r.pair+' · ',el('span',{style:'color:var(--'+(up?'ok':'bad')+')'},up?'ВВЕРХ (BUY)':'ВНИЗ (SELL)')),el('div',{class:'sm'},t+' · '+(n+' '+plural(n,r.is_test?'голос':'отметка',r.is_test?'голоса':'отметки',r.is_test?'голосов':'отметок')))),el('span',{class:'pbadge '+cls},lab)));
     }))];
   };
   wrap.replaceChildren(...build(await api('/signals/past')).filter(Boolean));
