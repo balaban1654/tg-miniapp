@@ -168,7 +168,7 @@ function showApp(){
   $('#login').hidden=true;$('#app').hidden=false;
   $('#meName').textContent=me.name+' · '+ROLE[me.role];
   const items=[['home','Дашборд'],['leads','Лиды'],['links','Ссылки']];
-  if(me.role==='admin'||me.role==='teamlead')items.push(['staff',me.role==='admin'?'Люди':'Моя команда']);
+  if(me.role==='admin'||me.role==='teamlead')items.push(['staff',me.role==='admin'?'Сотрудники':'Моя команда']);
   if(['admin','teamlead','streamer'].includes(me.role))items.splice(1,0,['chats','Чаты']);
   if(me.role==='admin')items.splice(1,0,['signals','Сигналы']);
   if(me.role==='analyst'){items.length=0;items.push(['signals','Сигналы']);if(tab!=='signals')tab='signals'}
@@ -305,21 +305,20 @@ async function viewLinks(){
 }
 
 async function viewStaff(){
-  const rows=await api('/staff');
+  const rows=(await api('/staff')).sort((a,b)=>(b.role==='admin')-(a.role==='admin')||a.id-b.id);
   const isAdmin=me.role==='admin';
   const f={login:el('input',{required:'',autocomplete:'off'}),name:el('input',{required:''}),password:el('input',{type:'password',minlength:'8',required:'',autocomplete:'new-password'}),
     role:el('select',{},...(isAdmin?['teamlead','streamer','buyer','analyst','admin']:['streamer']).map(r=>el('option',{value:r},ROLE[r]))),
-    parent:el('select',{},el('option',{value:''},'Без тимлидера'),...rows.filter(s=>s.role==='teamlead').map(s=>el('option',{value:s.id},s.name))),
-    ftd:el('input',{type:'number',min:'0',step:'0.01',placeholder:'25'}),pct:el('input',{type:'number',min:'0',max:'100',step:'0.1',placeholder:'5'})};
+    parent:el('select',{},el('option',{value:''},'Без тимлидера'),...rows.filter(s=>['admin','teamlead'].includes(s.role)).map(s=>el('option',{value:s.id},s.name+' · '+ROLE[s.role])))};
   const err=el('div',{class:'err',role:'alert'});
   const form=el('form',{class:'card form',onsubmit:async e=>{e.preventDefault();err.textContent='';
-    try{await api('/staff',{method:'POST',body:{login:f.login.value,name:f.name.value,password:f.password.value,role:f.role.value,parent_id:isAdmin?f.parent.value||undefined:undefined,rate_ftd:f.ftd.value,rate_percent:f.pct.value}});render()}catch(x){err.textContent=x.message}}},
+    try{await api('/staff',{method:'POST',body:{login:f.login.value,name:f.name.value,password:f.password.value,role:f.role.value,parent_id:isAdmin?f.parent.value||undefined:undefined}});render()}catch(x){err.textContent=x.message}}},
     el('label',{},'Логин',f.login),el('label',{},'Имя',f.name),el('label',{},'Пароль',f.password),el('label',{},'Роль',f.role),
-    isAdmin?el('label',{},'Тимлидер',f.parent):el('span'),el('label',{},'Ставка за FTD, $',f.ftd),el('label',{},'Процент, %',f.pct),
+    isAdmin?el('label',{},'Тимлидер',f.parent):el('span'),
     el('button',{class:'btn',type:'submit'},'Добавить'),err);
   const parentName=id=>(rows.find(s=>s.id===id)||{}).name||'—';
   const toggle=r=>isAdmin&&r.id!==me.id?el('button',{class:'btn o s',type:'button',onclick:async()=>{await api('/staff/'+r.id,{method:'PATCH',body:{active:!r.active}});render()}},r.active?'Отключить':'Включить'):'';
-  const pickP=el('select',{},...rows.filter(s=>['streamer','teamlead','buyer'].includes(s.role)).map(s=>el('option',{value:s.id},s.name+' · '+ROLE[s.role])));
+  const pickP=el('select',{},...rows.filter(s=>['admin','streamer','teamlead','buyer'].includes(s.role)).map(s=>el('option',{value:s.id},s.name+' · '+ROLE[s.role])));
   const po={t:el('input',{placeholder:'daria_manager',maxlength:'40'}),c:el('input',{placeholder:'daria'}),p:el('input',{placeholder:'LIO669'}),l:el('input',{placeholder:'https://…/register?…&ac=daria&cid=…'}),r:el('input',{placeholder:'https://… (необязательно)'})};
   const fill=()=>{const r=rows.find(x=>String(x.id)===pickP.value)||{};po.t.value=r.tg_username||'';po.c.value=r.po_campaign||'';po.p.value=r.po_promo||'';po.l.value=r.po_link||'';po.r.value=r.po_link_ru||''};
   pickP.addEventListener('change',fill);fill();
@@ -327,13 +326,14 @@ async function viewStaff(){
   const poForm=isAdmin?el('form',{class:'card form',onsubmit:async e=>{e.preventDefault();perr.textContent='';
     try{await api('/staff/'+pickP.value,{method:'PATCH',body:{tg_username:po.t.value,po_campaign:po.c.value,po_promo:po.p.value,po_link:po.l.value,po_link_ru:po.r.value}});perr.textContent='Сохранено';perr.className='err ok';setTimeout(render,600)}catch(x){perr.className='err';perr.textContent=x.message}}},
     el('h3',{style:'grid-column:1/-1;font-size:14px'},'Кампания в Pocket Option'),
-    el('label',{},'Человек',pickP),el('label',{},'Telegram менеджера (для клиента)',po.t),el('label',{},'Код кампании (ac)',po.c),el('label',{},'Промокод',po.p),
+    el('label',{},'Сотрудник',pickP),el('label',{},'Telegram менеджера (для клиента)',po.t),el('label',{},'Код кампании (ac)',po.c),el('label',{},'Промокод',po.p),
     el('label',{style:'grid-column:1/-1'},'Ссылка регистрации (WW)',po.l),el('label',{style:'grid-column:1/-1'},'Ссылка регистрации (RU)',po.r),
     el('button',{class:'btn',type:'submit'},'Сохранить'),perr):el('span');
-  return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},isAdmin?'Люди':'Моя команда')),form,poForm,
-    table(['Имя','Логин','Роль','Тимлидер','Кампания PO','Промокод','За FTD','Процент','Статус',''],rows.map(r=>[td(r.name),td(r.login),el('td',{},el('span',{class:'pill p-pur'},ROLE[r.role])),td(parentName(r.parent_id)),td(r.po_campaign||'—'),td(r.po_promo||'—'),td(money(r.rate_ftd),'n'),td(Number(r.rate_percent)+'%','n'),el('td',{},el('span',{class:'pill '+(r.active?'p-ok':'p-bad')},r.active?'активен':'отключён')),el('td',{},toggle(r))]),'Пока никого нет.')];
+  return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},isAdmin?'Сотрудники':'Моя команда')),form,poForm,
+    ctrT(table(['Имя','Логин','Роль','Тимлидер','Кампания PO','Промокод','Статус',''],rows.map(r=>[td(r.name),td(r.login),el('td',{},el('span',{class:'pill p-pur'},ROLE[r.role])),td(parentName(r.parent_id)),td(r.po_campaign||'—'),td(r.po_promo||'—'),el('td',{},el('span',{class:'pill '+(r.active?'p-ok':'p-bad')},r.active?'активен':'отключён')),el('td',{},toggle(r))]),'Пока никого нет.'))];
 }
 
+const ctrT=t=>{t.classList.add('ctr');return t};
 let poll=null;
 function stopPoll(){if(poll){clearInterval(poll);poll=null}}
 let chatsLabel='Чаты';

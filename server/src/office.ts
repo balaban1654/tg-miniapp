@@ -152,8 +152,8 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
       role = 'streamer';
       parentId = me.id;
     } else if (parentId !== null) {
-      const p = await db.query(`SELECT 1 FROM staff WHERE id = $1 AND role = 'teamlead'`, [parentId]);
-      if (!p.rowCount) return reply.code(400).send({ error: 'Родитель должен быть тимлидером' });
+      const p = await db.query(`SELECT 1 FROM staff WHERE id = $1 AND role IN ('teamlead','admin')`, [parentId]);
+      if (!p.rowCount) return reply.code(400).send({ error: 'Тимлидер: админ или тимлидер' });
     }
 
     try {
