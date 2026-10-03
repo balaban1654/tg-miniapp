@@ -620,7 +620,6 @@ async function viewHome(){
         el('p',{class:'sm',style:'margin:0'},'Создайте аккаунт Pocket Option по нашей ссылке и пополните счёт — доступ откроется автоматически. Рекомендуем пополнять от 100 $, так проще соблюдать риск-менеджмент.'),
         me.promo?el('div',{class:'row card',style:'padding:10px 12px'},el('div',{},el('div',{class:'sm'},'Промокод'),el('b',{class:'mono'},me.promo)),el('button',{class:'pillb',type:'button',onclick:async()=>{try{await navigator.clipboard.writeText(me.promo);toast('Промокод скопирован')}catch{toast('Выделите промокод вручную')}}},'Копировать')):null,
         btnBox,
-        legacyBlock(),
         el('p',{class:'sm',style:'margin:0'},'Нажимая «Зарегистрироваться», вы подтверждаете, что вам 18+ и вы понимаете: торговля связана с риском потери денег.')),
       ...await pastSignals().catch(()=>[])]);
     return;
@@ -1105,41 +1104,41 @@ async function viewMedia(){
   shell('Медиа',[el('b',{},'Каналы команды'),ch,el('b',{},'Наши трейдеры'),tr,el('b',{},'Новости команды'),el('div',{class:'card',style:'display:grid;gap:6px'},el('b',{style:'font-size:14px'},'Скоро здесь появятся новости'),el('div',{class:'sm',style:'line-height:1.5'},'Обновления тренажёра, итоги недели, новые трейдеры и важные объявления команды. Заглядывайте сюда почаще, чтобы ничего не пропустить.'))]);
 }
 
-/** Перенос из старого бота: вводим Pocket ID, если он в списке, доступ открывается сразу */
-function legacyBlock(){
-  const box=el('div',{style:'display:grid;gap:8px'});
-  const draw=()=>box.replaceChildren(el('button',{class:'btn o',type:'button',onclick:ask},'Я уже был в старом боте'));
-  const ask=()=>{
-    const inp=el('input',{type:'text',placeholder:'Ваш Pocket ID',maxlength:'40',autocomplete:'off',autocapitalize:'off',spellcheck:'false',
-      style:'width:100%;padding:12px 14px;border-radius:14px;border:1px solid var(--line);background:var(--card);color:var(--fg);font:600 15px var(--fb)'});
-    const go=async b=>{
-      const v=inp.value.trim();if(!v){toast('Введите Pocket ID');return}
-      b.disabled=true;
-      try{await api('/legacy/claim',{method:'POST',body:{trader_id:v}});await refreshMe();toast('Доступ открыт');render()}
-      catch(e){toast(e.message);b.disabled=false}
-    };
-    const ok=el('button',{class:'btn',type:'button',onclick:()=>go(ok)},'Подключить');
-    inp.addEventListener('keydown',e=>{if(e.key==='Enter')go(ok)});
-    box.replaceChildren(el('div',{class:'sm'},'Введите Pocket ID из старого бота. Если он есть в списке, доступ откроется сразу.'),inp,
-      el('div',{class:'two'},ok,el('button',{class:'btn o',type:'button',onclick:draw},'Отмена')));
-    inp.focus();
-  };
-  draw();return box;
-}
 const ROLE_NAME={lead:'Лид',moder:'Модер',admin:'Админ',streamer:'Стример',analyst:'Аналитик',buyer:'Медиабайер'};
 const COPY_ICON='<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 012-2h9"/></svg>';
 async function copyText(v){
   try{await navigator.clipboard.writeText(String(v))}catch{const t=el('textarea',{style:'position:fixed;opacity:0'});t.value=String(v);document.body.append(t);t.select();try{document.execCommand('copy')}catch{}t.remove()}
   toast('Скопировано: '+v);
 }
+/** Pocket ID ещё нет: «Добавить» превращается в поле и «Подтвердить». Принимается только ID из загруженной базы */
+function pocketAddRow(){
+  const box=el('div',{style:'display:grid;gap:8px'});
+  const draw=()=>box.replaceChildren(el('div',{class:'row'},el('span',{class:'sm'},'Pocket ID'),
+    el('button',{type:'button',class:'pillb',onclick:edit},'Добавить')));
+  const edit=()=>{
+    const inp=el('input',{type:'text',placeholder:'Ваш Pocket ID',maxlength:'40',autocomplete:'off',autocapitalize:'off',spellcheck:'false',
+      style:'flex:1;min-width:0;padding:11px 14px;border-radius:14px;border:1px solid var(--line);background:var(--bg2);color:var(--fg);font:600 15px var(--fb)'});
+    const ok=el('button',{type:'button',class:'btn',style:'flex:none;width:auto;padding:0 16px',onclick:()=>go()},'Подтвердить');
+    const go=async()=>{
+      const v=inp.value.trim();if(!v){toast('Введите Pocket ID');return}
+      ok.disabled=true;
+      try{await api('/legacy/claim',{method:'POST',body:{trader_id:v}});await refreshMe();toast('Pocket ID подтверждён, доступ открыт');render()}
+      catch(e){toast(e.message);ok.disabled=false}
+    };
+    inp.addEventListener('keydown',e=>{if(e.key==='Enter')go()});
+    box.replaceChildren(el('div',{class:'row'},el('span',{class:'sm'},'Pocket ID'),el('button',{type:'button',class:'pillb',onclick:draw},'Отмена')),
+      el('div',{style:'display:flex;gap:8px'},inp,ok));
+    inp.focus();
+  };
+  draw();return box;
+}
 function viewProfile(){
-  const rows=[['Telegram ID',me.tgId,true],['Pocket ID',me.pocketId||'ещё нет',!!me.pocketId],...(me.leadRole&&me.leadRole!=='lead'?[['Роль',ROLE_NAME[me.leadRole]||me.leadRole]]:[]),['Статус',({new:'новый',registered:'зарегистрирован',ftd:'пополнил счёт',active:'активен',churned:'неактивен'})[me.status]||me.status],['Менеджер',me.manager?(me.managerTg?el('a',{href:'https://t.me/'+me.managerTg,style:'color:var(--acc2);text-decoration:none',onclick:e=>{e.preventDefault();openLink('https://t.me/'+me.managerTg)}},'@'+me.managerTg):me.manager):'не назначен'],['Доступ',me.access?'открыт':'закрыт']];
+  const rows=[['Telegram ID',me.tgId,true],['Pocket ID',me.pocketId||null,true],...(me.leadRole&&me.leadRole!=='lead'?[['Роль',ROLE_NAME[me.leadRole]||me.leadRole]]:[]),['Статус',({new:'новый',registered:'зарегистрирован',ftd:'пополнил счёт',active:'активен',churned:'неактивен'})[me.status]||me.status],['Менеджер',me.manager?(me.managerTg?el('a',{href:'https://t.me/'+me.managerTg,style:'color:var(--acc2);text-decoration:none',onclick:e=>{e.preventDefault();openLink('https://t.me/'+me.managerTg)}},'@'+me.managerTg):me.manager):'не назначен'],['Доступ',me.access?'открыт':'закрыт']];
+  const copyBtn=v=>el('button',{type:'button','aria-label':'Копировать',title:'Копировать',style:'background:none;border:0;padding:2px;color:var(--mut);cursor:pointer;display:grid;place-items:center',onclick:()=>copyText(v)},svgEl(COPY_ICON));
   shell('Профиль',[el('div',{class:'card row',style:'justify-content:flex-start;gap:12px'},withPhoto(el('div',{class:'ava'},(me.name||'?').trim().slice(0,1).toUpperCase())),el('div',{},el('b',{style:'font:700 16px var(--fd)'},me.name),el('div',{class:'sm'},me.username?'@'+me.username:''))),
-    el('div',{class:'card',style:'display:grid;gap:10px'},rows.map(([k,v,cp])=>el('div',{class:'row'},el('span',{class:'sm'},k),
-      el('span',{style:'display:inline-flex;align-items:center;gap:8px'},el('b',{class:'mono'},v instanceof Node?v:String(v)),
-        cp?el('button',{type:'button','aria-label':'Копировать',title:'Копировать',style:'background:none;border:0;padding:2px;color:var(--mut);cursor:pointer;display:grid;place-items:center',onclick:()=>copyText(v)},svgEl(COPY_ICON)):null)))),
-    me.promo?el('div',{class:'card row'},el('span',{class:'sm'},'Промокод'),el('b',{class:'mono'},me.promo)):null,
-    me.access?null:legacyBlock(),
+    el('div',{class:'card',style:'display:grid;gap:10px'},rows.map(([k,v,cp])=>k==='Pocket ID'&&!v?pocketAddRow():el('div',{class:'row'},el('span',{class:'sm'},k),
+      el('span',{style:'display:inline-flex;align-items:center;gap:8px'},el('b',{class:'mono'},v instanceof Node?v:String(v)),cp?copyBtn(v):null)))),
+    me.promo&&me.status==='new'?el('div',{class:'card row'},el('span',{class:'sm'},'Промокод'),el('span',{style:'display:inline-flex;align-items:center;gap:8px'},el('b',{class:'mono'},me.promo),copyBtn(me.promo))):null,
     el('button',{class:'btn o',type:'button',onclick:support},'Написать в поддержку'),
     el('button',{class:'back',type:'button',onclick:()=>go('home')},'‹ На главную')]);
 }
