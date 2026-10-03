@@ -408,11 +408,23 @@ function heroArt(){
 }
 
 /** Карточка активного сигнала. Сигнал публикует человек (аналитик), тестовые видят только тестовые аккаунты */
+/** На главной активный сигнал по запросу показываем компактно: пара, время до входа и кнопка «Открыть сигнал». Полный экран открывается по кнопке */
+function signalCompact(r){
+  const sg=r.signal,entry=Date.parse(sg.entry_at),up=sg.direction==='up';
+  const left=el('b',{style:'font-size:20px;color:var(--acc2)'});
+  const tick=()=>{const sec=Math.ceil((entry-nowMs())/1000);left.textContent=sec>0?Math.floor(sec/60)+':'+String(sec%60).padStart(2,'0'):'сейчас'};
+  tick();timers.push(setInterval(tick,500));
+  liveSignalOn=true;   // главную по таймеру не перерисовываем, счётчик тикает сам
+  return el('div',{class:'card hero',style:'display:grid;gap:10px'},
+    el('div',{class:'row'},el('div',{},el('b',{style:'font-size:15px'},'Активный сигнал'),el('div',{class:'sm'},sg.pair+' · '+(up?'ВВЕРХ (BUY)':'ВНИЗ (SELL)'))),
+      el('div',{style:'text-align:right'},el('div',{class:'sm'},'до входа'),left)),
+    el('button',{class:'btn',type:'button',onclick:()=>signalResult(r)},'Открыть сигнал'));
+}
 async function signalCard(){
   const r=await api('/signals/active');
   const sg=r.signal;if(!sg)return null;
   const skew=Date.parse(r.now)-Date.now();
-  if(sg.requested_by)return (r.steps&&r.steps.length)?null:signalLive(sg,skew,r.cfg);
+  if(sg.requested_by)return (r.steps&&r.steps.length)?null:signalCompact(r);
   const entry=Date.parse(sg.entry_at);
   const hm2=new Date(entry).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
   const left=el('b',{class:'big',style:'font-size:22px;color:var(--acc2)'});
