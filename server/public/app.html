@@ -1138,7 +1138,7 @@ function viewProfile(){
   shell('Профиль',[el('div',{class:'card row',style:'justify-content:flex-start;gap:12px'},withPhoto(el('div',{class:'ava'},(me.name||'?').trim().slice(0,1).toUpperCase())),el('div',{},el('b',{style:'font:700 16px var(--fd)'},me.name),el('div',{class:'sm'},me.username?'@'+me.username:''))),
     el('div',{class:'card',style:'display:grid;gap:10px'},rows.map(([k,v,cp])=>k==='Pocket ID'&&!v?pocketAddRow():el('div',{class:'row'},el('span',{class:'sm'},k),
       el('span',{style:'display:inline-flex;align-items:center;gap:8px'},el('b',{class:'mono'},v instanceof Node?v:String(v)),cp?copyBtn(v):null)))),
-    me.promo&&me.status==='new'?el('div',{class:'card row'},el('span',{class:'sm'},'Промокод'),el('span',{style:'display:inline-flex;align-items:center;gap:8px'},el('b',{class:'mono'},me.promo),copyBtn(me.promo))):null,
+    me.promo&&['new','registered'].includes(me.status)?el('div',{class:'card row'},el('span',{class:'sm'},'Промокод'),el('span',{style:'display:inline-flex;align-items:center;gap:8px'},el('b',{class:'mono'},me.promo),copyBtn(me.promo))):null,
     el('button',{class:'btn o',type:'button',onclick:support},'Написать в поддержку'),
     el('button',{class:'back',type:'button',onclick:()=>go('home')},'‹ На главную')]);
 }
