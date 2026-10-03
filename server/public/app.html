@@ -599,8 +599,8 @@ function signalRated(sg,result,step){
       el('b',{style:'font-size:20px;color:var(--'+(win?'ok':'bad')+')'},win?'Плюс':'Минус'),
       el('div',{class:'sm'},sg.pair+(win?' · '+(step===1?'со входа':'с перекрытия '+(step-1)):'')),
       el('div',{class:'sm'},'Оценка записана в статистику.')),
-    el('button',{class:'btn',type:'button',onclick:()=>signalPairs()},'Запросить новый анализ'),
     el('button',{class:'btn o',type:'button',onclick:()=>signalPrep(sg.pair,sg.expiry_sec||sg.expiry_min*60)},'Повторить анализ · '+sg.pair),
+    el('button',{class:'btn',type:'button',onclick:()=>signalPairs()},'Запросить новый анализ'),
     el('button',{class:'btn o',type:'button',onclick:()=>{toast('Торговля завершена');tab='home';render()}},'Завершить торговлю'),
     el('p',{class:'sm',style:'margin:0'},'Не пытайтесь отыграться и торгуйте только той суммой, которую готовы потерять.')]);
 }
