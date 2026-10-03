@@ -220,7 +220,7 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
       [u.id],
     );
     const l = r.rows[0];
-    const dep = await db.query(`SELECT coalesce(sum(amount), 0) AS s FROM events WHERE tg_id = $1 AND type IN ('ftd','dep')`, [u.id]);
+    const dep = await db.query(`SELECT coalesce(sum(amount), 0) AS s, count(*)::int AS c FROM events WHERE tg_id = $1 AND type IN ('ftd','dep')`, [u.id]);
     const st = await db.query(
       `SELECT count(*) FILTER (WHERE result IS NOT NULL AND result <> 'skip')::int AS deals,
               count(*) FILTER (WHERE result = 'win')::int AS wins,
@@ -244,6 +244,7 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
       manager: l.manager,
       managerTg: l.manager_tg ?? null,
       deposited: Number(dep.rows[0].s),
+      depositCount: dep.rows[0].c,
       minDeposit: config.minDeposit,
       promo: l.po_promo,
       region: l.region,
