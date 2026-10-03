@@ -307,7 +307,7 @@ const profileCard=()=>el('div',{class:'row',style:'justify-content:flex-start;ga
  */
 function heroArt(){
   const NSV='http://www.w3.org/2000/svg';
-  const W=380,DX=30,BW=21,LIVE_X=322,TOP=14,BOT=104,T=5,TICK=.25,TREND=10,STEP=.38,CYCLE=6.4,SWEEP=3.6;   // новая свеча каждые 5 секунд, направление цены меняется каждые 10
+  const W=380,DX=30,BW=21,LIVE_X=322,TOP=14,BOT=104,T=4.2,TICK=.12,CYCLE=6.4,SWEEP=3.6;
   const svg=svgEl(`<svg class="hero-art" viewBox="0 0 380 128" aria-hidden="true">
 <defs>
 <linearGradient id="trail" x1="0" x2="1" y1="0" y2="0"><stop offset="0" stop-color="#9b5cff" stop-opacity="0"/><stop offset="1" stop-color="#9b5cff" stop-opacity=".26"/></linearGradient>
@@ -326,26 +326,24 @@ function heroArt(){
   const reduce=matchMedia('(prefers-reduced-motion:reduce)').matches;
 
   let price=100,id=0;
-  // Цена идёт вверх 10 секунд, потом вниз 10 секунд и так по кругу; сверху лёгкий шум
-  const dirAt=ts=>((Math.floor(ts/TREND)%2)+2)%2===0?1:-1;
-  const fresh=o=>({k:id++,o,c:o,t:o,h:o,l:o,born:0,el:null});
-  const step=(c,ts)=>{c.t+=dirAt(ts)*STEP+(Math.random()-.5)*.3};
-  const settle=c=>{c.h=Math.max(c.h,c.c);c.l=Math.min(c.l,c.c)};
+  const walk=()=>{price+=(Math.random()-.5)*1.5+(100-price)*.012;return price};
+  const fresh=o=>({k:id++,o,c:o,h:o,l:o,born:0,el:null});
+  const tickCandle=c=>{c.c=walk();c.h=Math.max(c.h,c.c);c.l=Math.min(c.l,c.c)};
   const candles=[];
-  for(let i=0;i<16;i++){const c=fresh(i?candles[i-1].c:price);for(let j=0;j<Math.round(T/TICK);j++){step(c,(i-16)*T+j*TICK);c.c=c.t;settle(c)}candles.push(c)}
+  for(let i=0;i<16;i++){const c=fresh(i?candles[i-1].c:price);for(let j=0;j<Math.round(T/TICK);j++)tickCandle(c);candles.push(c)}
   const gridLines=[];
   for(let i=0;i<14;i++)gridLines.push(mk('line',{y1:0,y2:128},vgrid));
 
   let lo=0,hi=1,first=true,tAcc=0,frac=0,last=performance.now(),born=last,cycleStart=-99,picks=[],mark=[];
   const xOf=c=>LIVE_X+(c.k-candles[candles.length-1].k)*DX-frac*DX;
 
-  function draw(now,dt=0){
+  function draw(now){
     const t=(now-born)/1000;
     // масштаб по видимым свечам, плавно
     let mn=1e9,mx=-1e9;
     for(const c of candles){if(xOf(c)<-DX)continue;mn=Math.min(mn,c.l);mx=Math.max(mx,c.h)}
     const pad=Math.max(1,(mx-mn)*.14);mn-=pad;mx+=pad;
-    if(first){lo=mn;hi=mx;first=false}else{const k=1-Math.exp(-dt*3.5);lo+=(mn-lo)*k;hi+=(mx-hi)*k}
+    if(first){lo=mn;hi=mx;first=false}else{lo+=(mn-lo)*.07;hi+=(mx-hi)*.07}
     const Y=v=>TOP+(hi-v)/(hi-lo)*(BOT-TOP);
 
     // сканер: проход каждые CYCLE секунд, между проходами его не видно
@@ -401,14 +399,13 @@ function heroArt(){
     if(reduce)return;
     if(!svg.isConnected&&now-born>800){return}   // карточку убрали со страницы, останавливаемся
     if(document.hidden){requestAnimationFrame(loop);last=now;return}
-    // каждый кадр: время считаем по реальному dt, поэтому движение ровное, без рывков
-    const dt=Math.min(.1,(now-last)/1000);last=now;
-    let live=candles[candles.length-1];
-    tAcc+=dt;frac+=dt/T;
-    while(tAcc>=TICK){tAcc-=TICK;step(live,(now-born)/1000)}
-    live.c+=(live.t-live.c)*(1-Math.exp(-dt*6));settle(live);
-    if(frac>=1){frac-=1;const c=fresh(live.c);candles.push(c);const old=candles.shift();if(old.el)old.el.g.remove()}
-    draw(now,dt);
+    const dt=Math.min(.1,(now-last)/1000);
+    if(now-last>=30){
+      last=now;tAcc+=dt;frac+=dt/T;
+      while(tAcc>=TICK){tAcc-=TICK;tickCandle(candles[candles.length-1])}
+      if(frac>=1){frac-=1;const prev=candles[candles.length-1];const c=fresh(prev.c);candles.push(c);const old=candles.shift();if(old.el)old.el.g.remove()}
+      draw(now);
+    }
     requestAnimationFrame(loop);
   }
   draw(born);
