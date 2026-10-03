@@ -156,6 +156,7 @@ main{flex:1;padding:6px 16px 96px;display:grid;gap:12px;align-content:start}
 @media(hover:hover){.rbtn:hover{background:var(--acc);color:#fff;box-shadow:0 0 0 3px #9b5cff33}}
 .rbtn:active,.rbtn:focus-visible{background:var(--acc);color:#fff;outline:none}
 .rbtn:active{transform:scale(.97)}
+.rbtn .rsub{display:block;margin-top:3px;font-size:11px;font-weight:500;opacity:.75;line-height:1.2}
 .seg{display:grid;grid-template-columns:1fr 1fr;gap:6px;background:var(--bg2);padding:4px;border-radius:12px}
 .seg button{border:0;background:none;border-radius:9px;padding:9px 6px;font-size:12px;font-weight:600;color:var(--mut);cursor:pointer}
 .seg button.on{background:var(--acc);color:#fff}
@@ -590,7 +591,7 @@ async function viewHome(){
   if(!me.access){
     // Сначала одна кнопка «Зарегистрироваться». Регион спрашиваем после нажатия
     let asking=false;
-    const REG={ru:'РФ и СНГ',ww:'Европа и мир'};
+    const REG={ru:['RU, СНГ','если вы в России'],ww:['EU, Мир','если вы в Европе']};
     const go=async r=>{
       const url=me.registerUrl[r];
       if(!url){toast('Ссылка регистрации для этого региона пока не настроена. Напишите нам через «Поддержка».');return}
@@ -605,8 +606,7 @@ async function viewHome(){
         btnBox.replaceChildren(
           el('div',{class:'rq',role:'status'},'Выберите, где вы находитесь'),
           el('div',{class:'rrow'},
-            el('button',{class:'rbtn',type:'button',onclick:()=>go('ru')},REG.ru),
-            el('button',{class:'rbtn',type:'button',onclick:()=>go('ww')},REG.ww)));
+            ['ru','ww'].map(k=>el('button',{class:'rbtn',type:'button',onclick:()=>go(k)},el('span',{style:'display:block'},REG[k][0]),el('span',{class:'rsub'},REG[k][1])))));
         return;
       }
       btnBox.replaceChildren(el('button',{class:'btn',type:'button',onclick:()=>{asking=true;drawBtn()}},'Зарегистрироваться'));
