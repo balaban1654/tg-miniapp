@@ -679,10 +679,10 @@ async function pastSignals(){
   const nodes=new Map();   // ключ сигнала → строка списка, чтобы обновлять список без перерисовки
   let listEl=null,mode='';
   const keyOf=r=>String(r.id!==undefined?r.id:r.entry_at+r.pair);
-  const sigOf=r=>r.wins+'/'+r.losses;
+  const sigOf=r=>r.wins+'/'+r.losses+(r.positive?'+':'');
   const inner=r=>{
     const n=r.wins+r.losses,up=r.direction==='up';
-    const cls=n===0||r.wins===r.losses?'n':r.wins>r.losses?'w':'l';
+    const cls=r.positive?'w':n===0||r.wins===r.losses?'n':r.wins>r.losses?'w':'l';
     const lab=cls==='w'?'Плюс':cls==='l'?'Минус':(n===0?'Нет итогов':'Поровну');
     const t=new Date(r.entry_at).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
     return el('div',{class:'ps-in'},

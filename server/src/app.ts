@@ -376,25 +376,27 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
 
   // Прошедшие сигналы. Показываем ВСЕ завершённые, без отбора. Итог считается по отметкам клиентов
   app.get('/signals/past', { preHandler: auth }, async (req) => {
-    // В истории: сигналы аналитика, по которым уже есть итоги от клиентов, и реальные сигналы по запросу, но только если
-    // клиенты по одной паре в одно время получили разный исход. Из таких публикуем только положительный (число плюсов)
+    // В истории: сигналы аналитика с итогами и все реальные сигналы по запросу. Клиентские сигналы по одной паре в одну минуту
+    // сводим в одну строку; если исходы разные (и плюс, и минус), публикуем только плюс (positive), минус не показываем
     const r = await db.query(
       `SELECT * FROM (
          SELECT s.id::text AS id, s.pair, s.direction, s.entry_at, s.is_test,
                 (SELECT count(*)::int FROM deals x WHERE x.signal_id = s.id AND x.result = 'win') + coalesce((s.demo_result = 'win')::int, 0) AS wins,
-                (SELECT count(*)::int FROM deals x WHERE x.signal_id = s.id AND x.result = 'loss') + coalesce((s.demo_result = 'loss')::int, 0) AS losses
+                (SELECT count(*)::int FROM deals x WHERE x.signal_id = s.id AND x.result = 'loss') + coalesce((s.demo_result = 'loss')::int, 0) AS losses,
+                FALSE AS positive
            FROM signals s
           WHERE NOT s.is_test AND s.requested_by IS NULL
             AND s.entry_at + (s.expiry_min || ' minutes')::interval < now()
          UNION ALL
          SELECT 'c' || md5(s.pair || s.direction || date_trunc('minute', s.entry_at)::text) AS id, s.pair, s.direction,
                 date_trunc('minute', s.entry_at) AS entry_at, FALSE AS is_test,
-                count(*) FILTER (WHERE d.result = 'win')::int AS wins, 0 AS losses
+                count(*) FILTER (WHERE d.result = 'win')::int AS wins,
+                count(*) FILTER (WHERE d.result = 'loss')::int AS losses,
+                (count(*) FILTER (WHERE d.result = 'win') > 0 AND count(*) FILTER (WHERE d.result = 'loss') > 0) AS positive
            FROM signals s JOIN deals d ON d.signal_id = s.id
           WHERE s.requested_by IS NOT NULL AND NOT s.is_test
             AND s.entry_at + (s.expiry_min || ' minutes')::interval < now()
           GROUP BY s.pair, s.direction, date_trunc('minute', s.entry_at)
-         HAVING count(*) FILTER (WHERE d.result = 'win') > 0 AND count(*) FILTER (WHERE d.result = 'loss') > 0
        ) q
         WHERE q.wins + q.losses > 0
         ORDER BY q.entry_at DESC LIMIT 5`,
