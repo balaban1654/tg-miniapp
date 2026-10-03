@@ -58,6 +58,8 @@ tr:last-child td{border-bottom:0}
 td.n{font-family:var(--fm);text-align:right}
 th.n{text-align:right}
 .ctr th,.ctr td,.ctr td.n{text-align:center}
+.ctr tr.band td{text-align:left;font:600 11px var(--fm);letter-spacing:.06em;text-transform:uppercase;color:var(--acc2);background:var(--bg2);border-bottom:1px solid var(--line);padding:8px 14px}
+.cp-btn{background:none;border:0;padding:2px;color:var(--mut);cursor:pointer;display:grid;place-items:center;border-radius:6px}.cp-btn:hover{color:var(--fg);background:var(--card2)}
 .cp{display:inline-flex;align-items:center;gap:8px}.cp button{background:none;border:0;padding:2px;color:var(--mut);cursor:pointer;display:grid;place-items:center;border-radius:6px}.cp button:hover{color:var(--fg);background:var(--card2)}
 .pill{display:inline-block;border-radius:99px;padding:2px 10px;font:600 11px var(--fm)}
 .p-ok{background:#3ddc9722;color:var(--ok)}.p-warn{background:#ffb84d22;color:var(--warn)}.p-bad{background:#ff6b8a22;color:var(--bad)}.p-pur{background:#9b5cff33;color:var(--acc2)}
@@ -228,14 +230,48 @@ function accessCell(r){
   };
   idle();return td;
 }
+const PENCIL='<path d="M4 20h4L19 9a2.8 2.8 0 00-4-4L4 16z"/><path d="M13.5 6.5l4 4"/>';
+/** Pocket ID с карандашом: админ может присвоить или поправить номер сам */
+function pocketCell(r){
+  const td=el('td',{class:'n'});
+  const save=async v=>{try{await api('/leads/'+r.tg_id+'/trader',{method:'PATCH',body:{trader_id:v}});render()}catch(x){toast(x.message)}};
+  const show=()=>{
+    const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+    ['viewBox:0 0 24 24','width:15','height:15','fill:none','stroke:currentColor','stroke-width:2','stroke-linecap:round','stroke-linejoin:round'].forEach(a=>{const[k,...v]=a.split(':');svg.setAttribute(k,v.join(':'))});svg.innerHTML=PENCIL;
+    const b=el('button',{type:'button',title:'Присвоить Pocket ID','aria-label':'Изменить Pocket ID',class:'cp-btn',onclick:edit},svg);
+    td.replaceChildren(el('span',{class:'cp'},r.trader_id||'—',me.role==='admin'?b:null));
+  };
+  const edit=()=>{
+    const inp=el('input',{value:r.trader_id||'',placeholder:'Pocket ID',maxlength:'40',style:'width:130px',
+      onkeydown:e=>{if(e.key==='Enter')save(inp.value.trim());if(e.key==='Escape')show()}});
+    td.replaceChildren(el('span',{style:'display:inline-flex;gap:6px;align-items:center'},inp,
+      el('button',{class:'btn s',type:'button',onclick:()=>save(inp.value.trim())},'OK'),
+      el('button',{class:'btn o s',type:'button','aria-label':'Отмена',onclick:show},'✕')));
+    inp.focus();
+  };
+  show();return td;
+}
 async function viewLeads(){
   const rows=await api('/leads');
   const showOwner=me.role==='admin'||me.role==='teamlead';
   const showComm=me.role==='admin';
-  const cols=['Лид','Telegram ID','Pocket ID','Статус',...(me.role==='admin'?['Тест']:[]),...(showOwner?['Владелец']:[]),'Ссылка','Пришёл','Депозиты',...(showComm?['Комиссия']:[])];
-  return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Лиды'),el('span',{class:'mut'},rows.length+' всего')),
-    table(cols,rows.map(r=>[td(r.username?'@'+r.username:(r.first_name||r.tg_id)),td(r.tg_id,'n'),r.is_tester?td('Тестовый аккаунт','n'):td(r.trader_id||'—','n'),el('td',{},pill(r.status)),...(me.role==='admin'?[accessCell(r)]:[]),...(showOwner?[td(r.owner_name||'не закреплён')]:[]),td(r.link_slug||'—'),td(date(r.created_at)),td(money(r.deposits),'n'),...(showComm?[td(money(r.commission),'n')]:[])]),
-      'Лидов пока нет. Они появятся, когда люди перейдут по вашим ссылкам и нажмут «Старт» в боте.')];
+  const cols=['Лид','Telegram ID','Pocket ID','Статус',...(me.role==='admin'?['Доступ']:[]),...(showOwner?['Владелец']:[]),'Ссылка','Пришёл','Депозиты',...(showComm?['Комиссия']:[])];
+  // Админ состав сверху: админ, модер, затем остальные роли; потом обычные лиды
+  const ORDER={admin:0,moder:1,streamer:2,analyst:3,buyer:4};
+  const staffRows=rows.filter(r=>r.lead_role&&r.lead_role!=='lead').sort((a,b)=>(ORDER[a.lead_role]??9)-(ORDER[b.lead_role]??9));
+  const leadRows=rows.filter(r=>!(r.lead_role&&r.lead_role!=='lead'));
+  const sorted=[...staffRows,...leadRows];
+  const tbl=table(cols,sorted.map(r=>[td(r.username?'@'+r.username:(r.first_name||r.tg_id)),td(r.tg_id,'n'),pocketCell(r),el('td',{},pill(r.status)),...(me.role==='admin'?[accessCell(r)]:[]),...(showOwner?[td(r.owner_name||'не закреплён')]:[]),td(r.link_slug||'—'),td(date(r.created_at)),td(money(r.deposits),'n'),...(showComm?[td(money(r.commission),'n')]:[])]),
+      'Лидов пока нет. Они появятся, когда люди перейдут по вашим ссылкам и нажмут «Старт» в боте.');
+  tbl.classList.add('ctr');
+  const body=tbl.querySelector('tbody');
+  if(body&&staffRows.length){
+    const band=t=>{const tr=el('tr',{class:'band'},el('td',{colspan:String(cols.length)},t));return tr};
+    const trs=[...body.children];
+    body.insertBefore(band('Админ состав'),trs[0]);
+    if(leadRows.length)body.insertBefore(band('Лиды'),trs[staffRows.length]);
+  }
+  return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Лиды'),el('span',{class:'mut'},rows.length+' всего')),tbl];
 }
 
 function goUrl(slug){return 'https://'+location.host.replace(/^crm\./,'go.')+'/s/'+slug}

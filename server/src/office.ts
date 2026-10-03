@@ -798,6 +798,15 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     return { ok: true };
   });
 
+  // Pocket ID вручную: админ присваивает его лиду сам (пустое значение сбрасывает)
+  app.patch<{ Params: { tgId: string } }>('/leads/:tgId/trader', { preHandler: need('admin') }, async (req, reply) => {
+    const v = str((req.body as any)?.trader_id, 40);
+    if (v && !/^[A-Za-z0-9_-]+$/.test(v)) return reply.code(400).send({ error: 'Pocket ID: только буквы, цифры, - и _' });
+    const r = await db.query('UPDATE leads SET trader_id = $2 WHERE tg_id = $1 RETURNING tg_id', [Number(req.params.tgId), v || null]);
+    if (!r.rowCount) return reply.code(404).send({ error: 'Лид не найден' });
+    return { ok: true };
+  });
+
   // Очистка журнала. Лиды, события и деньги не затрагиваются
   app.delete('/postbacks', { preHandler: need('admin') }, async () => {
     const r = await db.query('DELETE FROM postback_log');
