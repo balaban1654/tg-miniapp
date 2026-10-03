@@ -356,7 +356,7 @@ function heroArt(){
       picks=[];
       while(picks.length<2&&pool.length){const k=pool.splice(Math.floor(Math.random()*pool.length),1)[0];if(picks.every(p=>Math.abs(p.k-k)>=3))picks.push({k,done:false})}
     }
-    const sx=ph>=0&&ph<SWEEP?-14+(ph/SWEEP)*(LIVE_X+24):null;
+    const sx=ph>=0&&ph<SWEEP?-14+(ph/SWEEP)*(W+28):null;
     if(sx===null)scan.setAttribute('opacity',0);
     else{scan.setAttribute('opacity',Math.min(1,ph*3,(SWEEP-ph)*3));scan.setAttribute('transform','translate('+(sx-84).toFixed(1)+',0)')}
 
