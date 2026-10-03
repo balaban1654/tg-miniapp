@@ -169,6 +169,12 @@ const $=s=>document.querySelector(s);
 const ROLE={admin:'Админ',teamlead:'Тимлидер',streamer:'Стример',buyer:'Медиабайер',analyst:'Аналитик'};
 const STATUS={new:['Новый','p-pur'],registered:['Регистрация','p-warn'],ftd:['FTD','p-ok'],active:['Активный','p-ok'],churned:['Отвал','p-bad']};
 let me=null,tab='home';
+/* Адрес страницы: у каждого раздела своя ссылка (#/leads, #/acc/review), при обновлении остаёмся на месте */
+const ACC_TABS=['sum','review','bonus','pay','why','plan','form'];
+function hashPath(){return '/'+tab+(tab==='acc'?'/'+accState.tab:'')}
+function pushHash(){const h='#'+hashPath();if(location.hash!==h)history.pushState(null,'',h)}
+function readHash(){const[,t,sub]=(location.hash||'').split('/');if(!t)return;tab=t;if(t==='acc'&&ACC_TABS.includes(sub))accState.tab=sub}
+window.addEventListener('popstate',()=>{if(!me)return;readHash();showApp()});
 
 async function api(path,opts={}){
   const r=await fetch('/api/office'+path,{credentials:'same-origin',headers:{'content-type':'application/json'},...opts,body:opts.body?JSON.stringify(opts.body):(opts.method&&opts.method!=='GET'?'{}':undefined)});
@@ -222,13 +228,14 @@ function showApp(){
   if(me.role==='streamer')items.splice(items.length,0,['shifts','Смены и отчёты']);
   if(me.role==='admin')items.splice(items.findIndex(x=>x[0]==='push'),0,['acc','Бухгалтерия']);
   items.push(['notifs','Уведомления']);
+  if(!items.some(x=>x[0]===tab)){tab=items[0][0];history.replaceState(null,'','#'+hashPath())}
   const nav=$('#nav');nav.replaceChildren(...items.map(([k,t])=>el('button',{type:'button','data-t':k,class:k===tab?'on':'',onclick:()=>{tab=k;showApp();render()}},icon(k),el('span',{class:'lbl'},k==='chats'?chatsLabel:t))));
   render();updateBadge();
 }
 
 $('#loginForm').addEventListener('submit',async e=>{
   e.preventDefault();$('#lErr').textContent='';$('#lBtn').disabled=true;
-  try{await api('/login',{method:'POST',body:{login:$('#lLogin').value,password:$('#lPass').value}});me=await api('/me');showApp()}
+  try{await api('/login',{method:'POST',body:{login:$('#lLogin').value,password:$('#lPass').value}});me=await api('/me');readHash();showApp()}
   catch(x){$('#lErr').textContent=x.message}
   finally{$('#lBtn').disabled=false}
 });
@@ -237,6 +244,7 @@ $('#logout').addEventListener('click',async()=>{try{await api('/logout',{method:
 /** render({soft:true}) обновляет страницу на месте: без «Загрузка…» и с сохранением прокрутки, чтобы экран не дёргался */
 async function render(opt){
   stopPoll();
+  pushHash();
   const soft=!!(opt&&opt.soft===true);
   const m=$('#main'),y=window.scrollY,mt=m.scrollTop;
   if(!soft)m.replaceChildren(el('div',{class:'mut'},'Загрузка…'));
@@ -684,7 +692,7 @@ async function viewAcc(){
   const TABS=[['sum','Сводка'],['review','Отчёты на проверке'],['bonus','Бонусы и штрафы'],['pay','Выплаты и авансы'],['why','Причины по сменам'],['plan','KPI-план'],['form','Форма отчёта']];
   const drawBar=()=>{
     monthBar.replaceChildren(el('button',{type:'button','aria-label':'Предыдущий месяц',onclick:()=>{accState.period=perShift(accState.period,-1);accState.sel=null;drawBar();drawBody()}},'‹'),el('b',{},perLabel(accState.period)),el('button',{type:'button','aria-label':'Следующий месяц',onclick:()=>{accState.period=perShift(accState.period,1);accState.sel=null;drawBar();drawBody()}},'›'));
-    tabBar.replaceChildren(...TABS.map(([k,t])=>el('button',{type:'button',role:'tab','aria-selected':k===accState.tab?'true':'false',class:'lc-tab'+(k===accState.tab?' on':''),onclick:()=>{accState.tab=k;drawBar();drawBody()}},t)));
+    tabBar.replaceChildren(...TABS.map(([k,t])=>el('button',{type:'button',role:'tab','aria-selected':k===accState.tab?'true':'false',class:'lc-tab'+(k===accState.tab?' on':''),onclick:()=>{accState.tab=k;drawBar();drawBody();pushHash()}},t)));
   };
   const drawBody=async()=>{body.replaceChildren(el('div',{class:'mut'},'Загрузка…'));try{body.replaceChildren(...(await ({sum:accSum,review:accReview,bonus:accBonus,pay:accPay,why:accWhy,plan:accPlan,form:accForm})[accState.tab]()).filter(Boolean))}catch(x){if(x.message!=='auth')body.replaceChildren(el('div',{class:'err'},x.message))}};
   if(!accState.period)accState.period=(await api('/kpi/summary')).period;
@@ -1169,7 +1177,7 @@ async function viewPostbacks(){
       'Постбеков пока нет. Когда партнёрка отправит первый, он появится здесь.')];
 }
 
-(async()=>{try{me=await api('/me');showApp()}catch{showLogin()}})();
+(async()=>{try{me=await api('/me');readHash();showApp()}catch{showLogin()}})();
 </script>
 </body>
 </html>
