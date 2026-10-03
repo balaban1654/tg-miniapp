@@ -262,7 +262,7 @@ function shell(title,body){
   const init=(me.name||'?').trim().slice(0,1).toUpperCase();
   root.replaceChildren(
     el('div',{class:'hd'},
-      el('div',{class:'brand'},el('div',{class:'logo'},(()=>{const i=new Image();i.alt='H';i.src='/img/logo-128.webp';i.draggable=false;return i})()),el('div',{class:'bname'},el('b',{},title||'Hunter AI',el('span',{class:'clk'},clockNow())),el('span',{class:'onl2'},el('i'),'онлайн'))),
+      el('div',{class:'brand'},el('div',{class:'logo'},(()=>{const i=new Image();i.alt='H';i.src='/img/logo-128.webp';i.draggable=false;return i})()),el('div',{class:'bname'},el('b',{},title||'Hunter AI',title==='Сигнал'?el('span',{class:'clk'},clockNow()):null),el('span',{class:'onl2'},el('i'),'онлайн'))),
       el('div',{class:'hr'},el('button',{class:'pillb',type:'button',onclick:support},svgEl(CHAT_ICON),'Поддержка'),
         withPhoto(el('button',{class:'avb',type:'button','aria-label':'Профиль',onclick:()=>go('profile')},init)))),
     el('main',{},body),
