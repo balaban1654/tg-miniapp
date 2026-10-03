@@ -404,7 +404,9 @@ function heroArtBuild(){
 
   function loop(now){
     if(reduce)return;
-    if(!svg.isConnected&&now-born>800){svg._dead=true;return}   // карточку убрали со страницы, останавливаемся
+    // Пока главную перерисовывают, график недолго живёт вне страницы (карточка ещё собирается): ждём до 4 секунд, потом останавливаемся
+    if(svg.isConnected)svg._off=0;
+    else{if(!svg._off)svg._off=now;if(now-svg._off>4000){svg._dead=true;return}}
     if(document.hidden){requestAnimationFrame(loop);last=now;return}
     const dt=Math.min(.1,(now-last)/1000);
     if(now-last>=30){
