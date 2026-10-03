@@ -46,6 +46,30 @@ input,select{background:var(--bg2);border:1px solid var(--line);border-radius:10
 .bell{margin-left:auto;position:relative;background:none;border:0;padding:5px;color:var(--mut);cursor:pointer;display:grid;place-items:center;border-radius:8px}.bell:hover{color:var(--fg);background:var(--card2)}.bell .cnt{position:absolute;top:0;right:0;min-width:15px;height:15px;border-radius:99px;background:var(--bad);color:#fff;font:700 9px var(--fm);display:grid;place-items:center;padding:0 3px}
 .me-row{display:flex;align-items:center;gap:8px}.gear{background:none;border:0;padding:3px;color:var(--mut);cursor:pointer;display:grid;place-items:center;border-radius:6px}.gear:hover{color:var(--fg);background:var(--card2)}
 .lc-field{display:grid;gap:4px}.lc-field label{font-size:12px;color:var(--mut)}.lc-tabs{display:flex;gap:6px;border-bottom:1px solid var(--line);flex-wrap:wrap}.lc-tab{background:none;border:0;border-bottom:2px solid transparent;padding:10px 14px;color:var(--mut);font-weight:600;cursor:pointer;margin-bottom:-1px}.lc-tab.on{color:var(--fg);border-bottom-color:var(--acc)}.lc-pane{display:grid;gap:14px;min-height:190px;align-content:start}
+/* бухгалтерия стримеров */
+.inl{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.pbar2{height:8px;border-radius:9px;background:#ffffff1a;overflow:hidden}.pbar2 i{display:block;height:100%;border-radius:9px;background:linear-gradient(90deg,var(--acc),var(--acc2));transition:width .3s}.pbar2 i.done{background:linear-gradient(90deg,#1f9d6a,var(--ok))}
+.pl2{display:grid;gap:4px}.lab2{display:flex;justify-content:space-between;gap:10px;font-size:12px;flex-wrap:wrap}.warnt{color:var(--warn)}
+.two-sums{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(160px,1fr))}
+.sumbox{border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--bg2);display:grid;gap:2px}.sumbox .v{font:700 20px var(--fm)}.ok2,.pos2{color:var(--ok)}.neg2{color:var(--bad)}
+.kpi-card{display:grid;gap:12px;border-color:var(--acc);background:linear-gradient(180deg,#2a1857,var(--card))}
+.warn-card{display:grid;gap:8px;border-color:var(--warn);max-width:560px}
+.live-dot{display:flex;align-items:center;gap:8px}.live-dot i{width:9px;height:9px;border-radius:50%;background:var(--bad);animation:livep 1.6s infinite}@keyframes livep{70%{box-shadow:0 0 0 8px #ff6b8a00}0%{box-shadow:0 0 0 0 #ff6b8a88}}
+.drop2{border:1.5px dashed var(--acc);border-radius:12px;padding:14px;text-align:center;color:var(--acc2);background:#9b5cff10;font-weight:600;font-size:13px;cursor:pointer;width:100%}
+.mon2{display:flex;gap:6px;align-items:center}.mon2 button{background:var(--card);border:1px solid var(--line);color:var(--fg);border-radius:9px;width:32px;height:32px;cursor:pointer}.mon2 b{min-width:140px;text-align:center}
+tr.rowc{cursor:pointer}tr.rowc:hover{background:#ffffff08}tr.rowc.on{background:#9b5cff1f}
+.detailc{display:grid;gap:14px;border:1px solid var(--acc);border-radius:14px;padding:16px;background:linear-gradient(180deg,#2a185733,transparent 60%)}
+.steps2{display:grid;gap:8px}.stepc{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 14px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 14px;align-items:center}.stepc .f{grid-column:1;color:var(--mut);font-size:12px}.stepc .r{grid-row:1/span 2;grid-column:2;font:700 16px var(--fm);text-align:right}
+.totalc{display:flex;justify-content:space-between;align-items:baseline;gap:12px;border-top:1px solid var(--line);padding-top:12px}
+.two2c{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+.rev{display:grid;grid-template-columns:110px minmax(0,1fr) auto;gap:14px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;align-items:start}
+.shotc{display:block;height:96px;border-radius:9px;overflow:hidden;border:1px solid var(--line)}.shotc img{width:100%;height:100%;object-fit:cover}
+.meta2{display:grid;gap:4px;min-width:0}.kv2{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--mut)}.kv2 b{color:var(--fg)}
+.acts2{display:grid;gap:8px}.acts2 input{width:auto}
+.frow2{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,.8fr) 90px 90px 90px auto;gap:12px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px 12px}
+.fhead2{background:none;border:0;padding:0 12px;font:600 10px var(--fm);letter-spacing:.06em;text-transform:uppercase;color:var(--mut)}
+.chk{display:flex;justify-content:center}.chk input{width:auto}
+@media(max-width:800px){.rev{grid-template-columns:1fr}.frow2{grid-template-columns:1fr}.fhead2{display:none}}
 .lc-two{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
 .me{margin-top:auto;padding:10px;color:var(--mut);font-size:12px;display:grid;gap:8px}
 main{padding:22px clamp(14px,3vw,32px);display:grid;gap:18px;align-content:start;min-width:0}
@@ -179,6 +203,8 @@ const ICONS={
   push:'<path d="M6 16V11a6 6 0 1112 0v5l2 2H4z"/><path d="M10 21a2 2 0 004 0"/>',
   media:'<rect x="3" y="5" width="18" height="14" rx="3"/><path d="M10 9.5v5l4.5-2.5z"/>',
   pb:'<path d="M4 12h5l2-6 3 12 2-6h4"/>',
+  shifts:'<circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3 2"/>',
+  acc:'<rect x="3" y="6" width="18" height="13" rx="2.5"/><path d="M3 10h18M16 15h2"/>',
   notifs:'<path d="M6 16V11a6 6 0 1112 0v5l1.5 2h-15z"/><path d="M10 21a2 2 0 004 0"/>'};
 const icon=k=>{const s=document.createElementNS('http://www.w3.org/2000/svg','svg');s.setAttribute('viewBox','0 0 24 24');s.setAttribute('width','18');s.setAttribute('height','18');s.setAttribute('fill','none');s.setAttribute('stroke','currentColor');s.setAttribute('stroke-width','2');s.setAttribute('stroke-linecap','round');s.setAttribute('stroke-linejoin','round');s.setAttribute('aria-hidden','true');s.innerHTML=ICONS[k]||'';return s};
 function showApp(){
@@ -192,6 +218,8 @@ function showApp(){
   if(me.role==='admin')items.splice(1,0,['signals','Сигналы']);
   if(me.role==='analyst'){items.length=0;items.push(['signals','Сигналы']);if(tab!=='signals'&&tab!=='notifs')tab='signals'}
   if(me.role==='admin')items.push(['push','Пуши'],['media','Медиа'],['pb','Постбеки']);
+  if(me.role==='streamer')items.splice(items.length,0,['shifts','Смены и отчёты']);
+  if(me.role==='admin')items.splice(items.findIndex(x=>x[0]==='push'),0,['acc','Бухгалтерия']);
   items.push(['notifs','Уведомления']);
   const nav=$('#nav');nav.replaceChildren(...items.map(([k,t])=>el('button',{type:'button','data-t':k,class:k===tab?'on':'',onclick:()=>{tab=k;showApp();render()}},icon(k),el('span',{class:'lbl'},k==='chats'?chatsLabel:t))));
   render();updateBadge();
@@ -222,6 +250,8 @@ async function render(opt){
     else if(tab==='media')m.replaceChildren(...await viewMedia());
     else if(tab==='pb')m.replaceChildren(...await viewPostbacks());
     else if(tab==='notifs')m.replaceChildren(...await viewNotifs());
+    else if(tab==='shifts')m.replaceChildren(...await viewShifts());
+    else if(tab==='acc')m.replaceChildren(...await viewAcc());
   }catch(x){if(x.message!=='auth')m.replaceChildren(el('div',{class:'err'},x.message))}
   if(soft){window.scrollTo(0,y);m.scrollTop=mt}
 }
@@ -236,9 +266,11 @@ async function viewNotifs(){
 async function viewHome(){
   const s=await api('/stats');const b=s.byStatus;
   const k=(t,v)=>el('div',{class:'kpi'},el('small',{},t),el('b',{},String(v)));
-  return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Дашборд')),
+  const kpi=me.role==='streamer'?await kpiCardBlock().catch(()=>null):null;
+  const fstats=me.role==='admin'?await fieldStatsBlock().catch(()=>null):null;
+  return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Дашборд')),kpi,
     el('div',{class:'kpis'},k('Клики по ссылкам',s.clicks),k('Лиды',s.total),k('Регистрации',(b.registered||0)+(b.ftd||0)+(b.active||0)),k('FTD',(b.ftd||0)+(b.active||0)),k('Отвал',b.churned||0)),
-    el('div',{class:'kpis'},k('Депозиты',money(s.deposits)),k('Выводы',money(s.withdrawals)),...(s.commission!==null?[k('Заработано (комиссия)',money(s.commission))]:[]))];
+    el('div',{class:'kpis'},k('Депозиты',money(s.deposits)),k('Выводы',money(s.withdrawals)),...(s.commission!==null?[k('Заработано (комиссия)',money(s.commission))]:[])),fstats].filter(Boolean);
 }
 
 const LROLES=[['lead','Лид'],['moder','Модер'],['admin','Админ'],['streamer','Стример'],['analyst','Аналитик'],['buyer','Медиабайер']];
@@ -484,6 +516,338 @@ async function openStaffCard(id){
     bar,body);
   draw();
 }
+/* ===== Бухгалтерия стримеров: смены и отчёты (стример), бухгалтерия (админ), блок KPI на дашборде ===== */
+const hmin=m=>Math.floor(m/60)+' ч '+String(m%60).padStart(2,'0')+' мин';
+const usd2=n=>(n<0?'−':'')+'$'+Math.abs(Number(n)||0).toLocaleString('ru-RU',{minimumFractionDigits:2,maximumFractionDigits:2});
+const MONTHS=['январь','февраль','март','апрель','май','июнь','июль','август','сентябрь','октябрь','ноябрь','декабрь'];
+const perLabel=p=>{const[y,m]=p.split('-').map(Number);return MONTHS[m-1][0].toUpperCase()+MONTHS[m-1].slice(1)+' '+y};
+const perShift=(p,d)=>{let[y,m]=p.split('-').map(Number);m+=d;if(m<1){m=12;y--}if(m>12){m=1;y++}return y+'-'+String(m).padStart(2,'0')};
+const planPill=ok=>el('span',{class:'pill '+(ok?'p-ok':'p-bad')},ok?'выполнен':'не выполнен');
+const bar=(pct,done)=>el('div',{class:'pbar2'},el('i',{class:done?'done':'',style:'width:'+Math.max(0,Math.min(100,pct))+'%'}));
+const pbRow=(label,val,pct,done,note)=>el('div',{class:'pl2'},el('div',{class:'lab2'},el('span',{},label),el('b',{class:'mono'},val)),bar(pct,done),note?el('span',{class:'sm warnt'},note):null);
+const fileDataUrl=f=>new Promise((ok,no)=>{const r=new FileReader();r.onload=()=>ok(r.result);r.onerror=()=>no(new Error('Не удалось прочитать файл'));r.readAsDataURL(f)});
+const REPSTATUS={pending:['на проверке','p-warn'],approved:['зачтён','p-ok'],rejected:['отклонён','p-bad']};
+
+/** Карточка «Мой KPI» на дашборде стримера */
+async function kpiCardBlock(){
+  const d=await api('/kpi/me');
+  const {plan,kpi:k}=d,skew=Date.parse(d.now)-Date.now();
+  const shiftMin=plan.shiftH*60,planShifts=plan.hours/plan.shiftH;
+  let today=d.approvedToday+d.pendingToday;
+  if(d.live)today+=Math.max(0,Math.floor((Date.now()+skew-Date.parse(d.live.started_at))/60000));
+  const toWhole=Math.max(0,shiftMin-today);
+  const adv=d.advance;
+  let advNode;
+  if(adv.request)advNode=el('div',{class:'inl'},el('button',{class:'btn',type:'button',disabled:''},'Аванс '+usd2(adv.request.amount)),el('span',{class:'mut sm'},adv.request.status==='paid'?'Аванс выплачен':'Аванс запрошен, ждёт выплаты'));
+  else advNode=el('div',{class:'inl'},el('button',{class:'btn',type:'button',disabled:adv.can?null:'',onclick:async e=>{e.currentTarget.disabled=true;try{await api('/advance/request',{method:'POST'});toast('Аванс запрошен');render({soft:true})}catch(x){toast(x.message);e.currentTarget.disabled=false}}},'Запросить аванс '+usd2(adv.amount)),
+    el('span',{class:'mut sm'},adv.can?'Доступно: по минимальным ставкам набралось '+usd2(k.minTotal):'До аванса осталось '+usd2(adv.amount-k.minTotal)+' по минимальным ставкам'));
+  return el('div',{class:'card kpi-card'},
+    el('div',{class:'head'},el('h3',{style:'font-size:15px'},'Мой KPI · '+perLabel(k.period)),el('span',{class:'mut sm'},'считается только зачтённое время')),
+    pbRow('План по сменам',k.shifts+'/'+planShifts+' дн. · '+hmin(k.hoursMin)+' из '+plan.hours+' ч',k.hoursMin/k.planMin*100,k.shiftsDone,k.overtimeMin?'Переработал на '+hmin(k.overtimeMin)+': эти часы не оплачиваются, доплата на усмотрение руководителя':''),
+    pbRow('План по лидам (FTD)',k.ftdCount+' из '+plan.leads,k.ftdCount/plan.leads*100,k.leadsDone),
+    pbRow('Сегодня зачтено '+hmin(today)+' из '+plan.shiftH+' ч',toWhole?'ещё '+toWhole+' мин до целой смены':'смена закрыта',today/shiftMin*100,!toWhole),
+    el('div',{class:'two-sums'},
+      el('div',{class:'sumbox'},el('span',{class:'sm mut'},'По полным ставкам'),el('span',{class:'v ok2'},usd2(k.fullTotal)),el('span',{class:'sm mut'},'если выполнишь оба плана')),
+      el('div',{class:'sumbox'},el('span',{class:'sm mut'},'По минимальным ставкам'),el('span',{class:'v'},usd2(k.minTotal)),el('span',{class:'sm mut'},'если планы не выполнены'))),
+    el('div',{class:'sm mut'},'В суммы входят бонусы за FTD ('+usd2(k.ftdBonus)+'), дневные бонусы ('+usd2(k.dayBonus)+'), доп. бонусы ('+usd2(k.adjBonus)+') и штрафы (−'+usd2(k.adjPenalty).replace('$','$')+').'),
+    advNode);
+}
+
+/** Для админа на дашборде: суммы полей отчётов за месяц */
+async function fieldStatsBlock(){
+  const d=await api('/shifts/fieldstats');
+  if(!d.fields.length&&!d.rows.length)return null;
+  const cols=['Стример','Отчётов','Время',...d.fields];
+  const tot={};d.rows.forEach(r=>d.fields.forEach(f=>{tot[f]=(tot[f]||0)+(r.sums[f]||0)}));
+  const rows=d.rows.map(r=>[td(r.name),td(r.reports,'n'),td(hmin(r.minutes)),...d.fields.map(f=>td((r.sums[f]||0).toLocaleString('ru-RU'),'n'))]);
+  if(d.rows.length)rows.push([el('td',{},el('b',{},'Всего')),td(d.rows.reduce((a,r)=>a+r.reports,0),'n'),td(hmin(d.rows.reduce((a,r)=>a+r.minutes,0))),...d.fields.map(f=>el('td',{class:'n'},el('b',{},(tot[f]||0).toLocaleString('ru-RU'))))]);
+  return el('div',{style:'display:grid;gap:8px'},el('h3',{style:'font-size:15px'},'Эфиры за '+perLabel(d.period)),ctrT(table(cols,rows,'Зачтённых отчётов за месяц пока нет.')));
+}
+
+/* ---------- Стример: «Смены и отчёты» ---------- */
+async function viewShifts(){
+  let cur='shift';
+  const root=el('div',{style:'display:grid;gap:14px'});
+  const body=el('div',{style:'display:grid;gap:14px'});
+  const bar2=el('div',{class:'lc-tabs',role:'tablist'});
+  const drawTabs=()=>bar2.replaceChildren(...[['shift','Смена'],['reports','Мои отчёты']].map(([k,t])=>el('button',{type:'button',role:'tab','aria-selected':k===cur?'true':'false',class:'lc-tab'+(k===cur?' on':''),onclick:()=>{cur=k;drawTabs();drawBody()}},t)));
+  const drawBody=async()=>{stopPoll();body.replaceChildren(el('div',{class:'mut'},'Загрузка…'));try{body.replaceChildren(...(cur==='shift'?await shiftTab():await reportsTab()).filter(Boolean))}catch(x){if(x.message!=='auth')body.replaceChildren(el('div',{class:'err'},x.message))}};
+  await api('/shortfalls/sync',{method:'POST'}).catch(()=>{});
+  drawTabs();
+  root.append(bar2,body);
+  await drawBody();
+  return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Смены и отчёты'),el('span',{class:'mut sm'},me.name)),root];
+}
+
+async function shiftTab(){
+  const d=await api('/kpi/me');
+  const {plan}=d,skew=Date.parse(d.now)-Date.now(),shiftMin=plan.shiftH*60;
+  const out=[];
+  // Невыполненные дни: нужна причина
+  for(const s of d.shortfalls){
+    const ta=el('textarea',{class:'big',rows:'2',placeholder:'Почему не получилось выйти в эфир или не хватило времени',maxlength:'1000',style:'min-height:64px'});
+    const err=el('div',{class:'err',role:'alert'});
+    out.push(el('div',{class:'card warn-card'},el('b',{},'Смена за '+new Date(s.day+'T12:00:00').toLocaleDateString('ru-RU',{day:'numeric',month:'long'})+' не выполнена по плану'),
+      el('div',{class:'mut sm'},'Зачтено '+hmin(s.minutes)+' из '+plan.shiftH+' ч. Напишите причину, её прочтёт руководитель. Главное набрать '+plan.hours+' часов за месяц.'),
+      ta,err,el('div',{},el('button',{class:'btn s',type:'button',onclick:async()=>{err.textContent='';try{await api('/shortfalls/reason',{method:'POST',body:{day:s.day,reason:ta.value}});toast('Причина отправлена');render({soft:true})}catch(x){err.textContent=x.message}}},'Отправить'))));
+  }
+  const counted=d.approvedToday+d.pendingToday;
+  if(!d.live){
+    const url=el('input',{type:'url',placeholder:'https://tiktok.com/@name/live',maxlength:'500'});
+    const err=el('div',{class:'err',role:'alert'});
+    out.push(el('div',{class:'card',style:'display:grid;gap:10px;max-width:560px'},
+      el('div',{class:'head'},el('h3',{style:'font-size:15px'},'Смена не начата'),el('span',{class:'pill p-pur'},'сегодня зачтено '+hmin(counted)+' из '+plan.shiftH+' ч')),
+      el('label',{},'Ссылка на эфир (обязательно)',url),err,
+      el('div',{},el('button',{class:'btn',type:'button',onclick:async e=>{err.textContent='';e.currentTarget.disabled=true;try{await api('/shifts/start',{method:'POST',body:{stream_url:url.value}});toast('Смена началась');render({soft:true})}catch(x){err.textContent=x.message;e.currentTarget.disabled=false}}},'Начать смену')),
+      el('div',{class:'mut sm'},'Без ссылки на эфир смену начать нельзя.')));
+    return out;
+  }
+  const live=d.live;
+  const timer=el('div',{class:'mono',style:'font-size:30px'}),left=el('b',{class:'mono'});
+  const barEl=el('div',{class:'pbar2'},el('i',{style:'width:0'}));
+  const tick=()=>{const sec=Math.max(0,Math.floor((Date.now()+skew-Date.parse(live.started_at))/1000));
+    const h=Math.floor(sec/3600),m=Math.floor(sec%3600/60),s=sec%60;timer.textContent=String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
+    const leftMin=Math.max(0,shiftMin-counted-Math.floor(sec/60));left.textContent=leftMin?hmin(leftMin):'смена закрыта';
+    barEl.firstChild.style.width=Math.min(100,(counted+sec/60)/shiftMin*100)+'%'};
+  tick();poll=setInterval(tick,1000);
+  out.push(el('div',{class:'card kpi-card',style:'display:grid;gap:10px;max-width:560px'},
+    el('div',{class:'head'},el('h3',{style:'font-size:15px'},'Смена идёт'),el('span',{class:'live-dot sm'},el('i'),'эфир')),
+    timer,
+    el('div',{class:'lab2'},el('span',{},'До целой смены ('+plan.shiftH+' ч)'),left),barEl,
+    el('div',{class:'mut sm'},'Начало '+new Date(live.started_at).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'})+' · '+live.stream_url),
+    el('div',{},el('button',{class:'btn',type:'button',onclick:()=>openFinishModal(live,skew)},'Закончить смену'))));
+  return out;
+}
+
+async function openFinishModal(live,skew){
+  document.querySelectorAll('.lc-overlay').forEach(x=>x.remove());
+  const ov=el('div',{class:'lc-overlay',role:'dialog','aria-modal':'true'});
+  const close=()=>{ov.remove();document.removeEventListener('keydown',onKey)};
+  const onKey=e=>{if(e.key==='Escape')close()};
+  document.addEventListener('keydown',onKey);
+  const box=el('div',{class:'lc'},el('div',{class:'mut'},'Загрузка…'));
+  ov.append(box);document.body.append(ov);
+  let defs;try{defs=await api('/report-fields')}catch(x){box.replaceChildren(el('div',{class:'err'},x.message));return}
+  const elapsed=Math.max(1,Math.floor((Date.now()+skew-Date.parse(live.started_at))/60000));
+  const time=el('input',{type:'number',min:'1',max:'720',value:String(elapsed)});
+  const inputs=defs.map(d=>({d,i:el('input',{type:d.kind==='number'?'number':d.kind==='link'?'url':'text',min:d.kind==='number'?'0':null,step:d.kind==='number'?'any':null,placeholder:d.kind==='link'?'https://':''})}));
+  const comment=el('textarea',{class:'big',rows:'2',maxlength:'1000',placeholder:'Как прошёл эфир, что мешало (необязательно)',style:'min-height:64px'});
+  let shot=null;
+  const file=el('input',{type:'file',accept:'image/jpeg,image/png,image/webp',style:'display:none'});
+  const prev=el('div',{style:'display:none'});
+  const drop=el('button',{class:'drop2',type:'button',onclick:()=>file.click()},'Загрузить скриншот статистики эфира (обязательно)');
+  file.addEventListener('change',()=>{const f=file.files[0];if(!f)return;
+    if(!/^image\/(jpeg|png|webp)$/.test(f.type)){err.textContent='Нужна картинка JPG, PNG или WebP';return}
+    if(f.size>6*1024*1024){err.textContent='Скриншот больше 6 МБ';return}
+    err.textContent='';shot=f;prev.style.display='block';prev.replaceChildren(el('img',{src:URL.createObjectURL(f),alt:'Скриншот',style:'max-height:140px;border-radius:10px'}));drop.textContent='Заменить скриншот'});
+  const err=el('div',{class:'err',role:'alert'});
+  const send=el('button',{class:'btn',type:'button',onclick:async()=>{
+    err.textContent='';
+    if(!shot){err.textContent='Загрузите скриншот статистики эфира';return}
+    send.disabled=true;
+    try{
+      const fields={};inputs.forEach(x=>{fields[x.d.id]=x.i.value});
+      await api('/shifts/'+live.id+'/finish',{method:'POST',body:{declared_min:Number(time.value),fields,comment:comment.value,screenshot:await fileDataUrl(shot)}});
+      close();toast('Отчёт отправлен на проверку');render({soft:true});
+    }catch(x){err.textContent=x.message;send.disabled=false}
+  }},'Отправить на проверку');
+  box.replaceChildren(
+    el('div',{class:'lc-head'},el('h3',{style:'font-size:18px'},'Отчёт о смене'),el('button',{class:'btn o s',type:'button','aria-label':'Закрыть',onclick:close},'✕')),
+    el('div',{class:'lc-two'},el('div',{class:'lc-field'},el('label',{},'Время эфира, минут (подставилось с таймера)'),time),
+      ...inputs.map(x=>el('div',{class:'lc-field'},el('label',{},x.d.name+(x.d.required?' *':'')),x.i))),
+    el('div',{class:'lc-field'},el('label',{},'Комментарий'),comment),
+    file,drop,prev,err,el('div',{class:'lc-actions'},send));
+}
+
+async function reportsTab(){
+  const [rows,d]=await Promise.all([api('/shifts/mine'),api('/kpi/me')]);
+  const k=d.kpi;
+  const tiles=el('div',{class:'kpis'},...[['Зачтено за месяц',hmin(k.hoursMin)],['Смен',k.shifts+' из '+(d.plan.hours/d.plan.shiftH)],['На проверке',rows.filter(r=>r.status==='pending').length],['Доп. бонусы',usd2(k.adjBonus)],['Штрафы',usd2(k.adjPenalty)]].map(([a,b])=>el('div',{class:'kpi'},el('small',{},a),el('b',{style:'font-size:20px'},String(b)))));
+  const fmtF=r=>r.fields.filter(f=>f.value!==null&&f.value!=='').map(f=>f.name+' '+(typeof f.value==='number'?f.value.toLocaleString('ru-RU'):f.value)).join(' · ')||'—';
+  const del=r=>r.status==='approved'?null:el('button',{class:'btn o s',type:'button',onclick:async()=>{try{await api('/shifts/'+r.id,{method:'DELETE'});toast('Отчёт удалён');render({soft:true})}catch(x){toast(x.message)}}},'Удалить');
+  const trs=rows.map(r=>[td(new Date(r.day+'T12:00:00').toLocaleDateString('ru-RU',{day:'numeric',month:'short'})),
+    td(r.declared_min?hmin(r.declared_min)+(r.approved_min&&r.approved_min!==r.declared_min?' → '+hmin(r.approved_min):''):'—'),
+    el('td',{style:'white-space:normal;min-width:200px'},fmtF(r),r.comment?el('div',{class:'mut sm'},r.comment):null,r.reject_reason?el('div',{class:'sm',style:'color:var(--bad)'},'Причина отказа: '+r.reject_reason):null),
+    el('td',{},el('span',{class:'pill '+REPSTATUS[r.status][1]},REPSTATUS[r.status][0])),
+    el('td',{},r.has_screenshot?el('a',{href:'/api/office/shifts/'+r.id+'/screenshot',target:'_blank',rel:'noopener',style:'color:var(--acc2)'},'скриншот'):'—'),
+    el('td',{},del(r))]);
+  return[tiles,ctrT(table(['Дата','Время','Показатели','Статус','Скрин',''],trs,'Отчётов пока нет. После смены он появится здесь.')),
+    el('div',{class:'mut sm'},'Принятые отчёты хранятся в истории, непринятые можно удалить.')];
+}
+
+/* ---------- Админ: «Бухгалтерия» ---------- */
+let accState={period:null,tab:'sum',sel:null};
+async function viewAcc(){
+  const root=el('div',{style:'display:grid;gap:14px'}),body=el('div',{style:'display:grid;gap:14px'});
+  const monthBar=el('div',{class:'mon2'}),tabBar=el('div',{class:'lc-tabs',role:'tablist'});
+  const TABS=[['sum','Сводка'],['review','Отчёты на проверке'],['bonus','Бонусы и штрафы'],['pay','Выплаты и авансы'],['why','Причины по сменам'],['plan','KPI-план'],['form','Форма отчёта']];
+  const drawBar=()=>{
+    monthBar.replaceChildren(el('button',{type:'button','aria-label':'Предыдущий месяц',onclick:()=>{accState.period=perShift(accState.period,-1);accState.sel=null;drawBar();drawBody()}},'‹'),el('b',{},perLabel(accState.period)),el('button',{type:'button','aria-label':'Следующий месяц',onclick:()=>{accState.period=perShift(accState.period,1);accState.sel=null;drawBar();drawBody()}},'›'));
+    tabBar.replaceChildren(...TABS.map(([k,t])=>el('button',{type:'button',role:'tab','aria-selected':k===accState.tab?'true':'false',class:'lc-tab'+(k===accState.tab?' on':''),onclick:()=>{accState.tab=k;drawBar();drawBody()}},t)));
+  };
+  const drawBody=async()=>{body.replaceChildren(el('div',{class:'mut'},'Загрузка…'));try{body.replaceChildren(...(await ({sum:accSum,review:accReview,bonus:accBonus,pay:accPay,why:accWhy,plan:accPlan,form:accForm})[accState.tab]()).filter(Boolean))}catch(x){if(x.message!=='auth')body.replaceChildren(el('div',{class:'err'},x.message))}};
+  if(!accState.period)accState.period=(await api('/kpi/summary')).period;
+  drawBar();root.append(tabBar,body);await drawBody();
+  accRefresh=drawBody;
+  return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Бухгалтерия'),monthBar),root];
+}
+let accRefresh=()=>{};
+
+async function accSum(){
+  const d=await api('/kpi/summary?period='+accState.period);
+  const R=d.rows.filter(r=>r.staff.active||r.kpi.hoursMin||r.kpi.ftdCount||r.kpi.paid);
+  const tot=R.reduce((a,r)=>a+r.kpi.total,0),paid=R.reduce((a,r)=>a+r.kpi.paid,0);
+  const tiles=el('div',{class:'kpis'},...[['Начислено за месяц',usd2(tot)],['Выплачено',usd2(paid)],['К выплате',usd2(tot-paid)],['Оба плана выполнили',R.filter(r=>r.kpi.shiftsDone&&r.kpi.leadsDone).length+' из '+R.length]].map(([a,b])=>el('div',{class:'kpi'},el('small',{},a),el('b',{style:'font-size:20px'},b))));
+  const detail=el('div',{style:'display:grid;gap:12px'});
+  const rows=R.map(r=>{const k=r.kpi;
+    const tr=el('tr',{class:'rowc',tabindex:'0'},
+      td(r.staff.name),
+      el('td',{class:'n'},hmin(k.hoursMin),k.overtimeMin?el('div',{class:'sm',style:'color:var(--warn)'},'переработал +'+hmin(k.overtimeMin)):null),
+      td(k.shifts+'/'+(d.plan.hours/d.plan.shiftH),'n'),el('td',{},planPill(k.shiftsDone)),
+      td(k.ftdCount,'n'),el('td',{},planPill(k.leadsDone)),
+      el('td',{class:'n'},usd2(k.act.base),el('div',{class:'sm mut'},'ставка $'+k.act.baseRate)),
+      el('td',{class:'n'},usd2(k.act.leadsPay),el('div',{class:'sm mut'},k.ftdCount+'×$'+k.act.price)),
+      td(usd2(k.ftdBonus),'n'),td(usd2(k.dayBonus),'n'),
+      td(k.adjBonus||k.adjPenalty?usd2(k.adjBonus-k.adjPenalty):'—','n'),
+      el('td',{class:'n'},el('b',{},usd2(k.total))),td(k.paid?usd2(-k.paid):'—','n'),el('td',{class:'n'},el('b',{},usd2(k.due))));
+    const open=()=>{accState.sel=r.staff.id;[...tr.parentNode.children].forEach(x=>x.classList.toggle('on',x===tr));accDetail(detail,r.staff.id)};
+    tr.addEventListener('click',open);tr.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open()}});
+    if(accState.sel===r.staff.id)setTimeout(()=>{tr.classList.add('on');accDetail(detail,r.staff.id)},0);
+    return tr});
+  const tbl=el('div',{class:'tbl ctr'},el('table',{},el('thead',{},el('tr',{},['Стример','Часы','Смены','План смен','Лиды (FTD)','План лидов','За смены','За лидов','Бонусы FTD','Дневные','Доп.','Итого','Выплачено','К выплате'].map(c=>el('th',{},c)))),el('tbody',{},rows)));
+  return[tiles,R.length?tbl:el('div',{class:'card empty'},'Стримеров пока нет. Добавьте их в разделе «Сотрудники».'),el('div',{class:'mut sm'},'Нажмите на строку, чтобы увидеть разбор начисления.'),detail];
+}
+
+async function accDetail(box,id){
+  const d=await api('/kpi/'+id+'?period='+accState.period);
+  const k=d.kpi,plan=d.plan,n=k.ftdCount;
+  const step=(t,f,v,cls='')=>el('div',{class:'stepc'},el('b',{},t),el('span',{class:'r '+cls},v),el('span',{class:'f'},f));
+  const tierNote=k.leadsDone?(k.act.price>plan.price?' ('+n+' лидов, все по повышенной цене)':''):' (план по лидам не выполнен)';
+  const steps=[
+    step('Ставка за смены',(k.shiftsDone?'План по сменам выполнен':'План по сменам не выполнен')+': $'+k.act.baseRate+' × '+Math.min(k.hoursMin,k.planMin)+' ÷ '+k.planMin+' мин'+(k.overtimeMin?'. Переработка '+hmin(k.overtimeMin)+' записана, но не оплачивается':''),usd2(k.act.base)),
+    step('Лиды',n+' FTD × $'+k.act.price+tierNote,usd2(k.act.leadsPay)),
+    step('Бонусы за FTD','Один уровень по сумме первого депозита, с запасом '+Math.round(plan.tol*100)+'% на курс',usd2(k.ftdBonus),'pos2'),
+    step('Дневные бонусы',k.dayRows.filter(x=>x.hit).length+' дн. по $'+plan.day.bonus,usd2(k.dayBonus),'pos2'),
+    ...d.adjustments.map(a=>step(a.kind==='bonus'?'Доп. бонус':'Штраф',(a.comment||'без комментария')+' · '+(a.by||'')+' (комментарий видите только вы)',usd2(a.kind==='bonus'?a.amount:-a.amount),a.kind==='bonus'?'pos2':'neg2'))
+  ];
+  const tierTbl=ctrT(table(['Депозит FTD','Кол-во','С запасом','Бонус','Сумма'],[...k.tiers.map(t=>[td('>$'+t.over),td(t.n,'n'),td(t.tol||'—','n'),td('$'+t.bonus,'n'),td(t.n?'+'+usd2(t.n*t.bonus):'—','n')]),[td('ниже порога'),td(k.belowTier,'n'),td('—'),td('—'),td('—')]],''));
+  const dayTbl=k.dayRows.length?ctrT(table(['День (до 03:00)','FTD от $'+plan.day.min,'Бонус'],k.dayRows.map(x=>[td(new Date(x.d+'T12:00:00').toLocaleDateString('ru-RU',{day:'numeric',month:'short'})),td(x.n+' из '+plan.day.count+(x.all>x.n?' (всего '+x.all+')':''),'n'),td(x.hit?'+$'+plan.day.bonus:'—','n')]),'')):el('div',{class:'mut sm'},'Дней с тремя и более FTD от $'+plan.day.min+' не было.');
+  const pays=d.payouts.length?ctrT(table(['Выплата','Сумма','Заметка',''],d.payouts.map(p=>[td({advance:'Аванс',final:'Итоговая',extra:'Доплата'}[p.kind]+' · '+date(p.created_at)),td(usd2(p.amount),'n'),td(p.note||'—'),el('td',{},el('button',{class:'btn o s',type:'button',onclick:async()=>{await api('/payouts/'+p.id,{method:'DELETE'});accRefresh()}},'Удалить'))]),'')):null;
+  box.replaceChildren(el('div',{class:'detailc'},
+    el('div',{class:'head'},el('h3',{style:'font-size:15px'},'Разбор начисления: '+d.staff.name+', '+perLabel(d.period)),el('div',{style:'display:flex;gap:6px;align-items:center'},el('span',{class:'mut sm'},'смены'),planPill(k.shiftsDone),el('span',{class:'mut sm'},'лиды'),planPill(k.leadsDone))),
+    el('div',{class:'steps2'},steps),
+    el('div',{class:'totalc'},el('span',{class:'mut'},'Итого начислено'),el('b',{class:'mono',style:'font-size:24px;color:var(--acc2)'},usd2(k.total))),
+    el('div',{class:'totalc',style:'border:0;padding:0'},el('span',{class:'mut'},'Выплачено '+usd2(k.paid)),el('b',{class:'mono'},'К выплате '+usd2(k.due))),
+    el('div',{class:'two2c'},el('div',{style:'display:grid;gap:8px'},el('h4',{},'Бонусы за FTD по уровням'),tierTbl),el('div',{style:'display:grid;gap:8px'},el('h4',{},'Дневной бонус'),dayTbl)),
+    pays?el('div',{style:'display:grid;gap:8px'},el('h4',{},'Выплаты за месяц'),pays):null));
+}
+
+async function accReview(){
+  const [pend,all]=await Promise.all([api('/shifts/pending'),api('/shifts/all?period='+accState.period)]);
+  const card=r=>{
+    const min=el('input',{type:'number',min:'1',max:'720',value:String(r.declared_min),style:'width:90px'});
+    const why=el('input',{placeholder:'Причина отказа (необязательно)',style:'width:240px'});
+    const act=async(action,extra)=>{try{await api('/shifts/'+r.id+'/review',{method:'POST',body:{action,...extra}});toast(action==='approve'?'Отчёт зачтён':'Отчёт отклонён');accRefresh()}catch(x){toast(x.message)}};
+    return el('div',{class:'rev'},
+      el('a',{href:'/api/office/shifts/'+r.id+'/screenshot',target:'_blank',rel:'noopener',class:'shotc'},el('img',{src:'/api/office/shifts/'+r.id+'/screenshot',alt:'Скриншот',loading:'lazy'})),
+      el('div',{class:'meta2'},el('div',{},el('b',{},r.staff_name),' ',el('span',{class:'mut sm'},new Date(r.day+'T12:00:00').toLocaleDateString('ru-RU',{day:'numeric',month:'short'})),' ',el('span',{class:'pill p-pur'},'заявлено '+hmin(r.declared_min))),
+        el('div',{class:'kv2'},...r.fields.filter(f=>f.value!==null&&f.value!=='').map(f=>el('span',{},f.name+': ',el('b',{},typeof f.value==='number'?f.value.toLocaleString('ru-RU'):f.value)))),
+        el('div',{class:'mut sm'},r.stream_url),r.comment?el('div',{class:'sm'},r.comment):null),
+      el('div',{class:'acts2'},el('div',{class:'inl'},min,el('span',{class:'mut sm'},'мин'),el('button',{class:'btn s',type:'button',onclick:()=>act('approve',{minutes:Number(min.value)})},'Зачесть')),
+        el('div',{class:'inl'},why,el('button',{class:'btn o s',type:'button',onclick:()=>act('reject',{reason:why.value})},'Отклонить'))));
+  };
+  const hist=all.filter(r=>r.status!=='pending').map(r=>[td(r.staff_name),td(new Date(r.day+'T12:00:00').toLocaleDateString('ru-RU',{day:'numeric',month:'short'})),td(hmin(r.declared_min)+(r.approved_min&&r.approved_min!==r.declared_min?' → '+hmin(r.approved_min):'')),el('td',{},el('span',{class:'pill '+REPSTATUS[r.status][1]},REPSTATUS[r.status][0])),el('td',{},el('a',{href:'/api/office/shifts/'+r.id+'/screenshot',target:'_blank',rel:'noopener',style:'color:var(--acc2)'},'скриншот')),
+    el('td',{},r.status==='approved'?'':el('button',{class:'btn o s',type:'button',onclick:async()=>{try{await api('/shifts/'+r.id,{method:'DELETE'});accRefresh()}catch(x){toast(x.message)}}},'Удалить'))]);
+  return[el('div',{class:'head'},el('h3',{style:'font-size:15px'},'На проверке: '+pend.length),el('span',{class:'mut sm'},'после зачёта время идёт в расчёт и в дашборд стримера')),
+    pend.length?el('div',{style:'display:grid;gap:10px'},pend.map(card)):el('div',{class:'card empty'},'Нет отчётов на проверку.'),
+    el('h3',{style:'font-size:15px;margin-top:6px'},'Проверенные за '+perLabel(accState.period)),ctrT(table(['Стример','Дата','Время','Статус','Скрин',''],hist,'За этот месяц проверенных отчётов нет.'))];
+}
+
+async function streamersList(){return(await api('/staff')).filter(s=>s.role==='streamer'&&s.active)}
+
+async function accBonus(){
+  const [list,st]=await Promise.all([api('/adjustments?period='+accState.period),streamersList()]);
+  const who=el('select',{},...st.map(s=>el('option',{value:s.id},s.name)));
+  const kind=el('select',{},el('option',{value:'bonus'},'Бонус'),el('option',{value:'penalty'},'Штраф'));
+  const amount=el('input',{type:'number',min:'0',step:'0.01',placeholder:'Сумма, $'});
+  const comment=el('input',{placeholder:'За что (видите только вы)',maxlength:'500'});
+  const err=el('div',{class:'err',role:'alert'});
+  const form=el('div',{class:'card',style:'display:grid;gap:10px'},el('h3',{style:'font-size:14px'},'Добавить'),
+    el('div',{class:'lc-two'},el('label',{},'Стример',who),el('label',{},'Тип',kind),el('label',{},'Сумма',amount),el('label',{},'Комментарий',comment)),err,
+    el('div',{},el('button',{class:'btn s',type:'button',onclick:async()=>{err.textContent='';try{await api('/adjustments',{method:'POST',body:{staff_id:Number(who.value),kind:kind.value,amount:Number(amount.value),comment:comment.value,period:accState.period}});toast('Добавлено');accRefresh()}catch(x){err.textContent=x.message}}},'Добавить')));
+  const rows=list.map(a=>[td(a.d),td(a.staff_name),el('td',{},el('span',{class:'pill '+(a.kind==='bonus'?'p-ok':'p-bad')},a.kind==='bonus'?'бонус':'штраф')),td(usd2(a.kind==='bonus'?a.amount:-a.amount),'n'),el('td',{style:'white-space:normal;text-align:left'},a.comment||'—'),el('td',{},el('button',{class:'btn o s',type:'button',onclick:async()=>{await api('/adjustments/'+a.id,{method:'DELETE'});accRefresh()}},'Удалить'))]);
+  return[form,ctrT(table(['Дата','Стример','Тип','Сумма','Комментарий (видите только вы)',''],rows,'За этот месяц бонусов и штрафов нет.')),
+    el('div',{class:'mut sm'},'Стример видит бонусы и штрафы суммами, без вашего комментария. Переработку тоже можно оплатить здесь.')];
+}
+
+async function accPay(){
+  const [sum,advs,st]=await Promise.all([api('/kpi/summary?period='+accState.period),api('/advances'),streamersList()]);
+  const cards=await Promise.all(sum.rows.map(r=>api('/staff/'+r.staff.id+'/card').catch(()=>({}))));
+  const advBox=advs.length?el('div',{class:'card',style:'display:grid;gap:8px;border-color:var(--acc)'},el('h4',{},'Запросы аванса'),...advs.map(a=>el('div',{class:'inl',style:'justify-content:space-between'},
+    el('div',{},el('b',{},a.staff_name+' запросил '+usd2(a.amount)),el('div',{class:'mut sm'},perLabel(a.period))),
+    el('div',{class:'inl'},el('button',{class:'btn s',type:'button',onclick:async()=>{try{await api('/advances/'+a.id+'/decide',{method:'POST',body:{action:'pay'}});toast('Аванс записан как выплаченный');accRefresh()}catch(x){toast(x.message)}}},'Выплатил'),el('button',{class:'btn o s',type:'button',onclick:async()=>{try{await api('/advances/'+a.id+'/decide',{method:'POST',body:{action:'reject'}});accRefresh()}catch(x){toast(x.message)}}},'Отклонить'))))):null;
+  const rows=sum.rows.map((r,i)=>{const c=cards[i]||{};return[td(r.staff.name),td(usd2(r.kpi.total),'n'),td(r.kpi.paid?usd2(r.kpi.paid):'—','n'),el('td',{class:'n'},el('b',{},usd2(r.kpi.due))),td(c.payout_method||'не указано'),el('td',{class:'mono sm'},c.payout_wallet||el('span',{class:'mut'},'нет реквизитов'))]});
+  const who=el('select',{},...st.map(s=>el('option',{value:s.id},s.name)));
+  const kind=el('select',{},el('option',{value:'final'},'Итоговая выплата'),el('option',{value:'advance'},'Аванс (вручную)'),el('option',{value:'extra'},'Доплата'));
+  const amount=el('input',{type:'number',min:'0',step:'0.01',placeholder:'Сумма, $'});
+  const note=el('input',{placeholder:'Заметка (необязательно)',maxlength:'300'});
+  const err=el('div',{class:'err',role:'alert'});
+  const form=el('div',{class:'card',style:'display:grid;gap:10px'},el('h3',{style:'font-size:14px'},'Записать выплату'),
+    el('div',{class:'lc-two'},el('label',{},'Стример',who),el('label',{},'Тип',kind),el('label',{},'Сумма',amount),el('label',{},'Заметка',note)),err,
+    el('div',{},el('button',{class:'btn s',type:'button',onclick:async()=>{err.textContent='';try{await api('/payouts',{method:'POST',body:{staff_id:Number(who.value),kind:kind.value,amount:Number(amount.value),note:note.value,period:accState.period}});toast('Выплата записана');accRefresh()}catch(x){err.textContent=x.message}}},'Записать')));
+  return[el('div',{class:'head'},el('h3',{style:'font-size:15px'},'Выплаты за '+perLabel(accState.period)),el('span',{class:'pill p-pur'},'выплаты с 5 по 10 число следующего месяца')),
+    advBox,ctrT(table(['Стример','Итого','Выплачено','К выплате','Куда','Реквизиты'],rows,'Стримеров пока нет.')),form,
+    el('div',{class:'mut sm'},'Реквизиты берутся из карточки сотрудника (раздел «Сотрудники»). Запрошенный аванс не больше $'+sum.plan.advance+', вручную можно выплатить больше. Аванс вычитается из итога.')];
+}
+
+async function accWhy(){
+  const rows=await api('/shortfalls?period='+accState.period);
+  return[el('div',{class:'head'},el('h3',{style:'font-size:15px'},'Невыполненные дни за '+perLabel(accState.period))),
+    ctrT(table(['Стример','День','Зачтено','Причина'],rows.map(r=>[td(r.staff_name),td(new Date(r.day+'T12:00:00').toLocaleDateString('ru-RU',{day:'numeric',month:'short'})),td(hmin(r.minutes)),el('td',{style:'white-space:normal;text-align:left;min-width:240px'},r.reason?r.reason:el('span',{class:'mut'},'ещё не написал'))]),'Невыполненных дней нет.')),
+    el('div',{class:'mut sm'},'Если за день не набралось 3 часов, стример должен написать причину. Главное: 66 часов за месяц.')];
+}
+
+async function accPlan(){
+  const p=await api('/kpi/settings');
+  const num=(v,min)=>el('input',{type:'number',min:min??'0',step:'any',value:String(v)});
+  const f={hours:num(p.hours,1),shiftH:num(p.shiftH,.5),leads:num(p.leads),base:num(p.base),baseLow:num(p.baseLow),price:num(p.price),priceLow:num(p.priceLow),
+    dc:num(p.day.count,1),dm:num(p.day.min),db:num(p.day.bonus),dh:num(p.day.cutoffH),tol:num(Math.round(p.tol*100)),adv:num(p.advance)};
+  const tiers=p.tiers.map(t=>({from:num(t.from),price:num(t.price)}));
+  const ftd=p.ftd.map(t=>({over:num(t.over),bonus:num(t.bonus)}));
+  const err=el('div',{class:'err',role:'alert'});
+  const lab=(t,i)=>el('label',{},t,i);
+  const save=async()=>{err.textContent='';try{await api('/kpi/settings',{method:'PUT',body:{hours:+f.hours.value,shiftH:+f.shiftH.value,leads:+f.leads.value,base:+f.base.value,baseLow:+f.baseLow.value,price:+f.price.value,priceLow:+f.priceLow.value,
+    tiers:tiers.map(t=>({from:+t.from.value,price:+t.price.value})),ftd:ftd.map(t=>({over:+t.over.value,bonus:+t.bonus.value})),day:{count:+f.dc.value,min:+f.dm.value,bonus:+f.db.value,cutoffH:+f.dh.value},tol:+f.tol.value/100,advance:+f.adv.value}});toast('План сохранён');accRefresh()}catch(x){err.textContent=x.message}};
+  return[el('div',{class:'head'},el('h3',{style:'font-size:15px'},'KPI-план стримера')),
+    el('div',{class:'card',style:'display:grid;gap:14px'},
+      el('h4',{},'Смены'),el('div',{class:'lc-two'},lab('Часов в месяц (план)',f.hours),lab('Часов в одной смене',f.shiftH),lab('Ставка за смены, $',f.base),lab('Ставка, если смены не выполнены, $',f.baseLow)),
+      el('h4',{},'Лиды (FTD)'),el('div',{class:'lc-two'},lab('Минимум лидов',f.leads),lab('Цена лида, $',f.price),lab('Цена лида, если план не выполнен, $',f.priceLow)),
+      el('div',{class:'mut sm'},'Повышенная цена за каждого лида месяца:'),el('div',{class:'lc-two'},...tiers.map(t=>el('div',{class:'inl'},el('span',{class:'mut sm'},'от'),t.from,el('span',{class:'mut sm'},'лидов, $'),t.price))),
+      el('h4',{},'Бонус за FTD (по сумме первого депозита)'),el('div',{class:'lc-two'},...ftd.map(t=>el('div',{class:'inl'},el('span',{class:'mut sm'},'больше $'),t.over,el('span',{class:'mut sm'},'бонус $'),t.bonus))),
+      el('h4',{},'Дневной бонус'),el('div',{class:'lc-two'},lab('FTD в день',f.dc),lab('Минимальный депозит, $',f.dm),lab('Бонус, $',f.db),lab('День закрывается в (Киев), час',f.dh)),
+      el('h4',{},'Прочее'),el('div',{class:'lc-two'},lab('Запас на курс брокера, %',f.tol),lab('Максимальный аванс, $',f.adv)),
+      err,el('div',{},el('button',{class:'btn',type:'button',onclick:save},'Сохранить'))),
+    el('div',{class:'mut sm'},'Изменения применяются сразу ко всем месяцам, которые ещё считаются на лету. Выплаты за закрытые месяцы лучше фиксировать заметкой.')];
+}
+
+async function accForm(){
+  const list=await api('/report-fields');
+  const rows=list.map(x=>({id:x.id,name:el('input',{value:x.name,maxlength:'60'}),kind:el('select',{},el('option',{value:'number'},'число'),el('option',{value:'text'},'текст'),el('option',{value:'link'},'ссылка')),req:el('input',{type:'checkbox'}),dash:el('input',{type:'checkbox'}),act:el('input',{type:'checkbox'})}));
+  rows.forEach((r,i)=>{r.kind.value=list[i].kind;r.req.checked=list[i].required;r.dash.checked=list[i].on_dashboard;r.act.checked=list[i].active});
+  const box=el('div',{style:'display:grid;gap:8px'});
+  const draw=()=>{
+    box.replaceChildren(el('div',{class:'frow2 fhead2'},el('span',{},'Поле'),el('span',{},'Тип'),el('span',{},'Обязательно'),el('span',{},'На дашборде'),el('span',{},'Показывать'),el('span',{},'')),
+      ...rows.map((r,i)=>el('div',{class:'frow2'},r.name,r.kind,el('label',{class:'chk'},r.req),el('label',{class:'chk'},r.dash),el('label',{class:'chk'},r.act),
+        el('span',{class:'inl'},el('button',{class:'btn o s',type:'button','aria-label':'Выше',onclick:()=>{if(i){[rows[i-1],rows[i]]=[rows[i],rows[i-1]];draw()}}},'↑'),el('button',{class:'btn o s',type:'button','aria-label':'Ниже',onclick:()=>{if(i<rows.length-1){[rows[i+1],rows[i]]=[rows[i],rows[i+1]];draw()}}},'↓'),
+          r.id?null:el('button',{class:'btn o s',type:'button','aria-label':'Убрать',onclick:()=>{rows.splice(i,1);draw()}},'✕')))));
+  };
+  draw();
+  const err=el('div',{class:'err',role:'alert'});
+  return[el('div',{class:'head'},el('h3',{style:'font-size:15px'},'Форма отчёта о смене'),el('button',{class:'btn o s',type:'button',onclick:()=>{rows.push({id:null,name:el('input',{value:'',placeholder:'Название поля',maxlength:'60'}),kind:el('select',{},el('option',{value:'number'},'число'),el('option',{value:'text'},'текст'),el('option',{value:'link'},'ссылка')),req:el('input',{type:'checkbox'}),dash:el('input',{type:'checkbox'}),act:Object.assign(el('input',{type:'checkbox'}),{checked:true})});draw()}},'Добавить поле')),
+    box,err,el('div',{},el('button',{class:'btn',type:'button',onclick:async()=>{err.textContent='';try{await api('/report-fields',{method:'PUT',body:{fields:rows.map(r=>({id:r.id,name:r.name.value,kind:r.kind.value,required:r.req.checked,on_dashboard:r.dash.checked,active:r.act.checked}))}});toast('Форма сохранена');accRefresh()}catch(x){err.textContent=x.message}}},'Сохранить')),
+    el('div',{class:'mut sm'},'«На дашборде» работает для числовых полей: их суммы по зачтённым отчётам показываются на общем дашборде. Скриншот в форме есть всегда. Убранные поля скрываются, в старых отчётах значения остаются.')];
+}
+
 let pendingChat=null;
 async function viewChats(){
   let active=null;
