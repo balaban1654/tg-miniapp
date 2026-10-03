@@ -31,6 +31,8 @@ button{font:inherit;color:inherit}
 .logo{width:34px;height:34px;border-radius:50%;background:var(--acc);display:grid;place-items:center;font:700 12px var(--fd);overflow:hidden;flex:none;border:1.5px solid var(--acc)}
 .logo img{width:100%;height:100%;object-fit:cover;display:block}
 .bname{display:grid;gap:2px;line-height:1.1;min-width:0}
+.hd.sig .clk{font-size:18px;margin-left:10px}
+.hd.sig .pillb{padding:8px 9px}
 .bname b .clk{font:600 12px var(--fd);color:var(--mut);margin-left:8px;font-variant-numeric:tabular-nums}
 .bname b{font:700 15px var(--fd);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .onl2{display:flex;align-items:center;gap:5px;font-size:10.5px;font-weight:600;color:var(--ok)}
@@ -259,10 +261,11 @@ const clockNow=()=>new Date(nowMs()).toLocaleTimeString('ru-RU',{hour:'2-digit',
 setInterval(()=>{const t=clockNow();document.querySelectorAll('.clk').forEach(n=>{if(n.textContent!==t)n.textContent=t})},250);
 function shell(title,body){
   const init=(me.name||'?').trim().slice(0,1).toUpperCase();
+  const isSig=title==='Сигнал';
   root.replaceChildren(
-    el('div',{class:'hd'},
-      el('div',{class:'brand'},el('div',{class:'logo'},(()=>{const i=new Image();i.alt='H';i.src='/img/logo-128.webp';i.draggable=false;return i})()),el('div',{class:'bname'},el('b',{},title||'Hunter AI',title==='Сигнал'?el('span',{class:'clk'},clockNow()):null),el('span',{class:'onl2'},el('i'),'онлайн'))),
-      el('div',{class:'hr'},el('button',{class:'pillb',type:'button',onclick:support},svgEl(CHAT_ICON),'Поддержка'),
+    el('div',{class:'hd'+(isSig?' sig':'')},
+      el('div',{class:'brand'},el('div',{class:'logo'},(()=>{const i=new Image();i.alt='H';i.src='/img/logo-128.webp';i.draggable=false;return i})()),el('div',{class:'bname'},el('b',{},title||'Hunter AI',isSig?el('span',{class:'clk'},clockNow()):null),el('span',{class:'onl2'},el('i'),'онлайн'))),
+      el('div',{class:'hr'},el('button',{class:'pillb',type:'button','aria-label':'Поддержка',title:'Поддержка',onclick:support},svgEl(CHAT_ICON),isSig?null:'Поддержка'),
         withPhoto(el('button',{class:'avb',type:'button','aria-label':'Профиль',onclick:()=>go('profile')},init)))),
     el('main',{},body),
     el('nav',{class:'tabs'},el('div',{},TABS.map(([k,t])=>el('button',{type:'button',class:k===tab?'on':'',onclick:()=>go(k)},svgEl('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">'+ICON[k]+'</svg>'),t)))));
