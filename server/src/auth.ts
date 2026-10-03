@@ -87,11 +87,13 @@ export function loginOk(key: string): void {
 }
 
 export async function ensureAdmin(): Promise<void> {
+  // Имя по умолчанию «Администратор» заменяем на «Николай»: меняется один раз, дальше имя можно править как угодно
+  if (config.adminLogin) await db.query(`UPDATE staff SET name = 'Николай' WHERE role = 'admin' AND login = $1 AND name = 'Администратор'`, [config.adminLogin]);
   if (!config.adminLogin || !config.adminPassword) return;
   const r = await db.query(`SELECT 1 FROM staff WHERE role = 'admin' LIMIT 1`);
   if (r.rowCount) return;
   await db.query(
-    `INSERT INTO staff (login, password_hash, name, role) VALUES ($1,$2,'Администратор','admin')`,
+    `INSERT INTO staff (login, password_hash, name, role) VALUES ($1,$2,'Николай','admin')`,
     [config.adminLogin, await hashPassword(config.adminPassword)],
   );
 }
