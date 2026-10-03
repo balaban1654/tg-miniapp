@@ -906,14 +906,17 @@ function lesson1(n=1){
   }
   function paint(){if(svg)svg.innerHTML=chart(performance.now())}
   function liveText(){
-    const t=target(),n=until();
+    const t=target(),secs=until();
     if(t==='buy'){
       const E=entryTt(),ets='0:'+String(E).padStart(2,'0'),inWin=st.tt<=E&&st.tt>=E-3;
-      if(nEl)nEl.textContent=inWin?'!':String(n);
+      if(nEl)nEl.textContent=inWin?'!':String(secs);
       if(bigEl)bigEl.textContent=inWin?'Сейчас! Жми «Купить»':'секунд до входа. На '+ets+' жми «Купить»';
-      if(tipEl)tipEl.textContent=(st.round===2?(n===3?'Цена вернулась к точке входа, ставка возвращена. ':'Сделка ушла в минус, удваиваем сумму до 60 $. '):'')+(inWin?'Таймер свечи показывает '+ets+' — жми «Купить»':'Жди: через '+n+' '+plS(n)+' таймер свечи покажет '+ets+' — тогда жми «Купить»');
-    }
-    if(t==='wait'&&st.trade&&tipEl)tipEl.textContent='Сделка открыта — ждём '+st.trade.left+' '+plS(st.trade.left);
+      // В описании сверху число секунд не тикает: фиксируем его в начале шага, живой отсчёт показывает зелёная табличка на графике
+      if(st.tipSecs===undefined)st.tipSecs=secs;
+      const lead=st.round===2?(n===3?'Цена вернулась к точке входа, ставка возвращена. Заходим на ту же сумму ('+st.sum+' $), так как был возврат. ':'Сделка ушла в минус, удваиваем сумму до 60 $. '):'';
+      if(tipEl)tipEl.textContent=lead+(inWin?'Таймер свечи показывает '+ets+' — жми «Купить»':'Жди: через '+st.tipSecs+' '+plS(st.tipSecs)+' таймер свечи покажет '+ets+' — тогда жми «Купить»');
+    }else st.tipSecs=undefined;
+    if(t==='wait'&&st.trade&&tipEl)tipEl.textContent='Сделка открыта — ждём 5 секунд';   // число фиксированное, живой отсчёт показан на графике
   }
   function finishTrade(){
     // учебный сценарий: плюс (урок 1), минус и повторный вход (урок 2) или возврат (урок 3)
