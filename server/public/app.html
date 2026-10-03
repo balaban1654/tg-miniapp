@@ -305,7 +305,13 @@ const profileCard=()=>el('div',{class:'row',style:'justify-content:flex-start;ga
  * Линия-сканер проходит слева направо и ненадолго подсвечивает пару свечей, потом они гаснут до следующего прохода.
  * Это иллюстрация, а не анализ: цены случайные, сигналов и цифр здесь нет.
  */
+// График живёт между перерисовками главной (раз в 20 секунд): берём тот же узел, иначе он каждый раз создаётся заново и «дёргается»
+let heroCache=null;
 function heroArt(){
+  if(heroCache&&!heroCache._dead)return heroCache;
+  heroCache=heroArtBuild();return heroCache;
+}
+function heroArtBuild(){
   const NSV='http://www.w3.org/2000/svg';
   const W=380,DX=30,BW=21,LIVE_X=322,TOP=14,BOT=104,T=4.2,TICK=.12,CYCLE=6.4,SWEEP=3.6;
   const svg=svgEl(`<svg class="hero-art" viewBox="0 0 380 128" aria-hidden="true">
@@ -326,9 +332,10 @@ function heroArt(){
   const reduce=matchMedia('(prefers-reduced-motion:reduce)').matches;
 
   let price=100,id=0;
-  const walk=()=>{price+=(Math.random()-.5)*1.5+(100-price)*.012;return price};
-  const fresh=o=>({k:id++,o,c:o,h:o,l:o,born:0,el:null});
-  const tickCandle=c=>{c.c=walk();c.h=Math.max(c.h,c.c);c.l=Math.min(c.l,c.c)};
+  const walk=(extra=0)=>{price+=(Math.random()-.5)*1.5+(100-price)*.012+extra;return price};
+  // Иногда свеча выходит длинной: на неё накладывается большой толчок, размазанный по её тикам
+  const fresh=o=>({k:id++,o,c:o,h:o,l:o,born:0,el:null,big:Math.random()<.2?(Math.random()<.5?-1:1)*(5+Math.random()*4):0});
+  const tickCandle=c=>{c.c=walk(c.big/Math.round(T/TICK));c.h=Math.max(c.h,c.c);c.l=Math.min(c.l,c.c)};
   const candles=[];
   for(let i=0;i<16;i++){const c=fresh(i?candles[i-1].c:price);for(let j=0;j<Math.round(T/TICK);j++)tickCandle(c);candles.push(c)}
   const gridLines=[];
@@ -397,7 +404,7 @@ function heroArt(){
 
   function loop(now){
     if(reduce)return;
-    if(!svg.isConnected&&now-born>800){return}   // карточку убрали со страницы, останавливаемся
+    if(!svg.isConnected&&now-born>800){svg._dead=true;return}   // карточку убрали со страницы, останавливаемся
     if(document.hidden){requestAnimationFrame(loop);last=now;return}
     const dt=Math.min(.1,(now-last)/1000);
     if(now-last>=30){
