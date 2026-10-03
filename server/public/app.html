@@ -64,6 +64,7 @@ main{flex:1;padding:6px 16px 96px;display:grid;gap:12px;align-content:start}
 .prow{display:flex;justify-content:space-between;align-items:center;width:100%;border:0;border-radius:14px;background:var(--card);padding:18px 16px;color:var(--fg);font:700 15px var(--fd);cursor:pointer;text-align:left}
 .prow:active{transform:scale(.99);background:var(--card2)}
 .pay{background:#3ddc9722;color:var(--ok);border-radius:8px;padding:3px 8px;font-size:11.5px;font-weight:700}
+.pay.y{background:#ffb84d22;color:var(--warn)}.pay.g{background:#ffffff14;color:var(--mut)}
 .note{color:var(--mut);font-size:12.5px;line-height:1.5}
 .sig{border:1px solid var(--acc);border-radius:20px;padding:16px;background:var(--card);display:grid;gap:2px}
 .sig h3{font-size:20px;margin-bottom:6px}
@@ -1040,7 +1041,7 @@ function lesson1(n=1){
     fsShell('Шаг 1 · сигнал',[
       el('div',{class:'fs-tip'},'Выбери валютную пару — получишь учебный сигнал'),
       el('div',{class:'ptabs'},el('button',{type:'button',class:'on'},'Валюты OTC'),el('button',{type:'button',disabled:''},'Крипта · скоро'),el('button',{type:'button',disabled:''},'Акции · скоро')),
-      PAIRS.map(p=>el('button',{class:'prow',type:'button',onclick:()=>{st.pair=p;try{localStorage.setItem('train_pair',p)}catch{}st.view='prep';prepView()}},el('span',{},p),el('span',{class:'pay'},'+92%'))),
+      PAIRS.map((p,i)=>{const [pct,cl]=[['+92%',''],['+92%',''],['+92%',''],['+88%',''],['+74%',' y'],['+64%',' g']][i]||['+92%',''];return el('button',{class:'prow',type:'button',onclick:()=>{st.pair=p;try{localStorage.setItem('train_pair',p)}catch{}st.view='prep';prepView()}},el('span',{},p),el('span',{class:'pay'+cl},pct))}),
       el('div',{class:'note'},'Перед началом торговли проверяйте процент выплаты на платформе Pocket Option — он может меняться.')]);
   };
   const termView=()=>{
