@@ -38,11 +38,12 @@ jobs:
             cp /opt/hunter/deploy/nginx-hunter.conf /etc/nginx/sites-available/hunter
             if nginx -t; then systemctl reload nginx; else cp /tmp/hunter.bak /etc/nginx/sites-available/hunter; echo "Конфиг Nginx с ошибкой, возвращён прежний"; exit 1; fi'
 
-      - name: Резервные копии базы (скрипт и ежедневный запуск)
+      - name: Копии базы и сторож сервера (скрипты и cron)
         run: |
           ssh -i ~/.ssh/id_deploy "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" '
             install -m 755 /opt/hunter/deploy/backup.sh /usr/local/bin/hunter-backup
-            printf "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\n30 3 * * * root /usr/local/bin/hunter-backup >> /var/log/hunter-backup.log 2>&1\n" > /etc/cron.d/hunter-backup
+            install -m 755 /opt/hunter/deploy/watchdog.sh /usr/local/bin/hunter-watch
+            printf "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\n30 3 * * * root /usr/local/bin/hunter-backup >> /var/log/hunter-backup.log 2>&1\n*/5 * * * * root /usr/local/bin/hunter-watch >> /var/log/hunter-watch.log 2>&1\n" > /etc/cron.d/hunter-backup
             chmod 644 /etc/cron.d/hunter-backup'
 
       - name: Запуск приложения
