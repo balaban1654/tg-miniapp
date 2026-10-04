@@ -181,6 +181,11 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
       const d = (await db.query(`SELECT layout FROM nav_defaults WHERE role = 'streamer'`)).rows[0];
       return { ...me, nav_layout: d?.layout ?? null };
     }
+    // Админы видят одно общее меню: его настраивает любой из админов
+    if (me.role === 'admin') {
+      const d = (await db.query(`SELECT layout FROM nav_defaults WHERE role = 'admin'`)).rows[0];
+      if (d) return { ...me, nav_layout: d.layout };
+    }
     return me;
   });
 
@@ -224,13 +229,16 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
   };
   app.put('/profile/nav', { preHandler: auth }, async (req, reply) => {
     const lay = ((req.body ?? {}) as Record<string, unknown>).layout;
+    const shared = req.staff!.role === 'admin'; // у админов меню общее на всех
     if (lay === null) {
-      await db.query('UPDATE staff SET nav_layout = NULL WHERE id = $1', [req.staff!.id]);
+      if (shared) await db.query(`DELETE FROM nav_defaults WHERE role = 'admin'`);
+      await db.query(shared ? 'UPDATE staff SET nav_layout = NULL WHERE role = $1' : 'UPDATE staff SET nav_layout = NULL WHERE id = $1', [shared ? 'admin' : req.staff!.id]);
       return { ok: true };
     }
     const c = cleanNav(lay);
     if ('error' in c) return reply.code(400).send({ error: c.error });
-    await db.query('UPDATE staff SET nav_layout = $2::jsonb WHERE id = $1', [req.staff!.id, JSON.stringify(c.layout)]);
+    if (shared) await db.query(`INSERT INTO nav_defaults (role, layout) VALUES ('admin', $1::jsonb) ON CONFLICT (role) DO UPDATE SET layout = EXCLUDED.layout`, [JSON.stringify(c.layout)]);
+    else await db.query('UPDATE staff SET nav_layout = $2::jsonb WHERE id = $1', [req.staff!.id, JSON.stringify(c.layout)]);
     return { ok: true };
   });
   // Меню стримеров настраивает админ: одна раскладка для всех стримеров

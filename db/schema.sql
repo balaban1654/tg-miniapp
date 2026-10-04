@@ -496,3 +496,8 @@ END $$;
 
 -- Связь записи журнала с событием: чтобы можно было удалить постбек вместе с деньгами
 ALTER TABLE postback_log ADD COLUMN IF NOT EXISTS event_id BIGINT;
+
+-- Меню админов общее: берём уже настроенную раскладку первого админа, у которого она есть
+INSERT INTO nav_defaults (role, layout)
+  SELECT 'admin', nav_layout FROM staff WHERE role = 'admin' AND nav_layout IS NOT NULL ORDER BY id LIMIT 1
+  ON CONFLICT (role) DO NOTHING;
