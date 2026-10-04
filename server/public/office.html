@@ -83,6 +83,14 @@ tr.rowc{cursor:pointer}tr.rowc:hover{background:#ffffff08}tr.rowc.on{background:
 .totalc{display:flex;justify-content:space-between;align-items:baseline;gap:12px;border-top:1px solid var(--line);padding-top:12px}
 .two2c{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
 .rev{display:grid;grid-template-columns:110px minmax(0,1fr) auto;gap:14px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;align-items:start}
+.dw-btn{width:100%;box-sizing:border-box;text-align:left;background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;color:inherit;font:inherit;cursor:pointer}.dw-btn:hover{border-color:var(--acc)}
+.lc-overlay.dw-ov{z-index:90}.dw-sheet{width:min(360px,100%);background:var(--card);border:1px solid var(--line);border-radius:18px;padding:14px 14px 16px;display:grid;gap:12px;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+.dw-top{display:flex;align-items:center;justify-content:space-between;gap:8px}.dw-top b{font-size:14px}
+.dw-wheels{position:relative;display:grid;grid-template-columns:.8fr 1.5fr 1fr;gap:4px;height:200px}
+.dw-col{height:200px;overflow-y:auto;scroll-snap-type:y mandatory;padding:80px 0;scrollbar-width:none;overscroll-behavior:contain;-webkit-mask-image:linear-gradient(transparent,#000 30%,#000 70%,transparent);mask-image:linear-gradient(transparent,#000 30%,#000 70%,transparent)}.dw-col::-webkit-scrollbar{display:none}
+.dw-it{height:40px;display:grid;place-items:center;scroll-snap-align:center;color:var(--mut);font-size:17px;cursor:pointer;user-select:none;transition:color .12s}.dw-it.on{color:var(--fg);font-weight:700}
+.dw-bar{position:absolute;left:0;right:0;top:80px;height:40px;border-radius:10px;background:rgba(155,92,255,.16);border:1px solid rgba(155,92,255,.4);pointer-events:none}
+@media(max-width:560px){.lc-overlay.dw-ov{align-items:end;padding:0}.dw-sheet{width:100%;border-radius:20px 20px 0 0;padding-bottom:calc(16px + env(safe-area-inset-bottom,0px))}}
 .shot-hover{position:fixed;z-index:80;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:6px;box-shadow:0 18px 50px rgba(0,0,0,.65);pointer-events:none;overflow:hidden}.shot-hover img{display:block;width:100%;max-height:calc(100% - 0px);object-fit:contain;border-radius:8px}
 .shot-ov{z-index:70}.shot-box{position:relative;width:fit-content;min-width:260px;max-width:min(900px,90vw);margin:0 auto;max-height:84vh;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px;display:grid;gap:8px;box-shadow:0 20px 60px rgba(0,0,0,.6)}.shot-box img{display:block;max-width:100%;max-height:calc(84vh - 70px);margin:0 auto;object-fit:contain;border-radius:10px}.shot-x{position:absolute;top:10px;right:10px;background:rgba(13,8,23,.8)}
 .shotc{display:block;height:96px;border-radius:9px;overflow:hidden;border:1px solid var(--line)}.shotc img{width:100%;height:100%;object-fit:cover}
@@ -788,7 +796,7 @@ async function plansTasks(){
   const who=el('select',{},el('option',{value:'all'},'Все стримеры'),...staff.map(s=>el('option',{value:s.id},s.name+' · '+ROLE[s.role])));
   const title=el('input',{placeholder:'Что нужно сделать',maxlength:'200'});
   const details=el('input',{placeholder:'Подробности (необязательно)',maxlength:'2000'});
-  const due=el('input',{type:'date'});
+  const due=dateWheel({optional:true,placeholder:'Без срока',min:kyivToday().slice(0,4)+'-01-01',max:(+kyivToday().slice(0,4)+2)+'-12-31'});
   const err=el('div',{class:'err',role:'alert'});
   const add=async()=>{err.textContent='';try{const body={title:title.value,details:details.value,due:due.value||null};if(who.value==='all')body.all_streamers=true;else body.staff_ids=[Number(who.value)];const r=await api('/tasks',{method:'POST',body});toast(r.count>1?'Задача поставлена: '+r.count+' сотрудников':'Задача поставлена');plansRefresh()}catch(x){err.textContent=x.message}};
   title.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();add()}});
@@ -1263,6 +1271,51 @@ const EYE='<path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="1
 const EYEOFF='<path d="M17.9 17.9A10.9 10.9 0 0112 19C5 19 1 12 1 12a18 18 0 015.1-5.9M9.9 5.2A10.9 10.9 0 0112 5c7 0 11 7 11 7a18 18 0 01-2.2 3.2"/><path d="M1 1l22 22"/>';
 const COPYI='<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 01-1-1V4a1 1 0 011-1h10a1 1 0 011 1v1"/>';
 const KEYI='<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/>';
+/** Выбор даты как на iPhone: три колонки с прокруткой (день, месяц, год). Элемент-кнопка, у неё есть .value вида ГГГГ-ММ-ДД ('' если не выбрано) */
+const MONTHS_RU=['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+function dateWheel({value='',min='1990-01-01',max='2100-12-31',optional=false,placeholder='Выбрать дату'}={}){
+  const p2=n=>String(n).padStart(2,'0');
+  const iso=(y,m,d)=>y+'-'+p2(m+1)+'-'+p2(d);
+  const dim=(y,m)=>new Date(y,m+1,0).getDate();
+  let val=value||'';
+  const fmt=v=>v?new Date(v+'T12:00:00').toLocaleDateString('ru-RU',{day:'numeric',month:'long',year:'numeric'}):placeholder;
+  const btn=el('button',{type:'button',class:'dw-btn'},fmt(val));
+  Object.defineProperty(btn,'value',{get:()=>val,set:v=>{val=v||'';btn.textContent=fmt(val)}});
+  const H=40;
+  function col(items,idx,onPick){
+    const c=el('div',{class:'dw-col',role:'listbox'});
+    let timer=null,cur=idx;
+    const draw=()=>c.replaceChildren(...items.map((t,i)=>el('div',{class:'dw-it'+(i===cur?' on':''),role:'option',onclick:()=>{c.scrollTo({top:i*H,behavior:'smooth'})}},t)));
+    const settle=()=>{const i=Math.max(0,Math.min(items.length-1,Math.round(c.scrollTop/H)));if(i!==cur){cur=i;[...c.children].forEach((n,k)=>n.classList.toggle('on',k===i));onPick(i)}};
+    c.addEventListener('scroll',()=>{clearTimeout(timer);timer=setTimeout(()=>{settle();c.scrollTo({top:cur*H,behavior:'smooth'})},90);[...c.children].forEach((n,k)=>n.classList.toggle('on',k===Math.max(0,Math.min(items.length-1,Math.round(c.scrollTop/H)))))},{passive:true});
+    draw();
+    return{el:c,set(items2,i2){items=items2;cur=i2;draw();c.scrollTop=i2*H},jump(i2){cur=i2;[...c.children].forEach((n,k)=>n.classList.toggle('on',k===i2));c.scrollTop=i2*H},get idx(){return cur}};
+  }
+  function open(){
+    document.querySelectorAll('.dw-ov').forEach(x=>x.remove());
+    const now=new Date(),minY=+min.slice(0,4),maxY=+max.slice(0,4);
+    let init=val||iso(now.getFullYear(),now.getMonth(),now.getDate());
+    if(init<min)init=min;if(init>max)init=max;
+    let y=+init.slice(0,4),m=+init.slice(5,7)-1,d=+init.slice(8,10);
+    const years=[];for(let i=minY;i<=maxY;i++)years.push(i);
+    const days=()=>Array.from({length:dim(y,m)},(_,i)=>String(i+1));
+    const cd=col(days(),d-1,i=>{d=i+1;fix()}),cm=col(MONTHS_RU,m,i=>{m=i;refreshDays()}),cy=col(years.map(String),y-minY,i=>{y=years[i];refreshDays()});
+    function refreshDays(){const n=dim(y,m);if(d>n)d=n;cd.set(days(),d-1);fix()}
+    function fix(){let cur=iso(y,m,d);if(cur<min||cur>max){const t=cur<min?min:max;y=+t.slice(0,4);m=+t.slice(5,7)-1;d=+t.slice(8,10);cy.jump(y-minY);cm.jump(m);cd.set(days(),d-1)}}
+    const ov=el('div',{class:'lc-overlay dw-ov',role:'dialog','aria-modal':'true'});
+    const close=()=>{ov.remove();document.removeEventListener('keydown',onKey)};
+    const onKey=e=>{if(e.key==='Escape')close()};document.addEventListener('keydown',onKey);
+    ov.addEventListener('mousedown',e=>{if(e.target===ov)close()});
+    const sheet=el('div',{class:'dw-sheet'},
+      el('div',{class:'dw-top'},el('button',{type:'button',class:'btn o s',onclick:close},'Отмена'),el('b',{},'Выберите дату'),el('button',{type:'button',class:'btn s',onclick:()=>{val=iso(y,m,d);btn.textContent=fmt(val);btn.dispatchEvent(new Event('change'));close()}},'Готово')),
+      el('div',{class:'dw-wheels'},cd.el,cm.el,cy.el,el('div',{class:'dw-bar'})),
+      optional?el('button',{type:'button',class:'btn o s',style:'justify-self:center',onclick:()=>{val='';btn.textContent=fmt(val);btn.dispatchEvent(new Event('change'));close()}},'Очистить дату'):null);
+    ov.append(sheet);document.body.append(ov);
+    requestAnimationFrame(()=>{cd.jump(d-1);cm.jump(m);cy.jump(y-minY)});
+  }
+  btn.addEventListener('click',open);
+  return btn;
+}
 /** Скриншот: по наведению увеличенный просмотр рядом (на компьютере), по клику открывается окном, не на весь экран */
 function openShot(url){
   document.querySelectorAll('.shot-hover').forEach(x=>x.remove());
@@ -1306,10 +1359,9 @@ async function openStaffCard(id){
   ov.append(box);document.body.append(ov);
   let d;try{d=await api(self?'/profile':'/staff/'+id+'/card')}catch(x){box.replaceChildren(el('div',{class:'err'},x.message),el('button',{class:'btn o s',type:'button',onclick:close},'Закрыть'));return}
   const inp=(type,v,ph)=>el('input',{type,value:v||'',placeholder:ph||'',autocomplete:'off'});
-  const f={full:inp('text',d.full_name,'Фамилия Имя Отчество'),birth:inp('date',d.birth_date),city:inp('text',d.city,'Город проживания'),
+  const f={full:inp('text',d.full_name,'Фамилия Имя Отчество'),birth:dateWheel({value:d.birth_date||'',optional:true,min:'1940-01-01',max:new Date().toISOString().slice(0,10),placeholder:'Не указана'}),city:inp('text',d.city,'Город проживания'),
     method:el('select',{},el('option',{value:''},'Не выбран'),...d.payout_methods.map(m=>el('option',{value:m},m))),wallet:inp('text',d.payout_wallet,'Адрес кошелька или реквизиты')};
   f.method.value=d.payout_method||'';
-  f.birth.max=new Date().toISOString().slice(0,10);
   const fld=(l,i)=>el('div',{class:'lc-field'},el('label',{},l),i);
   const msg=el('div',{class:'err',role:'alert'});
   const say=(t,ok)=>{msg.className=ok?'ok-msg':'err';msg.textContent=t};
@@ -1675,7 +1727,7 @@ async function accExp(){
   const today=kyivToday();
   const amount=el('input',{type:'text',placeholder:'Сумма, $',inputmode:'decimal',autocomplete:'off'});
   const comment=el('input',{placeholder:'На что потрачено',maxlength:'300'});
-  const day=el('input',{type:'date',value:today.slice(0,7)===accState.period?today:accState.period+'-01'});
+  const day=dateWheel({value:today.slice(0,7)===accState.period?today:accState.period+'-01',min:(+today.slice(0,4)-3)+'-01-01',max:(+today.slice(0,4)+1)+'-12-31'});
   const err=el('div',{class:'err',role:'alert'});
   const add=async()=>{err.textContent='';try{await api('/expenses',{method:'POST',body:{amount:amount.value,comment:comment.value,day:day.value}});toast('Расход записан');accRefresh()}catch(x){err.textContent=x.message}};
   [amount,comment].forEach(i=>i.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();add()}}));
