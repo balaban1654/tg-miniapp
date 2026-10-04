@@ -1063,6 +1063,11 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
       await db.query(`UPDATE postback_log SET created_at = $2 WHERE query->>'txid' = $1`, [tx, r.created_at]);
       if (!o.ignored && !o.duplicate) { await db.query('UPDATE events SET created_at = $2 WHERE external_id = $1', [`${r.event}:${tx}`, r.created_at]); applied++; } else left++;
     }
+    // Лид, заведённый вручную и ещё не открывавший бота: дата «Пришёл» = первое событие из постбеков
+    await db.query(
+      `UPDATE leads SET created_at = LEAST(created_at, (SELECT min(created_at) FROM events WHERE tg_id = $1 AND created_at IS NOT NULL)) WHERE tg_id = $1 AND bot_started IS NOT TRUE AND EXISTS (SELECT 1 FROM events WHERE tg_id = $1)`,
+      [tgId],
+    );
     return { ok: true, applied, left };
   });
 

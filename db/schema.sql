@@ -512,3 +512,13 @@ DO $$ BEGIN
     INSERT INTO app_flags (key) VALUES ('legacy_leads_active');
   END IF;
 END $$;
+
+-- Один раз: у лидов, заведённых вручную из постбеков, дата «Пришёл» берётся с их первого события
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM app_flags WHERE key = 'manual_leads_created_at') THEN
+    UPDATE leads SET created_at = e.m
+      FROM (SELECT tg_id, min(created_at) AS m FROM events GROUP BY tg_id) e
+     WHERE e.tg_id = leads.tg_id AND leads.bot_started IS NOT TRUE AND leads.username IS NULL AND e.m < leads.created_at;
+    INSERT INTO app_flags (key) VALUES ('manual_leads_created_at');
+  END IF;
+END $$;
