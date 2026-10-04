@@ -343,7 +343,7 @@ textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10
 <script>
 const $=s=>document.querySelector(s);
 const ROLE={admin:'Админ',teamlead:'Тимлидер',streamer:'Стример',buyer:'Медиабайер',analyst:'Аналитик'};
-const STATUS={new:['Новый','p-pur'],registered:['Регистрация','p-warn'],ftd:['FTD','p-ok'],active:['Активный','p-ok'],churned:['Отвал','p-bad']};
+const STATUS={new:['Новый','p-pur'],registered:['Регистрация','ev-reg'],ftd:['FTD','ev-ftd'],active:['Активный','ev-dep'],churned:['Отвал','p-bad']};
 let me=null,tab='home';
 /* Адрес страницы: у каждого раздела своя ссылка (#/leads, #/acc/review), при обновлении остаёмся на месте */
 const STAFF_TABS=['team','links'];
@@ -1192,7 +1192,7 @@ async function plansGoals(){
 }
 
 /* ---------- Дашборд стримера ---------- */
-const DXS={new:['Новые','#9b5cff'],registered:['Регистрации','#4da3ff'],ftd:['FTD','#2dd4bf'],active:['Активные','#3ddc97'],churned:['Отвал','#ff6b8a']};
+const DXS={new:['Новые','#9b5cff'],registered:['Регистрации','#ffd54d'],ftd:['FTD','#3ddc97'],active:['Активные','#4da3ff'],churned:['Отвал','#ff6b8a']};
 const IC_CHECK='<circle cx="12" cy="12" r="9"/><path d="M8 12.5l3 3 5-6"/>',IC_ALERT='<path d="M12 3l9.5 17h-19z"/><path d="M12 10v4M12 17.2v.1"/>';
 function dxLiveCard(c,d,skew){
   const lvl=dxLvl(c.hoursMin,d.plan.paceMin);
