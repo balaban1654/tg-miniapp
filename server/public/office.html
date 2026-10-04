@@ -152,6 +152,7 @@ th.n{text-align:right}
 .cp{display:inline-flex;align-items:center;gap:8px}.cp button{background:none;border:0;padding:2px;color:var(--mut);cursor:pointer;display:grid;place-items:center;border-radius:6px}.cp button:hover{color:var(--fg);background:var(--card2)}
 .pill{display:inline-block;border-radius:99px;padding:2px 10px;font:600 11px var(--fm)}
 .p-ok{background:#3ddc9722;color:var(--ok)}.p-warn{background:#ffb84d22;color:var(--warn)}.p-bad{background:#ff6b8a22;color:var(--bad)}.p-pur{background:#9b5cff33;color:var(--acc2)}
+.ev-reg{background:#ffd54d26;color:#ffd54d}.ev-ftd{background:#3ddc9726;color:#3ddc97}.ev-dep{background:#4da3ff26;color:#6db6ff}.ev-comm{background:#9c2a4d66;color:#ff8fae}.ev-wd{background:#ffb84d22;color:var(--warn)}
 .form{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));align-items:end}
 .empty{padding:28px;text-align:center;color:var(--mut)}
 code{font-family:var(--fm);font-size:12px;color:var(--acc2)}
@@ -1615,8 +1616,8 @@ async function openLeadCard(tgId){
     el('div',{class:'lc-total'},el('span',{class:'mut sm'},'Всего пополнено'),el('b',{style:'font-size:20px'},money(d.depositsTotal)),el('span',{class:'mut sm'},d.depositsCount+' '+(d.depositsCount%10===1&&d.depositsCount%100!==11?'депозит':(d.depositsCount%10>=2&&d.depositsCount%10<=4&&(d.depositsCount%100<10||d.depositsCount%100>=20)?'депозита':'депозитов')))),
     deps.length?el('div',{class:'lc-list'},[...deps].reverse().map((e,i,a)=>{
       const isFirst=e===ftd||(!ftd&&e===deps[0]);
-      return el('div',{class:'lc-row'},el('span',{},fmtDT(e.created_at)),el('span',{class:'pill '+(isFirst?'p-ok':'p-pur')},isFirst?'Первый депозит':'Додеп'),el('b',{},e.amount!==null?money(e.amount):'—'))})):el('div',{class:'mut sm'},'Депозитов пока нет.')]),
-    wds.length?[el('h4',{class:'lc-h'},'Выводы · '+money(d.withdrawTotal)),el('div',{class:'lc-list'},wds.map(e=>el('div',{class:'lc-row'},el('span',{},fmtDT(e.created_at)),el('span',{class:'pill p-warn'},'Вывод'),el('b',{},e.amount!==null?money(e.amount):'—'))))]:null,
+      return el('div',{class:'lc-row'},el('span',{},fmtDT(e.created_at)),el('span',{class:'pill '+(isFirst?'ev-ftd':'ev-dep')},isFirst?'Первый депозит':'Додеп'),el('b',{},e.amount!==null?money(e.amount):'—'))})):el('div',{class:'mut sm'},'Депозитов пока нет.')]),
+    wds.length?[el('h4',{class:'lc-h'},'Выводы · '+money(d.withdrawTotal)),el('div',{class:'lc-list'},wds.map(e=>el('div',{class:'lc-row'},el('span',{},fmtDT(e.created_at)),el('span',{class:'pill ev-wd'},'Вывод'),el('b',{},e.amount!==null?money(e.amount):'—'))))]:null,
     el('div',{class:'lc-actions'},
       ['admin','teamlead','streamer'].includes(me.role)?el('button',{class:'btn',type:'button',onclick:()=>{close();pendingChat=L.tg_id;tab='chats';showApp()}},'Открыть чат'):null,
       el('a',{class:'btn o',href:profileUrl(L),target:'_blank',rel:'noopener',style:'text-decoration:none;display:inline-flex;align-items:center'},'Профиль в Telegram'))].flat().filter(Boolean));
@@ -2884,7 +2885,7 @@ async function viewPostbacks(){
       &&(!qq||[r.tg_id,(r.query||{}).trader_id,(r.query||{}).click_id].some(v=>v!=null&&String(v).toLowerCase().includes(qq))));
     const by={new:(a,b)=>new Date(b.created_at)-new Date(a.created_at),old:(a,b)=>new Date(a.created_at)-new Date(b.created_at),sum:(a,b)=>amt(b)-amt(a),sumAsc:(a,b)=>amt(a)-amt(b)};
     list=[...list].sort(by[F.sort]||by.new);
-    holder.replaceChildren(table(['Время','Событие','Telegram ID','Pocket ID',['Сумма','n'],'Результат',''],list.map(r=>{const qq2=r.query||{};return[td(time(r.created_at)),el('td',{},el('span',{class:'pill p-pur'},r.event)),tgCell(r),copyCell(qq2.trader_id),td(qq2.commission||qq2.sumdep||qq2.wdr_sum||qq2.amount||qq2.sum||'—','n'),el('td',{},el('span',{class:'pill '+(r.result==='ok'?'p-ok':(r.result.startsWith('дубль')||r.result.startsWith('пропущен'))?'p-warn':'p-bad')},r.result)),el('td',{},el('button',{class:'btn o s',type:'button',title:'Удалить постбек','aria-label':'Удалить постбек',onclick:()=>pbDeleteDialog(r,render)},svgIcon(TRASH,15)))]}),
+    holder.replaceChildren(table(['Время','Событие','Telegram ID','Pocket ID',['Сумма','n'],'Результат',''],list.map(r=>{const qq2=r.query||{};return[td(time(r.created_at)),el('td',{},el('span',{class:'pill ev-'+r.event},r.event)),tgCell(r),copyCell(qq2.trader_id),td(qq2.commission||qq2.sumdep||qq2.wdr_sum||qq2.amount||qq2.sum||'—','n'),el('td',{},el('span',{class:'pill '+(r.result==='ok'?'p-ok':(r.result.startsWith('дубль')||r.result.startsWith('пропущен'))?'p-warn':'p-bad')},r.result)),el('td',{},el('button',{class:'btn o s',type:'button',title:'Удалить постбек','aria-label':'Удалить постбек',onclick:()=>pbDeleteDialog(r,render)},svgIcon(TRASH,15)))]}),
       rows.length?'Ничего не найдено. Измените фильтры.':'Постбеков пока нет. Когда партнёрка отправит первый, он появится здесь.'));
     cnt.textContent=list.length===rows.length?rows.length+' всего':list.length+' из '+rows.length;
   };
