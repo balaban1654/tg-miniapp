@@ -1600,7 +1600,13 @@ function stopPoll(){if(poll){clearInterval(poll);poll=null}}
   const side=document.querySelector('.side'),btn=document.getElementById('burger');if(!side||!btn)return;
   const set=o=>{side.classList.toggle('open',o);btn.setAttribute('aria-expanded',o?'true':'false')};
   btn.addEventListener('click',e=>{e.stopPropagation();set(!side.classList.contains('open'))});
-  document.addEventListener('click',e=>{if(!side.classList.contains('open'))return;const inside=e.target.closest('.side-menu');if(!inside||e.target.closest('.nav button:not(.grp),#logout,#meGear,#meNav'))set(false)});
+  document.addEventListener('click',e=>{if(!side.classList.contains('open'))return;
+    // путь клика берём из события: меню перерисовывается, и e.target к этому моменту уже вынут из страницы
+    const path=e.composedPath().filter(n=>n.nodeType===1);
+    const inside=path.some(n=>n.classList.contains('side-menu'));
+    const isFolder=path.some(n=>n.tagName==='BUTTON'&&n.classList.contains('grp'));
+    const isAction=path.some(n=>n.id==='logout'||n.id==='meGear'||n.id==='meNav'||(n.tagName==='BUTTON'&&path.some(m=>m.classList.contains('nav'))));
+    if(!inside||(isAction&&!isFolder))set(false)});
   document.addEventListener('keydown',e=>{if(e.key==='Escape')set(false)});
   window.addEventListener('resize',()=>{if(window.innerWidth>760)set(false)});
 })();
