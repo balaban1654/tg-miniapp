@@ -365,7 +365,7 @@ function showApp(){
   $('#login').hidden=true;$('#app').hidden=false;
   $('#meName').textContent=me.name+' · '+ROLE[me.role];
   const gb=$('#meGear');if(gb&&!gb.firstChild){gb.append(svgIcon(GEAR,16));gb.onclick=()=>openStaffCard(null)}
-  const items=[['home','Дашборд'],['leads','Лиды'],...(['streamer','admin','teamlead'].includes(me.role)?[]:[['links','Ссылки']])];
+  const items=[['home','Дашборд'],['leads','Лиды'],];
   if(me.role==='admin'||me.role==='teamlead')items.push(['staff',me.role==='admin'?'Сотрудники':'Моя команда']);
   if(['admin','teamlead','streamer'].includes(me.role))items.splice(1,0,['chats','Чаты']);
   if(me.role==='admin')items.splice(1,0,['signals','Сигналы']);
@@ -373,7 +373,7 @@ function showApp(){
   if(me.role==='admin')items.push(['push','Пуши'],['media','Медиа'],['pb','Постбеки']);
   if(me.role==='streamer')items.splice(items.length,0,['shifts','Смены и отчёты'],['mytasks','Мои задачи']);
   if(me.role==='admin')items.splice(items.findIndex(x=>x[0]==='push'),0,['acc','Бухгалтерия'],['plans','Планы и задачи']);
-  if(tab==='links'&&['admin','teamlead'].includes(me.role)){tab='staff';staffState.tab='links'}
+  if(tab==='links'&&me.role==='admin'){tab='staff';staffState.tab='links'}
   if(!items.some(x=>x[0]===tab)){tab=items[0][0];history.replaceState(null,'','#'+hashPath())}
   const nav=$('#nav');nav.replaceChildren(...items.map(([k,t])=>el('button',{type:'button','data-t':k,class:k===tab?'on':'',onclick:()=>{tab=k;showApp();render()}},icon(k),el('span',{class:'lbl'},k==='chats'?chatsLabel:t),k==='mytasks'?el('span',{class:'nbadge',id:'tasksBadge',hidden:''}):null)));
   render();updateBadge();
@@ -1064,10 +1064,11 @@ let staffState={tab:'team'};
 async function viewStaff(){
   const isAdmin=me.role==='admin';
   const root=el('div',{style:'display:grid;gap:14px'}),body=el('div',{style:'display:grid;gap:14px'}),bar=el('div',{class:'lc-tabs',role:'tablist'});
-  const TABS=[['team',isAdmin?'Сотрудники':'Моя команда'],['links','Ссылки']];
+  if(!isAdmin)staffState.tab='team';
+  const TABS=[['team',isAdmin?'Сотрудники':'Моя команда'],...(isAdmin?[['links','Ссылки']]:[])];
   const drawBar=()=>bar.replaceChildren(...TABS.map(([k,t])=>el('button',{type:'button',role:'tab','aria-selected':String(k===staffState.tab),class:'lc-tab'+(k===staffState.tab?' on':''),onclick:()=>{staffState.tab=k;drawBar();drawBody();pushHash()}},t)));
   const drawBody=async()=>{body.replaceChildren(el('div',{class:'mut'},'Загрузка…'));try{body.replaceChildren(...(staffState.tab==='links'?(await viewLinks()).slice(1):(await staffTeam()).slice(1)).filter(Boolean))}catch(x){if(x.message!=='auth')body.replaceChildren(el('div',{class:'err'},x.message))}};
-  drawBar();root.append(bar,body);await drawBody();
+  drawBar();root.append(...(isAdmin?[bar]:[]),body);await drawBody();
   return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},isAdmin?'Сотрудники':'Моя команда')),root];
 }
 async function staffTeam(){

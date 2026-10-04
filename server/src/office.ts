@@ -477,7 +477,8 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     return out.sort((a, b) => b.deposits - a.deposits || b.clicks - a.clicks);
   });
 
-  app.post('/links', { preHandler: need('admin', 'teamlead', 'streamer', 'buyer') }, async (req, reply) => {
+  // Ссылки выдаёт только админ (в разделе «Сотрудники»)
+  app.post('/links', { preHandler: need('admin') }, async (req, reply) => {
     const me = req.staff!;
     const b = (req.body ?? {}) as Record<string, unknown>;
     const slug = str(b.slug, 40).toLowerCase();
