@@ -230,6 +230,18 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     await db.query(`UPDATE staff SET totp_secret = NULL, totp_pending = NULL, recovery_codes = '{}', totp_last = 0 WHERE id = $1`, [req.staff!.id]);
     return { ok: true };
   });
+  // Админ выдаёт сотруднику новый случайный пароль (виден один раз в ответе; в базе остаётся только хэш)
+  app.post<{ Params: { id: string } }>('/staff/:id/password/generate', { preHandler: need('admin') }, async (req, reply) => {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) return reply.code(400).send({ error: 'Неверный id' });
+    if (id === req.staff!.id) return reply.code(400).send({ error: 'Свой пароль меняйте в карточке: нужен текущий' });
+    const ABC = 'abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    const password = Array.from({ length: 12 }, () => ABC[randomInt(ABC.length)]).join('');
+    const r = await db.query('UPDATE staff SET password_hash = $2 WHERE id = $1', [id, await hashPassword(password)]);
+    if (!r.rowCount) return reply.code(404).send({ error: 'Сотрудник не найден' });
+    await db.query('DELETE FROM sessions WHERE staff_id = $1', [id]);
+    return { password };
+  });
   // Админ сбрасывает 2FA сотруднику, потерявшему телефон: тот при входе настроит её заново
   app.post<{ Params: { id: string } }>('/staff/:id/2fa/reset', { preHandler: need('admin') }, async (req, reply) => {
     const id = Number(req.params.id);

@@ -1057,7 +1057,7 @@ async function viewStaff(){
     el('label',{style:'grid-column:1/-1'},'Ссылка регистрации (WW)',po.l),el('label',{style:'grid-column:1/-1'},'Ссылка регистрации (RU)',po.r),
     el('button',{class:'btn',type:'submit'},'Сохранить'),perr):el('span');
   return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},isAdmin?'Сотрудники':'Моя команда')),form,poForm,
-    ctrT(table(['Имя','Логин','Роль','Тимлидер','Кампания PO','Промокод','Статус',''],rows.map(r=>[el('td',{},el('span',{class:'cp'},r.name,isAdmin?el('button',{type:'button',title:'Карточка сотрудника','aria-label':'Карточка сотрудника',onclick:()=>openStaffCard(r.id)},svgIcon(PERSON)):null)),td(r.login),el('td',{},el('span',{class:'pill p-pur'},ROLE[r.role])),td(parentName(r.parent_id)),td(r.po_campaign||'—'),td(r.po_promo||'—'),el('td',{},el('span',{class:'pill '+(r.active?'p-ok':'p-bad')},r.active?'активен':'отключён')),el('td',{},toggle(r))]),'Пока никого нет.'))];
+    ctrT(table(['Имя','Логин',...(isAdmin?['Пароль']:[]),'Роль','Тимлидер','Кампания PO','Промокод','Статус',''],rows.map(r=>[el('td',{},el('span',{class:'cp'},r.name,isAdmin?el('button',{type:'button',title:'Карточка сотрудника','aria-label':'Карточка сотрудника',onclick:()=>openStaffCard(r.id)},svgIcon(PERSON)):null)),td(r.login),...(isAdmin?[pwCell(r)]:[]),el('td',{},el('span',{class:'pill p-pur'},ROLE[r.role])),td(parentName(r.parent_id)),td(r.po_campaign||'—'),td(r.po_promo||'—'),el('td',{},el('span',{class:'pill '+(r.active?'p-ok':'p-bad')},r.active?'активен':'отключён')),el('td',{},toggle(r))]),'Пока никого нет.'))];
 }
 
 const ctrT=t=>{t.classList.add('ctr');return t};
@@ -1165,6 +1165,28 @@ async function twofaDialog(forced,done){
       forced?el('button',{class:'btn o',type:'button',onclick:async()=>{try{await api('/logout',{method:'POST'})}catch{}ov.remove();showLogin()}},'Выйти'):null));
   code.focus();
 }
+/** Колонка «Пароль»: в базе только хэш, поэтому показать старый пароль нельзя. Кнопка выдаёт новый, он виден с глазиком, пока не обновили страницу */
+const freshPw=new Map();
+function pwCell(r){
+  const td=el('td',{});
+  const draw=(show)=>{
+    const pw=freshPw.get(r.id);
+    const ico=(svg,title,fn)=>el('button',{type:'button',class:'iconb',title,'aria-label':title,onclick:fn,style:'background:none;border:0;color:var(--mut);cursor:pointer;padding:2px 4px'},svgIcon(svg));
+    const gen=ico(KEYI,'Выдать новый пароль',async()=>{
+      if(r.id===me.id){toast('Свой пароль меняйте в карточке (шестерёнка)');return}
+      if(!confirm('Выдать '+r.name+' новый пароль? Старый перестанет работать, сотрудник выйдет из кабинета.'))return;
+      try{const d=await api('/staff/'+r.id+'/password/generate',{method:'POST'});freshPw.set(r.id,d.password);draw(true)}catch(x){toast(x.message)}});
+    if(!pw){td.replaceChildren(el('span',{class:'mut',title:'Пароль хранится только в зашифрованном виде'},'••••••••'),gen);return}
+    td.replaceChildren(el('code',{style:'user-select:all'},show?pw:'•'.repeat(pw.length)),
+      ico(show?EYEOFF:EYE,show?'Скрыть':'Показать',()=>draw(!show)),
+      ico(COPYI,'Скопировать',async()=>{try{await navigator.clipboard.writeText(pw);toast('Пароль скопирован')}catch{toast('Выделите и скопируйте вручную')}}),gen);
+  };
+  draw(false);return td;
+}
+const EYE='<path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/>';
+const EYEOFF='<path d="M17.9 17.9A10.9 10.9 0 0112 19C5 19 1 12 1 12a18 18 0 015.1-5.9M9.9 5.2A10.9 10.9 0 0112 5c7 0 11 7 11 7a18 18 0 01-2.2 3.2"/><path d="M1 1l22 22"/>';
+const COPYI='<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 01-1-1V4a1 1 0 011-1h10a1 1 0 011 1v1"/>';
+const KEYI='<circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M16 7l3 3"/>';
 const GEAR='<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/>';
 /** Карточка сотрудника: id=null это своя (шестерёнка внизу), иначе карточка другого сотрудника для админа */
 async function openStaffCard(id){
