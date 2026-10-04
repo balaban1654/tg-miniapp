@@ -201,7 +201,7 @@ textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10
 
 .dx-ib.only-m{display:none}
 @media(max-width:760px){.only-d,.dx-hd .mark{display:none!important}.dx-ib.only-m{display:grid}.dx-ext{display:none}.dx-hd{flex-wrap:nowrap}.dx-hd .l{flex:1 1 auto;min-width:0;flex-wrap:wrap;gap:6px 8px}.dx-hd .l .dx-lbl{flex:1 1 auto;min-width:0}.dx-hd .l .dx-pw,.dx-hd .l>.dx-ib{flex:none}}
-@media(max-width:560px){.dx-pop,.dx-pop.wide{width:calc(100vw - 24px);padding:10px;gap:8px}.dx-seg2{height:24px}.dx-seg2 span{padding:0 5px;font-size:10.5px}.dx-fk b{font-size:15px}.dx-fsh b{font-size:14px}.dx-pop .dx-lbl{font-size:11px}}
+@media(max-width:560px){.dx-pop,.dx-pop.wide{width:min(340px,calc(100vw - 24px));padding:10px;gap:8px}.dx-pop .dx-rg{width:min(100%,220px)}.dx-seg2{height:24px}.dx-seg2 span{padding:0 5px;font-size:10.5px}.dx-fk b{font-size:15px}.dx-fsh b{font-size:14px}.dx-pop .dx-lbl{font-size:11px}}
 .burger{display:none}.side-menu{display:contents}
 @media(max-width:760px){
  .side{position:sticky;top:0;z-index:60;flex-wrap:nowrap;background:#0a0613}
@@ -229,7 +229,7 @@ textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10
 .dx-ib{display:grid;place-items:center;width:38px;height:38px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--mut);cursor:pointer;padding:0}.dx-ib:hover,.dx-ib.on{color:var(--acc2);border-color:var(--acc)}
 .dx-ib.sm2{width:30px;height:30px;border-radius:8px}
 .dx-pw{position:relative;display:inline-flex}
-.dx-pop{position:fixed;left:0;top:0;z-index:75;max-height:calc(100vh - 24px);overflow:auto;overscroll-behavior:contain;background:var(--card2);border:1px solid var(--line);border-radius:14px;padding:14px;box-shadow:0 18px 44px rgba(0,0,0,.55);text-transform:none;letter-spacing:0;font-weight:400;font-size:14px;color:var(--fg);width:min(360px,calc(100vw - 32px));display:grid;gap:10px}
+.dx-pop{position:absolute;left:0;top:0;z-index:75;background:var(--card2);border:1px solid var(--line);border-radius:14px;padding:14px;box-shadow:0 18px 44px rgba(0,0,0,.55);text-transform:none;letter-spacing:0;font-weight:400;font-size:14px;color:var(--fg);width:min(360px,calc(100vw - 32px));display:grid;gap:10px}
 .dx-pop.wide{width:min(430px,calc(100vw - 32px))}.dx-pop.top30{top:36px}
 .dx-pop label{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:13px;color:var(--mut)}.dx-pop input[type=date]{width:auto}
 .dx-live{display:flex;gap:10px;flex-wrap:wrap;padding:12px 14px;align-items:stretch}
@@ -713,6 +713,7 @@ $('#logout').addEventListener('click',async()=>{try{await api('/logout',{method:
 async function render(opt){
   stopPoll();
   document.querySelectorAll('.dx-ovl').forEach(x=>x.remove());
+  document.querySelectorAll('body > .dx-pop').forEach(x=>x.remove());dxReg.length=0;
   pushHash();
   const soft=!!(opt&&opt.soft===true);
   const m=$('#main'),y=window.scrollY,mt=m.scrollTop;
@@ -751,15 +752,18 @@ const dxDay=s=>{const[,m,d]=s.split('-').map(Number);return d+' '+dxMonths[m-1]}
 const dxReg=[];let dxLast=null;
 /** Всплывающее окно у кнопки: всегда целиком в экране (ниже кнопки, а если нет места, то выше), на телефоне не уезжает за край */
 function dxPlace(b,p){
-  p.style.maxHeight=(innerHeight-24)+'px';
-  const vw=document.documentElement.clientWidth,w=p.offsetWidth,h=p.offsetHeight,r=b.getBoundingClientRect();
+  // Окно лежит в документе (absolute): при прокрутке едет вместе со страницей, а не дёргается
+  const vw=document.documentElement.clientWidth,w=p.offsetWidth,h=p.offsetHeight,r=b.getBoundingClientRect(),sx=scrollX,sy=scrollY;
   let left=p.classList.contains('pr')?r.right-w:r.left;left=Math.max(12,Math.min(left,vw-w-12));
+  if(vw<=560)left=Math.max(12,(vw-w)/2);
   let top=r.bottom+8;
-  if(top+h>innerHeight-12){top=r.top-8-h>=12?r.top-8-h:Math.max(12,innerHeight-12-h)}
-  p.style.left=left+'px';p.style.top=top+'px';
+  if(top+h>innerHeight-12&&r.top-8-h>=12)top=r.top-8-h;
+  p.style.left=(left+sx)+'px';p.style.top=(top+sy)+'px';
 }
 const dxReplace=()=>dxReg.forEach(([b,p])=>{if(!p.hidden&&p.classList.contains('dx-pop'))dxPlace(b,p)});
-addEventListener('resize',dxReplace);addEventListener('scroll',dxReplace,true);
+addEventListener('resize',dxReplace);
+/* Прокрутка не двигает окна: оно закрывается, когда кнопка, к которой оно привязано, уходит с экрана */
+addEventListener('scroll',()=>dxReg.forEach(([b,p])=>{if(p.hidden||!p.classList.contains('dx-pop'))return;const r=b.getBoundingClientRect();if(!b.isConnected||r.bottom<0||r.top>innerHeight)dxCloseAll()}),{passive:true});
 function dxCloseAll(){dxReg.forEach(([b,p])=>{p.hidden=true;b.classList.remove('on');b.setAttribute('aria-expanded','false')})}
 document.addEventListener('click',dxCloseAll);
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){dxCloseAll();dxCloseModal()}});
@@ -767,7 +771,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'){dxCloseAll();dxClos
 function dxPopBtn(label,svg,content,cls='',btnCls=''){
   const b=el('button',{type:'button',class:'dx-ib sm2 '+btnCls,'aria-label':label,title:label,'aria-expanded':'false'});b.append(svgIcon(svg,18));
   const p=el('div',{class:'dx-pop '+cls,hidden:''},content);
-  b.addEventListener('click',e=>{e.stopPropagation();const open=p.hidden;dxCloseAll();if(open){p.hidden=false;b.classList.add('on');b.setAttribute('aria-expanded','true');dxPlace(b,p)}});
+  b.addEventListener('click',e=>{e.stopPropagation();const open=p.hidden;dxCloseAll();if(open){if(p.parentNode!==document.body)document.body.append(p);p.hidden=false;b.classList.add('on');b.setAttribute('aria-expanded','true');dxPlace(b,p)}});
   p.addEventListener('click',e=>e.stopPropagation());
   dxReg.push([b,p]);
   return el('span',{class:'dx-pw'},b,p);
