@@ -63,6 +63,8 @@ html{background:#0a0613}
 .nav{display:grid;gap:3px}
 .nav button{display:flex;align-items:center;gap:10px;text-align:left;white-space:nowrap;background:none;border:0;border-radius:9px;padding:9px 12px;color:var(--mut);font-weight:600;cursor:pointer}
 .nav button.on{background:var(--card2);color:var(--fg)}
+.nav button.grp{justify-content:flex-start}.nav button.grp .chv{margin-left:auto;transition:transform .15s;font-size:16px;line-height:1}.nav button.grp[aria-expanded=true] .chv{transform:rotate(90deg)}.nav button.grp.act{color:var(--fg)}.nav button.sub{padding-left:26px;font-size:13.5px}.nav button.sub svg{width:16px;height:16px}
+@media(max-width:760px){.nav button.sub{padding-left:12px}.nav button.grp .chv{margin-left:4px}}
 .nbadge{margin-left:auto;min-width:19px;height:19px;border-radius:99px;background:var(--bad);color:#fff;font:700 11px var(--fm);display:grid;place-items:center;padding:0 6px}
 .me-row{display:flex;align-items:center;gap:8px}.gear{background:none;border:0;padding:3px;color:var(--mut);cursor:pointer;display:grid;place-items:center;border-radius:6px}.gear:hover{color:var(--fg);background:var(--card2)}
 .lc-field{display:grid;gap:4px}.lc-field label{font-size:12px;color:var(--mut)}.lc-tabs{display:flex;gap:6px;border-bottom:1px solid var(--line);flex-wrap:wrap}.lc-tab{background:none;border:0;border-bottom:2px solid transparent;padding:10px 14px;color:var(--mut);font-weight:600;cursor:pointer;margin-bottom:-1px}.lc-tab.on{color:var(--fg);border-bottom-color:var(--acc)}.lc-pane{display:grid;gap:14px;min-height:190px;align-content:start}
@@ -364,6 +366,7 @@ function toast(t){document.querySelectorAll('.toast').forEach(x=>x.remove());con
 function showLogin(){me=null;$('#app').hidden=true;$('#login').hidden=false;$('#lPass').value=''}
 const ICONS={
   home:'<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>',
+  settings:'<path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/>',
   signals:'<path d="M3 17l5-6 4 3 8-9"/><path d="M15 5h5v5"/>',
   chats:'<path d="M21 12a8 8 0 01-11.6 7.1L4 20l1-4.6A8 8 0 1121 12z"/>',
   leads:'<path d="M3 5h18l-7 8v6l-4 2v-8z"/>',
@@ -393,7 +396,20 @@ function showApp(){
   if(me.role==='admin')items.splice(items.findIndex(x=>x[0]==='push'),0,['acc','Бухгалтерия'],['plans','Планы и задачи']);
   if(tab==='links'&&me.role==='admin'){tab='staff';staffState.tab='links'}
   if(!items.some(x=>x[0]===tab)){tab=items[0][0];history.replaceState(null,'','#'+hashPath())}
-  const nav=$('#nav');nav.replaceChildren(...items.map(([k,t])=>el('button',{type:'button','data-t':k,class:k===tab?'on':'',onclick:()=>{tab=k;showApp();render()}},icon(k),el('span',{class:'lbl'},k==='chats'?chatsLabel:t),k==='mytasks'?el('span',{class:'nbadge',id:'tasksBadge',hidden:''}):null)));
+  const nav=$('#nav');
+  const GROUP=['signals','staff','push','media'];   // у админа эти разделы свёрнуты в «Настройки»
+  const grouped=me.role==='admin';
+  const mkBtn=([k,t],sub)=>el('button',{type:'button','data-t':k,class:(k===tab?'on':'')+(sub?' sub':''),onclick:()=>{tab=k;showApp();render()}},icon(k),el('span',{class:'lbl'},k==='chats'?chatsLabel:t),k==='mytasks'?el('span',{class:'nbadge',id:'tasksBadge',hidden:''}):null);
+  const drawNav=()=>{
+    if(!grouped){nav.replaceChildren(...items.map(i=>mkBtn(i)));return}
+    const inGroup=GROUP.includes(tab);
+    let open=false;try{open=localStorage.getItem('hunterNavSettings')==='1'}catch{}
+    if(inGroup)open=true;
+    const main=items.filter(x=>!GROUP.includes(x[0])),subs=GROUP.map(k=>items.find(x=>x[0]===k)).filter(Boolean);
+    const gb=el('button',{type:'button',class:'grp'+(inGroup?' act':''),'aria-expanded':String(open),onclick:()=>{if(inGroup)return;open=!open;try{localStorage.setItem('hunterNavSettings',open?'1':'0')}catch{}drawNav()}},icon('settings'),el('span',{class:'lbl'},'Настройки'),el('span',{class:'chv'},'›'));
+    nav.replaceChildren(...main.map(i=>mkBtn(i)),gb,...(open?subs.map(i=>mkBtn(i,true)):[]));
+  };
+  drawNav();
   render();updateBadge();
 }
 
