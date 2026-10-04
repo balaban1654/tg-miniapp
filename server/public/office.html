@@ -933,6 +933,28 @@ function dxFunnelCopy(model){
     catch(err){toast('Не удалось скопировать картинку: браузер не разрешил доступ к буферу')}};
   return b;
 }
+const IC_HEART='<path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1.1L12 21l7.8-7.5 1-1.1a5.5 5.5 0 0 0 0-7.8z"/>';
+/* Админ: просмотры, подписчики, комментарии и лайки по зачтённым отчётам, полоски по стримерам как в воронке */
+function dxSocial(d){
+  const box=el('div',{style:'display:grid;gap:12px;min-width:240px'},el('div',{class:'mut sm'},'Загружаю…'));
+  const C=dxColorOf(d);
+  api('/shifts/fieldstats?from='+d.range.from+'&to='+d.range.to).then(r=>{
+    if(!r.fields.length){box.replaceChildren(el('div',{class:'mut sm'},'Полей для дашборда пока нет'));return}
+    box.replaceChildren(el('div',{class:'dx-lbl'},'Охваты за период (зачтённые отчёты)'),...r.fields.map(f=>{
+      const rows=r.rows.filter(x=>(x.sums[f]||0)>0),tot=r.rows.reduce((a,x)=>a+(x.sums[f]||0),0);
+      return el('div',{class:'dx-fs'},el('div',{class:'dx-fsh'},el('span',{class:'dx-lbl'},f),el('b',{},tot.toLocaleString('ru-RU'))),
+        el('div',{class:'dx-seg2',role:'img','aria-label':f+': '+rows.map(x=>x.name+' '+(x.sums[f]||0)).join(', ')},...(rows.length?rows.map(x=>el('span',{style:'flex:'+x.sums[f]+' 1 auto;background:'+C(x.staff_id),title:x.name+': '+x.sums[f]},x.name+' '+x.sums[f].toLocaleString('ru-RU'))):[el('span',{style:'flex:1;background:#ffffff1a;color:var(--mut)'},'нет данных')])));
+    }));
+  }).catch(()=>box.replaceChildren(el('div',{class:'mut sm'},'Не удалось загрузить')));
+  return box;
+}
+/* Стример: те же суммарные показатели всей команды, без разбивки по людям */
+function smSocial(d){
+  const S=d.social||{fields:[],totals:[]};
+  if(!S.fields.length)return el('div',{class:'mut sm'},'Полей для дашборда пока нет');
+  return el('div',{style:'display:grid;gap:12px;min-width:240px'},el('div',{class:'dx-lbl'},'Охваты всех стримеров за период'),
+    ...S.fields.map((f,i)=>el('div',{class:'dx-fsh'},el('span',{class:'dx-lbl'},f),el('b',{style:'font-size:22px'},(S.totals[i]||0).toLocaleString('ru-RU')))));
+}
 function dxColorOf(d){const ids=d.streamers.map(s=>s.id).sort((a,b)=>a-b);return id=>DXC[ids.indexOf(id)%DXC.length]}
 function dxFunnel(d){
   const C=dxColorOf(d),t=d.totals;
@@ -989,6 +1011,7 @@ function dxPlanFact(d){
   const icons=[];
   if(g)icons.push(dxPopBtn('Кольца выполнения плана',IC_RINGS,dxRings(d),'pl'));
   icons.push(dxPopBtn('Воронка',IC_FUNNEL,dxFunnel(d),'pl wide'));
+  icons.push(dxPopBtn('Просмотры, подписчики, комментарии и лайки',IC_HEART,dxSocial(d),'pl wide'));
   const avg=t.ftd?t.ftdSum/t.ftd:0,dShare=t.deposits?t.depSum/t.deposits*100:0,cShare=t.deposits?t.commission/t.deposits*100:0;
   const rows=[['FTD — первый депозит',t.ftd,g&&g.ftd,n0,showMark?'по графику '+Math.round(pace*100)+'%':''],
     ['Пополнения по FTD',t.ftdSum,g&&g.ftdSum,usd0,'средний FTD '+usd0(avg)],
@@ -1176,7 +1199,7 @@ function smMetrics(d){
   const lv=pct=>pct>=pace?'ok':pct>=pace*.85?'warn':'bad';
   const hp=m.hoursMin/pl.planMin*100,sp=m.shifts/m.planShifts*100,lp=m.ftd/pl.leads*100;
   const toGo=pl.leads-m.ftd;
-  return el('div',{class:'card dx-pf'},el('div',{class:'dx-hd'},el('div',{class:'l'},el('span',{class:'dx-lbl'},'Мои показатели за '+(d.range.whole?'месяц':perLabel(m.period).toLowerCase())),dxPopBtn('Общий план команды',IC_RINGS,smRings(d),'pl'),dxPopBtn('Воронка',IC_FUNNEL,smFunnel(d),'pl wide')),mark!==null?el('span',{class:'mut',style:'font-size:12px'},'метка: план на сегодня'):null),
+  return el('div',{class:'card dx-pf'},el('div',{class:'dx-hd'},el('div',{class:'l'},el('span',{class:'dx-lbl'},'Мои показатели за '+(d.range.whole?'месяц':perLabel(m.period).toLowerCase())),dxPopBtn('Общий план команды',IC_RINGS,smRings(d),'pl'),dxPopBtn('Воронка',IC_FUNNEL,smFunnel(d),'pl wide'),dxPopBtn('Просмотры, подписчики, комментарии и лайки',IC_HEART,smSocial(d),'pl')),mark!==null?el('span',{class:'mut',style:'font-size:12px'},'метка: план на сегодня'):null),
     smTile('Сегодня в эфире',hm(t.minutes),'/ '+fmtH(t.shiftMin)+' ч',t.minutes/t.shiftMin*100,null,t.minLeft>0?'до закрытия смены '+hm(t.minLeft):'смена закрыта',t.live?'идёт эфир':'',t.minLeft>0?'warn':'ok'),
     smTile('Часы в эфире',hw(m.hoursMin),'/ '+pl.hours+' ч',hp,mark,Math.round(hp)+'% плана','по графику '+hw(pl.paceMin)+' ч',lv(hp)),
     smTile('Закрытых смен',String(m.shifts),'/ '+n0(m.planShifts),sp,mark,Math.round(sp)+'% плана','смена = '+fmtH(pl.shiftH*60)+' ч',lv(sp)),

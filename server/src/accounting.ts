@@ -560,10 +560,8 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     return { ok: true };
   });
 
-  // Сводка по полям формы для общего дашборда: суммы числовых полей по зачтённым отчётам
-  app.get<{ Querystring: { period?: string; from?: string; to?: string } }>('/shifts/fieldstats', { preHandler: admin }, async (req) => {
-    const period = PERIOD.test(String(req.query.period)) ? String(req.query.period) : await currentPeriod();
-    const r = DATE.test(String(req.query.from)) && DATE.test(String(req.query.to)) ? { from: String(req.query.from), to: String(req.query.to) } : null;
+  // Суммы числовых полей отчётов (просмотры, подписчики…) по зачтённым отчётам: за даты или за месяц
+  const fieldSums = async (r: { from: string; to: string } | null, period: string) => {
     const defs = (await fieldsDef(true)).filter((d: any) => d.on_dashboard);
     const rows = (
       await db.query(
@@ -582,7 +580,15 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
       for (const f of x.fields as any[]) if (f.kind === 'number' && typeof f.value === 'number') e.sums[f.name] = (e.sums[f.name] ?? 0) + f.value;
       by.set(x.staff_id, e);
     }
-    return { period, from: r?.from ?? null, to: r?.to ?? null, fields: defs.map((d: any) => d.name), rows: [...by.values()] };
+    return { fields: defs.map((d: any) => d.name), rows: [...by.values()] };
+  };
+
+  // Сводка по полям формы для общего дашборда: суммы числовых полей по зачтённым отчётам
+  app.get<{ Querystring: { period?: string; from?: string; to?: string } }>('/shifts/fieldstats', { preHandler: admin }, async (req) => {
+    const period = PERIOD.test(String(req.query.period)) ? String(req.query.period) : await currentPeriod();
+    const r = DATE.test(String(req.query.from)) && DATE.test(String(req.query.to)) ? { from: String(req.query.from), to: String(req.query.to) } : null;
+    const fs = await fieldSums(r, period);
+    return { period, from: r?.from ?? null, to: r?.to ?? null, fields: fs.fields, rows: fs.rows };
   });
 
   // ----- KPI: свой (стример) и сводка (админ) -----
@@ -1195,6 +1201,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     const rejected = (await db.query(`SELECT id, to_char(day, 'YYYY-MM-DD') AS day, reject_reason FROM shift_reports WHERE staff_id = $1 AND status = 'rejected' AND day >= (now() AT TIME ZONE '${TZ}')::date - 14 ORDER BY day DESC`, [me.id])).rows;
     const short = (await db.query(`SELECT to_char(day, 'YYYY-MM-DD') AS day, minutes FROM shift_shortfalls WHERE staff_id = $1 AND reason IS NULL ORDER BY day`, [me.id])).rows;
 
+    const socialFs = await fieldSums({ from, to }, refMonth);
     const defs = ((await fieldsDef(true)) as any[]).filter((d) => d.on_dashboard);
     const last = (
       await db.query(
@@ -1213,6 +1220,8 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
       month: { period: refMonth, hoursMin: k.hoursMin, shifts: k.shifts, planShifts: plan.hours / plan.shiftH, ftd: k.ftdCount },
       today_: { minutes: todayMin, shiftMin, minLeft: Math.max(0, shiftMin - todayMin), live },
       funnel: { clicks, regs: ev.reg, ftd: ev.ftd },
+      // Суммарные просмотры, подписчики и т. д. по всем стримерам за период: общий показатель без разбивки по людям
+      social: { fields: socialFs.fields, totals: socialFs.fields.map((f: string) => socialFs.rows.reduce((a, r) => a + (r.sums[f] ?? 0), 0)) },
       clicksSince,
       byStatus,
       colleagues,
