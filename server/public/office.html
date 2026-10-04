@@ -154,9 +154,16 @@ textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10
 .bub.out{background:var(--acc3);justify-self:end;border-top-right-radius:3px}
 .bub small{display:block;color:#ffffffa0;font-size:11px;margin-top:2px}
 .bub img{max-width:240px;border-radius:8px;display:block;margin-bottom:4px}
-.reply{display:flex;gap:8px;padding:10px;border-top:1px solid var(--line)}
+.reply{display:flex;gap:8px;padding:10px;border-top:1px solid var(--line);align-items:flex-end}
+.rbtn{width:46px;height:46px;flex:none;padding:0;display:grid;place-items:center}.rbtn.rec{background:#ff3b4e;border-color:#ff3b4e;color:#fff}
+.qprev{display:flex;gap:8px;flex-wrap:wrap;padding:8px 12px 0}.qi{position:relative;display:flex;gap:8px;align-items:center;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:6px 30px 6px 6px;max-width:290px;font-size:12px}
+.qi img,.qi video{height:48px;width:48px;object-fit:cover;border-radius:8px;flex:none}.qi video.rd{border-radius:50%}.qi audio{height:34px;width:210px}.qi .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:170px}.qi .x{position:absolute;top:3px;right:3px;width:22px;height:22px;padding:0;border-radius:50%;line-height:1;font-size:12px}
+.recbar{flex:1;display:flex;align-items:center;gap:10px;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:0 12px;min-height:46px}.recdot{width:10px;height:10px;border-radius:50%;background:#ff3b4e;animation:blink 1s infinite}@keyframes blink{50%{opacity:.25}}
+.chat-thread.drag{outline:2px dashed var(--acc);outline-offset:-6px}
+.bub video{max-width:260px;width:100%;border-radius:8px;display:block;margin-bottom:4px}.bub video.vnote{width:200px;height:200px;border-radius:50%;object-fit:cover}.bub audio{width:250px;max-width:100%;display:block;margin-bottom:4px}.bub .fl{display:inline-flex;gap:6px;align-items:center;color:var(--acc2);text-decoration:none;margin-bottom:4px}.bub img{cursor:zoom-in}
+.vn-ov video{width:min(300px,70vw);height:min(300px,70vw);object-fit:cover;border-radius:50%;background:#000;display:block;margin:0 auto}.vn-ov video.mir{transform:scaleX(-1)}
 .reply textarea{flex:1;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px;resize:none;font:inherit;color:inherit;min-height:44px;max-height:120px}
-@media(max-width:760px){.chat-wrap{grid-template-columns:1fr;height:auto}.chat-list{max-height:220px}.chat-thread{height:60vh}}
+@media(max-width:760px){.reply{flex-wrap:wrap}.reply textarea{flex:1 1 100%;order:-1}.reply>.btn:last-child{margin-left:auto}.recbar{order:-1;flex:1 1 100%}.chat-wrap{grid-template-columns:1fr;height:auto}.chat-list{max-height:220px}.chat-thread{height:60vh}}
 @media(max-width:760px){
  #app{grid-template-columns:minmax(0,1fr)}
  .side{position:static;height:auto;flex-direction:row;flex-wrap:wrap;align-items:center;padding:10px;border-right:0;border-bottom:1px solid var(--line)}
@@ -1721,26 +1728,116 @@ async function viewChats(){
   const list=el('div',{class:'chat-list'});
   const head=el('div',{class:'thread-head'});
   const msgs=el('div',{class:'msgs'});
-  const ta=el('textarea',{id:'replyText',rows:'1',placeholder:'Ответ клиенту. Скриншот можно вставить Ctrl+V. Enter — отправить',maxlength:'4000'});
+  const ta=el('textarea',{id:'replyText',rows:'1',placeholder:'Ответ клиенту. Enter — отправить',maxlength:'4000'});
   const sendBtn=el('button',{class:'btn',type:'button'},'Отправить');
-  let photo=null;
-  const fileIn=el('input',{type:'file',accept:'image/jpeg,image/png,image/webp',style:'display:none'});
-  const attachBtn=el('button',{class:'btn o',type:'button',title:'Прикрепить скриншот (или вставьте Ctrl+V)','aria-label':'Прикрепить скриншот'},'📎');
-  const prev=el('div',{style:'display:none;padding:8px 12px 0;gap:8px;align-items:center'});
-  function setPhoto(f){
-    if(!f)return;
-    if(!/^image\/(jpeg|png|webp)$/.test(f.type)){err.textContent='Прикрепите картинку JPG, PNG или WebP';return}
-    if(f.size>6*1024*1024){err.textContent='Картинка больше 6 МБ';return}
-    err.textContent='';photo=f;
-    prev.style.display='flex';
-    prev.replaceChildren(el('img',{src:URL.createObjectURL(f),alt:'Скриншот к отправке',style:'height:56px;border-radius:8px'}),el('button',{class:'btn o',type:'button',onclick:clearPhoto},'Убрать'));
+  const IC=h=>svgIcon(h,22);
+  const CLIP='<path d="M21 11.5l-8.6 8.6a5 5 0 01-7.1-7.1l8.6-8.6a3.3 3.3 0 014.7 4.7l-8.6 8.6a1.7 1.7 0 01-2.4-2.4l7.9-7.9"/>';
+  const MIC='<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/>';
+  const VCIRC='<circle cx="12" cy="12" r="9"/><path d="M10 9l5 3-5 3z"/>';
+  const LIMIT=50*1024*1024;
+  let queue=[];                       // {file,name,type,kind,url}
+  const fileIn=el('input',{type:'file',multiple:'',style:'display:none'});
+  const attachBtn=el('button',{class:'btn o rbtn',type:'button',title:'Прикрепить файл: фото, видео, музыку, документ (или перетащите, или Ctrl+V)','aria-label':'Прикрепить файл'},IC(CLIP));
+  const micBtn=el('button',{class:'btn o rbtn',type:'button',title:'Записать голосовое','aria-label':'Записать голосовое'},IC(MIC));
+  const vidBtn=el('button',{class:'btn o rbtn',type:'button',title:'Записать видео-кружок','aria-label':'Записать видео-кружок'},IC(VCIRC));
+  const prev=el('div',{class:'qprev',style:'display:none'});
+  const fmtSize=b=>b<1024*1024?Math.max(1,Math.round(b/1024))+' КБ':(b/1024/1024).toFixed(1)+' МБ';
+  function drawQueue(){
+    prev.style.display=queue.length?'flex':'none';
+    prev.replaceChildren(...queue.map((q,i)=>{
+      const t=q.type||'';let th;
+      if(q.kind==='voice')th=el('audio',{src:q.url,controls:''});
+      else if(q.kind==='video_note')th=el('video',{src:q.url,class:'rd',muted:'',playsinline:'',onclick:e=>{const v=e.currentTarget;v.paused?v.play():v.pause()}});
+      else if(t.startsWith('image/')&&/^image\/(jpeg|png|webp|gif|bmp|svg\+xml|avif)$/.test(t))th=el('img',{src:q.url,alt:q.name});
+      else if(t.startsWith('video/'))th=el('video',{src:q.url,muted:'',playsinline:''});
+      else if(t.startsWith('audio/'))th=el('audio',{src:q.url,controls:''});
+      else th=el('span',{style:'font-size:22px'},'📄');
+      const label=(q.kind==='voice'||t.startsWith('audio/')&&q.kind!=='file')?null:el('span',{class:'nm',title:q.name},q.kind==='video_note'?'Кружок':q.name,el('br'),el('span',{class:'mut'},fmtSize(q.file.size)));
+      return el('div',{class:'qi'},th,label,el('button',{class:'btn o x',type:'button','aria-label':'Убрать',onclick:()=>{URL.revokeObjectURL(q.url);queue.splice(i,1);drawQueue()}},'✕'));
+    }));
   }
-  function clearPhoto(){photo=null;fileIn.value='';prev.style.display='none';prev.replaceChildren()}
+  function addFiles(list,kind){
+    err.textContent='';
+    for(const f of [...list]){
+      if(f.size>LIMIT){err.textContent='«'+f.name+'» больше 50 МБ: это предел Telegram для ботов';continue}
+      if(!f.size)continue;
+      queue.push({file:f,name:f.name||'file',type:f.type,kind:kind||'auto',url:URL.createObjectURL(f)});
+    }
+    drawQueue();
+  }
+  function clearQueue(){queue.forEach(q=>URL.revokeObjectURL(q.url));queue=[];fileIn.value='';drawQueue()}
   attachBtn.addEventListener('click',()=>fileIn.click());
-  fileIn.addEventListener('change',()=>setPhoto(fileIn.files[0]));
+  fileIn.addEventListener('change',()=>{addFiles(fileIn.files);fileIn.value=''});
+  // Голосовое: запись с микрофона, дальше сервер переводит в OGG/Opus
+  let rec=null;
+  const recBar=el('div',{class:'recbar',style:'display:none'});
+  async function startVoice(){
+    if(rec){rec.stop();return}
+    if(!navigator.mediaDevices||!window.MediaRecorder){err.textContent='Этот браузер не умеет записывать звук';return}
+    let stream;try{stream=await navigator.mediaDevices.getUserMedia({audio:true})}catch{err.textContent='Нет доступа к микрофону. Разрешите его в настройках браузера.';return}
+    err.textContent='';
+    const mr=new MediaRecorder(stream),chunks=[];let cancelled=false,t0=Date.now();
+    const timer=el('b',{class:'mono'},'0:00');
+    const tick=setInterval(()=>{const s=Math.floor((Date.now()-t0)/1000);timer.textContent=Math.floor(s/60)+':'+String(s%60).padStart(2,'0');if(s>=600)mr.stop()},300);
+    mr.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};
+    mr.onstop=()=>{
+      clearInterval(tick);stream.getTracks().forEach(t=>t.stop());rec=null;micBtn.classList.remove('rec');recBar.style.display='none';ta.style.display='';
+      if(!cancelled&&chunks.length){const b=new Blob(chunks,{type:mr.mimeType||'audio/webm'});addFiles([new File([b],'voice',{type:b.type})],'voice')}
+    };
+    rec={stop:()=>mr.state!=='inactive'&&mr.stop()};
+    recBar.replaceChildren(el('i',{class:'recdot'}),el('span',{},'Запись голосового'),timer,el('span',{style:'flex:1'}),el('button',{class:'btn o s',type:'button',onclick:()=>{cancelled=true;mr.stop()}},'Отмена'));
+    recBar.style.display='flex';ta.style.display='none';micBtn.classList.add('rec');micBtn.title='Остановить запись';
+    mr.start();
+  }
+  micBtn.addEventListener('click',startVoice);
+  // Видео-кружок: окно с камерой, запись до 60 секунд, сервер вырезает квадрат и переводит в формат Telegram
+  async function videoNoteDialog(){
+    if(!navigator.mediaDevices||!window.MediaRecorder){err.textContent='Этот браузер не умеет записывать видео';return}
+    let stream;try{stream=await navigator.mediaDevices.getUserMedia({video:{width:{ideal:640},height:{ideal:640},facingMode:'user'},audio:true})}catch{err.textContent='Нет доступа к камере или микрофону. Разрешите их в настройках браузера.';return}
+    document.querySelectorAll('.vn-ov').forEach(x=>x.remove());
+    const ov=el('div',{class:'lc-overlay vn-ov',role:'dialog','aria-modal':'true'});
+    const vid=el('video',{class:'mir',autoplay:'',muted:'',playsinline:''});vid.srcObject=stream;vid.muted=true;
+    const msg=el('div',{class:'mut sm',style:'text-align:center'},'Нажмите круглую кнопку, чтобы начать запись (до 60 секунд)');
+    const actions=el('div',{class:'lc-actions',style:'justify-content:center'});
+    const box=el('div',{class:'lc',style:'width:min(380px,100%)'},el('div',{class:'lc-head'},el('h3',{style:'font-size:18px'},'Видео-кружок')),vid,msg,actions);
+    ov.append(box);document.body.append(ov);
+    let mr=null,chunks=[],blobUrl=null,result=null,tick=null;
+    const stop=()=>{clearInterval(tick);stream.getTracks().forEach(t=>t.stop())};
+    const close=()=>{if(mr&&mr.state!=='inactive'){mr.onstop=null;mr.stop()}stop();if(blobUrl)URL.revokeObjectURL(blobUrl);ov.remove()};
+    ov.addEventListener('mousedown',e=>{if(e.target===ov&&!(mr&&mr.state==='recording'))close()});
+    const idle=()=>actions.replaceChildren(el('button',{class:'btn',type:'button',onclick:begin,style:'background:#ff3b4e;border-color:#ff3b4e'},'● Начать запись'),el('button',{class:'btn o',type:'button',onclick:close},'Отмена'));
+    function begin(){
+      chunks=[];const types=['video/mp4','video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'];
+      const mt=types.find(t=>MediaRecorder.isTypeSupported(t));
+      mr=new MediaRecorder(stream,mt?{mimeType:mt}:undefined);
+      mr.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};
+      let t0=Date.now();
+      mr.onstop=()=>{
+        clearInterval(tick);
+        result=new Blob(chunks,{type:mr.mimeType||'video/webm'});blobUrl=URL.createObjectURL(result);
+        stream.getTracks().forEach(t=>t.stop());
+        vid.srcObject=null;vid.classList.remove('mir');vid.muted=false;vid.src=blobUrl;vid.loop=true;vid.play().catch(()=>{});
+        msg.textContent='Так увидит клиент. Нажмите на кружок, чтобы остановить или продолжить.';
+        vid.onclick=()=>vid.paused?vid.play():vid.pause();
+        actions.replaceChildren(el('button',{class:'btn',type:'button',onclick:()=>{addFiles([new File([result],'circle',{type:result.type})],'video_note');if(blobUrl)URL.revokeObjectURL(blobUrl);ov.remove()}},'Добавить к сообщению'),
+          el('button',{class:'btn o',type:'button',onclick:()=>{ov.remove();videoNoteDialog()}},'Переснять'));
+      };
+      mr.start();
+      const timer=el('b',{class:'mono'},'0:00');
+      tick=setInterval(()=>{const s=Math.floor((Date.now()-t0)/1000);timer.textContent=Math.floor(s/60)+':'+String(s%60).padStart(2,'0');if(s>=60)mr.stop()},250);
+      msg.replaceChildren('Идёт запись ',timer,' из 1:00');
+      actions.replaceChildren(el('button',{class:'btn',type:'button',onclick:()=>mr.stop()},'■ Стоп'));
+    }
+    idle();
+  }
+  vidBtn.addEventListener('click',videoNoteDialog);
   const err=el('div',{class:'err',role:'alert',style:'padding:0 12px'});
-  const thread=el('div',{class:'chat-thread'},head,msgs,el('div',{},err,prev,el('div',{class:'reply'},attachBtn,fileIn,ta,sendBtn)));
-  const preview=r=>(r.last_dir==='out'?'Вы: ':'')+(r.last_text||({photo:'📷 Фото',document:'📎 Файл',voice:'🎤 Голосовое',video:'🎬 Видео',sticker:'Стикер'})[r.last_kind]||'Сообщение');
+  const thread=el('div',{class:'chat-thread'},head,msgs,el('div',{},err,prev,el('div',{class:'reply'},attachBtn,micBtn,vidBtn,fileIn,ta,recBar,sendBtn)));
+  // Перетаскивание файлов в окно переписки
+  ['dragenter','dragover'].forEach(ev=>thread.addEventListener(ev,e=>{if(e.dataTransfer&&[...e.dataTransfer.types].includes('Files')){e.preventDefault();thread.classList.add('drag')}}));
+  ['dragleave','drop'].forEach(ev=>thread.addEventListener(ev,e=>{if(ev==='dragleave'&&thread.contains(e.relatedTarget))return;thread.classList.remove('drag')}));
+  thread.addEventListener('drop',e=>{if(e.dataTransfer&&e.dataTransfer.files.length){e.preventDefault();addFiles(e.dataTransfer.files)}});
+  const preview=r=>(r.last_dir==='out'?'Вы: ':'')+(r.last_text||({photo:'📷 Фото',document:'📎 Файл',voice:'🎤 Голосовое',audio:'🎵 Музыка',video:'🎬 Видео',video_note:'⭕ Кружок',animation:'GIF',sticker:'Стикер'})[r.last_kind]||'Сообщение');
   async function loadList(){
     const rows=await api('/chats');
     list.replaceChildren(...(rows.length?rows.map(r=>el('button',{type:'button',class:'chat-item'+(r.tg_id==active?' on':''),onclick:()=>openChat(r.tg_id)},
@@ -1757,8 +1854,20 @@ async function viewChats(){
     head.replaceChildren(el('div',{},d.lead.username?[d.lead.first_name?el('b',{style:'margin-right:8px'},d.lead.first_name):null,el('a',{...L,style:L.style+';font-weight:600'},'@'+d.lead.username)]:el('a',{...L,style:L.style+';font-weight:700'},cname(d.lead))),el('span',{class:'mut sm'},'Telegram ID '+d.lead.tg_id+' · Pocket ID '+(d.lead.trader_id||'нет')+' · '+(d.lead.owner_name?'ведёт '+d.lead.owner_name:'не закреплён')));
     msgs.replaceChildren(...d.messages.map(m=>{
       const body=[];
-      if(m.has_file&&m.kind==='photo')body.push(el('img',{src:'/api/office/chats/'+d.lead.tg_id+'/file/'+m.id,alt:'Фото от клиента'}));
-      else if(m.has_file)body.push(el('a',{href:'/api/office/chats/'+d.lead.tg_id+'/file/'+m.id,target:'_blank',rel:'noopener',style:'color:var(--acc2)'},'Открыть файл ('+m.kind+')'));
+      const url='/api/office/chats/'+d.lead.tg_id+'/file/'+m.id;
+      const lost=n=>n.addEventListener('error',()=>n.replaceWith(el('span',{class:'mut'},'Файл не открылся (Telegram отдаёт боту файлы до 20 МБ)')),{once:true});
+      if(m.has_file){
+        let n;
+        if(m.kind==='photo'){n=el('img',{src:url,alt:'Фото',loading:'lazy',onclick:()=>openShot(url)})}
+        else if(m.kind==='video'){n=el('video',{src:url,controls:'',preload:'metadata',playsinline:''})}
+        else if(m.kind==='video_note'){n=el('video',{src:url,class:'vnote',controls:'',preload:'metadata',playsinline:''})}
+        else if(m.kind==='animation'){n=el('video',{src:url,autoplay:'',loop:'',muted:'',playsinline:'',controls:''})}
+        else if(m.kind==='voice'||m.kind==='audio'){n=el('audio',{src:url,controls:'',preload:'metadata'})}
+        else{n=el('a',{class:'fl',href:url,target:'_blank',rel:'noopener',download:m.file_name||''},'📄 '+(m.file_name||'Файл'))}
+        if(n.tagName!=='A')lost(n);
+        body.push(n);
+        if((m.kind==='audio'||m.kind==='document')&&m.file_name&&m.kind!=='document')body.push(el('div',{},m.file_name));
+      }
       else if(!m.text)body.push(el('span',{class:'mut'},'['+m.kind+']'));
       if(m.text)body.push(m.text);
       body.push(el('small',{},(m.direction==='out'?(m.staff_name||'Команда')+' · ':'')+new Date(m.created_at).toLocaleString('ru-RU',{timeZone:'Europe/Kyiv',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})));
@@ -1768,15 +1877,34 @@ async function viewChats(){
   }
   async function openChat(id){active=id;msgs.dataset.init='';err.textContent='';try{await loadThread();await loadList()}catch(e){err.textContent=e.message}}
   async function send(){
-    const text=ta.value.trim();if((!text&&!photo)||!active)return;
+    const text=ta.value.trim();if((!text&&!queue.length)||!active)return;
+    if(rec)return;
     sendBtn.disabled=true;err.textContent='';
-    try{const body={text};if(photo)body.photo=await fileToDataUrl(photo);
-      await api('/chats/'+active+'/reply',{method:'POST',body});ta.value='';clearPhoto();await loadThread();await loadList()}
+    const id=active;
+    try{
+      if(!queue.length){await api('/chats/'+id+'/reply',{method:'POST',body:{text}})}
+      else{
+        // подпись уходит с первым файлом; если она длиннее лимита Telegram или файл это кружок, отправляем отдельным сообщением
+        let sepText=text,first=true;
+        for(let i=0;i<queue.length;i++){
+          const q=queue[i];sendBtn.textContent='Отправка '+(i+1)+'/'+queue.length+'…';
+          const cap=first&&text&&text.length<=1024&&q.kind!=='video_note'?text:'';
+          if(cap){sepText=''}
+          first=false;
+          const r=await fetch('/api/office/chats/'+id+'/send-file?kind='+q.kind+(cap?'&caption='+encodeURIComponent(cap):''),{method:'POST',credentials:'same-origin',
+            headers:{'content-type':'application/octet-stream','x-file-name':encodeURIComponent(q.name),'x-file-type':encodeURIComponent(q.type||'')},body:q.file});
+          const data=await r.json().catch(()=>({}));
+          if(r.status===401){showLogin();throw new Error('auth')}
+          if(!r.ok)throw new Error(data.error||'Ошибка '+r.status);
+        }
+        if(sepText)await api('/chats/'+id+'/reply',{method:'POST',body:{text:sepText}});
+      }
+      ta.value='';clearQueue();await loadThread();await loadList()}
     catch(e){err.textContent=e.message;if(/уже взял/.test(e.message)){await loadList();await loadThread().catch(()=>{})}}
-    finally{sendBtn.disabled=false;ta.focus()}
+    finally{sendBtn.disabled=false;sendBtn.textContent='Отправить';ta.focus()}
   }
   sendBtn.addEventListener('click',send);
-  ta.addEventListener('paste',e=>{const f=[...(e.clipboardData?.files||[])].find(x=>x.type.startsWith('image/'));if(f){e.preventDefault();setPhoto(f)}});
+  ta.addEventListener('paste',e=>{const fs=[...(e.clipboardData?.files||[])];if(fs.length){e.preventDefault();addFiles(fs)}});
   ta.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send()}});
   await loadList();
   head.replaceChildren(el('span',{class:'mut'},'Выберите чат слева'));

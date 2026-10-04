@@ -108,10 +108,12 @@ bot.on('message', async (ctx) => {
   let fileId: string | null = null;
   if (m.text) kind = 'text';
   else if (m.photo) [kind, fileId] = ['photo', m.photo[m.photo.length - 1].file_id];
+  else if (m.animation) [kind, fileId] = ['animation', m.animation.file_id];
   else if (m.document) [kind, fileId] = ['document', m.document.file_id];
   else if (m.voice) [kind, fileId] = ['voice', m.voice.file_id];
+  else if (m.audio) [kind, fileId] = ['audio', m.audio.file_id];
   else if (m.video) [kind, fileId] = ['video', m.video.file_id];
-  else if (m.video_note) [kind, fileId] = ['video', m.video_note.file_id];
+  else if (m.video_note) [kind, fileId] = ['video_note', m.video_note.file_id];
   else if (m.sticker) kind = 'sticker';
 
   const first = await recordIncoming({
@@ -119,6 +121,7 @@ bot.on('message', async (ctx) => {
     kind,
     text: m.text ?? m.caption ?? null,
     fileId,
+    fileName: m.document?.file_name ?? m.audio?.file_name ?? null,
     tgMessageId: m.message_id,
   });
   if (first) await ctx.reply('Принято. Ответим прямо здесь, в этом чате.');

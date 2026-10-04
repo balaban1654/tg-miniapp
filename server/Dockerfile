@@ -9,6 +9,8 @@ RUN npm run build
 FROM node:20-alpine
 WORKDIR /app
 ENV NODE_ENV=production
+# ffmpeg: голосовые и кружки из браузера переводим в форматы Telegram
+RUN apk add --no-cache ffmpeg
 COPY server/package*.json ./
 RUN npm ci --omit=dev
 COPY --from=build /app/dist ./dist

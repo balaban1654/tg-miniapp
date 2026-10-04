@@ -9,6 +9,7 @@ import { createBroadcast, segmentWhere, SEGMENTS, type Button } from './push.js'
 import { randomInt, randomBytes, createHash } from 'node:crypto';
 const sha256 = (v: string) => createHash('sha256').update(v).digest('hex');
 import { accountingRoutes } from './accounting.js';
+import { toVoice, toVideoNote } from './media.js';
 import {
   type Staff,
   type Role,
@@ -530,7 +531,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     );
     if (!lead.rowCount) return reply.code(404).send({ error: 'Чат не найден' });
     const msgs = await db.query(
-      `SELECT m.id, m.direction, m.kind, m.text, m.created_at, (m.file_id IS NOT NULL) AS has_file, s.name AS staff_name
+      `SELECT m.id, m.direction, m.kind, m.text, m.created_at, (m.file_id IS NOT NULL) AS has_file, m.file_name, s.name AS staff_name
          FROM messages m LEFT JOIN staff s ON s.id = m.staff_id WHERE m.tg_id = $1 ORDER BY m.id DESC LIMIT 200`,
       [tgId],
     );
@@ -540,7 +541,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
   app.get<{ Params: { tgId: string; msgId: string } }>('/chats/:tgId/file/:msgId', { preHandler: auth }, async (req, reply) => {
     const me = req.staff!;
     const r = await db.query(
-      `SELECT m.file_id, m.kind FROM messages m JOIN leads d ON d.tg_id = m.tg_id
+      `SELECT m.file_id, m.kind, m.file_name FROM messages m JOIN leads d ON d.tg_id = m.tg_id
         WHERE m.id = $1 AND m.tg_id = $2 AND m.file_id IS NOT NULL AND ${chatScope(me, 'd.owner_id')}`,
       [Number(req.params.msgId), Number(req.params.tgId)],
     );
@@ -550,16 +551,121 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
       const resp = await fetch(`https://api.telegram.org/file/bot${config.botToken}/${f.file_path}`);
       if (!resp.ok) throw new Error('telegram');
       const ext = (f.file_path ?? '').split('.').pop()?.toLowerCase() ?? '';
-      const types: Record<string, string> = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', mp4: 'video/mp4', ogg: 'audio/ogg', oga: 'audio/ogg', pdf: 'application/pdf' };
-      return reply
+      const types: Record<string, string> = {
+        jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', gif: 'image/gif',
+        mp4: 'video/mp4', mov: 'video/quicktime', webm: 'video/webm',
+        ogg: 'audio/ogg', oga: 'audio/ogg', opus: 'audio/ogg', mp3: 'audio/mpeg', m4a: 'audio/mp4', wav: 'audio/wav', flac: 'audio/flac',
+        pdf: 'application/pdf',
+      };
+      const buf = Buffer.from(await resp.arrayBuffer());
+      const type = types[ext] ?? 'application/octet-stream';
+      const inline = type !== 'application/octet-stream';
+      reply
         .header('Cache-Control', 'private, max-age=3600')
         .header('X-Content-Type-Options', 'nosniff')
-        .type(types[ext] ?? 'application/octet-stream')
-        .send(Buffer.from(await resp.arrayBuffer()));
+        .header('Accept-Ranges', 'bytes')
+        .header('Content-Disposition', `${inline ? 'inline' : 'attachment'}; filename*=UTF-8''${encodeURIComponent(r.rows[0].file_name || 'file.' + (ext || 'bin'))}`)
+        .type(type);
+      // Safari и перемотка видео просят Range
+      const m = /^bytes=(\d*)-(\d*)$/.exec(String(req.headers.range ?? ''));
+      if (m && (m[1] || m[2])) {
+        const start = m[1] ? Number(m[1]) : Math.max(0, buf.length - Number(m[2]));
+        const end = m[1] && m[2] ? Math.min(Number(m[2]), buf.length - 1) : buf.length - 1;
+        if (start > end || start >= buf.length) return reply.code(416).header('Content-Range', `bytes */${buf.length}`).send();
+        return reply.code(206).header('Content-Range', `bytes ${start}-${end}/${buf.length}`).send(buf.subarray(start, end + 1));
+      }
+      return reply.send(buf);
     } catch {
       return reply.code(502).send({ error: 'Не удалось получить файл из Telegram' });
     }
   });
+
+  // Закрепление клиента за тем, кто ответил первым (админ клиентов не забирает). Возвращает текст ошибки или null
+  async function claimLead(me: Staff, tgId: number, ownerId: number | null): Promise<string | null> {
+    if (ownerId === null && (me.role === 'streamer' || me.role === 'teamlead')) {
+      const claim = await db.query('UPDATE leads SET owner_id = $2 WHERE tg_id = $1 AND owner_id IS NULL RETURNING tg_id', [tgId, me.id]);
+      if (!claim.rowCount) {
+        const o = await db.query('SELECT o.id, o.name FROM leads d JOIN staff o ON o.id = d.owner_id WHERE d.tg_id = $1', [tgId]);
+        if (o.rows[0]?.id !== me.id) return `Этого клиента уже взял ${o.rows[0]?.name ?? 'другой стример'}`;
+      }
+    }
+    return null;
+  }
+
+  // Любой файл клиенту: тело запроса это сам файл, остальное в заголовках и адресе (kind=auto|voice|video_note, caption)
+  const FILE_LIMIT = 50 * 1024 * 1024; // предел Bot API на отправку
+  app.addContentTypeParser('application/octet-stream', { parseAs: 'buffer', bodyLimit: FILE_LIMIT + 1024 }, (_req, body, done) => done(null, body));
+  app.post<{ Params: { tgId: string }; Querystring: { kind?: string; caption?: string } }>(
+    '/chats/:tgId/send-file',
+    { preHandler: auth, bodyLimit: FILE_LIMIT + 1024 },
+    async (req, reply) => {
+      const me = req.staff!;
+      const tgId = Number(req.params.tgId);
+      let file = Buffer.isBuffer(req.body) ? (req.body as Buffer) : null;
+      if (!file || !file.length) return reply.code(400).send({ error: 'Файл пустой' });
+      if (file.length > FILE_LIMIT) return reply.code(413).send({ error: 'Файл больше 50 МБ: это предел Telegram для ботов' });
+      const decode = (v: unknown) => {
+        try {
+          return decodeURIComponent(String(v ?? ''));
+        } catch {
+          return '';
+        }
+      };
+      let name = decode(req.headers['x-file-name']).replace(/[\\/:*?"<>|\x00-\x1f]/g, '_').slice(0, 120) || 'file';
+      const mime = decode(req.headers['x-file-type']).toLowerCase().split(';')[0].trim();
+      const reqKind = str(req.query.kind, 12);
+      const caption = str(req.query.caption, 1024);
+      const lead = await db.query(`SELECT d.owner_id FROM leads d WHERE d.tg_id = $1 AND ${chatScope(me, 'd.owner_id')}`, [tgId]);
+      if (!lead.rowCount) return reply.code(404).send({ error: 'Чат не найден' });
+      const claimErr = await claimLead(me, tgId, lead.rows[0].owner_id);
+      if (claimErr) return reply.code(409).send({ error: claimErr });
+
+      const ext = (name.split('.').pop() ?? '').toLowerCase();
+      const isImg = /^image\/(jpeg|png|webp)$/.test(mime) && ((file[0] === 0xff && file[1] === 0xd8) || file.subarray(1, 4).toString() === 'PNG' || (file.subarray(0, 4).toString() === 'RIFF' && file.subarray(8, 12).toString() === 'WEBP'));
+      type Plan = { kind: string; send: () => Promise<{ id: number; fileId: string | null }> };
+      let plan: Plan;
+      try {
+        if (reqKind === 'voice') {
+          file = await toVoice(file);
+          name = 'voice.ogg';
+          plan = { kind: 'voice', send: async () => { const m = await bot.api.sendVoice(tgId, new InputFile(file!, name), caption ? { caption } : {}); return { id: m.message_id, fileId: m.voice.file_id }; } };
+        } else if (reqKind === 'video_note') {
+          file = await toVideoNote(file);
+          name = 'circle.mp4';
+          plan = { kind: 'video_note', send: async () => { const m = await bot.api.sendVideoNote(tgId, new InputFile(file!, name)); return { id: m.message_id, fileId: m.video_note.file_id }; } };
+        } else if (isImg && file.length <= 10 * 1024 * 1024) {
+          plan = { kind: 'photo', send: async () => { const m = await bot.api.sendPhoto(tgId, new InputFile(file!, name), caption ? { caption } : {}); return { id: m.message_id, fileId: m.photo[m.photo.length - 1]?.file_id ?? null }; } };
+        } else if (mime === 'image/gif' || ext === 'gif') {
+          plan = { kind: 'animation', send: async () => { const m = await bot.api.sendAnimation(tgId, new InputFile(file!, name), caption ? { caption } : {}); return { id: m.message_id, fileId: m.animation.file_id }; } };
+        } else if (/^video\/(mp4|quicktime|x-m4v)$/.test(mime) || ['mp4', 'mov', 'm4v'].includes(ext)) {
+          plan = { kind: 'video', send: async () => { const m = await bot.api.sendVideo(tgId, new InputFile(file!, name), { ...(caption ? { caption } : {}), supports_streaming: true }); return { id: m.message_id, fileId: m.video.file_id }; } };
+        } else if (/^audio\/(mpeg|mp3|mp4|x-m4a|m4a)$/.test(mime) || ['mp3', 'm4a'].includes(ext)) {
+          plan = { kind: 'audio', send: async () => { const m = await bot.api.sendAudio(tgId, new InputFile(file!, name), caption ? { caption } : {}); return { id: m.message_id, fileId: m.audio.file_id }; } };
+        } else {
+          plan = { kind: 'document', send: async () => { const m = await bot.api.sendDocument(tgId, new InputFile(file!, name), caption ? { caption } : {}); return { id: m.message_id, fileId: m.document.file_id }; } };
+        }
+      } catch (e) {
+        req.log.warn({ err: String(e) }, 'chat: не удалось обработать запись');
+        return reply.code(422).send({ error: 'Не удалось обработать запись. Попробуйте записать ещё раз.' });
+      }
+      let tgMessageId: number | null = null;
+      let fileId: string | null = null;
+      if (!config.disableBot) {
+        try {
+          const r = await plan.send();
+          tgMessageId = r.id;
+          fileId = r.fileId;
+        } catch {
+          return reply.code(502).send({ error: 'Telegram не принял файл. Возможно, клиент заблокировал бота или формат не подходит.' });
+        }
+      }
+      await db.query(
+        `INSERT INTO messages (tg_id, direction, staff_id, kind, text, file_id, tg_message_id, file_name) VALUES ($1,'out',$2,$3,$4,$5,$6,$7)`,
+        [tgId, me.id, plan.kind, caption || null, fileId, tgMessageId, plan.kind === 'document' || plan.kind === 'audio' ? name : null],
+      );
+      return { ok: true };
+    },
+  );
 
   app.post<{ Params: { tgId: string } }>('/chats/:tgId/reply', { preHandler: auth, bodyLimit: 9 * 1024 * 1024 }, async (req, reply) => {
     const me = req.staff!;
@@ -581,13 +687,8 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     if (!lead.rowCount) return reply.code(404).send({ error: 'Чат не найден' });
 
     // Кто первым ответил, тот и забирает лида. Админ лидов не забирает.
-    if (lead.rows[0].owner_id === null && (me.role === 'streamer' || me.role === 'teamlead')) {
-      const claim = await db.query('UPDATE leads SET owner_id = $2 WHERE tg_id = $1 AND owner_id IS NULL RETURNING tg_id', [tgId, me.id]);
-      if (!claim.rowCount) {
-        const o = await db.query('SELECT o.id, o.name FROM leads d JOIN staff o ON o.id = d.owner_id WHERE d.tg_id = $1', [tgId]);
-        if (o.rows[0]?.id !== me.id) return reply.code(409).send({ error: `Этого клиента уже взял ${o.rows[0]?.name ?? 'другой стример'}` });
-      }
-    }
+    const claimErr = await claimLead(me, tgId, lead.rows[0].owner_id);
+    if (claimErr) return reply.code(409).send({ error: claimErr });
 
     let tgMessageId: number | null = null;
     let fileId: string | null = null;

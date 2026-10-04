@@ -131,6 +131,7 @@ CREATE TABLE IF NOT EXISTS messages (
   created_at    TIMESTAMPTZ DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS messages_tg ON messages(tg_id, id);
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS file_name TEXT;
 
 -- Пуши: бот может писать только тем, кто нажал /start. last_seen_at нужен для «давно не заходил»
 ALTER TABLE leads ADD COLUMN IF NOT EXISTS bot_started BOOLEAN DEFAULT FALSE;
