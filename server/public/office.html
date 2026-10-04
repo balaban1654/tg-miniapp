@@ -1361,7 +1361,7 @@ async function viewLeads(){
   if(me.role==='admin'){
     const ta=el('textarea',{class:'big',rows:'4',placeholder:'Pocket ID из старого бота, по одному в строке'});
     legacyCard=el('div',{class:'card',style:'display:grid;gap:8px'},el('b',{style:'font-size:13px'},'Пользователи из старого бота'),
-      el('div',{class:'mut sm'},'Загрузите список Pocket ID. Когда человек введёт свой ID в мини-приложении, ему откроется доступ, ID привяжется к его Telegram ID и он отметится в лидах.'),
+      el('div',{class:'mut sm'},'Загрузите список Pocket ID. Человек вводит свой ID в мини-приложении, ID привяжется к его Telegram ID, и он отметится в лидах. Доступ откроется после пополнения счёта (от $10): когда придёт постбек.'),
       legacy?el('div',{class:'sm'},'В списке: '+legacy.total+' · подключились: '+legacy.claimed):null,ta,
       el('div',{},el('button',{class:'btn o s',type:'button',onclick:async()=>{try{const r=await api('/legacy/bulk',{method:'POST',body:{text:ta.value}});ta.value='';toast('Добавлено: '+r.added+(r.skipped?', уже были: '+r.skipped:''));setTimeout(render,700)}catch(x){toast(x.message)}}},'Загрузить')));
   }

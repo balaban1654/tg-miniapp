@@ -299,7 +299,7 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
     };
   });
 
-  // Перенос из старого бота: клиент вводит свой Pocket ID, он есть в загруженном списке, значит доступ открывается сразу
+  // Перенос из старого бота: клиент вводит свой Pocket ID из загруженного списка. Доступ откроется не сразу, а после постбека с пополнением (от $10)
   const claimTries = new Map<number, { n: number; at: number }>();
   app.post('/legacy/claim', { preHandler: auth }, async (req, reply) => {
     const tgId = req.tg!.id;
@@ -318,7 +318,7 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
     const other = await db.query('SELECT 1 FROM leads WHERE trader_id = $1 AND tg_id <> $2 AND access LIMIT 1', [id, tgId]);
     if (other.rowCount) return fail(409, 'Этот Pocket ID уже подключён к другому аккаунту');
     await db.query('UPDATE legacy_ids SET claimed_by = $2, claimed_at = coalesce(claimed_at, now()) WHERE trader_id = $1', [id, tgId]);
-    await db.query(`UPDATE leads SET trader_id = $2, access = TRUE, status = CASE WHEN status IN ('new','registered','ftd') THEN 'active' ELSE status END WHERE tg_id = $1`, [tgId, id]);
+    await db.query(`UPDATE leads SET trader_id = $2, status = CASE WHEN status = 'new' THEN 'registered' ELSE status END WHERE tg_id = $1`, [tgId, id]);
     claimTries.delete(tgId);
     return { ok: true };
   });

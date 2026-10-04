@@ -663,7 +663,7 @@ async function viewHome(){
   if(!me)await refreshMe();
   if(!me.access&&me.status==='registered'){
     // Шаг 2: регистрация уже пришла постбеком, ждём пополнения
-    const min=me.minDeposit||50,got=Number(me.deposited||0);
+    const min=me.minDeposit||10,got=Number(me.deposited||0);
     const lockedSig2=await signalCard().catch(()=>null);
     shell('Hunter AI',[profileCard(),stats4({deals:0,wins:0,losses:0,rate:null}),lockedSig2,
       el('div',{class:'card hero'},heroArt(),
@@ -1267,7 +1267,7 @@ function pocketAddRow(){
     const go=async()=>{
       const v=inp.value.trim();if(!v){toast('Введите Pocket ID');return}
       ok.disabled=true;
-      try{await api('/legacy/claim',{method:'POST',body:{trader_id:v}});await refreshMe();toast('Pocket ID подтверждён, доступ открыт');render()}
+      try{await api('/legacy/claim',{method:'POST',body:{trader_id:v}});await refreshMe();toast('Pocket ID подтверждён. Пополните счёт от '+(me.minDeposit||10)+' $, и доступ откроется');render()}
       catch(e){toast(e.message);ok.disabled=false}
     };
     inp.addEventListener('keydown',e=>{if(e.key==='Enter')go()});

@@ -10,7 +10,7 @@ export const config = {
   botToken: need('BOT_TOKEN'),
   botUsername: process.env.BOT_USERNAME ?? 'hunters_aibot',
   // Минимальное пополнение для открытия доступа, $
-  minDeposit: Number(process.env.MIN_DEPOSIT) > 0 ? Number(process.env.MIN_DEPOSIT) : 50,
+  minDeposit: Number(process.env.MIN_DEPOSIT) > 0 ? Number(process.env.MIN_DEPOSIT) : 10,
   miniAppUrl: process.env.MINIAPP_URL ?? '',
   termsUrl: process.env.TERMS_URL ?? 'https://hunterai.space/terms',
   publicUrl: process.env.PUBLIC_URL ?? 'http://localhost:3000',
