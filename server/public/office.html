@@ -94,7 +94,7 @@ tr.rowc{cursor:pointer}tr.rowc:hover{background:#ffffff08}tr.rowc.on{background:
 @media(max-width:800px){.rev{grid-template-columns:1fr}.frow2{grid-template-columns:1fr}.fhead2{display:none}}
 .lc-two{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
 .me{margin-top:auto;padding:10px;color:var(--mut);font-size:12px;display:grid;gap:8px}
-main{padding:22px clamp(14px,3vw,32px);display:grid;gap:18px;align-content:start;min-width:0}
+main{padding:22px clamp(14px,3vw,32px);display:grid;grid-template-columns:minmax(0,1fr);gap:18px;align-content:start;min-width:0}
 .head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
 .kpis{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
 .kpi{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px}
@@ -112,13 +112,14 @@ th.n{text-align:right}
 .lc{width:min(720px,100%);max-height:90vh;overflow:auto;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px;display:grid;gap:14px;box-shadow:0 20px 60px rgba(0,0,0,.6)}
 .lc-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
 .lc-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px 18px}
+@media(max-width:560px){.lc-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 12px}.lc-kv .sm{font-size:11px}.lc{padding:16px;border-radius:14px}.lc-tabs{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}.lc-tabs::-webkit-scrollbar{display:none}.lc-tab{white-space:nowrap;padding:10px 12px;flex:none}.lc-two{grid-template-columns:minmax(0,1fr)}.lc-overlay{padding:10px}}
 .lc-kv{display:grid;gap:2px}.lc-kv b{font-weight:600;word-break:break-word}
 .lc-h{font:700 12px var(--fm);letter-spacing:.06em;text-transform:uppercase;color:var(--acc2);margin:4px 0 0}
 .lc-steps{display:grid;gap:10px}.lc-step{display:flex;gap:12px;align-items:flex-start;opacity:.55}.lc-step.done{opacity:1}
 .lc-dot{width:10px;height:10px;border-radius:50%;background:var(--line);margin-top:6px;flex:none}.lc-step.done .lc-dot{background:var(--ok)}
 .lc-total{display:flex;gap:12px;align-items:baseline;flex-wrap:wrap}
 .lc-list{display:grid;gap:6px}.lc-row{display:grid;grid-template-columns:1fr auto auto;gap:12px;align-items:center;padding:8px 12px;border:1px solid var(--line);border-radius:10px}
-.lf{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.lf input{flex:1 1 220px;min-width:0;width:auto}.lf select{width:auto;flex:0 1 auto;max-width:100%}
+.lf{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.lf input{flex:1 1 220px;min-width:0;width:auto}.lf select{width:auto;flex:1 1 150px;max-width:100%;min-width:0}
 .lc-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:4px}
 
 .ctr tr.band td{text-align:left;font:600 11px var(--fm);letter-spacing:.06em;text-transform:uppercase;color:var(--acc2);background:var(--bg2);border-bottom:1px solid var(--line);padding:8px 14px}
@@ -179,8 +180,8 @@ textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10
 .dx-ib{display:grid;place-items:center;width:38px;height:38px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--mut);cursor:pointer;padding:0}.dx-ib:hover,.dx-ib.on{color:var(--acc2);border-color:var(--acc)}
 .dx-ib.sm2{width:30px;height:30px;border-radius:8px}
 .dx-pw{position:relative;display:inline-flex}
-.dx-pop{position:absolute;z-index:30;top:46px;background:var(--card2);border:1px solid var(--line);border-radius:14px;padding:14px;box-shadow:0 18px 44px rgba(0,0,0,.55);text-transform:none;letter-spacing:0;font-weight:400;font-size:14px;color:var(--fg);width:min(360px,calc(100vw - 32px));display:grid;gap:10px}
-.dx-pop.pr{right:0}.dx-pop.pl{left:0}.dx-pop.wide{width:min(430px,calc(100vw - 32px))}.dx-pop.top30{top:36px}
+.dx-pop{position:fixed;left:0;top:0;z-index:75;max-height:calc(100vh - 24px);overflow:auto;overscroll-behavior:contain;background:var(--card2);border:1px solid var(--line);border-radius:14px;padding:14px;box-shadow:0 18px 44px rgba(0,0,0,.55);text-transform:none;letter-spacing:0;font-weight:400;font-size:14px;color:var(--fg);width:min(360px,calc(100vw - 32px));display:grid;gap:10px}
+.dx-pop.wide{width:min(430px,calc(100vw - 32px))}.dx-pop.top30{top:36px}
 .dx-pop label{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:13px;color:var(--mut)}.dx-pop input[type=date]{width:auto}
 .dx-live{display:flex;gap:10px;flex-wrap:wrap;padding:12px 14px;align-items:stretch}
 .dx-lc{display:flex;flex-direction:column;padding:7px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg2);min-width:0}
@@ -507,6 +508,17 @@ const dmy=s=>s.split('-').reverse().join('.');
 const dxMonths=['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
 const dxDay=s=>{const[,m,d]=s.split('-').map(Number);return d+' '+dxMonths[m-1]};
 const dxReg=[];let dxLast=null;
+/** Всплывающее окно у кнопки: всегда целиком в экране (ниже кнопки, а если нет места, то выше), на телефоне не уезжает за край */
+function dxPlace(b,p){
+  p.style.maxHeight=(innerHeight-24)+'px';
+  const vw=document.documentElement.clientWidth,w=p.offsetWidth,h=p.offsetHeight,r=b.getBoundingClientRect();
+  let left=p.classList.contains('pr')?r.right-w:r.left;left=Math.max(12,Math.min(left,vw-w-12));
+  let top=r.bottom+8;
+  if(top+h>innerHeight-12){top=r.top-8-h>=12?r.top-8-h:Math.max(12,innerHeight-12-h)}
+  p.style.left=left+'px';p.style.top=top+'px';
+}
+const dxReplace=()=>dxReg.forEach(([b,p])=>{if(!p.hidden&&p.classList.contains('dx-pop'))dxPlace(b,p)});
+addEventListener('resize',dxReplace);addEventListener('scroll',dxReplace,true);
 function dxCloseAll(){dxReg.forEach(([b,p])=>{p.hidden=true;b.classList.remove('on');b.setAttribute('aria-expanded','false')})}
 document.addEventListener('click',dxCloseAll);
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){dxCloseAll();dxCloseModal()}});
@@ -514,7 +526,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'){dxCloseAll();dxClos
 function dxPopBtn(label,svg,content,cls='',btnCls=''){
   const b=el('button',{type:'button',class:'dx-ib sm2 '+btnCls,'aria-label':label,title:label,'aria-expanded':'false'});b.append(svgIcon(svg,18));
   const p=el('div',{class:'dx-pop '+cls,hidden:''},content);
-  b.addEventListener('click',e=>{e.stopPropagation();const open=p.hidden;dxCloseAll();if(open){p.hidden=false;b.classList.add('on');b.setAttribute('aria-expanded','true')}});
+  b.addEventListener('click',e=>{e.stopPropagation();const open=p.hidden;dxCloseAll();if(open){p.hidden=false;b.classList.add('on');b.setAttribute('aria-expanded','true');dxPlace(b,p)}});
   p.addEventListener('click',e=>e.stopPropagation());
   dxReg.push([b,p]);
   return el('span',{class:'dx-pw'},b,p);
