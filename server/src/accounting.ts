@@ -1169,6 +1169,9 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     const ftdBy = new Map(
       ((await db.query(`SELECT d.owner_id, count(*)::int AS n FROM events e JOIN leads d ON d.tg_id = e.tg_id WHERE e.type = 'ftd' AND d.lead_role = 'lead' AND d.owner_id IS NOT NULL AND to_char(e.created_at AT TIME ZONE '${TZ}', 'YYYY-MM') = $1 GROUP BY d.owner_id`, [refMonth])).rows as any[]).map((r) => [r.owner_id, r.n]),
     );
+    const teamDeposits = Number(
+      (await db.query(`SELECT coalesce(sum(e.amount), 0)::float AS s FROM events e JOIN leads d ON d.tg_id = e.tg_id WHERE e.type IN ('ftd','dep') AND d.lead_role = 'lead' AND d.owner_id IS NOT NULL AND to_char(e.created_at AT TIME ZONE '${TZ}', 'YYYY-MM') = $1`, [refMonth])).rows[0].s,
+    );
     const colleagues = colRows
       .map((c) => {
         const lv = liveBy.get(c.id) ?? null;
@@ -1205,8 +1208,8 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
       clicksSince,
       byStatus,
       colleagues,
-      // Общий план команды: часы всех стримеров и FTD против плана на команду (цель по FTD берётся из целей компании)
-      team: { size: colRows.length + 1, hoursMin: k.hoursMin + colRows.reduce((a, c) => a + (hoursBy.get(c.id) ?? 0), 0), ftd: k.ftdCount + colRows.reduce((a, c) => a + (ftdBy.get(c.id) ?? 0), 0), ftdGoal: plan.goals.ftd },
+      // Общий план команды (как кольца у админа): депозиты и FTD всей команды за месяц против целей компании
+      team: { ftd: k.ftdCount + colRows.reduce((a, c) => a + (ftdBy.get(c.id) ?? 0), 0), ftdGoal: plan.goals.ftd, deposits: teamDeposits, depositsGoal: plan.goals.deposits },
       salary: {
         period: refMonth,
         base: [k.min.base, k.full.base],

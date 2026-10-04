@@ -892,16 +892,15 @@ function smFunnel(d){
   return[el('div',{class:'dx-fk'},el('b',{title:'Из клика в регистрацию'},'CTR: '+pc(ctr)),el('b',{title:'Из регистрации в депозит'},'RTD: '+pc(rtd))),
     ...stages.map(([n,v])=>el('div',{class:'dx-fs'},el('div',{class:'dx-fsh'},el('span',{class:'dx-lbl'},n),el('b',{},n0(v))),el('div',{class:'dx-seg2'},el('span',{style:'flex:1;background:var(--acc)'},n0(v))))),note].filter(Boolean);
 }
-/** Кольца стримера: общий план всей команды, часы эфира всех стримеров и FTD команды */
+/** Кольца стримера: как у админа, общий план команды (депозиты и FTD всей команды за месяц) */
 function smRings(d){
-  const T=d.team,pl=d.plan;
-  const planMin=pl.planMin*T.size;
+  const T=d.team;
   const R1=98,R2=74,c1=2*Math.PI*R1,c2=2*Math.PI*R2;
-  const p1=Math.max(0,Math.min(1,planMin?T.hoursMin/planMin:0)),p2=Math.max(0,Math.min(1,T.ftdGoal?T.ftd/T.ftdGoal:0));
+  const p1=Math.max(0,Math.min(1,T.depositsGoal?T.deposits/T.depositsGoal:0)),p2=Math.max(0,Math.min(1,T.ftdGoal?T.ftd/T.ftdGoal:0));
   const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox','0 0 220 220');
   svg.innerHTML='<circle class="tr" cx="110" cy="110" r="'+R1+'"/><circle class="pr" cx="110" cy="110" r="'+R1+'" stroke="var(--acc)" stroke-dasharray="'+(c1*p1).toFixed(1)+' '+c1.toFixed(1)+'"/><circle class="tr" cx="110" cy="110" r="'+R2+'"/><circle class="pr" cx="110" cy="110" r="'+R2+'" stroke="var(--ok)" stroke-dasharray="'+(c2*p2).toFixed(1)+' '+c2.toFixed(1)+'"/>';
   const cv=(c,a,b)=>el('div',{class:'dx-cv'},el('b',{},a),el('span',{},el('i',{style:'background:'+c}),b));
-  return el('div',{class:'dx-rings',style:'flex-direction:column;align-items:center;gap:6px'},el('div',{class:'mut sm',style:'text-align:center'},'План всей команды'),el('div',{class:'dx-rg',role:'img','aria-label':'Команда: часы '+Math.round(p1*100)+'% плана, FTD '+Math.round(p2*100)+'% плана'},svg,el('div',{class:'ctr'},cv('var(--ok)',T.ftd+' / '+T.ftdGoal,'FTD команды'),cv('var(--acc)',hw(T.hoursMin)+' / '+hw(planMin)+' ч','часы команды'))));
+  return el('div',{class:'dx-rings'},el('div',{class:'dx-rg',role:'img','aria-label':'Депозиты команды '+Math.round(p1*100)+'% плана, FTD '+Math.round(p2*100)+'% плана'},svg,el('div',{class:'ctr'},cv('var(--ok)',n0(T.ftd)+' / '+n0(T.ftdGoal),'FTD'),cv('var(--acc)',usd0(T.deposits)+' / '+usd0(T.depositsGoal),'депозиты'))));
 }
 function smMetrics(d){
   const m=d.month,pl=d.plan,pace=pl.pace*100,mark=pace<99.5?pace:null,t=d.today_;
