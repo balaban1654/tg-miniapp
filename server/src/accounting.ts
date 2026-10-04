@@ -785,9 +785,45 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     const period = PERIOD.test(String(req.query.period)) ? String(req.query.period) : await currentPeriod();
     return (
       await db.query(
-        `SELECT f.id, f.staff_id, s.name AS staff_name, to_char(f.day, 'YYYY-MM-DD') AS day, f.minutes, f.reason, f.reason_at
-           FROM shift_shortfalls f JOIN staff s ON s.id = f.staff_id WHERE to_char(f.day, 'YYYY-MM') = $1 ORDER BY f.day DESC, s.name`,
+        `SELECT f.id, f.staff_id, s.name AS staff_name, to_char(f.day, 'YYYY-MM-DD') AS day, f.minutes, f.reason, f.reason_at,
+                f.accepted_at, f.penalty_id, a.amount::float AS penalty_amount, a.comment AS penalty_comment
+           FROM shift_shortfalls f JOIN staff s ON s.id = f.staff_id LEFT JOIN staff_adjustments a ON a.id = f.penalty_id
+          WHERE to_char(f.day, 'YYYY-MM') = $1 AND s.role <> 'admin' ORDER BY f.day DESC, s.name`,
         [period],
+      )
+    ).rows;
+  });
+  // Принять причину (галочка): день больше не требует внимания
+  app.post<{ Params: { id: string } }>('/shortfalls/:id/accept', { preHandler: admin }, async (req, reply) => {
+    const r = await db.query(`UPDATE shift_shortfalls SET accepted_at = CASE WHEN accepted_at IS NULL THEN now() END WHERE id = $1 RETURNING id`, [Number(req.params.id)]);
+    if (!r.rowCount) return reply.code(404).send({ error: 'Запись не найдена' });
+    return { ok: true };
+  });
+  // Штраф за невыполненный день: сумма и причина. Причина видна стримеру во вкладке «Штрафы». Удаляется в «Бонусах и штрафах»
+  app.post<{ Params: { id: string } }>('/shortfalls/:id/penalty', { preHandler: admin }, async (req, reply) => {
+    const b = (req.body ?? {}) as Record<string, any>;
+    const amount = Math.abs(Number(b.amount));
+    if (!Number.isFinite(amount) || amount <= 0 || amount > 100000) return reply.code(400).send({ error: 'Укажите сумму штрафа' });
+    const f = (await db.query(`SELECT staff_id, to_char(day, 'YYYY-MM') AS period, penalty_id FROM shift_shortfalls WHERE id = $1`, [Number(req.params.id)])).rows[0];
+    if (!f) return reply.code(404).send({ error: 'Запись не найдена' });
+    if (f.penalty_id) return reply.code(409).send({ error: 'Штраф за этот день уже выписан' });
+    if (await isClosed(f.period)) return reply.code(409).send({ error: 'Месяц закрыт, штрафы менять нельзя. Откройте месяц заново в Бухгалтерии' });
+    const a = await db.query(
+      `INSERT INTO staff_adjustments (staff_id, period, kind, amount, comment, created_by, visible) VALUES ($1,$2,'penalty',$3,$4,$5,TRUE) RETURNING id`,
+      [f.staff_id, f.period, amount, str(b.comment, 500) || null, req.staff!.id],
+    );
+    await db.query('UPDATE shift_shortfalls SET penalty_id = $2 WHERE id = $1', [Number(req.params.id), a.rows[0].id]);
+    return { ok: true };
+  });
+  // Свои штрафы стримера: сумма и причина
+  app.get('/my/penalties', { preHandler: stream }, async (req) => {
+    return (
+      await db.query(
+        `SELECT a.id, a.period, a.amount::float AS amount, CASE WHEN a.visible THEN a.comment END AS comment, a.created_at,
+                to_char(f.day, 'YYYY-MM-DD') AS day
+           FROM staff_adjustments a LEFT JOIN shift_shortfalls f ON f.penalty_id = a.id
+          WHERE a.staff_id = $1 AND a.kind = 'penalty' ORDER BY a.created_at DESC LIMIT 200`,
+        [req.staff!.id],
       )
     ).rows;
   });

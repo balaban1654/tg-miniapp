@@ -522,3 +522,8 @@ DO $$ BEGIN
     INSERT INTO app_flags (key) VALUES ('manual_leads_created_at');
   END IF;
 END $$;
+
+-- Невыполненные дни: админ принимает причину или выписывает штраф (комментарий штрафа видит стример)
+ALTER TABLE staff_adjustments ADD COLUMN IF NOT EXISTS visible BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE shift_shortfalls ADD COLUMN IF NOT EXISTS accepted_at TIMESTAMPTZ;
+ALTER TABLE shift_shortfalls ADD COLUMN IF NOT EXISTS penalty_id INT REFERENCES staff_adjustments(id) ON DELETE SET NULL;

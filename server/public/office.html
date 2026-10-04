@@ -1923,13 +1923,21 @@ async function viewShifts(){
   const root=el('div',{style:'display:grid;gap:14px'});
   const body=el('div',{style:'display:grid;gap:14px'});
   const bar2=el('div',{class:'lc-tabs',role:'tablist'});
-  const drawTabs=()=>bar2.replaceChildren(...[['shift','Смена'],['reports','Мои отчёты']].map(([k,t])=>el('button',{type:'button',role:'tab','aria-selected':k===cur?'true':'false',class:'lc-tab'+(k===cur?' on':''),onclick:()=>{cur=k;drawTabs();drawBody()}},t)));
-  const drawBody=async()=>{stopPoll();body.replaceChildren(el('div',{class:'mut'},'Загрузка…'));try{body.replaceChildren(...(cur==='shift'?await shiftTab():await reportsTab()).filter(Boolean))}catch(x){if(x.message!=='auth')body.replaceChildren(el('div',{class:'err'},x.message))}};
+  const drawTabs=()=>bar2.replaceChildren(...[['shift','Смена'],['reports','Мои отчёты'],['fines','Штрафы']].map(([k,t])=>el('button',{type:'button',role:'tab','aria-selected':k===cur?'true':'false',class:'lc-tab'+(k===cur?' on':''),onclick:()=>{cur=k;drawTabs();drawBody()}},t)));
+  const drawBody=async()=>{stopPoll();body.replaceChildren(el('div',{class:'mut'},'Загрузка…'));try{body.replaceChildren(...(cur==='shift'?await shiftTab():cur==='fines'?await finesTab():await reportsTab()).filter(Boolean))}catch(x){if(x.message!=='auth')body.replaceChildren(el('div',{class:'err'},x.message))}};
   await api('/shortfalls/sync',{method:'POST'}).catch(()=>{});
   drawTabs();
   root.append(bar2,body);
   await drawBody();
   return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Смены и отчёты'),el('span',{class:'mut sm'},me.name)),root];
+}
+
+async function finesTab(){
+  const rows=await api('/my/penalties');
+  const tot=rows.reduce((a,r)=>a+r.amount,0);
+  return[el('div',{class:'head'},el('h3',{style:'font-size:15px'},'Мои штрафы'),rows.length?el('span',{class:'pill p-bad'},'всего −'+usd2(tot)):null),
+    ctrT(table(['Дата','Сумма','Причина'],rows.map(r=>[td(new Date(r.created_at).toLocaleDateString('ru-RU',{day:'numeric',month:'short',year:'numeric'})),td('−'+usd2(r.amount),'n'),el('td',{style:'white-space:normal;text-align:center;min-width:240px'},r.comment||el('span',{class:'mut'},'—'))]),'Штрафов нет.')),
+    el('div',{class:'mut sm'},'Штраф вычитается из зарплаты за месяц. Если он выписан по ошибке, напишите руководителю.')];
 }
 
 async function shiftTab(){
@@ -2298,11 +2306,38 @@ async function accExp(){
     el('div',{class:'mut sm'},'Расходы вычитаются из чистой прибыли на дашборде. Зарплаты сюда вносить не нужно, они считаются сами.')];
 }
 
+function penaltyDialog(r,done){
+  document.querySelectorAll('.lc-overlay').forEach(x=>x.remove());
+  const ov=el('div',{class:'lc-overlay',role:'dialog','aria-modal':'true'});
+  const close=()=>{ov.remove();document.removeEventListener('keydown',onKey)};
+  const onKey=e=>{if(e.key==='Escape')close()};document.addEventListener('keydown',onKey);
+  ov.addEventListener('mousedown',e=>{if(e.target===ov)close()});
+  const amount=el('input',{type:'number',min:'0',step:'0.01',placeholder:'Сумма, $',inputmode:'decimal'});
+  const comment=el('textarea',{class:'big',rows:'3',maxlength:'500',placeholder:'Причина: её увидит стример во вкладке «Штрафы»',style:'min-height:80px'});
+  const err=el('div',{class:'err',role:'alert'});
+  const send=el('button',{class:'btn',type:'button',onclick:async()=>{
+    err.textContent='';send.disabled=true;
+    try{await api('/shortfalls/'+r.id+'/penalty',{method:'POST',body:{amount:Number(amount.value),comment:comment.value}});close();toast('Штраф выписан');done()}
+    catch(x){err.textContent=x.message;send.disabled=false}}},'Выписать штраф');
+  ov.append(el('div',{class:'lc',style:'width:min(440px,100%)'},
+    el('div',{class:'lc-head'},el('h3',{style:'font-size:18px'},'Штраф: '+r.staff_name+', '+new Date(r.day+'T12:00:00').toLocaleDateString('ru-RU',{day:'numeric',month:'long'})),el('button',{class:'btn o s',type:'button','aria-label':'Закрыть',onclick:close},'✕')),
+    r.reason?el('div',{class:'mut sm'},'Причина стримера: '+r.reason):null,
+    el('div',{class:'lc-field'},el('label',{},'Сумма'),amount),el('div',{class:'lc-field'},el('label',{},'Причина штрафа'),comment),
+    err,el('div',{class:'lc-actions'},send)));
+  document.body.append(ov);amount.focus();
+}
 async function accWhy(){
   const rows=await api('/shortfalls?period='+accState.period);
+  const act=r=>{
+    if(r.penalty_id)return el('td',{},el('span',{class:'pill p-bad',title:r.penalty_comment||''},'штраф −'+usd2(r.penalty_amount)));
+    if(r.accepted_at)return el('td',{},el('span',{class:'pill p-ok'},'принято'));
+    const ok=el('button',{class:'btn s',type:'button',title:'Принять причину','aria-label':'Принять причину',onclick:async()=>{try{await api('/shortfalls/'+r.id+'/accept',{method:'POST'});accRefresh()}catch(x){toast(x.message)}}},svgIcon('<path d="M5 12.5l4.5 4.5L19 7.5"/>',16));
+    const fine=el('button',{class:'btn o s',type:'button',onclick:()=>penaltyDialog(r,accRefresh)},'Штраф');
+    return el('td',{},el('span',{style:'display:inline-flex;gap:6px;align-items:center'},ok,fine));
+  };
   return[el('div',{class:'head'},el('h3',{style:'font-size:15px'},'Невыполненные дни за '+perLabel(accState.period))),
-    ctrT(table(['Стример','День','Зачтено','Причина'],rows.map(r=>[td(r.staff_name),td(new Date(r.day+'T12:00:00').toLocaleDateString('ru-RU',{day:'numeric',month:'short'})),td(hmin(r.minutes)),el('td',{style:'white-space:normal;text-align:left;min-width:240px'},r.reason?r.reason:el('span',{class:'mut'},'ещё не написал'))]),'Невыполненных дней нет.')),
-    el('div',{class:'mut sm'},'Если за день не набралось 3 часов, стример должен написать причину. Главное: 66 часов за месяц.')];
+    ctrT(table(['Стример','День','Зачтено','Причина',''],rows.map(r=>[td(r.staff_name),td(new Date(r.day+'T12:00:00').toLocaleDateString('ru-RU',{day:'numeric',month:'short'})),td(hmin(r.minutes)),el('td',{style:'white-space:normal;text-align:center;min-width:240px'},r.reason?r.reason:el('span',{class:'mut'},'ещё не написал')),act(r)]),'Невыполненных дней нет.')),
+    el('div',{class:'mut sm'},'Если за день не набралось 3 часов, стример должен написать причину. Главное: 66 часов за месяц. Штраф можно удалить во вкладке «Бонусы и штрафы».')];
 }
 
 async function accPlan(){
