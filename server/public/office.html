@@ -2938,7 +2938,7 @@ async function viewPostbacks(){
     cnt.textContent=list.length===rows.length?rows.length+' всего':list.length+' из '+rows.length;
   };
   draw();
-  return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Постбеки'),el('div',{style:'display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end'},cnt,rangeBar(()=>render({soft:true})),upBtn,upFile,clearBox,el('button',{class:'btn o s',type:'button',onclick:()=>render({soft:true})},'Обновить'))),bar,totBox,holder];
+  return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Постбеки'),rangeBar(()=>render({soft:true}))),el('div',{style:'display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end;margin:-4px 0 10px'},cnt,upBtn,upFile,clearBox,el('button',{class:'btn o s',type:'button',onclick:()=>render({soft:true})},'Обновить')),bar,totBox,holder];
 }
 
 (async()=>{try{me=await api('/me');readHash();showApp()}catch{showLogin()}})();
