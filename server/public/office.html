@@ -93,7 +93,7 @@ tr.rowc{cursor:pointer}tr.rowc:hover{background:#ffffff08}tr.rowc.on{background:
 .chk{display:flex;justify-content:center}.chk input{width:auto}
 @media(max-width:800px){.rev{grid-template-columns:1fr}.frow2{grid-template-columns:1fr}.fhead2{display:none}}
 .lc-two{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
-.me{margin-top:auto;padding:10px;color:var(--mut);font-size:12px;display:grid;gap:8px}
+.iic{display:none}.me{margin-top:auto;padding:10px;color:var(--mut);font-size:12px;display:grid;gap:8px}
 main{padding:22px clamp(14px,3vw,32px);display:grid;grid-template-columns:minmax(0,1fr);gap:18px;align-content:start;min-width:0}
 .head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
 .kpis{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
@@ -169,7 +169,7 @@ textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10
 @media(max-width:760px){
  #app{grid-template-columns:minmax(0,1fr)}
  .side{position:static;height:auto;flex-direction:row;flex-wrap:wrap;align-items:center;padding:10px;border-right:0;border-bottom:1px solid var(--line)}
- .side .brand{padding:0 8px 0 0}.nav{grid-auto-flow:column;overflow-x:auto;min-width:0;max-width:100%;flex:1 1 100%;order:3}.me{margin:0 0 0 auto;display:flex;align-items:center}
+ .side{flex-wrap:wrap;row-gap:8px}.side .brand{padding:0;flex:1 1 0;min-width:0}.side .brand .logo{flex:none}.side .brand b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.nav{grid-auto-flow:column;overflow-x:auto;min-width:0;max-width:100%;flex:1 1 100%;order:3}.me{margin:0 0 0 auto;padding:0;display:flex;align-items:center;gap:8px;flex:0 1 auto;min-width:0}.me-row{min-width:0;gap:4px}#meName{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:34vw}@media(max-width:560px){.mrole{display:none}}.me .btn.s{padding:6px 12px;line-height:1.2;white-space:nowrap}#installBtn{padding:6px 9px!important}#installBtn .ilbl{display:none}#installBtn .iic{display:block}
 }
 /* дашборд админа */
 .dx{display:grid;gap:16px;min-width:0}
@@ -308,7 +308,7 @@ textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10
   <aside class="side">
     <div class="brand"><div class="logo">H</div><b style="font:700 14px var(--fd)">Hunter Office</b></div>
     <nav class="nav" id="nav"></nav>
-    <div class="me"><div class="me-row"><span id="meName"></span><button class="gear" id="meGear" type="button" title="Моя карточка" aria-label="Моя карточка"></button></div><button class="btn o s" id="installBtn" type="button" hidden>Установить приложение</button><button class="btn o s" id="logout" type="button">Выйти</button></div>
+    <div class="me"><div class="me-row"><span id="meName"></span><button class="gear" id="meGear" type="button" title="Моя карточка" aria-label="Моя карточка"></button></div><button class="btn o s" id="installBtn" type="button" hidden title="Установить приложение" aria-label="Установить приложение"><svg class="iic" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg><span class="ilbl">Установить приложение</span></button><button class="btn o s" id="logout" type="button">Выйти</button></div>
   </aside>
   <main id="main"></main>
 </div>
@@ -372,7 +372,7 @@ function showApp(){
   if(me.totp===false&&['admin','teamlead'].includes(me.role)){$('#login').hidden=true;$('#app').hidden=true;twofaDialog(true);return}
   document.querySelectorAll('.tf-overlay').forEach(x=>x.remove());
   $('#login').hidden=true;$('#app').hidden=false;
-  $('#meName').textContent=me.name+' · '+ROLE[me.role];
+  $('#meName').replaceChildren(me.name,el('span',{class:'mrole'},' · '+ROLE[me.role]));
   const gb=$('#meGear');if(gb&&!gb.firstChild){gb.append(svgIcon(GEAR,16));gb.onclick=()=>openStaffCard(null)}
   const items=[['home','Дашборд'],['leads','Лиды'],];
   if(me.role==='admin'||me.role==='teamlead')items.push(['staff',me.role==='admin'?'Сотрудники':'Моя команда']);
