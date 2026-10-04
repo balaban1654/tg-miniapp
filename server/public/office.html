@@ -43,7 +43,7 @@ input,select{background:var(--bg2);border:1px solid var(--line);border-radius:10
 .nav{display:grid;gap:3px}
 .nav button{display:flex;align-items:center;gap:10px;text-align:left;white-space:nowrap;background:none;border:0;border-radius:9px;padding:9px 12px;color:var(--mut);font-weight:600;cursor:pointer}
 .nav button.on{background:var(--card2);color:var(--fg)}
-.bell{margin-left:auto;position:relative;background:none;border:0;padding:5px;color:var(--mut);cursor:pointer;display:grid;place-items:center;border-radius:8px}.bell:hover{color:var(--fg);background:var(--card2)}.bell .cnt{position:absolute;top:0;right:0;min-width:15px;height:15px;border-radius:99px;background:var(--bad);color:#fff;font:700 9px var(--fm);display:grid;place-items:center;padding:0 3px}
+.nbadge{margin-left:auto;min-width:19px;height:19px;border-radius:99px;background:var(--bad);color:#fff;font:700 11px var(--fm);display:grid;place-items:center;padding:0 6px}
 .me-row{display:flex;align-items:center;gap:8px}.gear{background:none;border:0;padding:3px;color:var(--mut);cursor:pointer;display:grid;place-items:center;border-radius:6px}.gear:hover{color:var(--fg);background:var(--card2)}
 .lc-field{display:grid;gap:4px}.lc-field label{font-size:12px;color:var(--mut)}.lc-tabs{display:flex;gap:6px;border-bottom:1px solid var(--line);flex-wrap:wrap}.lc-tab{background:none;border:0;border-bottom:2px solid transparent;padding:10px 14px;color:var(--mut);font-weight:600;cursor:pointer;margin-bottom:-1px}.lc-tab.on{color:var(--fg);border-bottom-color:var(--acc)}.lc-pane{display:grid;gap:14px;min-height:190px;align-content:start}
 /* бухгалтерия стримеров */
@@ -268,7 +268,7 @@ textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10
 
 <div id="app" hidden>
   <aside class="side">
-    <div class="brand"><div class="logo">H</div><b style="font:700 14px var(--fd)">Hunter Office</b><button class="bell" id="bell" type="button" title="Уведомления" aria-label="Уведомления"></button></div>
+    <div class="brand"><div class="logo">H</div><b style="font:700 14px var(--fd)">Hunter Office</b></div>
     <nav class="nav" id="nav"></nav>
     <div class="me"><div class="me-row"><span id="meName"></span><button class="gear" id="meGear" type="button" title="Моя карточка" aria-label="Моя карточка"></button></div><button class="btn o s" id="logout" type="button">Выйти</button></div>
   </aside>
@@ -324,24 +324,22 @@ const ICONS={
   shifts:'<circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3 2"/>',
   acc:'<rect x="3" y="6" width="18" height="13" rx="2.5"/><path d="M3 10h18M16 15h2"/>',
   plans:'<path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 6l1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2"/>',
-  notifs:'<path d="M6 16V11a6 6 0 1112 0v5l1.5 2h-15z"/><path d="M10 21a2 2 0 004 0"/>'};
+  mytasks:'<circle cx="12" cy="12" r="9"/><path d="M8 12.5l3 3 5-6"/>'};
 const icon=k=>{const s=document.createElementNS('http://www.w3.org/2000/svg','svg');s.setAttribute('viewBox','0 0 24 24');s.setAttribute('width','18');s.setAttribute('height','18');s.setAttribute('fill','none');s.setAttribute('stroke','currentColor');s.setAttribute('stroke-width','2');s.setAttribute('stroke-linecap','round');s.setAttribute('stroke-linejoin','round');s.setAttribute('aria-hidden','true');s.innerHTML=ICONS[k]||'';return s};
 function showApp(){
   $('#login').hidden=true;$('#app').hidden=false;
   $('#meName').textContent=me.name+' · '+ROLE[me.role];
-  const bl=$('#bell');if(bl&&!bl.firstChild){bl.append(svgIcon(ICONS.notifs,18));bl.onclick=()=>{tab='notifs';showApp()}}
   const gb=$('#meGear');if(gb&&!gb.firstChild){gb.append(svgIcon(GEAR,16));gb.onclick=()=>openStaffCard(null)}
   const items=[['home','Дашборд'],['leads','Лиды'],['links','Ссылки']];
   if(me.role==='admin'||me.role==='teamlead')items.push(['staff',me.role==='admin'?'Сотрудники':'Моя команда']);
   if(['admin','teamlead','streamer'].includes(me.role))items.splice(1,0,['chats','Чаты']);
   if(me.role==='admin')items.splice(1,0,['signals','Сигналы']);
-  if(me.role==='analyst'){items.length=0;items.push(['signals','Сигналы']);if(tab!=='signals'&&tab!=='notifs')tab='signals'}
+  if(me.role==='analyst'){items.length=0;items.push(['signals','Сигналы']);if(tab!=='signals')tab='signals'}
   if(me.role==='admin')items.push(['push','Пуши'],['media','Медиа'],['pb','Постбеки']);
-  if(me.role==='streamer')items.splice(items.length,0,['shifts','Смены и отчёты']);
+  if(me.role==='streamer')items.splice(items.length,0,['shifts','Смены и отчёты'],['mytasks','Мои задачи']);
   if(me.role==='admin')items.splice(items.findIndex(x=>x[0]==='push'),0,['acc','Бухгалтерия'],['plans','Планы и задачи']);
-  items.push(['notifs','Уведомления']);
   if(!items.some(x=>x[0]===tab)){tab=items[0][0];history.replaceState(null,'','#'+hashPath())}
-  const nav=$('#nav');nav.replaceChildren(...items.map(([k,t])=>el('button',{type:'button','data-t':k,class:k===tab?'on':'',onclick:()=>{tab=k;showApp();render()}},icon(k),el('span',{class:'lbl'},k==='chats'?chatsLabel:t))));
+  const nav=$('#nav');nav.replaceChildren(...items.map(([k,t])=>el('button',{type:'button','data-t':k,class:k===tab?'on':'',onclick:()=>{tab=k;showApp();render()}},icon(k),el('span',{class:'lbl'},k==='chats'?chatsLabel:t),k==='mytasks'?el('span',{class:'nbadge',id:'tasksBadge',hidden:''}):null)));
   render();updateBadge();
 }
 
@@ -371,19 +369,12 @@ async function render(opt){
     else if(tab==='push')m.replaceChildren(...await viewPush());
     else if(tab==='media')m.replaceChildren(...await viewMedia());
     else if(tab==='pb')m.replaceChildren(...await viewPostbacks());
-    else if(tab==='notifs')m.replaceChildren(...await viewNotifs());
     else if(tab==='shifts')m.replaceChildren(...await viewShifts());
     else if(tab==='acc')m.replaceChildren(...await viewAcc());
     else if(tab==='plans')m.replaceChildren(...await viewPlans());
+    else if(tab==='mytasks')m.replaceChildren(...await viewMyTasks());
   }catch(x){if(x.message!=='auth')m.replaceChildren(el('div',{class:'err'},x.message))}
   if(soft){window.scrollTo(0,y);m.scrollTop=mt}
-}
-
-/** Уведомления: пока заготовка. Позже здесь копятся события по ролям и настройка, что получать и куда */
-async function viewNotifs(){
-  return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Уведомления')),
-    el('div',{class:'card',style:'display:grid;gap:8px'},el('b',{},'Здесь появятся ваши уведомления'),
-      el('div',{class:'mut sm'},'У каждой роли они копятся свои: новые отчёты на проверку, запросы аванса, отставание от плана, решения по вашим отчётам. Отдельно появится настройка, что и куда получать.'))];
 }
 
 /* ---------- Дашборд админа: план/факт, воронка, зарплаты, расходы, чистая прибыль ---------- */
@@ -773,7 +764,7 @@ function smTasks(d){
   d.tasks.forEach(t=>{
     const done=t.status==='done',over=!done&&t.due&&t.due<d.today;
     const sub=done?'Отправлено на проверку. Нажмите, чтобы вернуть в работу':[t.details,t.due?'до '+dxDay(t.due):''].filter(Boolean).join(' · ')||'Без срока';
-    items.push(el('button',{type:'button',class:'dx-tk',title:done?'Вернуть в работу':'Отметить выполненной',onclick:async()=>{try{await api('/tasks/'+t.id+(done?'/undo':'/done'),{method:'POST'});toast(done?'Задача снова в работе':'Задача отправлена на проверку');render({soft:true})}catch(x){toast(x.message)}}},
+    items.push(el('button',{type:'button',class:'dx-tk',title:done?'Вернуть в работу':'Отметить выполненной',onclick:async()=>{try{await api('/tasks/'+t.id+(done?'/undo':'/done'),{method:'POST'});toast(done?'Задача снова в работе':'Задача отправлена на проверку');render({soft:true});setTasksBadge()}catch(x){toast(x.message)}}},
       el('span',{class:'dx-ic '+(done?'ok':'a')},svgIcon(IC_CHECK,18)),el('span',{class:'dx-tx'},el('span',{class:'tt',style:done?'text-decoration:line-through;color:var(--mut)':''},t.title),el('span',{class:'ts',style:over?'color:var(--bad)':''},sub))));
   });
   return el('div',{class:'card dx-tasks'},el('div',{class:'dx-lbl'},'Мои задачи'),el('div',{class:'dx-tl'},...(items.length?items:[el('div',{class:'dx-ok'},'Задач нет. Отличная работа')])));
@@ -806,6 +797,29 @@ async function simpleTasksCard(){
     const done=t.status==='done',over=!done&&t.due&&t.due<today;
     return el('button',{type:'button',class:'dx-tk',onclick:async()=>{try{await api('/tasks/'+t.id+(done?'/undo':'/done'),{method:'POST'});render({soft:true})}catch(x){toast(x.message)}}},
       el('span',{class:'dx-ic '+(done?'ok':'a')},svgIcon(IC_CHECK,18)),el('span',{class:'dx-tx'},el('span',{class:'tt',style:done?'text-decoration:line-through;color:var(--mut)':''},t.title),el('span',{class:'ts',style:over?'color:var(--bad)':''},done?'Отправлено на проверку':[t.details,t.due?'до '+dxDay(t.due):''].filter(Boolean).join(' · ')||'Без срока')))}));
+}
+
+/** Стример: все его задачи, у пункта меню цифра незакрытых */
+async function viewMyTasks(){
+  const list=await api('/tasks/mine?all=1');
+  const today=kyivToday();
+  const act=(t,path)=>async()=>{try{await api('/tasks/'+t.id+path,{method:'POST'});toast(path==='/done'?'Задача отправлена на проверку':'Задача снова в работе');render({soft:true});setTasksBadge()}catch(x){toast(x.message)}};
+  const card=t=>{
+    const over=t.status==='open'&&t.due&&t.due<today;
+    return el('div',{class:'card',style:'display:flex;gap:14px;align-items:center;flex-wrap:wrap'},
+      el('span',{class:'dx-ic '+(t.status==='open'?'a':'ok')},svgIcon(IC_CHECK,18)),
+      el('div',{style:'flex:1;min-width:200px;display:grid;gap:2px'},el('b',{style:t.status==='accepted'?'text-decoration:line-through;color:var(--mut)':''},t.title),
+        t.details?el('div',{class:'mut sm'},t.details):null,
+        el('div',{class:'sm',style:'color:'+(over?'var(--bad)':'var(--mut)')},t.due?'Срок: '+dmy(t.due).slice(0,5)+(over?' · просрочено':''):'Без срока')),
+      t.status==='open'?el('button',{class:'btn s',type:'button',onclick:act(t,'/done')},'Выполнено'):
+      t.status==='done'?el('div',{class:'inl'},el('span',{class:'pill p-warn'},'на проверке'),el('button',{class:'btn o s',type:'button',onclick:act(t,'/undo')},'Вернуть в работу')):
+      el('span',{class:'pill p-ok'},'принята'));
+  };
+  const open=list.filter(t=>t.status==='open'),wait=list.filter(t=>t.status==='done'),acc=list.filter(t=>t.status==='accepted');
+  const sec=(title,items)=>items.length?el('div',{style:'display:grid;gap:10px'},el('h3',{style:'font-size:15px'},title),...items.map(card)):null;
+  return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Мои задачи')),
+    open.length||wait.length||acc.length?null:el('div',{class:'card empty'},'Задач пока нет. Когда руководитель поставит задачу, она появится здесь.'),
+    sec('Нужно сделать · '+open.length,open),sec('На проверке · '+wait.length,wait),sec('Принятые',acc)].filter(Boolean);
 }
 
 async function viewHome(){
@@ -946,8 +960,15 @@ let poll=null;
 function stopPoll(){if(poll){clearInterval(poll);poll=null}}
 let chatsLabel='Чаты';
 async function updateBadge(){
-  if(!me||!['admin','teamlead','streamer'].includes(me.role))return;
-  try{const c=await api('/chats');const n=c.filter(x=>x.waiting).length;chatsLabel='Чаты '+c.length+(n?' ('+n+')':'');const b=document.querySelector('[data-t=chats] .lbl');if(b&&b.textContent!==chatsLabel)b.textContent=chatsLabel}catch{}
+  if(!me)return;
+  if(['admin','teamlead','streamer'].includes(me.role)){
+    try{const c=await api('/chats');const n=c.filter(x=>x.waiting).length;chatsLabel='Чаты '+c.length+(n?' ('+n+')':'');const b=document.querySelector('[data-t=chats] .lbl');if(b&&b.textContent!==chatsLabel)b.textContent=chatsLabel}catch{}
+  }
+  if(me.role==='streamer')await setTasksBadge();
+}
+/** Цифра у пункта «Мои задачи»: сколько задач ещё не закрыто */
+async function setTasksBadge(){
+  try{const t=await api('/tasks/mine');const n=t.filter(x=>x.status==='open').length;const b=document.getElementById('tasksBadge');if(b){b.textContent=String(n);b.hidden=!n}}catch{}
 }
 setInterval(updateBadge,20000);
 

@@ -883,8 +883,15 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     return { ok: true };
   });
   // Свои задачи: открытые и ждущие принятия
-  app.get('/tasks/mine', { preHandler: anyStaff }, async (req) => {
-    const rows = (await db.query(`SELECT ${TASK_COLS} FROM staff_tasks t JOIN staff s ON s.id = t.staff_id WHERE t.staff_id = $1 AND t.status <> 'accepted' ORDER BY (t.status = 'open') DESC, t.due NULLS LAST, t.id DESC`, [req.staff!.id])).rows;
+  app.get<{ Querystring: { all?: string } }>('/tasks/mine', { preHandler: anyStaff }, async (req) => {
+    const withAccepted = req.query.all === '1';
+    const rows = (
+      await db.query(
+        `SELECT ${TASK_COLS} FROM staff_tasks t JOIN staff s ON s.id = t.staff_id WHERE t.staff_id = $1 AND ($2::boolean OR t.status <> 'accepted')
+          ORDER BY (t.status = 'open') DESC, (t.status = 'done') DESC, t.due NULLS LAST, t.id DESC LIMIT 60`,
+        [req.staff!.id, withAccepted],
+      )
+    ).rows;
     return rows.map(taskRow);
   });
   app.post<{ Params: { id: string } }>('/tasks/:id/done', { preHandler: anyStaff }, async (req, reply) => {
