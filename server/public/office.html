@@ -1741,6 +1741,7 @@ async function accDetail(box,id){
     pays?el('div',{style:'display:grid;gap:8px'},el('h4',{},'Выплаты за месяц'),pays):null));
 }
 
+let reviewFilter={who:'',st:'',sort:'new'};
 async function accReview(){
   const [pend,all]=await Promise.all([api('/shifts/pending'),api('/shifts/all?period='+accState.period)]);
   const card=r=>{
@@ -1757,11 +1758,29 @@ async function accReview(){
       el('div',{class:'acts2'},el('div',{class:'inl'},hh,el('span',{class:'mut sm'},'ч'),mm,el('span',{class:'mut sm'},'мин'),el('button',{class:'btn s',type:'button',onclick:()=>{const t=total();if(t<1||t>720){toast('Время от 1 минуты до 12 часов');return}act('approve',{minutes:t})}},'Зачесть')),
         el('div',{class:'inl'},why,el('button',{class:'btn o s',type:'button',onclick:()=>act('reject',{reason:why.value})},'Отклонить'))));
   };
-  const hist=all.filter(r=>r.status!=='pending').map(r=>[td(r.staff_name),td(new Date(r.day+'T12:00:00').toLocaleDateString('ru-RU',{day:'numeric',month:'short'})),td(hmin(r.declared_min)+(r.approved_min&&r.approved_min!==r.declared_min?' → '+hmin(r.approved_min):'')),el('td',{},el('span',{class:'pill '+REPSTATUS[r.status][1]},REPSTATUS[r.status][0])),el('td',{},el('a',{href:'/api/office/shifts/'+r.id+'/screenshot',target:'_blank',rel:'noopener',style:'color:var(--acc2)'},'скриншот')),
-    el('td',{},r.status==='approved'?'':el('button',{class:'btn o s',type:'button',onclick:async()=>{try{await api('/shifts/'+r.id,{method:'DELETE'});accRefresh()}catch(x){toast(x.message)}}},'Удалить'))]);
+  // Проверенные: фильтр по стримеру и статусу, сортировка, удаление (в том числе принятых), предпросмотр скриншота
+  const done=all.filter(r=>r.status!=='pending');
+  const HF=reviewFilter;
+  const staffNames=[...new Set(done.map(r=>r.staff_name))].sort();
+  const selF=(opts,key,all2)=>{const x=el('select',{onchange:()=>{HF[key]=x.value;drawHist()}},...(all2?[el('option',{value:''},all2)]:[]),...opts.map(([v,t])=>el('option',{value:v},t)));x.value=HF[key];return x};
+  const histBar=el('div',{class:'lf'},selF(staffNames.map(n=>[n,n]),'who','Все стримеры'),selF(Object.entries(REPSTATUS).filter(([k])=>k!=='pending').map(([k,v])=>[k,v[0]]),'st','Все статусы'),
+    selF([['new','Сначала новые'],['old','Сначала старые'],['long','Дольше эфир'],['short','Короче эфир'],['who','По стримеру А–Я']],'sort'),
+    el('button',{class:'btn o s',type:'button',onclick:()=>{Object.assign(HF,{who:'',st:'',sort:'new'});accRefresh()}},'Сбросить'));
+  const histHold=el('div',{});
+  const min=r=>r.approved_min??r.declared_min??0;
+  const drawHist=()=>{
+    const list=done.filter(r=>(!HF.who||r.staff_name===HF.who)&&(!HF.st||r.status===HF.st));
+    const by={new:(a,b)=>b.day.localeCompare(a.day)||b.id-a.id,old:(a,b)=>a.day.localeCompare(b.day)||a.id-b.id,long:(a,b)=>min(b)-min(a),short:(a,b)=>min(a)-min(b),who:(a,b)=>a.staff_name.localeCompare(b.staff_name,'ru')||b.day.localeCompare(a.day)}[HF.sort];
+    list.sort(by);
+    const rows=list.map(r=>[td(r.staff_name),td(new Date(r.day+'T12:00:00').toLocaleDateString('ru-RU',{day:'numeric',month:'short'})),td(r.status==='await'?'—':hmin(r.declared_min)+(r.approved_min&&r.approved_min!==r.declared_min?' → '+hmin(r.approved_min):'')),el('td',{},el('span',{class:'pill '+REPSTATUS[r.status][1]},REPSTATUS[r.status][0])),
+      el('td',{},r.has_screenshot?shotThumb('/api/office/shifts/'+r.id+'/screenshot',{style:'color:var(--acc2)'}).appendChild(document.createTextNode('скриншот')).parentNode:'—'),
+      el('td',{},el('button',{class:'btn o s',type:'button',style:'color:var(--bad)',onclick:async()=>{if(!confirm('Удалить отчёт '+r.staff_name+' за '+new Date(r.day+'T12:00:00').toLocaleDateString('ru-RU',{day:'numeric',month:'long'})+' из системы?'+(r.status==='approved'?' Его время пропадёт из расчёта часов и зарплаты.':'')))return;try{await api('/shifts/'+r.id,{method:'DELETE'});toast('Отчёт удалён');accRefresh()}catch(x){toast(x.message)}}},'Удалить'))]);
+    histHold.replaceChildren(ctrT(table(['Стример','Дата','Время','Статус','Скрин',''],rows,done.length?'Ничего не найдено. Измените фильтры.':'За этот месяц проверенных отчётов нет.')));
+  };
+  drawHist();
   return[el('div',{class:'head'},el('h3',{style:'font-size:15px'},'На проверке: '+pend.length),el('span',{class:'mut sm'},'после зачёта время идёт в расчёт и в дашборд стримера')),
     pend.length?el('div',{style:'display:grid;gap:10px'},pend.map(card)):el('div',{class:'card empty'},'Нет отчётов на проверку.'),
-    el('h3',{style:'font-size:15px;margin-top:6px'},'Проверенные за '+perLabel(accState.period)),ctrT(table(['Стример','Дата','Время','Статус','Скрин',''],hist,'За этот месяц проверенных отчётов нет.'))];
+    el('h3',{style:'font-size:15px;margin-top:6px'},'Проверенные за '+perLabel(accState.period)),histBar,histHold];
 }
 
 async function streamersList(){return(await api('/staff')).filter(s=>s.role==='streamer'&&s.active)}

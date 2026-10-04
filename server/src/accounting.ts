@@ -469,8 +469,16 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
   // Удалить можно только то, что не принято
   app.delete<{ Params: { id: string } }>('/shifts/:id', { preHandler: anyStaff }, async (req, reply) => {
     const me = req.staff!;
-    const r = await db.query(`DELETE FROM shift_reports WHERE id = $1 AND status <> 'approved' AND (staff_id = $2 OR $3) RETURNING id`, [Number(req.params.id), me.id, me.role === 'admin']);
-    if (!r.rowCount) return reply.code(409).send({ error: 'Принятый отчёт удалить нельзя' });
+    const row = (await db.query(`SELECT staff_id, status, to_char(day, 'YYYY-MM') AS pm FROM shift_reports WHERE id = $1`, [Number(req.params.id)])).rows[0];
+    if (!row) return reply.code(404).send({ error: 'Отчёт не найден' });
+    if (me.role !== 'admin') {
+      if (row.staff_id !== me.id) return reply.code(404).send({ error: 'Отчёт не найден' });
+      if (row.status === 'approved') return reply.code(409).send({ error: 'Принятый отчёт удалить нельзя' });
+    } else if (row.status === 'approved' && (await isClosed(row.pm))) {
+      return reply.code(409).send({ error: 'Месяц закрыт: принятый отчёт удалить нельзя. Откройте месяц заново в Бухгалтерии.' });
+    }
+    // Админ может удалить любой отчёт, в том числе принятый: время из расчёта уйдёт
+    await db.query('DELETE FROM shift_reports WHERE id = $1', [Number(req.params.id)]);
     return { ok: true };
   });
 
