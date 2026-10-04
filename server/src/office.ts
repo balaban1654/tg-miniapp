@@ -39,7 +39,7 @@ declare module 'fastify' {
 /** Условие видимости лидов и ссылок по роли. Возвращает SQL-фрагмент для колонки owner. */
 
 /** Способы выплат: позже список переедет в раздел «Бухгалтерия» */
-const PAYOUT_METHODS = ['Tippo ID', 'USDT BEP20'];
+const PAYOUT_METHODS = ['Tippo ID', 'Binance ID', 'USDT BEP20'];
 const STAFF_CARD_COLS = 'id, login, name, role, streams, tg_username, full_name, to_char(birth_date, \'YYYY-MM-DD\') AS birth_date, city, payout_method, payout_wallet';
 
 /** Разбор полей карточки сотрудника: вернёт колонки для UPDATE или текст ошибки */
