@@ -1719,7 +1719,9 @@ async function accDetail(box,id){
 async function accReview(){
   const [pend,all]=await Promise.all([api('/shifts/pending'),api('/shifts/all?period='+accState.period)]);
   const card=r=>{
-    const min=el('input',{type:'number',min:'1',max:'720',value:String(r.declared_min),style:'width:90px'});
+    const hh=el('input',{type:'number',min:'0',max:'12',inputmode:'numeric',value:String(Math.min(12,Math.floor(r.declared_min/60))),'aria-label':'Часы',style:'width:64px;text-align:center'});
+    const mm=el('input',{type:'number',min:'0',max:'59',inputmode:'numeric',value:String(r.declared_min>=720?0:r.declared_min%60),'aria-label':'Минуты',style:'width:64px;text-align:center'});
+    const total=()=>(Number(hh.value)||0)*60+(Number(mm.value)||0);
     const why=el('input',{placeholder:'Причина отказа (необязательно)',style:'width:240px'});
     const act=async(action,extra)=>{try{await api('/shifts/'+r.id+'/review',{method:'POST',body:{action,...extra}});toast(action==='approve'?'Отчёт зачтён':'Отчёт отклонён');accRefresh()}catch(x){toast(x.message)}};
     return el('div',{class:'rev'},
@@ -1727,7 +1729,7 @@ async function accReview(){
       el('div',{class:'meta2'},el('div',{},el('b',{},r.staff_name),' ',el('span',{class:'mut sm'},new Date(r.day+'T12:00:00').toLocaleDateString('ru-RU',{day:'numeric',month:'short'})),' ',el('span',{class:'pill p-pur'},'заявлено '+hmin(r.declared_min)),r.declared_start?el('span',{class:'mut sm',title:'Начало эфира, указанное в отчёте'},' · начало '+new Date(r.declared_start).toLocaleString('ru-RU',{timeZone:'Europe/Kyiv',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})):null),
         el('div',{class:'kv2'},...r.fields.filter(f=>f.value!==null&&f.value!=='').map(f=>el('span',{},f.name+': ',el('b',{},typeof f.value==='number'?f.value.toLocaleString('ru-RU'):f.value)))),
         el('div',{class:'mut sm'},r.stream_url),r.comment?el('div',{class:'sm'},r.comment):null),
-      el('div',{class:'acts2'},el('div',{class:'inl'},min,el('span',{class:'mut sm'},'мин'),el('button',{class:'btn s',type:'button',onclick:()=>act('approve',{minutes:Number(min.value)})},'Зачесть')),
+      el('div',{class:'acts2'},el('div',{class:'inl'},hh,el('span',{class:'mut sm'},'ч'),mm,el('span',{class:'mut sm'},'мин'),el('button',{class:'btn s',type:'button',onclick:()=>{const t=total();if(t<1||t>720){toast('Время от 1 минуты до 12 часов');return}act('approve',{minutes:t})}},'Зачесть')),
         el('div',{class:'inl'},why,el('button',{class:'btn o s',type:'button',onclick:()=>act('reject',{reason:why.value})},'Отклонить'))));
   };
   const hist=all.filter(r=>r.status!=='pending').map(r=>[td(r.staff_name),td(new Date(r.day+'T12:00:00').toLocaleDateString('ru-RU',{day:'numeric',month:'short'})),td(hmin(r.declared_min)+(r.approved_min&&r.approved_min!==r.declared_min?' → '+hmin(r.approved_min):'')),el('td',{},el('span',{class:'pill '+REPSTATUS[r.status][1]},REPSTATUS[r.status][0])),el('td',{},el('a',{href:'/api/office/shifts/'+r.id+'/screenshot',target:'_blank',rel:'noopener',style:'color:var(--acc2)'},'скриншот')),
