@@ -695,7 +695,7 @@ function dxModal(btn,s,d,skew,mode){
     el('div',{class:'dx-mh'},el('div',{class:'dx-av'},svgIcon('<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',24)),el('div',{},el('h2',{},s.name),el('div',{class:'tg'},s.tg?'@'+String(s.tg).replace(/^@/,''):s.login)),el('div',{class:'dx-sp'}),
       el('div',{class:'dx-hr'},el('div',{class:'dx-hr1'},el('span',{class:'dx-st'+(s.live?'':' off')},s.live?'в эфире '+hm(Math.max(0,Math.floor((Date.now()+skew-Date.parse(s.live.started_at))/60000))):'не в эфире · '+dxOffText(s,d.today)),x),openLink||closeLink)),
     openForm,closeForm,
-    el('div',{},el('div',{class:'dx-hd'},el('div',{class:'dx-sec'},'Часы за месяц'),el('div',{class:'dx-hv'},left!==null?el('span',{class:'dx-cl'},'До закрытия: '+left+' мин'):null,el('b',{style:'color:'+col},hm(hrs)+' / '+plan.hours+' ч'))),
+    el('div',{},el('div',{class:'dx-hd'},el('div',{class:'dx-sec'},'Часы за месяц'),el('div',{class:'dx-hv'},left!==null?el('span',{class:'dx-cl'},'До нормы смены: '+hm(left)):null,el('b',{style:'color:'+col},hm(hrs)+' / '+plan.hours+' ч'))),
       el('div',{class:'dx-bar',style:'margin:13px 0 0'},el('i',{style:'width:'+Math.min(100,pct)+'%;background:'+col}),el('u',{style:'left:'+Math.min(100,pp)+'%'})),
       el('div',{class:'dx-meta',style:'margin-top:13px'},el('span',{},pct+'% плана'),el('span',{},'по графику на сегодня '+hm(pace)))),
     el('div',{class:'dx-sg'},...[['Смен',m.shifts],['FTD',m.ftd],['FTD $',usd0(m.ftdSum)],['Все депозиты',usd0(m.deposits)]].map(([a,b])=>el('div',{class:'c'},el('span',{},a),el('b',{},String(b))))),
@@ -899,7 +899,7 @@ function smMetrics(d){
     smTile('Часы в эфире',hm(m.hoursMin),'/ '+pl.hours+' ч',hp,mark,Math.round(hp)+'% плана','по графику '+hm(pl.paceMin),lv(hp)),
     smTile('Закрытых смен',String(m.shifts),'/ '+n0(m.planShifts),sp,mark,Math.round(sp)+'% плана','смена = '+fmtH(pl.shiftH*60)+' ч',lv(sp)),
     smTile('Лиды (FTD)',String(m.ftd),'/ '+pl.leads,lp,mark,Math.round(lp)+'% плана',toGo>0?'ещё '+toGo+' до плана':'план выполнен',lv(lp)),
-    smTile('Сегодня в эфире',hm(t.minutes),'/ '+fmtH(t.shiftMin)+' ч',t.minutes/t.shiftMin*100,null,t.minLeft>0?'до закрытия смены '+t.minLeft+' мин':'смена закрыта',t.live?'идёт эфир':'',t.minLeft>0?'warn':'ok'));
+    smTile('Сегодня в эфире',hm(t.minutes),'/ '+fmtH(t.shiftMin)+' ч',t.minutes/t.shiftMin*100,null,t.minLeft>0?'до нормы смены осталось '+hm(t.minLeft):'норма смены выполнена',t.live?'идёт эфир':'',t.minLeft>0?'warn':'ok'));
 }
 function smLeads(d){
   const b=d.byStatus,total=Object.values(b).reduce((a,x)=>a+x,0),f=d.funnel;
