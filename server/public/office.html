@@ -695,7 +695,7 @@ function dxModal(btn,s,d,skew,mode){
     el('div',{class:'dx-mh'},el('div',{class:'dx-av'},svgIcon('<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',24)),el('div',{},el('h2',{},s.name),el('div',{class:'tg'},s.tg?'@'+String(s.tg).replace(/^@/,''):s.login)),el('div',{class:'dx-sp'}),
       el('div',{class:'dx-hr'},el('div',{class:'dx-hr1'},el('span',{class:'dx-st'+(s.live?'':' off')},s.live?'в эфире '+hm(Math.max(0,Math.floor((Date.now()+skew-Date.parse(s.live.started_at))/60000))):'не в эфире · '+dxOffText(s,d.today)),x),openLink||closeLink)),
     openForm,closeForm,
-    el('div',{},el('div',{class:'dx-hd'},el('div',{class:'dx-sec'},'Часы за месяц'),el('div',{class:'dx-hv'},left!==null?el('span',{class:'dx-cl'},'До нормы смены: '+hm(left)):null,el('b',{style:'color:'+col},hm(hrs)+' / '+plan.hours+' ч'))),
+    el('div',{},el('div',{class:'dx-hd'},el('div',{class:'dx-sec'},'Часы за месяц'),el('div',{class:'dx-hv'},left!==null?el('span',{class:'dx-cl'},'До закрытия: '+hm(left)):null,el('b',{style:'color:'+col},hm(hrs)+' / '+plan.hours+' ч'))),
       el('div',{class:'dx-bar',style:'margin:13px 0 0'},el('i',{style:'width:'+Math.min(100,pct)+'%;background:'+col}),el('u',{style:'left:'+Math.min(100,pp)+'%'})),
       el('div',{class:'dx-meta',style:'margin-top:13px'},el('span',{},pct+'% плана'),el('span',{},'по графику на сегодня '+hm(pace)))),
     el('div',{class:'dx-sg'},...[['Смен',m.shifts],['FTD',m.ftd],['FTD $',usd0(m.ftdSum)],['Все депозиты',usd0(m.deposits)]].map(([a,b])=>el('div',{class:'c'},el('span',{},a),el('b',{},String(b))))),
@@ -890,16 +890,26 @@ function smFunnel(d){
   return[el('div',{class:'dx-fk'},el('b',{title:'Из клика в регистрацию'},'CTR: '+pc(ctr)),el('b',{title:'Из регистрации в депозит'},'RTD: '+pc(rtd))),
     ...stages.map(([n,v])=>el('div',{class:'dx-fs'},el('div',{class:'dx-fsh'},el('span',{class:'dx-lbl'},n),el('b',{},n0(v))),el('div',{class:'dx-seg2'},el('span',{style:'flex:1;background:var(--acc)'},n0(v))))),note].filter(Boolean);
 }
+/** Кольца стримера: часы эфира и лиды (FTD) от месячного плана, внутри цифры с цветными точками */
+function smRings(d){
+  const m=d.month,pl=d.plan;
+  const R1=98,R2=74,c1=2*Math.PI*R1,c2=2*Math.PI*R2;
+  const p1=Math.max(0,Math.min(1,pl.planMin?m.hoursMin/pl.planMin:0)),p2=Math.max(0,Math.min(1,pl.leads?m.ftd/pl.leads:0));
+  const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox','0 0 220 220');
+  svg.innerHTML='<circle class="tr" cx="110" cy="110" r="'+R1+'"/><circle class="pr" cx="110" cy="110" r="'+R1+'" stroke="var(--acc)" stroke-dasharray="'+(c1*p1).toFixed(1)+' '+c1.toFixed(1)+'"/><circle class="tr" cx="110" cy="110" r="'+R2+'"/><circle class="pr" cx="110" cy="110" r="'+R2+'" stroke="var(--ok)" stroke-dasharray="'+(c2*p2).toFixed(1)+' '+c2.toFixed(1)+'"/>';
+  const cv=(c,a,b)=>el('div',{class:'dx-cv'},el('b',{},a),el('span',{},el('i',{style:'background:'+c}),b));
+  return el('div',{class:'dx-rings'},el('div',{class:'dx-rg',role:'img','aria-label':'Часы '+Math.round(p1*100)+'% плана, лиды '+Math.round(p2*100)+'% плана'},svg,el('div',{class:'ctr'},cv('var(--ok)',m.ftd+' / '+pl.leads,'лиды (FTD)'),cv('var(--acc)',hm(m.hoursMin)+' / '+pl.hours+' ч','часы в эфире'))));
+}
 function smMetrics(d){
   const m=d.month,pl=d.plan,pace=pl.pace*100,mark=pace<99.5?pace:null,t=d.today_;
   const lv=pct=>pct>=pace?'ok':pct>=pace*.85?'warn':'bad';
   const hp=m.hoursMin/pl.planMin*100,sp=m.shifts/m.planShifts*100,lp=m.ftd/pl.leads*100;
   const toGo=pl.leads-m.ftd;
-  return el('div',{class:'card dx-pf'},el('div',{class:'dx-hd'},el('div',{class:'l'},el('span',{class:'dx-lbl'},'Мои показатели за '+(d.range.whole?'месяц':perLabel(m.period).toLowerCase())),dxPopBtn('Воронка',IC_FUNNEL,smFunnel(d),'pl wide')),mark!==null?el('span',{class:'mut',style:'font-size:12px'},'метка: план на сегодня'):null),
+  return el('div',{class:'card dx-pf'},el('div',{class:'dx-hd'},el('div',{class:'l'},el('span',{class:'dx-lbl'},'Мои показатели за '+(d.range.whole?'месяц':perLabel(m.period).toLowerCase())),dxPopBtn('Кольца выполнения плана',IC_RINGS,smRings(d),'pl'),dxPopBtn('Воронка',IC_FUNNEL,smFunnel(d),'pl wide')),mark!==null?el('span',{class:'mut',style:'font-size:12px'},'метка: план на сегодня'):null),
     smTile('Часы в эфире',hm(m.hoursMin),'/ '+pl.hours+' ч',hp,mark,Math.round(hp)+'% плана','по графику '+hm(pl.paceMin),lv(hp)),
     smTile('Закрытых смен',String(m.shifts),'/ '+n0(m.planShifts),sp,mark,Math.round(sp)+'% плана','смена = '+fmtH(pl.shiftH*60)+' ч',lv(sp)),
     smTile('Лиды (FTD)',String(m.ftd),'/ '+pl.leads,lp,mark,Math.round(lp)+'% плана',toGo>0?'ещё '+toGo+' до плана':'план выполнен',lv(lp)),
-    smTile('Сегодня в эфире',hm(t.minutes),'/ '+fmtH(t.shiftMin)+' ч',t.minutes/t.shiftMin*100,null,t.minLeft>0?'до нормы смены осталось '+hm(t.minLeft):'норма смены выполнена',t.live?'идёт эфир':'',t.minLeft>0?'warn':'ok'));
+    smTile('Сегодня в эфире',hm(t.minutes),'/ '+fmtH(t.shiftMin)+' ч',t.minutes/t.shiftMin*100,null,t.minLeft>0?'до закрытия смены '+hm(t.minLeft):'смена закрыта',t.live?'идёт эфир':'',t.minLeft>0?'warn':'ok'));
 }
 function smLeads(d){
   const b=d.byStatus,total=Object.values(b).reduce((a,x)=>a+x,0),f=d.funnel;
