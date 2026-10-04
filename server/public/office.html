@@ -1059,7 +1059,7 @@ const smTile=(lbl,v,small,pct,mark,left,right,cls)=>el('div',{class:'dx-m'},el('
   el('div',{class:'dx-bar'},el('i',{style:'width:'+Math.min(100,pct)+'%'}),mark!==null?el('u',{style:'left:'+mark+'%'}):null),el('div',{class:'dx-meta'},el('span',{class:cls},left),el('span',{},right)));
 function smFunnel(d){
   const f=d.funnel,ctr=f.clicks?f.regs/f.clicks*100:null,rtd=f.regs?f.ftd/f.regs*100:null,pc=v=>v===null?'—':v.toFixed(1).replace('.',',')+'%';
-  const stages=[['Клики',f.clicks],['Регистрации',f.regs],['FTD',f.ftd],['Додепы',f.dep]];
+  const stages=[['Клики',f.clicks],['Регистрации',f.regs],['FTD',f.ftd]];
   const note=d.clicksSince&&d.range.from<d.clicksSince?el('div',{class:'mut sm'},'Клики считаются с '+dmy(d.clicksSince)+': раньше их время не записывалось.'):null;
   return[el('div',{class:'dx-fk'},el('b',{title:'Из клика в регистрацию'},'CTR: '+pc(ctr)),el('b',{title:'Из регистрации в депозит'},'RTD: '+pc(rtd))),
     ...stages.map(([n,v])=>el('div',{class:'dx-fs'},el('div',{class:'dx-fsh'},el('span',{class:'dx-lbl'},n),el('b',{},n0(v))),el('div',{class:'dx-seg2'},el('span',{style:'flex:1;background:var(--acc)'},n0(v))))),note].filter(Boolean);
