@@ -354,7 +354,8 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
 
   app.post('/shifts/start', { preHandler: stream }, async (req, reply) => {
     const me = req.staff!;
-    const url = str((req.body as any)?.stream_url, 500);
+    // Из вставленного текста берём первую ссылку (TikTok и другие делятся текстом со ссылкой внутри)
+    const url = str((req.body as any)?.stream_url, 500).match(/https?:\/\/[^\s]+/i)?.[0] ?? '';
     if (!/^https?:\/\/[^\s]+\.[^\s]+$/i.test(url)) return reply.code(400).send({ error: 'Вставьте ссылку на эфир, например https://tiktok.com/@name/live' });
     if ((await db.query(`SELECT 1 FROM shift_reports WHERE staff_id = $1 AND status = 'live'`, [me.id])).rowCount) return reply.code(409).send({ error: 'Смена уже идёт' });
     const r = await db.query(`INSERT INTO shift_reports (staff_id, stream_url, day) VALUES ($1,$2,(now() AT TIME ZONE '${TZ}')::date) RETURNING id`, [me.id, url]);

@@ -854,7 +854,7 @@ function smSalary(d){
   const a=s.advance;
   if(a&&a.request)adv=el('div',{class:'sm-adv'},el('div',{class:'tx'},el('b',{},a.request.status==='paid'?'Аванс '+usd0(a.request.amount)+' выплачен.':'Аванс '+usd0(a.request.amount)+' запрошен.'),a.request.status==='paid'?' Получить можно один раз в месяц.':' Ждёт выплаты.'),el('button',{class:'btn',type:'button',disabled:''},'Запросить аванс'));
   else if(a)adv=el('div',{class:'sm-adv'+(a.can?'':' off')},el('div',{class:'tx'},a.can?el('b',{},'Аванс '+usd0(a.amount)+' доступен. '):null,a.can?'По минимальным ставкам уже накопилось '+usd0(s.totalMin)+'. Получить можно один раз в месяц.':'До аванса осталось '+usd0(a.amount-s.totalMin)+' по минимальным ставкам. Получить можно один раз в месяц.'),
-    el('button',{class:'btn',type:'button',disabled:a.can?null:'',onclick:async e=>{e.currentTarget.disabled=true;try{await api('/advance/request',{method:'POST'});toast('Аванс запрошен');render({soft:true})}catch(x){toast(x.message);e.currentTarget.disabled=false}}},'Запросить аванс'));
+    el('button',{class:'btn',type:'button',disabled:a.can?null:'',onclick:async e=>{const bt=e.currentTarget;bt.disabled=true;try{await api('/advance/request',{method:'POST'});toast('Аванс запрошен');render({soft:true})}catch(x){toast(x.message);bt.disabled=false}}},'Запросить аванс'));
   return el('div',{class:'card sm-pay'},el('div',{class:'dx-lbl'},'Моя зарплата за месяц'),
     el('div',{style:'margin-top:8px'},el('div',{class:'big2'},pr(pay[0],pay[1])),el('div',{class:'cap'},'К выплате: план не выполнен / выполнен')),
     el('div',{class:'cols'},
@@ -1290,7 +1290,7 @@ async function kpiCardBlock(){
   const adv=d.advance;
   let advNode;
   if(adv.request)advNode=el('div',{class:'inl'},el('button',{class:'btn',type:'button',disabled:''},'Аванс '+usd2(adv.request.amount)),el('span',{class:'mut sm'},adv.request.status==='paid'?'Аванс выплачен':'Аванс запрошен, ждёт выплаты'));
-  else advNode=el('div',{class:'inl'},el('button',{class:'btn',type:'button',disabled:adv.can?null:'',onclick:async e=>{e.currentTarget.disabled=true;try{await api('/advance/request',{method:'POST'});toast('Аванс запрошен');render({soft:true})}catch(x){toast(x.message);e.currentTarget.disabled=false}}},'Запросить аванс '+usd2(adv.amount)),
+  else advNode=el('div',{class:'inl'},el('button',{class:'btn',type:'button',disabled:adv.can?null:'',onclick:async e=>{const bt=e.currentTarget;bt.disabled=true;try{await api('/advance/request',{method:'POST'});toast('Аванс запрошен');render({soft:true})}catch(x){toast(x.message);bt.disabled=false}}},'Запросить аванс '+usd2(adv.amount)),
     el('span',{class:'mut sm'},adv.can?'Доступно: по минимальным ставкам набралось '+usd2(k.minTotal):'До аванса осталось '+usd2(adv.amount-k.minTotal)+' по минимальным ставкам'));
   return el('div',{class:'card kpi-card'},
     el('div',{class:'head'},el('h3',{style:'font-size:15px'},'Мой KPI · '+perLabel(k.period)),el('span',{class:'mut sm'},'считается только зачтённое время')),
@@ -1346,12 +1346,12 @@ async function shiftTab(){
   }
   const counted=d.approvedToday+d.pendingToday;
   if(!d.live){
-    const url=el('input',{type:'url',placeholder:'https://tiktok.com/@name/live',maxlength:'500'});
+    const url=el('input',{type:'text',inputmode:'url',autocapitalize:'off',autocomplete:'off',placeholder:'https://tiktok.com/@name/live',maxlength:'500'});
     const err=el('div',{class:'err',role:'alert'});
     out.push(el('div',{class:'card',style:'display:grid;gap:10px;max-width:560px'},
       el('div',{class:'head'},el('h3',{style:'font-size:15px'},'Смена не начата'),el('span',{class:'pill p-pur'},'сегодня зачтено '+hmin(counted)+' из '+plan.shiftH+' ч')),
       el('label',{},'Ссылка на эфир (обязательно)',url),err,
-      el('div',{},el('button',{class:'btn',type:'button',onclick:async e=>{err.textContent='';e.currentTarget.disabled=true;try{await api('/shifts/start',{method:'POST',body:{stream_url:url.value}});toast('Смена началась');render({soft:true})}catch(x){err.textContent=x.message;e.currentTarget.disabled=false}}},'Начать смену')),
+      el('div',{},el('button',{class:'btn',type:'button',onclick:async e=>{const b=e.currentTarget;err.textContent='';b.disabled=true;try{await api('/shifts/start',{method:'POST',body:{stream_url:url.value}});toast('Смена началась');render({soft:true})}catch(x){err.textContent=x.message;b.disabled=false}}},'Начать смену')),
       el('div',{class:'mut sm'},'Без ссылки на эфир смену начать нельзя.')));
     return out;
   }
