@@ -906,16 +906,18 @@ function dxFunnelCopy(model){
   const draw=()=>{
     const W=1000,P=50,ff='Montserrat, system-ui, sans-serif',BH=64;
     const lines=model.note?Math.ceil(model.note.length/62):0;
-    const H=P*2+70+model.stages.length*(46+BH+34)+(lines?lines*36+10:0);
+    const rowH=model.plain?70:46+BH+34;
+    const H=P*2+70+model.stages.length*rowH+(lines?lines*36+10:0);
     const c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d');
     x.fillStyle=css('--card2')||'#251847';x.fillRect(0,0,W,H);
     x.textBaseline='middle';x.textAlign='left';let y=P+20;
     x.font='700 44px '+ff;x.fillStyle=css('--acc2')||'#c9a6ff';
-    x.fillText('CTR: '+model.ctr,P,y);const w1=x.measureText('CTR: '+model.ctr+'     ').width;x.fillText('RTD: '+model.rtd,P+w1,y);
+    if(model.head)x.fillText(model.head,P,y);else{x.fillText('CTR: '+model.ctr,P,y);const w1=x.measureText('CTR: '+model.ctr+'     ').width;x.fillText('RTD: '+model.rtd,P+w1,y)}
     y+=70;
     for(const st of model.stages){
       x.font='700 28px '+ff;x.fillStyle=css('--mut')||'#a89cc8';x.fillText(st.name.toUpperCase(),P,y);
       x.textAlign='right';x.font='700 36px '+ff;x.fillStyle=css('--fg')||'#fff';x.fillText(st.total,W-P,y);x.textAlign='left';
+      if(model.plain){y+=70;continue}
       y+=46;
       const tot=st.segs.reduce((a,g)=>a+g.w,0),avail=W-P*2-(st.segs.length-1)*4;let px=P;
       if(!st.segs.length){x.fillStyle='#ffffff1a';x.beginPath();x.roundRect(P,y,W-P*2,BH,12);x.fill();x.fillStyle=css('--mut')||'#a89cc8';x.font='700 26px '+ff;x.fillText('нет данных',P+20,y+BH/2+2)}
@@ -940,7 +942,8 @@ function dxSocial(d){
   const C=dxColorOf(d);
   api('/shifts/fieldstats?from='+d.range.from+'&to='+d.range.to).then(r=>{
     if(!r.fields.length){box.replaceChildren(el('div',{class:'mut sm'},'Полей для дашборда пока нет'));return}
-    box.replaceChildren(el('div',{class:'dx-lbl'},'Охваты за период (зачтённые отчёты)'),...r.fields.map(f=>{
+    const model={head:'Охваты за период',note:'',stages:r.fields.map(f=>({name:f,total:r.rows.reduce((a,x)=>a+(x.sums[f]||0),0).toLocaleString('ru-RU'),segs:r.rows.filter(x=>(x.sums[f]||0)>0).map(x=>({t:x.name+' '+(x.sums[f]||0).toLocaleString('ru-RU'),w:x.sums[f],c:C(x.staff_id)}))}))};
+    box.replaceChildren(dxFunnelCopy(model),el('div',{class:'dx-lbl'},'Охваты за период (зачтённые отчёты)'),...r.fields.map(f=>{
       const rows=r.rows.filter(x=>(x.sums[f]||0)>0),tot=r.rows.reduce((a,x)=>a+(x.sums[f]||0),0);
       return el('div',{class:'dx-fs'},el('div',{class:'dx-fsh'},el('span',{class:'dx-lbl'},f),el('b',{},tot.toLocaleString('ru-RU'))),
         el('div',{class:'dx-seg2',role:'img','aria-label':f+': '+rows.map(x=>x.name+' '+(x.sums[f]||0)).join(', ')},...(rows.length?rows.map(x=>el('span',{style:'flex:'+x.sums[f]+' 1 auto;background:'+C(x.staff_id),title:x.name+': '+x.sums[f]},x.name+' '+x.sums[f].toLocaleString('ru-RU'))):[el('span',{style:'flex:1;background:#ffffff1a;color:var(--mut)'},'нет данных')])));
@@ -952,7 +955,8 @@ function dxSocial(d){
 function smSocial(d){
   const S=d.social||{fields:[],totals:[]};
   if(!S.fields.length)return el('div',{class:'mut sm'},'Полей для дашборда пока нет');
-  return el('div',{style:'display:grid;gap:12px;min-width:240px'},el('div',{class:'dx-lbl'},'Мои охваты за период'),
+  const model={head:'Мои охваты за период',note:'',plain:true,stages:S.fields.map((f,i)=>({name:f,total:(S.totals[i]||0).toLocaleString('ru-RU'),segs:[]}))};
+  return el('div',{style:'display:grid;gap:12px;min-width:240px'},dxFunnelCopy(model),el('div',{class:'dx-lbl'},'Мои охваты за период'),
     ...S.fields.map((f,i)=>el('div',{class:'dx-fsh'},el('span',{class:'dx-lbl'},f),el('b',{style:'font-size:22px'},(S.totals[i]||0).toLocaleString('ru-RU')))));
 }
 function dxColorOf(d){const ids=d.streamers.map(s=>s.id).sort((a,b)=>a-b);return id=>DXC[ids.indexOf(id)%DXC.length]}
