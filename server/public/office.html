@@ -1762,6 +1762,53 @@ async function accDetail(box,id){
     pays?el('div',{style:'display:grid;gap:8px'},el('h4',{},'Выплаты за месяц'),pays):null));
 }
 
+/** Админ вносит отчёт за прошедший день за стримера: сразу зачтённый (перенос того, что было до запуска системы) */
+async function openAddReportModal(){
+  document.querySelectorAll('.lc-overlay').forEach(x=>x.remove());
+  const ov=el('div',{class:'lc-overlay',role:'dialog','aria-modal':'true'});
+  const close=()=>{ov.remove();document.removeEventListener('keydown',onKey)};
+  const onKey=e=>{if(e.key==='Escape')close()};document.addEventListener('keydown',onKey);
+  const box=el('div',{class:'lc'},el('div',{class:'mut'},'Загрузка…'));ov.append(box);document.body.append(ov);
+  let defs,staff;try{[defs,staff]=await Promise.all([api('/report-fields'),api('/staff')])}catch(x){box.replaceChildren(el('div',{class:'err'},x.message));return}
+  defs=defs.filter(d=>d.active);staff=staff.filter(x=>x.role==='streamer'&&x.active);
+  const kToday=new Date().toLocaleDateString('sv-SE',{timeZone:'Europe/Kyiv'});
+  const who=el('select',{},el('option',{value:''},'Выберите стримера'),...staff.map(x=>el('option',{value:x.id},x.name)));
+  const startDay=dateWheel({value:kToday,min:(+kToday.slice(0,4)-1)+'-01-01',max:kToday}),startTime=timeWheel({value:'12:00'});
+  const hrs=el('input',{type:'number',min:'0',max:'12',inputmode:'numeric',value:'0','aria-label':'Часы',style:'text-align:center'});
+  const mins=el('input',{type:'number',min:'0',max:'59',inputmode:'numeric',value:'0','aria-label':'Минуты',style:'text-align:center'});
+  const totalMin=()=>(Number(hrs.value)||0)*60+(Number(mins.value)||0);
+  const time=el('div',{style:'display:grid;grid-template-columns:1fr auto 1fr auto;gap:8px;align-items:center'},hrs,el('span',{class:'mut'},'ч'),mins,el('span',{class:'mut'},'мин'));
+  const inputs=defs.map(d=>({d,i:el('input',{type:d.kind==='number'?'number':d.kind==='link'?'url':'text',min:d.kind==='number'?'0':null,step:d.kind==='number'?'any':null,placeholder:d.kind==='link'?'https://':''})}));
+  const comment=el('textarea',{class:'big',rows:'2',maxlength:'1000',placeholder:'Комментарий (необязательно)',style:'min-height:64px'});
+  let shot=null;
+  const file=el('input',{type:'file',accept:'image/jpeg,image/png,image/webp',style:'display:none'});
+  const prev=el('div',{style:'display:none'});
+  const drop=el('button',{class:'drop2',type:'button',onclick:()=>file.click()},'Загрузить скриншот статистики эфира (если есть)');
+  file.addEventListener('change',()=>{const f=file.files[0];if(!f)return;
+    if(!/^image\/(jpeg|png|webp)$/.test(f.type)){err.textContent='Нужна картинка JPG, PNG или WebP';return}
+    if(f.size>6*1024*1024){err.textContent='Скриншот больше 6 МБ';return}
+    err.textContent='';shot=f;prev.style.display='block';prev.replaceChildren(el('img',{src:URL.createObjectURL(f),alt:'Скриншот',style:'max-height:140px;border-radius:10px'}));drop.textContent='Заменить скриншот'});
+  const err=el('div',{class:'err',role:'alert'});
+  const send=el('button',{class:'btn',type:'button',onclick:async()=>{
+    err.textContent='';
+    if(!who.value){err.textContent='Выберите стримера';return}
+    if(totalMin()<1||totalMin()>720){err.textContent='Укажите время эфира: от 1 минуты до 12 часов';return}
+    send.disabled=true;
+    try{
+      const fields={};inputs.forEach(x=>{fields[x.d.id]=x.i.value});
+      await api('/shifts/add',{method:'POST',body:{staff_id:Number(who.value),declared_min:totalMin(),start:startDay.value+'T'+startTime.value,fields,comment:comment.value,screenshot:shot?await fileDataUrl(shot):undefined}});
+      close();toast('Отчёт добавлен и зачтён');accRefresh();
+    }catch(x){err.textContent=x.message;send.disabled=false}
+  }},'Добавить и зачесть');
+  box.replaceChildren(
+    el('div',{class:'lc-head'},el('h3',{style:'font-size:18px'},'Добавить отчёт'),el('button',{class:'btn o s',type:'button','aria-label':'Закрыть',onclick:close},'✕')),
+    el('div',{class:'mut sm'},'Отчёт сразу станет проверенным и зачтённым, время пойдёт в расчёт часов и зарплаты.'),
+    el('div',{class:'lc-two'},el('div',{class:'lc-field'},el('label',{},'Стример'),who),el('div',{class:'lc-field'},el('label',{},'Длительность эфира'),time),
+      el('div',{class:'lc-field'},el('label',{},'Дата начала эфира'),startDay),el('div',{class:'lc-field'},el('label',{},'Время начала эфира'),startTime),
+      ...inputs.map(x=>el('div',{class:'lc-field'},el('label',{},x.d.name),x.i))),
+    el('div',{class:'lc-field'},el('label',{},'Комментарий'),comment),
+    file,drop,prev,err,el('div',{class:'lc-actions'},send));
+}
 let reviewFilter={who:'',st:'',sort:'new'};
 async function accReview(){
   const [pend,all]=await Promise.all([api('/shifts/pending'),api('/shifts/all?period='+accState.period)]);
@@ -1801,7 +1848,7 @@ async function accReview(){
   drawHist();
   return[el('div',{class:'head'},el('h3',{style:'font-size:15px'},'На проверке: '+pend.length),el('span',{class:'mut sm'},'после зачёта время идёт в расчёт и в дашборд стримера')),
     pend.length?el('div',{style:'display:grid;gap:10px'},pend.map(card)):el('div',{class:'card empty'},'Нет отчётов на проверку.'),
-    el('h3',{style:'font-size:15px;margin-top:6px'},'Проверенные за '+perLabel(accState.period)),histBar,histHold];
+    el('div',{class:'head',style:'margin-top:6px'},el('h3',{style:'font-size:15px'},'Проверенные за '+perLabel(accState.period)),el('button',{class:'btn s',type:'button',onclick:openAddReportModal},'Добавить отчёт')),histBar,histHold];
 }
 
 async function streamersList(){return(await api('/staff')).filter(s=>s.role==='streamer'&&s.active)}

@@ -379,6 +379,60 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     return { ok: true, id: r.rows[0].id };
   });
 
+  // Значения полей отчёта по текущим настройкам формы (requireAll: проверять обязательные поля)
+  const parseFields = async (given: Record<string, unknown>, requireAll: boolean): Promise<{ error: string } | { fields: { name: string; kind: string; value: string | number | null }[] }> => {
+    const defs = await fieldsDef(true);
+    const fields: { name: string; kind: string; value: string | number | null }[] = [];
+    for (const d of defs) {
+      const raw = given[String(d.id)];
+      const has = raw !== undefined && raw !== null && String(raw).trim() !== '';
+      if (!has) {
+        if (d.required && requireAll) return { error: `Заполните поле «${d.name}»` };
+        fields.push({ name: d.name, kind: d.kind, value: null });
+        continue;
+      }
+      if (d.kind === 'number') {
+        const v = Number(String(raw).replace(',', '.'));
+        if (!Number.isFinite(v) || v < 0 || v > 1e9) return { error: `Поле «${d.name}»: введите число` };
+        fields.push({ name: d.name, kind: d.kind, value: v });
+      } else if (d.kind === 'link') {
+        const v = str(raw, 500);
+        if (!/^https?:\/\/[^\s]+$/i.test(v)) return { error: `Поле «${d.name}»: вставьте ссылку` };
+        fields.push({ name: d.name, kind: d.kind, value: v });
+      } else fields.push({ name: d.name, kind: d.kind, value: str(raw, 500) });
+    }
+    return { fields };
+  };
+
+  // Админ добавляет отчёт за прошедший день: сразу проверенный и зачтённый (для переноса того, что было до запуска системы)
+  app.post('/shifts/add', { preHandler: admin, bodyLimit: 9 * 1024 * 1024 }, async (req, reply) => {
+    const me = req.staff!;
+    const b = (req.body ?? {}) as Record<string, any>;
+    const sid = Number(b.staff_id);
+    if (!(await db.query(`SELECT 1 FROM staff WHERE id = $1 AND role = 'streamer'`, [sid])).rowCount) return reply.code(404).send({ error: 'Выберите стримера' });
+    if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(String(b.start))) return reply.code(400).send({ error: 'Укажите дату и время начала эфира' });
+    const mins = Math.trunc(Number(b.declared_min));
+    if (!Number.isFinite(mins) || mins < 1 || mins > 720) return reply.code(400).send({ error: 'Время эфира от 1 минуты до 12 часов' });
+    const t = (await db.query(`SELECT ($1::timestamp AT TIME ZONE '${TZ}') AS s, to_char($1::timestamp, 'YYYY-MM-DD') AS day, to_char($1::timestamp, 'YYYY-MM') AS pm`, [String(b.start)]).catch(() => null))?.rows[0];
+    if (!t) return reply.code(400).send({ error: 'Укажите дату и время начала эфира' });
+    if (+t.s > Date.now() + 10 * 60_000) return reply.code(400).send({ error: 'Начало эфира не может быть в будущем' });
+    if (await isClosed(t.pm)) return reply.code(409).send({ error: 'Месяц закрыт. Откройте его заново в Бухгалтерии, добавьте отчёт и закройте месяц снова.' });
+    const pf = await parseFields((b.fields ?? {}) as Record<string, unknown>, false);
+    if ('error' in pf) return reply.code(400).send({ error: pf.error });
+    let photo: Buffer | null = null;
+    if (typeof b.screenshot === 'string' && b.screenshot) {
+      photo = Buffer.from(b.screenshot.replace(/^data:[^,]*,/, ''), 'base64');
+      if (!IMG_OK(photo)) return reply.code(400).send({ error: 'Скриншот должен быть картинкой JPG, PNG или WebP' });
+      if (photo.length > 6 * 1024 * 1024) return reply.code(400).send({ error: 'Скриншот больше 6 МБ' });
+    }
+    await db.query(
+      `INSERT INTO shift_reports (staff_id, status, started_at, ended_at, day, declared_min, approved_min, declared_start, fields, comment, screenshot, screenshot_type, reviewed_by, reviewed_at)
+       VALUES ($1,'approved',$2::timestamptz,$2::timestamptz + make_interval(mins => $3::int),$4::date,$3::int,$3::int,$2::timestamptz,$5::jsonb,$6,$7,$8,$9,now())`,
+      [sid, t.s, mins, t.day, JSON.stringify(pf.fields), str(b.comment, 1000) || null, photo, photo ? imgType(photo) : null, me.id],
+    );
+    return { ok: true };
+  });
+
   // Админ закрывает смену стримера без отчёта: данные потом внесёт сам стример (у него это задача)
   app.post<{ Params: { id: string } }>('/shifts/:id/close', { preHandler: admin }, async (req, reply) => {
     const r = await db.query(`UPDATE shift_reports SET status = 'await', ended_at = now() WHERE id = $1 AND status = 'live'`, [Number(req.params.id)]);
@@ -411,27 +465,9 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     if (!IMG_OK(photo)) return reply.code(400).send({ error: 'Скриншот должен быть картинкой JPG, PNG или WebP' });
     if (photo.length > 6 * 1024 * 1024) return reply.code(400).send({ error: 'Скриншот больше 6 МБ' });
     // Поля формы из текущих настроек, значения сохраняются вместе с названиями
-    const defs = await fieldsDef(true);
-    const given = (b.fields ?? {}) as Record<string, unknown>;
-    const fields: { name: string; kind: string; value: string | number | null }[] = [];
-    for (const d of defs) {
-      const raw = given[String(d.id)];
-      const has = raw !== undefined && raw !== null && String(raw).trim() !== '';
-      if (!has) {
-        if (d.required) return reply.code(400).send({ error: `Заполните поле «${d.name}»` });
-        fields.push({ name: d.name, kind: d.kind, value: null });
-        continue;
-      }
-      if (d.kind === 'number') {
-        const v = Number(String(raw).replace(',', '.'));
-        if (!Number.isFinite(v) || v < 0 || v > 1e9) return reply.code(400).send({ error: `Поле «${d.name}»: введите число` });
-        fields.push({ name: d.name, kind: d.kind, value: v });
-      } else if (d.kind === 'link') {
-        const v = str(raw, 500);
-        if (!/^https?:\/\/[^\s]+$/i.test(v)) return reply.code(400).send({ error: `Поле «${d.name}»: вставьте ссылку` });
-        fields.push({ name: d.name, kind: d.kind, value: v });
-      } else fields.push({ name: d.name, kind: d.kind, value: str(raw, 500) });
-    }
+    const pf = await parseFields((b.fields ?? {}) as Record<string, unknown>, true);
+    if ('error' in pf) return reply.code(400).send({ error: pf.error });
+    const fields = pf.fields;
     await db.query(
       `UPDATE shift_reports SET status = 'pending', ended_at = coalesce(ended_at, now()), declared_min = $2, fields = $3::jsonb, comment = $4, screenshot = $5, screenshot_type = $6, declared_start = $7 WHERE id = $1`,
       [row.id, declared, JSON.stringify(fields), str(b.comment, 1000) || null, photo, imgType(photo), declaredStart],
