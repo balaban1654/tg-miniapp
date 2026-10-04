@@ -1203,8 +1203,8 @@ function dxLiveCard(c,d,skew){
   const link=c.live.stream_url?el('a',{class:'dx-go big',href:c.live.stream_url,target:'_blank',rel:'noopener',title:'Открыть эфир','aria-label':'Открыть эфир'},svgIcon(IC_EXT,18)):null;
   return el('div',{class:'dx-lc live'},el('div',{class:'dx-lcl'},head,time),el('div',{class:'dx-lvx'},el('span',{class:'dx-liv'},'LIVE'),link));
 }
-const smTile=(lbl,v,small,pct,mark,left,right,cls)=>el('div',{class:'dx-m'},el('div',{class:'dx-lbl'},lbl),el('div',{class:'v'},v,small?el('small',{},' '+small):null),
-  el('div',{class:'dx-bar'},el('i',{style:'width:'+Math.min(100,pct)+'%'}),mark!==null?el('u',{style:'left:'+mark+'%'}):null),el('div',{class:'dx-meta'},el('span',{class:cls},left),el('span',{},right)));
+const smTile=(lbl,v,small,pct,mark,left,right,cls,extra,xcls)=>el('div',{class:'dx-m'},el('div',{class:'dx-lbl'},lbl),el('div',{class:'v'},v,small?el('small',{},' '+small):null),
+  el('div',{class:'dx-bar'},el('i',{style:'width:'+Math.min(100,pct)+'%'}),mark!==null?el('u',{style:'left:'+mark+'%'}):null),el('div',{class:'dx-meta'},el('span',{class:cls},left),el('span',{},right)),extra?el('div',{class:'dx-meta'},el('span',{class:xcls},extra)):null);
 function smFunnel(d){
   const f=d.funnel,ctr=f.clicks?f.regs/f.clicks*100:null,rtd=f.regs?f.ftd/f.regs*100:null,pc=v=>v===null?'—':v.toFixed(1).replace('.',',')+'%';
   const stages=[['Клики',f.clicks],['Регистрации',f.regs],['FTD',f.ftd]];
@@ -1229,9 +1229,9 @@ function smMetrics(d){
   const hp=m.hoursMin/pl.planMin*100,sp=m.shifts/m.planShifts*100,lp=m.ftd/pl.leads*100;
   const toGo=pl.leads-m.ftd;
   return el('div',{class:'card dx-pf'},el('div',{class:'dx-hd'},el('div',{class:'l'},el('span',{class:'dx-lbl'},'Мои показатели за '+(d.range.whole?'месяц':perLabel(m.period).toLowerCase())),dxPopBtn('Общий план команды',IC_RINGS,smRings(d),'pl'),dxPopBtn('Воронка',IC_FUNNEL,smFunnel(d),'pl wide'),dxPopBtn('Просмотры, подписчики, комментарии и лайки',IC_HEART,smSocial(d),'pl')),mark!==null?el('span',{class:'mut',style:'font-size:12px'},'метка: план на сегодня'):null),
-    smTile('Сегодня в эфире',hm(t.minutes),'/ '+fmtH(t.shiftMin)+' ч',t.minutes/t.shiftMin*100,null,t.minLeft>0?'до закрытия смены '+hm(t.minLeft):'смена закрыта',t.live?'идёт эфир':'',t.minLeft>0?'warn':'ok'),
+    smTile('Сегодня в эфире',hm(t.minutes),'/ '+fmtH(t.shiftMin)+' ч',t.minutes/t.shiftMin*100,null,t.live?'идёт эфир':'','','ok'),
     smTile('Часы в эфире',hw(m.hoursMin),'/ '+pl.hours+' ч',hp,mark,Math.round(hp)+'% плана','по графику '+hw(pl.paceMin)+' ч',lv(hp)),
-    smTile('Закрытых смен',String(m.shifts),'/ '+n0(m.planShifts),sp,mark,Math.round(sp)+'% плана','смена = '+fmtH(pl.shiftH*60)+' ч',lv(sp)),
+    smTile('Закрытых смен',String(m.shifts),'/ '+n0(m.planShifts),sp,mark,Math.round(sp)+'% плана','смена = '+fmtH(pl.shiftH*60)+' ч',lv(sp),t.minLeft>0?'до закрытия смены '+hm(t.minLeft):'смена закрыта',t.minLeft>0?'warn':'ok'),
     smTile('Лиды (FTD)',String(m.ftd),'/ '+pl.leads,lp,mark,Math.round(lp)+'% плана',toGo>0?'ещё '+toGo+' до плана':'план выполнен',lv(lp)));
 }
 function smLeads(d){
