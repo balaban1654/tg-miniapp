@@ -320,6 +320,13 @@ textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10
  .dx-prof{gap:3px;margin-top:0}.dx-prof .res{font-size:12px;padding-top:5px}.dx-prof .res b{font-size:15px}
  .dx-vd{padding:5px 8px;font-size:11px;margin-top:0}.dx-md .btn{padding:7px 12px;font-size:12px}
 }
+@media(max-width:560px){
+ .dx-live{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding:10px}
+ .dx-lc{padding:7px 9px;min-height:56px;justify-content:center}
+ .dx-lc b{font-size:13px;display:flex;flex-wrap:wrap;align-items:baseline;gap:0 5px}.dx-lc b .dx-fc,.dx-lc b .dx-hp{margin-left:0;font-size:11px}
+ .dx-lc .t{font-size:15px}.dx-lc .t.off{font-size:12px}
+ .dx-lc.live{gap:8px;justify-content:space-between}.dx-lvx{flex:none}.dx-liv{font-size:9px}.dx-go.big{width:26px;height:26px}
+}
 @media(max-width:900px){.dx-cols{grid-template-columns:minmax(0,1fr)}.dx-tasks{flex:none;min-height:0}.dx-tl{position:static;max-height:320px;margin-top:8px}}
 @media(max-width:560px){.dx-sg{grid-template-columns:repeat(2,minmax(0,1fr))}.dx-sal{grid-template-columns:minmax(0,1fr)}.dx-net .big{font-size:36px}}
 @media(prefers-reduced-motion:reduce){.live-dot i{animation:none}}
