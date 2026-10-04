@@ -14,6 +14,11 @@ export function parseStartPayload(payload: string): string | null {
   return m ? m[1] : null;
 }
 
+/** Узнать id чата: нужно один раз, чтобы указать группу для копий базы (BACKUP_TG_CHAT_ID). Работает и в группе. */
+bot.command('chatid', async (ctx) => {
+  await ctx.reply(`ID этого чата: ${ctx.chat.id}`);
+});
+
 bot.command('start', async (ctx) => {
   const from = ctx.from;
   if (!from) return;
