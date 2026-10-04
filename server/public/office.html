@@ -136,9 +136,9 @@ textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10
 .reply textarea{flex:1;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px;resize:none;font:inherit;color:inherit;min-height:44px;max-height:120px}
 @media(max-width:760px){.chat-wrap{grid-template-columns:1fr;height:auto}.chat-list{max-height:220px}.chat-thread{height:60vh}}
 @media(max-width:760px){
- #app{grid-template-columns:1fr}
+ #app{grid-template-columns:minmax(0,1fr)}
  .side{position:static;height:auto;flex-direction:row;flex-wrap:wrap;align-items:center;padding:10px;border-right:0;border-bottom:1px solid var(--line)}
- .side .brand{padding:0 8px 0 0}.nav{grid-auto-flow:column;overflow-x:auto}.me{margin:0 0 0 auto;display:flex;align-items:center}
+ .side .brand{padding:0 8px 0 0}.nav{grid-auto-flow:column;overflow-x:auto;min-width:0;max-width:100%;flex:1 1 100%;order:3}.me{margin:0 0 0 auto;display:flex;align-items:center}
 }
 /* дашборд админа */
 .dx{display:grid;gap:16px;min-width:0}
@@ -208,6 +208,33 @@ textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10
 @media(max-width:900px){.dx-cols{grid-template-columns:minmax(0,1fr)}.dx-tasks{flex:none;min-height:0}.dx-tl{position:static;max-height:320px;margin-top:8px}}
 @media(max-width:560px){.dx-sg{grid-template-columns:repeat(2,minmax(0,1fr))}.dx-sal{grid-template-columns:minmax(0,1fr)}.dx-net .big{font-size:36px}}
 @media(prefers-reduced-motion:reduce){.live-dot i{animation:none}}
+/* выбор периода (общий для всех ролей) */
+.rb{display:flex;align-items:center;gap:10px;position:relative;margin-left:auto}
+.rb-pill{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:9px 14px;color:var(--fg);cursor:pointer;font-weight:600;font-size:14px}
+.rb-pill svg{color:var(--mut)}.rb-pill:hover,.rb-pill.on{border-color:var(--acc)}
+.rb-pill .chv{margin-left:6px;transition:transform .15s}.rb-pill.on .chv{transform:rotate(180deg)}
+.rb-go{background:var(--card2);border:1px solid var(--line);color:var(--fg);border-radius:12px;padding:10px 18px;font:700 12px var(--fm);letter-spacing:.08em;text-transform:uppercase;cursor:pointer}.rb-go:hover{background:var(--acc);border-color:var(--acc);color:#fff}
+.rb-pill:focus-visible,.rb-go:focus-visible,.rb-d:focus-visible,.rb-ps button:focus-visible,.rb-nav:focus-visible{outline:2px solid var(--acc2);outline-offset:2px}
+.rb-pop{position:absolute;right:0;top:calc(100% + 8px);z-index:40;background:#120b22;border:1px solid var(--line);border-radius:16px;padding:16px 18px;box-shadow:0 20px 50px rgba(0,0,0,.6);display:grid;grid-template-columns:180px auto;gap:20px}
+.rb-ps{display:flex;flex-direction:column;gap:2px;padding-top:38px}
+.rb-ps button{text-align:left;background:none;border:0;color:var(--fg);font-weight:600;font-size:14px;padding:7px 12px;border-radius:99px;cursor:pointer;white-space:nowrap}.rb-ps button:hover{background:var(--card2)}.rb-ps button.on{background:var(--acc3);color:#fff}
+.rb-cal{display:grid;grid-template-columns:repeat(2,minmax(252px,1fr));gap:26px}
+.rb-m{display:grid;gap:6px}
+.rb-mh{display:flex;align-items:center;justify-content:center;gap:8px;position:relative;font:700 16px var(--fd);height:30px}
+.rb-nav{position:absolute;top:2px;width:26px;height:26px;border-radius:50%;border:1px solid var(--line);background:none;color:var(--mut);cursor:pointer;display:grid;place-items:center;padding:0}.rb-nav:hover{color:var(--fg);border-color:var(--acc)}.rb-nav.l{left:0}.rb-nav.r{right:0}.rb-nav.mob{display:none}
+.rb-g{display:grid;grid-template-columns:repeat(7,1fr);gap:3px 0;text-align:center}
+.rb-w{font:700 10px var(--fm);color:var(--mut);padding:4px 0;text-transform:uppercase}
+.rb-d{height:34px;border:0;background:none;color:var(--fg);font:600 13px var(--fm);cursor:pointer;border-radius:50%;position:relative;padding:0}
+.rb-d.out{color:#ffffff40}.rb-d:hover{background:var(--card2)}
+.rb-d.in{background:#3a2a8a66;border-radius:0}.rb-d.in.out{color:#ffffff66}
+.rb-d.start,.rb-d.end{background:var(--acc);color:#fff;border-radius:50%}.rb-d.start.in-r{border-radius:50% 0 0 50%}
+.rb-d.today{box-shadow:inset 0 0 0 1.5px #ff5cc8}
+.rb-hint{grid-column:1/-1;color:var(--mut);font-size:12px}
+@media(max-width:820px){
+ .rb{width:100%;flex-wrap:wrap;margin-left:0}.rb-pill{flex:1;min-width:0}
+ .rb-pop{position:fixed;left:12px;right:12px;top:auto;margin-top:8px;grid-template-columns:1fr;max-height:80vh;overflow:auto}
+ .rb-ps{flex-direction:row;flex-wrap:wrap;padding-top:0}.rb-cal{grid-template-columns:1fr}.rb-cal .rb-m:first-child{display:none}.rb-nav.mob{display:grid}
+}
 </style>
 </head>
 <body>
@@ -353,7 +380,6 @@ const fmtH=m=>{const h=m/60;return Number.isInteger(h)?String(h):h.toFixed(1).re
 const dmy=s=>s.split('-').reverse().join('.');
 const dxMonths=['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
 const dxDay=s=>{const[,m,d]=s.split('-').map(Number);return d+' '+dxMonths[m-1]};
-let dx={preset:'month',from:null,to:null};
 const dxReg=[];let dxLast=null;
 function dxCloseAll(){dxReg.forEach(([b,p])=>{p.hidden=true;b.classList.remove('on');b.setAttribute('aria-expanded','false')})}
 document.addEventListener('click',dxCloseAll);
@@ -375,32 +401,66 @@ const IC_CAL='<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M8 3v4M1
 const IC_EXT='<path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>';
 const IC_CHEV='<path d="M9 6l6 6-6 6"/>';
 
-function dxQuery(){
-  const t=kyivToday();
-  if(dx.preset==='all')return'?all=1';
-  if(dx.preset==='today')return'?from='+t+'&to='+t;
-  if(dx.preset==='week'){const dow=(new Date(t+'T00:00:00Z').getUTCDay()+6)%7;return'?from='+addDay(t,-dow)+'&to='+addDay(t,6-dow)}
-  if(dx.preset==='custom'&&dx.from&&dx.to)return'?from='+dx.from+'&to='+dx.to;
-  return'';
+/* ---------- Выбор периода: один и тот же в шапке у всех ролей ---------- */
+let dxRange=null; // {from,to} по Киеву; null означает текущий месяц
+const dxMonthRange=(off=0)=>{let m=kyivToday().slice(0,7);if(off)m=perShift(m,off);return{from:m+'-01',to:lastDayOf(m)}};
+const dxCur=()=>dxRange||dxMonthRange(0);
+const dxText=r=>dmy(r.from)+' - '+dmy(r.to);
+const dxSame=(a,b)=>a&&b&&a.from===b.from&&a.to===b.to;
+function dxPresets(){const t=kyivToday();return[['Сегодня',{from:t,to:t}],['Вчера',{from:addDay(t,-1),to:addDay(t,-1)}],['Последние 7 дней',{from:addDay(t,-6),to:t}],['За последние 30 дней',{from:addDay(t,-29),to:t}],['Текущий месяц',dxMonthRange(0)],['Прошлый месяц',dxMonthRange(-1)]]}
+const IC_CHEVD='<path d="M6 9l6 6 6-6"/>';
+function rangeBar(onApply){
+  let sel={...dxCur()},anchor=null,view=perShift(sel.to.slice(0,7),-1);
+  const today=kyivToday();
+  const pillText=el('span',{});
+  const pill=el('button',{type:'button',class:'rb-pill','aria-haspopup':'dialog','aria-expanded':'false'},svgIcon(IC_CAL,18),pillText,(()=>{const c=svgIcon(IC_CHEVD,16);c.classList.add('chv');return c})());
+  const pop=el('div',{class:'rb-pop',hidden:'',role:'dialog','aria-label':'Выбор периода'});
+  const go=el('button',{type:'button',class:'rb-go',onclick:()=>{dxRange={...sel};anchor=null;pop.hidden=true;pill.classList.remove('on');onApply(dxRange)}},'Найти');
+  const days=[];
+  const monthEl=(m,side)=>{
+    const first=m+'-01',dow=(new Date(first+'T00:00:00Z').getUTCDay()+6)%7,start=addDay(first,-dow);
+    const head=el('div',{class:'rb-mh'},side==='l'?el('button',{type:'button',class:'rb-nav l','aria-label':'Раньше',onclick:e=>{e.stopPropagation();view=perShift(view,-1);draw()}},svgIcon('<path d="M15 6l-6 6 6 6"/>',14)):null,perLabel(m),side==='r'?el('button',{type:'button',class:'rb-nav l mob','aria-label':'Раньше',onclick:e=>{e.stopPropagation();view=perShift(view,-1);draw()}},svgIcon('<path d="M15 6l-6 6 6 6"/>',14)):null,side==='r'?el('button',{type:'button',class:'rb-nav r','aria-label':'Позже',onclick:e=>{e.stopPropagation();view=perShift(view,1);draw()}},svgIcon('<path d="M9 6l6 6-6 6"/>',14)):null);
+    const grid=el('div',{class:'rb-g'},...['Пн','Вт','Ср','Чт','Пт','Сб','Вс'].map(w=>el('div',{class:'rb-w'},w)));
+    for(let i=0;i<42;i++){
+      const d=addDay(start,i),out=d.slice(0,7)!==m;
+      const b=el('button',{type:'button',class:'rb-d'+(out?' out':''),'data-d':d,'aria-label':dmy(d),onclick:()=>pick(d)},String(Number(d.slice(8))));
+      b.addEventListener('mouseenter',()=>{if(anchor)paint(anchor<=d?{from:anchor,to:d}:{from:d,to:anchor})});
+      days.push(b);grid.append(b);
+    }
+    return el('div',{class:'rb-m'},head,grid);
+  };
+  const paint=r=>days.forEach(b=>{const d=b.dataset.d;b.classList.toggle('in',d>=r.from&&d<=r.to);b.classList.toggle('start',d===r.from);b.classList.toggle('end',d===r.to);b.classList.toggle('today',d===today)});
+  function pick(d){
+    if(!anchor){anchor=d;sel={from:d,to:d}}
+    else{sel=anchor<=d?{from:anchor,to:d}:{from:d,to:anchor};anchor=null}
+    draw();
+  }
+  function draw(){
+    pillText.textContent=anchor?dmy(sel.from)+' - …':dxText(sel);
+    days.length=0;
+    const presets=dxPresets();
+    const ps=el('div',{class:'rb-ps'},...presets.map(([t,r])=>el('button',{type:'button',class:dxSame(r,sel)&&!anchor?'on':'',onclick:()=>{sel={...r};anchor=null;view=perShift(r.to.slice(0,7),-1);draw()}},t)),el('button',{type:'button',class:!anchor&&!presets.some(([,r])=>dxSame(r,sel))||anchor?'on':'',onclick:()=>{anchor=null}},'Свободный период'));
+    pop.replaceChildren(ps,el('div',{class:'rb-cal'},monthEl(view,'l'),monthEl(perShift(view,1),'r')));
+    paint(sel);
+  }
+  pill.addEventListener('click',e=>{e.stopPropagation();const open=pop.hidden;dxCloseAll();if(open){sel={...dxCur()};anchor=null;view=perShift(sel.to.slice(0,7),-1);draw();pop.hidden=false;pill.classList.add('on');pill.setAttribute('aria-expanded','true')}});
+  pop.addEventListener('click',e=>e.stopPropagation());
+  dxReg.push([pill,pop]);
+  draw();pop.hidden=true;
+  return el('div',{class:'rb'},pill,go,pop);
 }
-function dxSub(d){
-  const r=d.range;
-  if(dx.preset==='all')return'За всё время';
-  if(dx.preset==='today')return'Сегодня, '+dxDay(r.from);
-  if(dx.preset==='week')return dx.preset&&(r.from.slice(0,7)===r.to.slice(0,7)?Number(r.from.slice(8))+'–'+dxDay(r.to):dxDay(r.from)+' – '+dxDay(r.to));
-  if(dx.preset==='custom')return dmy(r.from)+' — '+dmy(r.to);
-  const day=Number(d.today.slice(8)),dim=r.to.slice(8);
-  return perLabel(r.from.slice(0,7))+' · на '+dxDay(d.today)+' (день '+day+' из '+Number(dim)+')';
+function dxHead(sub,onApply){
+  return el('div',{class:'dx-top'},el('div',{class:'dx-ttl'},el('h2',{},'Дашборд'),el('span',{class:'dx-sub'},sub)),rangeBar(onApply));
+}
+function dxRangeLabel(r,today){
+  const t=today||kyivToday();
+  if(r.from===r.to)return r.from===t?'Сегодня, '+dxDay(t):dxDay(r.from)+' '+r.from.slice(0,4);
+  const whole=r.from.endsWith('-01')&&r.to===lastDayOf(r.from.slice(0,7));
+  if(whole)return perLabel(r.from.slice(0,7))+(r.from.slice(0,7)===t.slice(0,7)?' · на '+dxDay(t)+' (день '+Number(t.slice(8))+' из '+Number(r.to.slice(8))+')':'');
+  return dmy(r.from)+' — '+dmy(r.to);
 }
 
-function dxHeader(d){
-  const seg=el('div',{class:'dx-seg',role:'group','aria-label':'Период'},...[['today','Сегодня'],['week','Неделя'],['month','Месяц'],['all','Всё время']].map(([k,t])=>el('button',{type:'button',class:dx.preset===k?'on':'',onclick:()=>{dx.preset=k;render({soft:true})}},t)));
-  const d1=el('input',{type:'date',value:dx.from||d.range.from}),d2=el('input',{type:'date',value:dx.to||d.range.to});
-  const ap=el('button',{class:'btn s',type:'button',onclick:()=>{if(!d1.value||!d2.value||d1.value>d2.value){toast('Проверьте даты периода');return}dx.preset='custom';dx.from=d1.value;dx.to=d2.value;render({soft:true})}},'Применить');
-  const cal=dxPopBtn('Выбрать период',IC_CAL,[el('label',{},'С',d1),el('label',{},'По',d2),ap],'pr top30',dx.preset==='custom'?'on':'');
-  cal.querySelector('.dx-ib').classList.remove('sm2');
-  return el('div',{class:'dx-top'},el('div',{class:'dx-ttl'},el('h2',{},'Дашборд'),el('span',{class:'dx-sub'},dxSub(d))),el('div',{class:'dx-rng'},seg,cal));
-}
+function dxQuery(){const r=dxCur();return'?from='+r.from+'&to='+r.to}
 
 const dxLvl=(m,pace)=>!pace||m>=pace?'ok':m>=pace*.85?'warn':'bad';
 function dxOffText(s,today){
@@ -561,18 +621,19 @@ async function adminDash(){
     document.querySelectorAll('[data-live]').forEach(n=>{n.textContent=hm(Math.max(0,Math.floor((Date.now()+skew-Date.parse(n.dataset.live))/60000)))});
     if(!document.querySelector('.dx-ovl')&&dxReg.every(([,p])=>p.hidden)&&Date.now()+skew-Date.parse(d.now)>90000)render({soft:true});
   },20000);
-  return[el('div',{class:'dx'},dxHeader(d),dxLive(d,skew),el('div',{class:'dx-cols'},el('div',{class:'dx-col'},dxPlanFact(d)),el('div',{class:'dx-col'},dxNet(d),dxTasks(d))),fs)];
+  return[el('div',{class:'dx'},dxHead(dxRangeLabel({from:d.range.from,to:d.range.to},d.today),()=>render({soft:true})),dxLive(d,skew),el('div',{class:'dx-cols'},el('div',{class:'dx-col'},dxPlanFact(d)),el('div',{class:'dx-col'},dxNet(d),dxTasks(d))),fs)];
 }
 
 async function viewHome(){
   if(me.role==='admin')return adminDash();
-  const s=await api('/stats');const b=s.byStatus;
+  dxReg.length=0;
+  const r=dxCur();
+  const s=await api('/stats?from='+r.from+'&to='+r.to);const b=s.byStatus;
   const k=(t,v)=>el('div',{class:'kpi'},el('small',{},t),el('b',{},String(v)));
   const kpi=me.role==='streamer'?await kpiCardBlock().catch(()=>null):null;
-  const fstats=me.role==='admin'?await fieldStatsBlock().catch(()=>null):null;
-  return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Дашборд')),kpi,
+  return[el('div',{class:'dx'},dxHead(dxRangeLabel(r),()=>render({soft:true})),kpi,
     el('div',{class:'kpis'},k('Клики по ссылкам',s.clicks),k('Лиды',s.total),k('Регистрации',(b.registered||0)+(b.ftd||0)+(b.active||0)),k('FTD',(b.ftd||0)+(b.active||0)),k('Отвал',b.churned||0)),
-    el('div',{class:'kpis'},k('Депозиты',money(s.deposits)),k('Выводы',money(s.withdrawals)),...(s.commission!==null?[k('Заработано (комиссия)',money(s.commission))]:[])),fstats].filter(Boolean);
+    el('div',{class:'kpis'},k('Депозиты',money(s.deposits)),k('Выводы',money(s.withdrawals))))];
 }
 
 const LROLES=[['lead','Лид'],['moder','Модер'],['admin','Админ'],['streamer','Стример'],['analyst','Аналитик'],['buyer','Медиабайер']];

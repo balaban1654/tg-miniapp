@@ -154,16 +154,33 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // Сводка для дашборда
-  app.get('/stats', { preHandler: auth }, async (req) => {
+  app.get<{ Querystring: { from?: string; to?: string } }>('/stats', { preHandler: auth }, async (req) => {
     const me = req.staff!;
+    // Период (по Киеву): лиды, пришедшие за эти даты, клики и деньги за них. Без периода считаем всё время
+    const D = /^\d{4}-\d{2}-\d{2}$/;
+    let range: [string, string] | null = null;
+    if (D.test(String(req.query.from)) && D.test(String(req.query.to))) {
+      range = String(req.query.from) <= String(req.query.to) ? [String(req.query.from), String(req.query.to)] : [String(req.query.to), String(req.query.from)];
+    }
+    const TZ = 'Europe/Kyiv';
     const leads = await db.query(
-      `SELECT status, count(*)::int AS n FROM leads WHERE ${ownerScope(me, 'owner_id')} GROUP BY status`,
+      `SELECT status, count(*)::int AS n FROM leads WHERE ${ownerScope(me, 'owner_id')}
+         ${range ? `AND (created_at AT TIME ZONE '${TZ}')::date BETWEEN $1::date AND $2::date` : ''} GROUP BY status`,
+      (range ?? []) as string[],
     );
-    const clicks = await db.query(`SELECT coalesce(sum(clicks),0)::int AS n FROM links WHERE ${ownerScope(me, 'owner_id')}`);
+    const clicks = range
+      ? await db.query(
+          `SELECT count(*)::int AS n FROM link_clicks c JOIN links l ON l.id = c.link_id
+            WHERE ${ownerScope(me, 'l.owner_id')} AND (c.at AT TIME ZONE '${TZ}')::date BETWEEN $1::date AND $2::date`,
+          range,
+        )
+      : await db.query(`SELECT coalesce(sum(clicks),0)::int AS n FROM links WHERE ${ownerScope(me, 'owner_id')}`);
     const money = await db.query(
       `SELECT e.type, coalesce(sum(e.amount),0)::float AS s
          FROM events e JOIN leads d ON d.tg_id = e.tg_id
-        WHERE e.type IN ('ftd','dep','wd','comm') AND ${ownerScope(me, 'd.owner_id')} GROUP BY e.type`,
+        WHERE e.type IN ('ftd','dep','wd','comm') AND ${ownerScope(me, 'd.owner_id')}
+          ${range ? `AND (e.created_at AT TIME ZONE '${TZ}')::date BETWEEN $1::date AND $2::date` : ''} GROUP BY e.type`,
+      (range ?? []) as string[],
     );
     const m: Record<string, number> = {};
     for (const x of money.rows) m[x.type] = x.s;
