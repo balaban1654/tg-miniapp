@@ -90,6 +90,7 @@ html{background:#0a0613}
 .auto-acc{cursor:default;pointer-events:none}
 .sum-row td{border-top:2px solid var(--acc);background:#9b5cff14;font-weight:700}
 .pb-drop{flex:1;display:flex;align-items:center;justify-content:center;min-width:0;padding:10px 12px;font-size:12px}.pb-drop.busy{opacity:.6}.pb-clip{padding:0 12px;display:grid;place-items:center}
+.pb-tots{display:flex;gap:16px;flex-wrap:wrap;margin:2px 0 10px}.pb-tot{display:inline-flex;align-items:center;gap:8px}.pb-tot b{font-size:16px}
 .drop-row{display:flex;gap:8px;align-items:stretch}.drop-row .drop2{flex:1;width:auto}.drop-paste{padding:0 14px;display:grid;place-items:center}.drop2.over{background:#9b5cff33;border-style:solid}
 .drop2{border:1.5px dashed var(--acc);border-radius:12px;padding:14px;text-align:center;color:var(--acc2);background:#9b5cff10;font-weight:600;font-size:13px;cursor:pointer;width:100%}
 .mon2{display:flex;gap:6px;align-items:center}.mon2 button{background:var(--card);border:1px solid var(--line);color:var(--fg);border-radius:9px;width:32px;height:32px;cursor:pointer}.mon2 b{min-width:140px;text-align:center}
@@ -2859,7 +2860,7 @@ async function viewPostbacks(){
     sel([['ok','Принятые'],['skip','Пропущенные (нет лида)'],['dup','Дубли'],['err','С ошибкой']],'res','Все результаты'),
     sel([['new','Сначала новые'],['old','Сначала старые'],['sum','Сумма: больше → меньше'],['sumAsc','Сумма: меньше → больше']],'sort'),
     el('button',{class:'btn o s',type:'button',onclick:()=>{Object.assign(F,{q:'',ev:'',res:'',sort:'new'});render()}},'Сбросить'));
-  const holder=el('div',{});const cnt=el('span',{class:'mut'},'');
+  const holder=el('div',{});const cnt=el('span',{class:'mut'},'');const totBox=el('div',{class:'pb-tots'});
   // Telegram ID: если его нет, можно вписать вручную. Привяжется ко всем записям этого Pocket ID, лид заведётся в «Лидах»
   const tgCell=r=>{
     const qq=r.query||{},v=r.tg_id||qq.click_id,trader=qq.trader_id;
@@ -2887,10 +2888,20 @@ async function viewPostbacks(){
     list=[...list].sort(by[F.sort]||by.new);
     holder.replaceChildren(table(['Время','Событие','Telegram ID','Pocket ID',['Сумма','n'],'Результат',''],list.map(r=>{const qq2=r.query||{};return[td(time(r.created_at)),el('td',{},el('span',{class:'pill ev-'+r.event},r.event)),tgCell(r),copyCell(qq2.trader_id),td(qq2.commission||qq2.sumdep||qq2.wdr_sum||qq2.amount||qq2.sum||'—','n'),el('td',{},el('span',{class:'pill '+(r.result==='ok'?'p-ok':(r.result.startsWith('дубль')||r.result.startsWith('пропущен'))?'p-warn':'p-bad')},r.result)),el('td',{},el('button',{class:'btn o s',type:'button',title:'Удалить постбек','aria-label':'Удалить постбек',onclick:()=>pbDeleteDialog(r,()=>render({soft:true}))},svgIcon(TRASH,15)))]}),
       rows.length?'Ничего не найдено. Измените фильтры.':'Постбеков пока нет. Когда партнёрка отправит первый, он появится здесь.'));
+    // Итого по показанным записям: по каждому событию отдельно, а строка «Итого» внизу таблицы, когда выбрано одно событие
+    const by2={};list.forEach(r=>{const o=by2[r.event]||(by2[r.event]={n:0,s:0});o.n++;o.s+=amt(r)});
+    const types=Object.keys(by2).filter(k=>k!=='reg');
+    const usd=v=>'$'+v.toLocaleString('ru-RU',{minimumFractionDigits:2,maximumFractionDigits:2});
+    totBox.replaceChildren(...types.map(k=>el('span',{class:'pb-tot'},el('span',{class:'pill ev-'+k},k),el('b',{},usd(by2[k].s)),el('span',{class:'mut sm'},by2[k].n+' шт'))));
+    const tb=holder.querySelector('tbody');
+    if(tb&&list.length&&types.length===1&&Object.keys(by2).length===1){
+      const tr=el('tr',{class:'sum-row'},el('td',{},'Итого'),el('td',{},el('span',{class:'pill ev-'+types[0]},types[0])),el('td',{}),el('td',{}),el('td',{class:'n'},usd(by2[types[0]].s)),el('td',{},by2[types[0]].n+' шт'),el('td',{}));
+      tb.append(tr);
+    }
     cnt.textContent=list.length===rows.length?rows.length+' всего':list.length+' из '+rows.length;
   };
   draw();
-  return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Постбеки'),el('div',{style:'display:flex;gap:8px;align-items:center'},cnt,upBtn,upFile,clearBox,el('button',{class:'btn o s',type:'button',onclick:()=>render({soft:true})},'Обновить'))),bar,holder];
+  return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Постбеки'),el('div',{style:'display:flex;gap:8px;align-items:center'},cnt,upBtn,upFile,clearBox,el('button',{class:'btn o s',type:'button',onclick:()=>render({soft:true})},'Обновить'))),bar,totBox,holder];
 }
 
 (async()=>{try{me=await api('/me');readHash();showApp()}catch{showLogin()}})();
