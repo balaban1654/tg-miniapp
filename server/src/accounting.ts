@@ -17,6 +17,16 @@ export interface KpiPlan {
   day: { count: number; min: number; bonus: number; cutoffH: number }; // дневной бонус
   tol: number; // запас на курс брокера
   advance: number; // максимальный аванс
+  goals: Goals; // цели месяца для дашборда админа
+}
+
+/** Цели месяца: по ним на дашборде считается план/факт */
+export interface Goals {
+  ftd: number; // FTD, штук
+  ftdSum: number; // пополнения по FTD, $
+  deposits: number; // все депозиты (FTD и додепы), $
+  commission: number; // комиссия, $
+  net: number; // чистая прибыль, $
 }
 
 export const DEFAULT_PLAN: KpiPlan = {
@@ -40,16 +50,18 @@ export const DEFAULT_PLAN: KpiPlan = {
   day: { count: 4, min: 50, bonus: 50, cutoffH: 3 },
   tol: 0.1,
   advance: 200,
+  goals: { ftd: 50, ftdSum: 4500, deposits: 9500, commission: 6000, net: 3900 },
 };
 
 const TZ = 'Europe/Kyiv';
 const r2 = (n: number) => Math.round(n * 100) / 100;
 const PERIOD = /^\d{4}-(0[1-9]|1[0-2])$/;
+const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 export async function getPlan(): Promise<KpiPlan> {
   const row = (await db.query('SELECT data FROM kpi_settings WHERE id = 1')).rows[0];
   const d = (row?.data ?? {}) as Partial<KpiPlan>;
-  return { ...DEFAULT_PLAN, ...d, day: { ...DEFAULT_PLAN.day, ...(d.day ?? {}) } };
+  return { ...DEFAULT_PLAN, ...d, day: { ...DEFAULT_PLAN.day, ...(d.day ?? {}) }, goals: { ...DEFAULT_PLAN.goals, ...(d.goals ?? {}) } };
 }
 
 export async function currentPeriod(): Promise<string> {
@@ -206,6 +218,13 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
       day: { count: n(b.day?.count, cur.day.count, 1, 100), min: n(b.day?.min, cur.day.min), bonus: n(b.day?.bonus, cur.day.bonus), cutoffH: n(b.day?.cutoffH, cur.day.cutoffH, 0, 12) },
       tol: n(b.tol, cur.tol, 0, 0.5),
       advance: n(b.advance, cur.advance),
+      goals: {
+        ftd: n(b.goals?.ftd, cur.goals.ftd, 0, 1e6),
+        ftdSum: n(b.goals?.ftdSum, cur.goals.ftdSum, 0, 1e9),
+        deposits: n(b.goals?.deposits, cur.goals.deposits, 0, 1e9),
+        commission: n(b.goals?.commission, cur.goals.commission, 0, 1e9),
+        net: n(b.goals?.net, cur.goals.net, 0, 1e9),
+      },
     };
     await db.query('UPDATE kpi_settings SET data = $1::jsonb WHERE id = 1', [JSON.stringify(next)]);
     return { ok: true, plan: next };
@@ -374,20 +393,28 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
   });
 
   // Сводка по полям формы для общего дашборда: суммы числовых полей по зачтённым отчётам
-  app.get<{ Querystring: { period?: string } }>('/shifts/fieldstats', { preHandler: admin }, async (req) => {
+  app.get<{ Querystring: { period?: string; from?: string; to?: string } }>('/shifts/fieldstats', { preHandler: admin }, async (req) => {
     const period = PERIOD.test(String(req.query.period)) ? String(req.query.period) : await currentPeriod();
+    const r = DATE.test(String(req.query.from)) && DATE.test(String(req.query.to)) ? { from: String(req.query.from), to: String(req.query.to) } : null;
     const defs = (await fieldsDef(true)).filter((d: any) => d.on_dashboard);
-    const rows = (await db.query(`SELECT s.staff_id, st.name, s.fields, s.approved_min FROM shift_reports s JOIN staff st ON st.id = s.staff_id WHERE s.status = 'approved' AND to_char(s.day, 'YYYY-MM') = $1`, [period])).rows;
+    const rows = (
+      await db.query(
+        r
+          ? `SELECT s.staff_id, st.name, s.fields, s.approved_min FROM shift_reports s JOIN staff st ON st.id = s.staff_id WHERE s.status = 'approved' AND s.day BETWEEN $1::date AND $2::date`
+          : `SELECT s.staff_id, st.name, s.fields, s.approved_min FROM shift_reports s JOIN staff st ON st.id = s.staff_id WHERE s.status = 'approved' AND to_char(s.day, 'YYYY-MM') = $1`,
+        r ? [r.from, r.to] : [period],
+      )
+    ).rows;
     type Agg = { staff_id: number; name: string; reports: number; minutes: number; sums: Record<string, number> };
     const by = new Map<number, Agg>();
-    for (const r of rows) {
-      const e: Agg = by.get(r.staff_id) ?? { staff_id: r.staff_id, name: r.name, reports: 0, minutes: 0, sums: {} };
+    for (const x of rows) {
+      const e: Agg = by.get(x.staff_id) ?? { staff_id: x.staff_id, name: x.name, reports: 0, minutes: 0, sums: {} };
       e.reports++;
-      e.minutes += r.approved_min ?? 0;
-      for (const f of r.fields as any[]) if (f.kind === 'number' && typeof f.value === 'number') e.sums[f.name] = (e.sums[f.name] ?? 0) + f.value;
-      by.set(r.staff_id, e);
+      e.minutes += x.approved_min ?? 0;
+      for (const f of x.fields as any[]) if (f.kind === 'number' && typeof f.value === 'number') e.sums[f.name] = (e.sums[f.name] ?? 0) + f.value;
+      by.set(x.staff_id, e);
     }
-    return { period, fields: defs.map((d: any) => d.name), rows: [...by.values()] };
+    return { period, from: r?.from ?? null, to: r?.to ?? null, fields: defs.map((d: any) => d.name), rows: [...by.values()] };
   });
 
   // ----- KPI: свой (стример) и сводка (админ) -----
@@ -533,5 +560,277 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
         [period],
       )
     ).rows;
+  });
+
+  // ----- Расходы компании (админ) -----
+  app.get<{ Querystring: { period?: string } }>('/expenses', { preHandler: admin }, async (req) => {
+    const period = PERIOD.test(String(req.query.period)) ? String(req.query.period) : await currentPeriod();
+    const rows = (
+      await db.query(
+        `SELECT e.id, to_char(e.day, 'YYYY-MM-DD') AS day, e.amount::float AS amount, e.comment, c.name AS by
+           FROM expenses e LEFT JOIN staff c ON c.id = e.created_by WHERE to_char(e.day, 'YYYY-MM') = $1 ORDER BY e.day DESC, e.id DESC`,
+        [period],
+      )
+    ).rows;
+    return { period, total: r2(rows.reduce((a: number, x: any) => a + x.amount, 0)), rows };
+  });
+  app.post('/expenses', { preHandler: admin }, async (req, reply) => {
+    const b = (req.body ?? {}) as Record<string, any>;
+    const amount = Math.abs(Number(String(b.amount).replace(',', '.')));
+    const comment = str(b.comment, 300);
+    if (!Number.isFinite(amount) || amount <= 0 || amount > 1e7) return reply.code(400).send({ error: 'Укажите сумму расхода в долларах' });
+    if (!comment) return reply.code(400).send({ error: 'Напишите, на что потрачено' });
+    const day = DATE.test(String(b.day)) ? String(b.day) : (await db.query(`SELECT to_char((now() AT TIME ZONE '${TZ}')::date, 'YYYY-MM-DD') AS d`)).rows[0].d;
+    await db.query('INSERT INTO expenses (day, amount, comment, created_by) VALUES ($1::date, $2, $3, $4)', [day, r2(amount), comment, req.staff!.id]);
+    return { ok: true };
+  });
+  app.delete<{ Params: { id: string } }>('/expenses/:id', { preHandler: admin }, async (req) => {
+    await db.query('DELETE FROM expenses WHERE id = $1', [Number(req.params.id)]);
+    return { ok: true };
+  });
+
+  // ----- Дашборд админа: план/факт, воронка, зарплаты, расходы, чистая прибыль -----
+  const ymd = (d: Date) => d.toISOString().slice(0, 10);
+  const addDays = (s: string, n: number) => {
+    const d = new Date(`${s}T00:00:00Z`);
+    d.setUTCDate(d.getUTCDate() + n);
+    return ymd(d);
+  };
+  const daysBetween = (a: string, b: string) => Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 86400000);
+  const monthLen = (m: string) => new Date(Date.UTC(Number(m.slice(0, 4)), Number(m.slice(5, 7)), 0)).getUTCDate();
+  const lastOfMonth = (m: string) => `${m}-${String(monthLen(m)).padStart(2, '0')}`;
+  const nextMonth = (m: string) => {
+    const y = Number(m.slice(0, 4));
+    const mo = Number(m.slice(5, 7));
+    return mo === 12 ? `${y + 1}-01` : `${y}-${String(mo + 1).padStart(2, '0')}`;
+  };
+
+  type Agg = { reg: number; ftd: number; ftdSum: number; dep: number; depSum: number; comm: number };
+  const emptyAgg = (): Agg => ({ reg: 0, ftd: 0, ftdSum: 0, dep: 0, depSum: 0, comm: 0 });
+  const aggEvents = async (from: string, to: string): Promise<Map<number, Agg>> => {
+    const rows = (
+      await db.query(
+        `SELECT d.owner_id, e.type, count(*)::int AS n, coalesce(sum(e.amount), 0)::float AS s
+           FROM events e JOIN leads d ON d.tg_id = e.tg_id
+          WHERE d.owner_id IS NOT NULL AND e.type IN ('reg','ftd','dep','comm')
+            AND (e.created_at AT TIME ZONE '${TZ}')::date BETWEEN $1::date AND $2::date
+          GROUP BY d.owner_id, e.type`,
+        [from, to],
+      )
+    ).rows as { owner_id: number; type: string; n: number; s: number }[];
+    const m = new Map<number, Agg>();
+    for (const r of rows) {
+      const a = m.get(r.owner_id) ?? emptyAgg();
+      if (r.type === 'reg') a.reg = r.n;
+      else if (r.type === 'ftd') {
+        a.ftd = r.n;
+        a.ftdSum = r.s;
+      } else if (r.type === 'dep') {
+        a.dep = r.n;
+        a.depSum = r.s;
+      } else a.comm = r.s;
+      m.set(r.owner_id, a);
+    }
+    return m;
+  };
+
+  app.get<{ Querystring: { from?: string; to?: string; all?: string } }>('/dashboard', { preHandler: admin }, async (req) => {
+    const plan = await getPlan();
+    const today = (await db.query(`SELECT to_char((now() AT TIME ZONE '${TZ}')::date, 'YYYY-MM-DD') AS d`)).rows[0].d as string;
+    const allTime = req.query.all === '1';
+    let from: string;
+    let to: string;
+    if (allTime) {
+      const first = (
+        await db.query(
+          `SELECT to_char(least(
+              (SELECT min(created_at AT TIME ZONE '${TZ}') FROM events),
+              (SELECT min(day)::timestamp FROM shift_reports),
+              (SELECT min(day)::timestamp FROM expenses)), 'YYYY-MM-DD') AS d`,
+        )
+      ).rows[0].d as string | null;
+      from = first ?? today;
+      to = today;
+    } else if (DATE.test(String(req.query.from)) && DATE.test(String(req.query.to))) {
+      from = String(req.query.from);
+      to = String(req.query.to);
+      if (from > to) [from, to] = [to, from];
+      if (daysBetween(from, to) > 800) from = addDays(to, -800);
+    } else {
+      const m = today.slice(0, 7);
+      from = `${m}-01`;
+      to = lastOfMonth(m);
+    }
+    const rangeDays = daysBetween(from, to) + 1;
+    const ref = to > today ? today : to; // последний день периода, который уже наступил
+    const refMonth = ref.slice(0, 7);
+
+    // Месяцы периода и доля каждого: для зарплаты неполного месяца
+    const months: { m: string; w: number }[] = [];
+    for (let m = from.slice(0, 7); m <= to.slice(0, 7) && months.length < 36; m = nextMonth(m)) {
+      const s = `${m}-01` > from ? `${m}-01` : from;
+      const e = lastOfMonth(m) < to ? lastOfMonth(m) : to;
+      months.push({ m, w: allTime ? 1 : (daysBetween(s, e) + 1) / monthLen(m) });
+    }
+    const goalFactor = allTime ? null : months.reduce((a, x) => a + x.w, 0);
+    const g = plan.goals;
+    const goals = goalFactor === null ? null : { ftd: g.ftd * goalFactor, ftdSum: g.ftdSum * goalFactor, deposits: g.deposits * goalFactor, commission: g.commission * goalFactor, net: g.net * goalFactor };
+    // Где должны быть сегодня: доля прошедших дней периода
+    const pace = ref >= to ? 1 : Math.max(0, Math.min(1, (daysBetween(from, ref) + 1) / rangeDays));
+
+    const staffRows = (await db.query(`SELECT id, name, login, tg_username, active FROM staff WHERE role = 'streamer' ORDER BY id`)).rows as { id: number; name: string; login: string; tg_username: string | null; active: boolean }[];
+    const ids = staffRows.map((s) => s.id);
+
+    const evRange = await aggEvents(from, to);
+    const refStart = `${refMonth}-01`;
+    const evMonth = refStart === from && lastOfMonth(refMonth) === to ? evRange : await aggEvents(refStart, lastOfMonth(refMonth));
+
+    const clicksRows = (
+      allTime
+        ? await db.query(`SELECT owner_id, coalesce(sum(clicks), 0)::int AS n FROM links GROUP BY owner_id`)
+        : await db.query(
+            `SELECT l.owner_id, count(*)::int AS n FROM link_clicks c JOIN links l ON l.id = c.link_id
+              WHERE (c.at AT TIME ZONE '${TZ}')::date BETWEEN $1::date AND $2::date GROUP BY l.owner_id`,
+            [from, to],
+          )
+    ).rows as { owner_id: number; n: number }[];
+    const clicks = new Map(clicksRows.map((r) => [r.owner_id, r.n]));
+    const clicksSince = (await db.query(`SELECT to_char(min(at AT TIME ZONE '${TZ}'), 'YYYY-MM-DD') AS d FROM link_clicks`)).rows[0].d as string | null;
+
+    const nowIso = new Date().toISOString();
+    const live = new Map(
+      ((await db.query(`SELECT DISTINCT ON (staff_id) staff_id, started_at, stream_url FROM shift_reports WHERE status = 'live' ORDER BY staff_id, id DESC`)).rows as { staff_id: number; started_at: string; stream_url: string }[]).map((r) => [r.staff_id, r]),
+    );
+    const lastEnd = new Map(
+      ((await db.query(`SELECT staff_id, max(ended_at) AS t FROM shift_reports WHERE status <> 'live' AND ended_at IS NOT NULL GROUP BY staff_id`)).rows as { staff_id: number; t: string }[]).map((r) => [r.staff_id, r.t]),
+    );
+    const lastLen = new Map(
+      ((await db.query(`SELECT DISTINCT ON (staff_id) staff_id, coalesce(approved_min, declared_min) AS m FROM shift_reports WHERE status <> 'live' AND ended_at IS NOT NULL ORDER BY staff_id, ended_at DESC`)).rows as { staff_id: number; m: number | null }[]).map((r) => [r.staff_id, r.m]),
+    );
+    const todayMin = new Map(
+      ((await db.query(`SELECT staff_id, coalesce(sum(coalesce(approved_min, declared_min)), 0)::int AS m FROM shift_reports WHERE status IN ('approved','pending') AND day = $1::date GROUP BY staff_id`, [today])).rows as { staff_id: number; m: number }[]).map((r) => [r.staff_id, r.m]),
+    );
+    const pendingBy = new Map(
+      ((await db.query(`SELECT staff_id, count(*)::int AS n FROM shift_reports WHERE status = 'pending' GROUP BY staff_id`)).rows as { staff_id: number; n: number }[]).map((r) => [r.staff_id, r.n]),
+    );
+    const shortBy = new Map(
+      ((await db.query(`SELECT staff_id, count(*)::int AS n FROM shift_shortfalls WHERE reason IS NULL AND to_char(day, 'YYYY-MM') = $1 GROUP BY staff_id`, [refMonth])).rows as { staff_id: number; n: number }[]).map((r) => [r.staff_id, r.n]),
+    );
+    const advances = (await db.query(`SELECT r.id, r.staff_id, s.name AS staff_name, r.amount::float AS amount FROM advance_requests r JOIN staff s ON s.id = r.staff_id WHERE r.status = 'pending' ORDER BY r.id`)).rows as { id: number; staff_id: number; staff_name: string; amount: number }[];
+
+    // KPI: по месяцам периода (зарплата за период) и за «текущий» месяц (карточка стримера)
+    const kpiCache = new Map<string, KpiResult>();
+    const kpi = async (id: number, m: string) => {
+      const key = `${id}:${m}`;
+      let v = kpiCache.get(key);
+      if (!v) {
+        v = await kpiFor(id, m, plan);
+        kpiCache.set(key, v);
+      }
+      return v;
+    };
+    const paceMin = plan.hours * 60 * (refMonth === today.slice(0, 7) ? Number(today.slice(8, 10)) / monthLen(refMonth) : 1);
+
+    const out: any[] = [];
+    let salaries = 0;
+    for (const s of staffRows) {
+      let salary = 0;
+      let paid = 0;
+      for (const mm of months) {
+        const k = await kpi(s.id, mm.m);
+        salary += k.fullTotal * mm.w;
+        paid += k.paid * mm.w;
+      }
+      const a = evRange.get(s.id) ?? emptyAgg();
+      const am = evMonth.get(s.id) ?? emptyAgg();
+      const k = await kpi(s.id, refMonth);
+      const lv = live.get(s.id) ?? null;
+      const elapsed = lv ? Math.max(0, Math.floor((Date.now() - Date.parse(lv.started_at)) / 60000)) : 0;
+      const doneToday = (todayMin.get(s.id) ?? 0) + elapsed;
+      const has = a.reg || a.ftd || a.dep || a.comm || (clicks.get(s.id) ?? 0) || k.hoursMin || salary || lv;
+      if (!s.active && !has) continue;
+      salaries += salary;
+      out.push({
+        id: s.id,
+        name: s.name,
+        login: s.login,
+        tg: s.tg_username,
+        active: s.active,
+        live: lv ? { started_at: lv.started_at, stream_url: lv.stream_url, elapsed } : null,
+        lastEnd: lastEnd.get(s.id) ?? null,
+        lastMin: lastLen.get(s.id) ?? null,
+        minLeft: lv ? Math.max(0, plan.shiftH * 60 - doneToday) : null,
+        pending: pendingBy.get(s.id) ?? 0,
+        range: { clicks: clicks.get(s.id) ?? 0, regs: a.reg, ftd: a.ftd, ftdSum: a.ftdSum, dep: a.dep, depSum: a.depSum, deposits: a.ftdSum + a.depSum, commission: a.comm, salary: r2(salary), paid: r2(paid) },
+        month: {
+          period: refMonth,
+          ftd: am.ftd,
+          ftdSum: am.ftdSum,
+          deposits: am.ftdSum + am.depSum,
+          commission: am.comm,
+          hoursMin: k.hoursMin,
+          planMin: k.planMin,
+          shifts: k.shifts,
+          baseMin: k.min.base,
+          baseFull: k.full.base,
+          leadsMin: k.min.leadsPay,
+          leadsFull: k.full.leadsPay,
+          ftdBonus: k.ftdBonus,
+          dayBonus: k.dayBonus,
+          bonus: k.adjBonus,
+          penalty: k.adjPenalty,
+          paid: k.paid,
+          totalMin: k.minTotal,
+          totalFull: k.fullTotal,
+        },
+      });
+    }
+    out.sort((x, y) => (y.live ? y.live.elapsed + 1e6 : 0) - (x.live ? x.live.elapsed + 1e6 : 0) || (Date.parse(y.lastEnd ?? '0') || 0) - (Date.parse(x.lastEnd ?? '0') || 0));
+
+    const sum = (f: (x: any) => number) => out.reduce((acc, x) => acc + f(x), 0);
+    const commission = sum((x) => x.range.commission);
+    const expRows = (
+      await db.query(`SELECT id, to_char(day, 'YYYY-MM-DD') AS day, amount::float AS amount, comment FROM expenses WHERE day BETWEEN $1::date AND $2::date ORDER BY day DESC, id DESC`, [from, to])
+    ).rows as { id: number; day: string; amount: number; comment: string }[];
+    const expenses = r2(expRows.reduce((acc, x) => acc + x.amount, 0));
+    const net = r2(commission - salaries - expenses);
+
+    const lagging = out
+      .filter((x) => x.active && paceMin > 0 && x.month.hoursMin < paceMin)
+      .map((x) => ({ id: x.id, name: x.name, hoursMin: x.month.hoursMin, level: x.month.hoursMin < paceMin * 0.85 ? 'bad' : 'warn' }))
+      .sort((a, b) => a.hoursMin - b.hoursMin);
+
+    return {
+      now: nowIso,
+      today,
+      range: { from, to, days: rangeDays, all: allTime, ref, refMonth, whole: months.length === 1 && months[0].w === 1 },
+      plan: { hours: plan.hours, shiftH: plan.shiftH, paceMin, planMin: plan.hours * 60, dayCount: plan.day.count },
+      pace,
+      goals,
+      goalsMonthly: g,
+      clicksSince,
+      streamers: out,
+      totals: {
+        clicks: sum((x) => x.range.clicks),
+        regs: sum((x) => x.range.regs),
+        ftd: sum((x) => x.range.ftd),
+        ftdSum: sum((x) => x.range.ftdSum),
+        dep: sum((x) => x.range.dep),
+        depSum: sum((x) => x.range.depSum),
+        deposits: sum((x) => x.range.deposits),
+        commission: r2(commission),
+        salaries: r2(salaries),
+        expenses,
+        net,
+        netPlanToDate: goals ? r2(goals.net * pace) : null,
+      },
+      expenses: expRows,
+      tasks: {
+        pending: out.filter((x) => x.pending).map((x) => ({ id: x.id, name: x.name, n: x.pending })),
+        advances,
+        lagging,
+        shortfalls: out.filter((x) => shortBy.get(x.id)).map((x) => ({ id: x.id, name: x.name, n: shortBy.get(x.id) as number })),
+      },
+    };
   });
 }

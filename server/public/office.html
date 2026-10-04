@@ -140,6 +140,74 @@ textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10
  .side{position:static;height:auto;flex-direction:row;flex-wrap:wrap;align-items:center;padding:10px;border-right:0;border-bottom:1px solid var(--line)}
  .side .brand{padding:0 8px 0 0}.nav{grid-auto-flow:column;overflow-x:auto}.me{margin:0 0 0 auto;display:flex;align-items:center}
 }
+/* дашборд админа */
+.dx{display:grid;gap:16px;min-width:0}
+.dx-top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.dx-ttl{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}.dx-ttl h2{font-size:24px}.dx-sub{color:var(--mut);font-size:14px}
+.dx-rng{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-left:auto}
+.dx-seg{display:flex;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:3px;gap:2px}
+.dx-seg button{border:0;background:none;color:var(--mut);padding:6px 12px;border-radius:7px;cursor:pointer;font-size:13px}.dx-seg button.on{background:var(--acc);color:#fff;font-weight:700}
+.dx-ib{display:grid;place-items:center;width:38px;height:38px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--mut);cursor:pointer;padding:0}.dx-ib:hover,.dx-ib.on{color:var(--acc2);border-color:var(--acc)}
+.dx-ib.sm2{width:30px;height:30px;border-radius:8px}
+.dx-pw{position:relative;display:inline-flex}
+.dx-pop{position:absolute;z-index:30;top:46px;background:var(--card2);border:1px solid var(--line);border-radius:14px;padding:14px;box-shadow:0 18px 44px rgba(0,0,0,.55);text-transform:none;letter-spacing:0;font-weight:400;font-size:14px;color:var(--fg);width:min(360px,calc(100vw - 32px));display:grid;gap:10px}
+.dx-pop.pr{right:0}.dx-pop.pl{left:0}.dx-pop.wide{width:min(430px,calc(100vw - 32px))}.dx-pop.top30{top:36px}
+.dx-pop label{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:13px;color:var(--mut)}.dx-pop input[type=date]{width:auto}
+.dx-live{display:flex;gap:10px;flex-wrap:wrap;padding:12px 14px;align-items:stretch}
+.dx-lc{display:flex;flex-direction:column;padding:7px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg2);min-width:0}
+.dx-lc b{font-weight:600;font-size:14px}.dx-lc .t{font-size:18px;font-weight:700;color:var(--ok);display:flex;align-items:center;gap:6px}.dx-lc .t.off{color:var(--mut);font-size:14px;font-weight:500}
+.dx-nm{background:none;border:0;padding:0;color:var(--fg);font-weight:600;cursor:pointer;border-bottom:1px dashed var(--mut)}.dx-nm:hover,.dx-nm.on{color:var(--acc2);border-bottom-color:var(--acc2)}
+.dx-hp{font-size:12px;font-weight:500;margin-left:4px}.dx-hp.ok{color:var(--ok)}.dx-hp.warn{color:var(--warn)}.dx-hp.bad{color:var(--bad)}
+.dx-go{display:inline-flex;color:var(--mut);padding:2px;border-radius:5px}.dx-go:hover{color:var(--acc2)}
+.dx-cols{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:16px;align-items:stretch}
+.dx-col{display:flex;flex-direction:column;gap:16px;min-width:0}
+.dx-lbl{font:700 12px var(--fm);letter-spacing:.06em;text-transform:uppercase;color:var(--mut)}
+.dx-hd{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.dx-hd .l{display:flex;align-items:center;gap:10px}
+.dx-pf{display:flex;flex-direction:column}
+.dx-m{padding:14px 0;border-bottom:1px solid var(--line);display:grid;gap:6px}.dx-m:last-child{border:0;padding-bottom:0}
+.dx-m .v{font:700 26px var(--fm);letter-spacing:-.02em}.dx-m .v small{font-size:14px;color:var(--mut);font-weight:500}
+.dx-bar{position:relative;height:8px;border-radius:99px;background:#ffffff1a;margin:6px 0 4px}.dx-bar i{position:absolute;left:0;top:0;bottom:0;border-radius:99px;background:linear-gradient(90deg,var(--acc3),var(--acc))}.dx-bar u{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--fg);border-radius:1px}
+.dx-meta{display:flex;justify-content:space-between;font-size:12px;color:var(--mut);gap:8px;flex-wrap:wrap}.dx-meta .ok{color:var(--ok);font-weight:700}.dx-meta .warn{color:var(--warn);font-weight:700}.dx-meta .bad{color:var(--bad);font-weight:700}
+.dx-net .big{font:800 44px var(--fm);letter-spacing:-.03em;line-height:1.05}.dx-net .big.pos{color:var(--ok)}.dx-net .big.neg{color:var(--bad)}
+.dx-chip{display:inline-flex;font-size:12px;font-weight:700;padding:4px 10px;border-radius:99px;width:max-content}.dx-chip.ok{background:#3ddc9722;color:var(--ok)}.dx-chip.bad{background:#ff6b8a22;color:var(--bad)}
+.dx-eq{display:grid;gap:6px;border-top:1px solid var(--line);padding-top:12px;font-size:13px;color:var(--mut)}.dx-eq div{display:flex;justify-content:space-between;gap:8px}.dx-eq b{color:var(--fg)}
+.dx-tasks{position:relative;flex:1;min-height:220px}
+.dx-tl{position:absolute;left:18px;right:18px;top:48px;bottom:10px;overflow-y:auto;scrollbar-width:none;-webkit-mask-image:linear-gradient(#000 calc(100% - 22px),transparent);mask-image:linear-gradient(#000 calc(100% - 22px),transparent)}.dx-tl::-webkit-scrollbar{display:none;width:0;height:0}
+.dx-tk{display:flex;align-items:center;gap:14px;padding:13px 4px;border-bottom:1px solid var(--line);color:var(--fg);text-decoration:none;cursor:pointer;background:none;border-left:0;border-right:0;border-top:0;width:100%;text-align:left}.dx-tk:hover .tt{color:var(--acc2)}
+.dx-bd{display:grid;place-items:center;min-width:34px;height:34px;border-radius:99px;color:#fff;font-size:15px;font-weight:700;flex:none}.dx-bd.w{background:#d98a0b}.dx-bd.r{background:#d6455d}
+.dx-tx{display:flex;flex-direction:column;gap:2px;flex:1;min-width:0}.dx-tx .tt{font-size:15px;font-weight:600}.dx-tx .ts{font-size:13px;color:var(--mut)}
+.dx-ok{padding:18px 0;color:var(--mut);text-align:center}
+.dx-rings{display:flex;justify-content:center}.dx-rg{position:relative;width:min(100%,300px);aspect-ratio:1;margin:0 auto}.dx-rg svg{width:100%;height:100%;display:block;transform:rotate(-90deg)}
+.dx-rg .tr{fill:none;stroke:#ffffff1a;stroke-width:14}.dx-rg .pr{fill:none;stroke-width:14;stroke-linecap:round}
+.dx-rg .ctr{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;text-align:center}
+.dx-cv{display:flex;flex-direction:column;align-items:center}.dx-cv b{font-size:16px;line-height:1.1}.dx-cv span{font-size:12px;color:var(--mut);display:inline-flex;align-items:center;gap:6px}.dx-cv i{width:9px;height:9px;border-radius:50%}
+.dx-fk{display:flex;gap:16px;flex-wrap:wrap}.dx-fk b{font-size:18px;color:var(--acc2)}
+.dx-fs{display:grid;gap:6px}.dx-fsh{display:flex;justify-content:space-between;align-items:baseline}.dx-fsh b{font-size:16px}
+.dx-seg2{display:flex;gap:2px;height:28px}.dx-seg2 span{display:flex;align-items:center;padding:0 8px;min-width:max-content;overflow:hidden;white-space:nowrap;font-size:12px;font-weight:700;color:#0d0817;border-radius:6px}.dx-seg2 span:first-child{border-radius:8px 6px 6px 8px}.dx-seg2 span:last-child{border-radius:6px 8px 8px 6px}
+.dx-list{display:grid}.dx-list .r{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--line);font-size:13px}.dx-list .r:last-child{border:0}.dx-list .r em{font-style:normal;color:var(--mut);font-size:12px;display:block}.dx-list .neg{color:var(--bad)}
+.dx-ovl{position:fixed;inset:0;z-index:70;display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow:auto;background:rgba(5,2,12,.6)}
+.dx-ovl.hv{background:none;pointer-events:none;padding:0;overflow:visible}
+.dx-md{width:min(560px,100%);background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px;display:flex;flex-direction:column;gap:16px;margin-block:auto;box-shadow:0 24px 60px rgba(0,0,0,.6)}
+.dx-ovl.hv .dx-md{pointer-events:auto;position:fixed;margin:0;max-height:calc(100vh - 24px);overflow:auto}
+.dx-mh{display:flex;align-items:center;gap:12px}.dx-mh h2{font-size:20px}.dx-mh .tg{font-size:12px;color:var(--mut)}.dx-sp{flex:1}
+.dx-av{width:44px;height:44px;border-radius:50%;background:#9b5cff33;color:var(--acc2);display:grid;place-items:center;flex:none}
+.dx-st{display:inline-flex;font-size:12px;font-weight:700;padding:4px 10px;border-radius:99px;background:#3ddc9722;color:var(--ok)}.dx-st.off{background:#ffffff14;color:var(--mut)}
+.dx-x{width:32px;height:32px;border:1px solid var(--line);border-radius:8px;background:none;color:var(--mut);cursor:pointer;font-size:18px;line-height:1}.dx-x:hover{color:var(--acc2);border-color:var(--acc)}
+.dx-sg{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.dx-sg .c{border:1px solid var(--line);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:2px;min-width:0}.dx-sg .c span{font-size:12px;color:var(--mut)}.dx-sg .c b{font-size:19px;white-space:nowrap}
+.dx-sec{font:700 12px var(--fm);letter-spacing:.06em;text-transform:uppercase;color:var(--mut)}.dx-sec.big{font:700 22px var(--fd);letter-spacing:-.01em;text-transform:none;color:var(--fg)}
+.dx-sal{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:6px 24px}.dx-scol{display:flex;flex-direction:column;gap:6px}
+.dx-sh{font-size:12px;color:var(--mut);text-transform:uppercase;letter-spacing:.06em;margin-top:6px}.dx-scol .dx-sh:first-child{margin-top:0}
+.dx-row{display:flex;justify-content:space-between;gap:8px;font-size:13px;color:var(--mut)}.dx-row b{color:var(--fg)}.dx-scol .dx-row{border-bottom:1px solid var(--line);padding-bottom:6px}
+.dx-dm{color:var(--mut);font-weight:500}.dx-sl{color:var(--mut);margin:0 5px;font-weight:400}
+.dx-topay{margin-top:auto;display:flex;justify-content:space-between;align-items:baseline;gap:10px;border-top:2px solid var(--line);padding-top:10px;font-size:15px;color:var(--fg)}.dx-topay b{font-size:18px;white-space:nowrap}.dx-topay b span:last-child{color:var(--ok)}
+.dx-prof{display:grid;gap:6px;margin-top:6px}.dx-prof .res{font-size:16px;color:var(--fg);border-top:1px solid var(--line);padding-top:8px}.dx-prof .res b{font-size:22px}
+.dx-vd{margin-top:4px;padding:10px 12px;border-radius:10px;font-size:14px;line-height:1.35}.dx-vd.g{background:#3ddc9722;color:var(--ok)}.dx-vd.y{background:#ffb84d22;color:var(--warn)}.dx-vd.r{background:#ff6b8a22;color:var(--bad)}
+.dx-hv{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;justify-content:flex-end}.dx-cl{font-size:13px;color:var(--mut)}
+.dx-neg{color:var(--bad)}.dx-ovl a,.dx-pop a{text-decoration:none}
+@media(max-width:900px){.dx-cols{grid-template-columns:minmax(0,1fr)}.dx-tasks{flex:none;min-height:0}.dx-tl{position:static;max-height:320px;margin-top:8px}}
+@media(max-width:560px){.dx-sg{grid-template-columns:repeat(2,minmax(0,1fr))}.dx-sal{grid-template-columns:minmax(0,1fr)}.dx-net .big{font-size:36px}}
+@media(prefers-reduced-motion:reduce){.live-dot i{animation:none}}
 </style>
 </head>
 <body>
@@ -170,7 +238,7 @@ const ROLE={admin:'Админ',teamlead:'Тимлидер',streamer:'Стрим�
 const STATUS={new:['Новый','p-pur'],registered:['Регистрация','p-warn'],ftd:['FTD','p-ok'],active:['Активный','p-ok'],churned:['Отвал','p-bad']};
 let me=null,tab='home';
 /* Адрес страницы: у каждого раздела своя ссылка (#/leads, #/acc/review), при обновлении остаёмся на месте */
-const ACC_TABS=['sum','review','bonus','pay','why','plan','form'];
+const ACC_TABS=['sum','review','bonus','pay','exp','why','plan','form'];
 function hashPath(){return '/'+tab+(tab==='acc'?'/'+accState.tab:'')}
 function pushHash(){const h='#'+hashPath();if(location.hash!==h)history.pushState(null,'',h)}
 function readHash(){const[,t,sub]=(location.hash||'').split('/');if(!t)return;tab=t;if(t==='acc'&&ACC_TABS.includes(sub))accState.tab=sub}
@@ -244,6 +312,7 @@ $('#logout').addEventListener('click',async()=>{try{await api('/logout',{method:
 /** render({soft:true}) обновляет страницу на месте: без «Загрузка…» и с сохранением прокрутки, чтобы экран не дёргался */
 async function render(opt){
   stopPoll();
+  document.querySelectorAll('.dx-ovl').forEach(x=>x.remove());
   pushHash();
   const soft=!!(opt&&opt.soft===true);
   const m=$('#main'),y=window.scrollY,mt=m.scrollTop;
@@ -272,7 +341,231 @@ async function viewNotifs(){
       el('div',{class:'mut sm'},'У каждой роли они копятся свои: новые отчёты на проверку, запросы аванса, отставание от плана, решения по вашим отчётам. Отдельно появится настройка, что и куда получать.'))];
 }
 
+/* ---------- Дашборд админа: план/факт, воронка, зарплаты, расходы, чистая прибыль ---------- */
+const DXC=['#9b5cff','#3ddc97','#4da3ff','#ffb84d','#ff6b8a','#2dd4bf','#f472b6','#a3e635'];
+const kyivToday=()=>new Date().toLocaleDateString('sv-SE',{timeZone:'Europe/Kyiv'});
+const addDay=(s,n)=>{const d=new Date(s+'T00:00:00Z');d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10)};
+const usd0=n=>(n<0?'−':'')+'$'+Math.abs(Math.round(Number(n)||0)).toLocaleString('ru-RU');
+const sgn0=n=>(n<0?'−':'+')+'$'+Math.abs(Math.round(Number(n)||0)).toLocaleString('ru-RU');
+const n0=n=>Math.round(Number(n)||0).toLocaleString('ru-RU');
+const hm=m=>Math.floor(m/60)+' ч '+String(Math.round(m)%60).padStart(2,'0')+' мин';
+const fmtH=m=>{const h=m/60;return Number.isInteger(h)?String(h):h.toFixed(1).replace('.',',')};
+const dmy=s=>s.split('-').reverse().join('.');
+const dxMonths=['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
+const dxDay=s=>{const[,m,d]=s.split('-').map(Number);return d+' '+dxMonths[m-1]};
+let dx={preset:'month',from:null,to:null};
+const dxReg=[];let dxLast=null;
+function dxCloseAll(){dxReg.forEach(([b,p])=>{p.hidden=true;b.classList.remove('on');b.setAttribute('aria-expanded','false')})}
+document.addEventListener('click',dxCloseAll);
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){dxCloseAll();dxCloseModal()}});
+/** Кнопка-иконка с всплывающим окном; клик вне окна и Esc закрывают */
+function dxPopBtn(label,svg,content,cls='',btnCls=''){
+  const b=el('button',{type:'button',class:'dx-ib sm2 '+btnCls,'aria-label':label,title:label,'aria-expanded':'false'});b.append(svgIcon(svg,18));
+  const p=el('div',{class:'dx-pop '+cls,hidden:''},content);
+  b.addEventListener('click',e=>{e.stopPropagation();const open=p.hidden;dxCloseAll();if(open){p.hidden=false;b.classList.add('on');b.setAttribute('aria-expanded','true')}});
+  p.addEventListener('click',e=>e.stopPropagation());
+  dxReg.push([b,p]);
+  return el('span',{class:'dx-pw'},b,p);
+}
+const IC_RINGS='<circle cx="12" cy="12" r="9" opacity=".4"/><path d="M12 3a9 9 0 0 1 8.5 6"/><circle cx="12" cy="12" r="4.5" opacity=".4"/><path d="M12 7.5a4.5 4.5 0 0 1 4.5 4.5"/>';
+const IC_FUNNEL='<path d="M3 4h18l-7 8v6l-4 2v-8z"/>';
+const IC_WALLET='<path d="M3 7a2 2 0 0 1 2-2h13v4"/><path d="M3 7v11a2 2 0 0 0 2 2h14a1 1 0 0 0 1-1v-9a1 1 0 0 0-1-1H5a2 2 0 0 1-2-2z"/><circle cx="16" cy="14.5" r="1.2"/>';
+const IC_RECEIPT='<path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/>';
+const IC_CAL='<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M8 3v4M16 3v4M3 10h18"/>';
+const IC_EXT='<path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>';
+const IC_CHEV='<path d="M9 6l6 6-6 6"/>';
+
+function dxQuery(){
+  const t=kyivToday();
+  if(dx.preset==='all')return'?all=1';
+  if(dx.preset==='today')return'?from='+t+'&to='+t;
+  if(dx.preset==='week'){const dow=(new Date(t+'T00:00:00Z').getUTCDay()+6)%7;return'?from='+addDay(t,-dow)+'&to='+addDay(t,6-dow)}
+  if(dx.preset==='custom'&&dx.from&&dx.to)return'?from='+dx.from+'&to='+dx.to;
+  return'';
+}
+function dxSub(d){
+  const r=d.range;
+  if(dx.preset==='all')return'За всё время';
+  if(dx.preset==='today')return'Сегодня, '+dxDay(r.from);
+  if(dx.preset==='week')return dx.preset&&(r.from.slice(0,7)===r.to.slice(0,7)?Number(r.from.slice(8))+'–'+dxDay(r.to):dxDay(r.from)+' – '+dxDay(r.to));
+  if(dx.preset==='custom')return dmy(r.from)+' — '+dmy(r.to);
+  const day=Number(d.today.slice(8)),dim=r.to.slice(8);
+  return perLabel(r.from.slice(0,7))+' · на '+dxDay(d.today)+' (день '+day+' из '+Number(dim)+')';
+}
+
+function dxHeader(d){
+  const seg=el('div',{class:'dx-seg',role:'group','aria-label':'Период'},...[['today','Сегодня'],['week','Неделя'],['month','Месяц'],['all','Всё время']].map(([k,t])=>el('button',{type:'button',class:dx.preset===k?'on':'',onclick:()=>{dx.preset=k;render({soft:true})}},t)));
+  const d1=el('input',{type:'date',value:dx.from||d.range.from}),d2=el('input',{type:'date',value:dx.to||d.range.to});
+  const ap=el('button',{class:'btn s',type:'button',onclick:()=>{if(!d1.value||!d2.value||d1.value>d2.value){toast('Проверьте даты периода');return}dx.preset='custom';dx.from=d1.value;dx.to=d2.value;render({soft:true})}},'Применить');
+  const cal=dxPopBtn('Выбрать период',IC_CAL,[el('label',{},'С',d1),el('label',{},'По',d2),ap],'pr top30',dx.preset==='custom'?'on':'');
+  cal.querySelector('.dx-ib').classList.remove('sm2');
+  return el('div',{class:'dx-top'},el('div',{class:'dx-ttl'},el('h2',{},'Дашборд'),el('span',{class:'dx-sub'},dxSub(d))),el('div',{class:'dx-rng'},seg,cal));
+}
+
+const dxLvl=(m,pace)=>!pace||m>=pace?'ok':m>=pace*.85?'warn':'bad';
+function dxOffText(s,today){
+  if(!s.lastEnd)return'ещё не выходил';
+  const k=new Date(s.lastEnd).toLocaleDateString('sv-SE',{timeZone:'Europe/Kyiv'});
+  const diff=Math.round((Date.parse(today+'T00:00:00Z')-Date.parse(k+'T00:00:00Z'))/86400000);
+  const when=diff<=0?'сегодня':diff===1?'вчера':dxDay(k);
+  return when+(s.lastMin?', '+hm(s.lastMin):'');
+}
+function dxLive(d,skew){
+  const pace=d.plan.paceMin;
+  const cards=d.streamers.filter(s=>s.active||s.live).map(s=>{
+    const lvl=dxLvl(s.month.hoursMin,pace);
+    const name=el('button',{type:'button',class:'dx-nm','aria-haspopup':'dialog'},s.name);
+    dxAttachCard(name,s,d,skew);
+    const head=el('b',{},name,el('span',{class:'dx-hp '+lvl,title:'По графику сегодня '+fmtH(pace)+' ч'},fmtH(s.month.hoursMin)+'/'+d.plan.hours+' ч'));
+    const time=s.live
+      ?el('span',{class:'t'},el('span',{'data-live':s.live.started_at},hm(Math.max(0,Math.floor((Date.now()+skew-Date.parse(s.live.started_at))/60000)))),s.live.stream_url?el('a',{class:'dx-go',href:s.live.stream_url,target:'_blank',rel:'noopener',title:'Открыть эфир','aria-label':'Открыть эфир'},svgIcon(IC_EXT,14)):null)
+      :el('span',{class:'t off'},dxOffText(s,d.today));
+    return el('div',{class:'dx-lc'},head,time);
+  });
+  return el('div',{class:'card dx-live'},...(cards.length?cards:[el('span',{class:'mut'},'Стримеров пока нет. Добавьте их в разделе «Сотрудники».')]));
+}
+
+/* Карточка стримера: на компьютере по наведению, на телефоне по нажатию */
+let dxHoverT=null;
+const dxCanHover=()=>matchMedia('(hover:hover) and (pointer:fine)').matches;
+function dxCloseModal(){document.querySelectorAll('.dx-ovl').forEach(x=>x.remove());document.querySelectorAll('.dx-nm.on').forEach(x=>x.classList.remove('on'))}
+function dxAttachCard(btn,s,d,skew){
+  const clr=()=>{clearTimeout(dxHoverT);dxHoverT=null};
+  const later=f=>{clr();dxHoverT=setTimeout(f,260)};
+  const open=mode=>{dxCloseModal();dxModal(btn,s,d,skew,mode)};
+  if(dxCanHover()){btn.addEventListener('mouseenter',()=>{clr();dxHoverT=setTimeout(()=>open('hover'),120)});btn.addEventListener('mouseleave',()=>later(dxCloseModal))}
+  btn.addEventListener('click',e=>{e.stopPropagation();clr();open(dxCanHover()?'hover':'tap')});
+}
+const dxPair=p=>el('span',{},el('span',{class:'dx-dm'},usd0(p[0])),el('span',{class:'dx-sl'},'/'),el('span',{},usd0(p[1])));
+function dxModal(btn,s,d,skew,mode){
+  const m=s.month,plan=d.plan,pace=plan.paceMin,hrs=m.hoursMin;
+  const col=({ok:'var(--ok)',warn:'var(--warn)',bad:'var(--bad)'})[dxLvl(hrs,pace)];
+  const pct=Math.round(hrs/plan.planMin*100),pp=Math.round(pace/plan.planMin*100);
+  const tot=i=>[m.baseMin,m.baseFull][i]+[m.leadsMin,m.leadsFull][i]+m.ftdBonus+m.dayBonus+m.bonus-m.penalty;
+  const pay=[tot(0)-m.paid,tot(1)-m.paid];
+  const cost=tot(1),profit=m.commission-cost,ratio=cost>0?m.commission/cost:99;
+  let vcls='g',vt='Выгоден',vx='приносит $'+ratio.toFixed(1).replace('.',',')+' комиссии на каждый $1 зарплаты';
+  if(ratio<1){vcls='r';vt='Убыточен';vx='зарплата больше комиссии'}else if(ratio<2){vcls='y';vt='На грани';vx='комиссия лишь в '+ratio.toFixed(1).replace('.',',')+' раза больше зарплаты'}
+  if(hrs<pace*.85&&vcls==='g')vx+='. Но сильно отстаёт по часам, '+fmtH(hrs)+' из '+plan.hours;
+  const hv=(v,cls)=>el('b',{class:cls||''},v);
+  const row=(a,b)=>el('div',{class:'dx-row'},el('span',{},a),b);
+  let left=null;
+  if(s.live&&s.minLeft!==null){const extra=Math.max(0,Math.floor((Date.now()+skew-Date.parse(d.now))/60000));left=Math.max(0,s.minLeft-extra)}
+  const x=el('button',{type:'button',class:'dx-x','aria-label':'Закрыть',onclick:dxCloseModal},'×');
+  const md=el('div',{class:'dx-md',role:'dialog','aria-modal':'true','aria-label':s.name},
+    el('div',{class:'dx-mh'},el('div',{class:'dx-av'},svgIcon('<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',24)),el('div',{},el('h2',{},s.name),el('div',{class:'tg'},s.tg?'@'+String(s.tg).replace(/^@/,''):s.login)),el('div',{class:'dx-sp'}),
+      el('span',{class:'dx-st'+(s.live?'':' off')},s.live?'в эфире '+hm(Math.max(0,Math.floor((Date.now()+skew-Date.parse(s.live.started_at))/60000))):'не в эфире · '+dxOffText(s,d.today)),x),
+    el('div',{},el('div',{class:'dx-hd'},el('div',{class:'dx-sec'},'Часы за месяц'),el('div',{class:'dx-hv'},left!==null?el('span',{class:'dx-cl'},'До закрытия: '+left+' мин'):null,el('b',{style:'color:'+col},fmtH(hrs)+' / '+plan.hours+' ч'))),
+      el('div',{class:'dx-bar',style:'margin:13px 0 0'},el('i',{style:'width:'+Math.min(100,pct)+'%;background:'+col}),el('u',{style:'left:'+Math.min(100,pp)+'%'})),
+      el('div',{class:'dx-meta',style:'margin-top:13px'},el('span',{},pct+'% плана'),el('span',{},'по графику на сегодня '+fmtH(pace)+' ч'))),
+    el('div',{class:'dx-sg'},...[['Смен',m.shifts],['FTD',m.ftd],['FTD $',usd0(m.ftdSum)],['Все депозиты',usd0(m.deposits)]].map(([a,b])=>el('div',{class:'c'},el('span',{},a),el('b',{},String(b))))),
+    el('div',{style:'display:grid;gap:8px'},el('div',{class:'dx-sec big'},'Зарплата за месяц'),
+      el('div',{class:'dx-sal'},
+        el('div',{class:'dx-scol'},el('div',{class:'dx-sh'},'База'),row('Ставка ('+m.shifts+' смен)',hv(dxPair([m.baseMin,m.baseFull]))),row('Лиды ('+m.ftd+')',hv(dxPair([m.leadsMin,m.leadsFull])))),
+        el('div',{class:'dx-scol'},el('div',{class:'dx-sh'},'Удержания'),row('Штрафы',hv(m.penalty?sgn0(-m.penalty):'$0',m.penalty?'dx-neg':'')),row('Выплачено (аванс)',hv(m.paid?sgn0(-m.paid):'$0'))),
+        el('div',{class:'dx-scol'},el('div',{class:'dx-sh'},'Бонусы'),row('FTD (суммы больше)',hv(m.ftdBonus?sgn0(m.ftdBonus):'$0')),row('Дневной ('+(d.plan.dayCount||4)+' FTD)',hv(m.dayBonus?sgn0(m.dayBonus):'$0')),row('Премии',hv(m.bonus?sgn0(m.bonus):'$0'))),
+        el('div',{class:'dx-topay'},el('span',{},'К выплате'),el('b',{},el('span',{class:'dx-dm'},usd0(pay[0])),el('span',{class:'dx-sl'},'/'),el('span',{},usd0(pay[1])))))),
+    el('div',{class:'dx-prof'},el('div',{class:'dx-sec'},'Выгоден ли сотрудник'),row('Комиссия с лидов',hv(usd0(m.commission))),row('Зарплата по полным ставкам',hv('−'+usd0(cost),'dx-neg')),
+      el('div',{class:'dx-row res'},el('span',{},'Прибыль с сотрудника'),el('b',{style:'color:'+(profit<0?'var(--bad)':'var(--fg)')},sgn0(profit))),
+      el('div',{class:'dx-vd '+vcls},el('b',{},vt+'. '),vx+'.')),
+    el('div',{class:'dx-hd'},el('span',{class:'mut sm'},'Данные за '+perLabel(m.period)),el('a',{href:'#/acc/sum',style:'color:var(--acc2);font-weight:700;font-size:12px',onclick:e=>{e.preventDefault();dxCloseModal();dxGo('acc','sum')}},'Открыть в Бухгалтерии →')));
+  const ov=el('div',{class:'dx-ovl'+(mode==='hover'?' hv':'')},md);
+  if(mode==='hover'){
+    const r=btn.getBoundingClientRect(),w=Math.min(560,innerWidth-32);
+    md.style.width=w+'px';md.style.left=Math.max(16,Math.min(r.left,innerWidth-w-16))+'px';md.style.top=Math.max(12,Math.min(r.bottom+10,innerHeight-220))+'px';
+    md.addEventListener('mouseenter',()=>{clearTimeout(dxHoverT);dxHoverT=null});
+    md.addEventListener('mouseleave',()=>{clearTimeout(dxHoverT);dxHoverT=setTimeout(dxCloseModal,260)});
+  }else ov.addEventListener('click',e=>{if(e.target===ov)dxCloseModal()});
+  document.body.append(ov);btn.classList.add('on');
+  if(mode!=='hover')x.focus();
+}
+function dxGo(t,sub){tab=t;if(sub)accState.tab=sub;showApp()}
+
+function dxColorOf(d){const ids=d.streamers.map(s=>s.id).sort((a,b)=>a-b);return id=>DXC[ids.indexOf(id)%DXC.length]}
+function dxFunnel(d){
+  const C=dxColorOf(d),t=d.totals;
+  const stages=[['Клики','clicks'],['Регистрации','regs'],['FTD','ftd'],['Додепы','dep']];
+  const ctr=t.clicks?t.regs/t.clicks*100:null,rtd=t.regs?t.ftd/t.regs*100:null;
+  const pc=v=>v===null?'—':v.toFixed(1).replace('.',',')+'%';
+  const note=!d.range.all&&d.clicksSince&&d.range.from<d.clicksSince?el('div',{class:'mut sm'},'Клики считаются с '+dmy(d.clicksSince)+': раньше их время не записывалось.'):null;
+  return[el('div',{class:'dx-fk'},el('b',{title:'Из клика в регистрацию'},'CTR: '+pc(ctr)),el('b',{title:'Из регистрации в депозит'},'RTD: '+pc(rtd))),
+    ...stages.map(([n,k])=>{
+      const rows=d.streamers.filter(s=>s.range[k]>0);
+      return el('div',{class:'dx-fs'},el('div',{class:'dx-fsh'},el('span',{class:'dx-lbl'},n),el('b',{},n0(t[k]))),
+        el('div',{class:'dx-seg2',role:'img','aria-label':n+': '+rows.map(s=>s.name+' '+n0(s.range[k])).join(', ')+', всего '+n0(t[k])},...(rows.length?rows.map(s=>el('span',{style:'flex:'+s.range[k]+' 1 auto;background:'+C(s.id),title:s.name+': '+n0(s.range[k])},s.name+' '+n0(s.range[k]))):[el('span',{style:'flex:1;background:#ffffff1a;color:var(--mut)'},'нет данных')])));
+    }),note].filter(Boolean);
+}
+function dxRings(d){
+  const g=d.goals,t=d.totals;
+  const R1=98,R2=74,c1=2*Math.PI*R1,c2=2*Math.PI*R2;
+  const p1=Math.max(0,Math.min(1,g.deposits?t.deposits/g.deposits:0)),p2=Math.max(0,Math.min(1,g.ftd?t.ftd/g.ftd:0));
+  const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox','0 0 220 220');
+  svg.innerHTML='<circle class="tr" cx="110" cy="110" r="'+R1+'"/><circle class="pr" cx="110" cy="110" r="'+R1+'" stroke="var(--acc)" stroke-dasharray="'+(c1*p1).toFixed(1)+' '+c1.toFixed(1)+'"/><circle class="tr" cx="110" cy="110" r="'+R2+'"/><circle class="pr" cx="110" cy="110" r="'+R2+'" stroke="var(--ok)" stroke-dasharray="'+(c2*p2).toFixed(1)+' '+c2.toFixed(1)+'"/>';
+  const cv=(c,a,b)=>el('div',{class:'dx-cv'},el('b',{},a),el('span',{},el('i',{style:'background:'+c}),b));
+  return el('div',{class:'dx-rings'},el('div',{class:'dx-rg',role:'img','aria-label':'Все депозиты '+Math.round(p1*100)+'% плана, FTD '+Math.round(p2*100)+'% плана'},svg,el('div',{class:'ctr'},cv('var(--ok)',n0(t.ftd)+' / '+n0(g.ftd),'FTD'),cv('var(--acc)',usd0(t.deposits)+' / '+usd0(g.deposits),'депозиты'))));
+}
+function dxPlanFact(d){
+  const g=d.goals,t=d.totals,pace=d.pace,showMark=g&&pace<0.995;
+  const title=d.range.whole&&!d.range.all?'План / факт за месяц':'План / факт';
+  const icons=[];
+  if(g)icons.push(dxPopBtn('Кольца выполнения плана',IC_RINGS,dxRings(d),'pl'));
+  icons.push(dxPopBtn('Воронка',IC_FUNNEL,dxFunnel(d),'pl wide'));
+  const avg=t.ftd?t.ftdSum/t.ftd:0,dShare=t.deposits?t.depSum/t.deposits*100:0,cShare=t.deposits?t.commission/t.deposits*100:0;
+  const rows=[['FTD — первый депозит',t.ftd,g&&g.ftd,n0,showMark?'по графику '+Math.round(pace*100)+'%':''],
+    ['Пополнения по FTD',t.ftdSum,g&&g.ftdSum,usd0,'средний FTD '+usd0(avg)],
+    ['Все депозиты (FTD + додепы)',t.deposits,g&&g.deposits,usd0,'додепы '+usd0(t.depSum)+' · '+Math.round(dShare)+'%'],
+    ['Комиссия получена',t.commission,g&&g.commission,usd0,cShare.toFixed(1).replace('.',',')+'% от депозитов']];
+  return el('div',{class:'card dx-pf'},el('div',{class:'dx-hd'},el('div',{class:'l'},el('span',{class:'dx-lbl'},title),...icons),showMark?el('span',{class:'mut',style:'font-size:12px'},'метка: план на сегодня'):null),
+    ...rows.map(([n,v,goal,f,note])=>{
+      const pct=goal>0?v/goal*100:null,cls=pct===null?'':pct>=pace*100?'ok':pct>=pace*85?'warn':'bad';
+      return el('div',{class:'dx-m'},el('div',{class:'dx-lbl'},n),el('div',{class:'v'},f(v),goal>0?el('small',{},' / '+f(goal)):null),
+        pct!==null?el('div',{class:'dx-bar'},el('i',{style:'width:'+Math.min(100,pct)+'%'}),showMark?el('u',{style:'left:'+(pace*100)+'%'}):null):null,
+        el('div',{class:'dx-meta'},el('span',{class:cls},pct!==null?Math.round(pct)+'% плана':''),el('span',{},note)));
+    }));
+}
+function dxNet(d){
+  const t=d.totals;
+  const sal=el('div',{class:'dx-list'},...d.streamers.filter(s=>s.range.salary||s.range.paid).map(s=>el('div',{class:'r'},el('span',{},s.name,el('em',{},'начислено · выплачено '+usd0(s.range.paid))),el('b',{},usd0(s.range.salary)))),
+    el('div',{class:'r'},el('span',{},'Итого начислено'),el('b',{},usd0(t.salaries))));
+  const salPop=el('div',{style:'display:grid;gap:8px'},el('div',{class:'dx-hd'},el('span',{class:'dx-lbl'},'Зарплаты за период'),el('a',{href:'#/acc/sum',style:'color:var(--acc2);font-weight:700;font-size:12px',onclick:e=>{e.preventDefault();dxGo('acc','sum')}},'Бухгалтерия →')),sal,
+    d.range.whole?null:el('div',{class:'mut sm'},'Неполный месяц: зарплата считается пропорционально дням.'));
+  const exp=el('div',{class:'dx-list'},...(d.expenses.length?d.expenses.slice(0,12).map(x=>el('div',{class:'r'},el('span',{},x.comment,el('em',{},dmy(x.day).slice(0,5))),el('b',{class:'dx-neg'},'−'+usd0(x.amount)))):[el('div',{class:'dx-ok'},'Расходов за период нет')]),
+    d.expenses.length?el('div',{class:'r'},el('span',{},'Итого расходов'),el('b',{class:'dx-neg'},'−'+usd0(t.expenses))):null);
+  const expPop=el('div',{style:'display:grid;gap:8px'},el('div',{class:'dx-hd'},el('span',{class:'dx-lbl'},'Расходы за период'),el('a',{href:'#/acc/exp',style:'color:var(--acc2);font-weight:700;font-size:12px',onclick:e=>{e.preventDefault();dxGo('acc','exp')}},'+ Добавить')),exp);
+  const diff=t.netPlanToDate===null?null:t.net-t.netPlanToDate;
+  const margin=t.commission>0?Math.round(t.net/t.commission*100):null;
+  return el('div',{class:'card dx-net',style:'display:grid;gap:8px'},el('div',{class:'dx-hd'},el('div',{class:'l'},el('span',{class:'dx-lbl'},'Чистая прибыль'),dxPopBtn('Зарплаты',IC_WALLET,salPop,'pr'),dxPopBtn('Расходы',IC_RECEIPT,expPop,'pr'))),
+    el('div',{class:'big '+(t.net<0?'neg':'pos')},usd0(t.net)),
+    diff!==null?el('span',{class:'dx-chip '+(diff>=0?'ok':'bad')},(diff>=0?'▲ на '+usd0(diff)+' выше':'▼ на '+usd0(-diff)+' ниже')+' плана на эту дату'):null,
+    margin!==null?el('div',{class:'mut',style:'font-size:13px'},'Маржа '+(margin<0?'−'+Math.abs(margin):margin)+'% от комиссии'):null,
+    el('div',{class:'dx-eq'},el('div',{},el('span',{},'Комиссия получена'),el('b',{},usd0(t.commission))),el('div',{},el('span',{},'− Зарплаты и бонусы'),el('b',{class:'dx-neg'},'−'+usd0(t.salaries))),el('div',{},el('span',{},'− Расходы'),el('b',{class:'dx-neg'},'−'+usd0(t.expenses))),el('div',{},el('span',{},'= Чистая прибыль'),el('b',{style:'color:'+(t.net<0?'var(--bad)':'var(--ok)')},usd0(t.net)))));
+}
+function dxTasks(d){
+  const T=d.tasks,rows=[];
+  const names=(a,f)=>a.map(f).join(' · ');
+  const hlag=T.lagging.map(x=>x.name+' '+fmtH(x.hoursMin)+'/'+d.plan.hours+' ч').join(' · ');
+  if(T.pending.length)rows.push([T.pending.reduce((a,x)=>a+x.n,0),'w','Отчёты ждут проверки',names(T.pending,x=>x.name+' '+x.n),'acc','review']);
+  if(T.advances.length)rows.push([T.advances.length,'w','Заявка на аванс',names(T.advances,x=>x.staff_name+' · '+usd0(x.amount)),'acc','pay']);
+  if(T.lagging.length)rows.push([T.lagging.length,T.lagging.some(x=>x.level==='bad')?'r':'w','Стримеры отстают от плана',hlag,'acc','sum']);
+  if(T.shortfalls.length)rows.push([T.shortfalls.reduce((a,x)=>a+x.n,0),'w','Недобор часов без причины',names(T.shortfalls,x=>x.name+' '+x.n),'acc','why']);
+  const list=el('div',{class:'dx-tl'},...(rows.length?rows.map(([n,c,t,s,tb,sub])=>el('button',{type:'button',class:'dx-tk',onclick:()=>dxGo(tb,sub)},el('b',{class:'dx-bd '+c},String(n)),el('span',{class:'dx-tx'},el('span',{class:'tt'},t),el('span',{class:'ts'},s)),svgIcon(IC_CHEV,16))):[el('div',{class:'dx-ok'},'Всё в порядке: задач нет')]));
+  return el('div',{class:'card dx-tasks'},el('div',{class:'dx-lbl'},'Требует внимания'),list);
+}
+async function adminDash(){
+  dxReg.length=0;dxCloseModal();
+  const d=await api('/dashboard'+dxQuery());
+  const skew=Date.parse(d.now)-Date.now();
+  const fs=await fieldStatsBlock('?from='+d.range.from+'&to='+d.range.to).catch(()=>null);
+  stopPoll();
+  poll=setInterval(()=>{
+    document.querySelectorAll('[data-live]').forEach(n=>{n.textContent=hm(Math.max(0,Math.floor((Date.now()+skew-Date.parse(n.dataset.live))/60000)))});
+    if(!document.querySelector('.dx-ovl')&&dxReg.every(([,p])=>p.hidden)&&Date.now()+skew-Date.parse(d.now)>90000)render({soft:true});
+  },20000);
+  return[el('div',{class:'dx'},dxHeader(d),dxLive(d,skew),el('div',{class:'dx-cols'},el('div',{class:'dx-col'},dxPlanFact(d)),el('div',{class:'dx-col'},dxNet(d),dxTasks(d))),fs)];
+}
+
 async function viewHome(){
+  if(me.role==='admin')return adminDash();
   const s=await api('/stats');const b=s.byStatus;
   const k=(t,v)=>el('div',{class:'kpi'},el('small',{},t),el('b',{},String(v)));
   const kpi=me.role==='streamer'?await kpiCardBlock().catch(()=>null):null;
@@ -562,16 +855,18 @@ async function kpiCardBlock(){
     advNode);
 }
 
-/** Для админа на дашборде: суммы полей отчётов за месяц */
-async function fieldStatsBlock(){
-  const d=await api('/shifts/fieldstats');
+/** Для админа на дашборде: суммы полей отчётов за период (qs: ?from=&to=, без него текущий месяц) */
+async function fieldStatsBlock(qs=''){
+  const d=await api('/shifts/fieldstats'+qs);
   if(!d.fields.length&&!d.rows.length)return null;
   const cols=['Стример','Отчётов','Время',...d.fields];
   const tot={};d.rows.forEach(r=>d.fields.forEach(f=>{tot[f]=(tot[f]||0)+(r.sums[f]||0)}));
   const rows=d.rows.map(r=>[td(r.name),td(r.reports,'n'),td(hmin(r.minutes)),...d.fields.map(f=>td((r.sums[f]||0).toLocaleString('ru-RU'),'n'))]);
   if(d.rows.length)rows.push([el('td',{},el('b',{},'Всего')),td(d.rows.reduce((a,r)=>a+r.reports,0),'n'),td(hmin(d.rows.reduce((a,r)=>a+r.minutes,0))),...d.fields.map(f=>el('td',{class:'n'},el('b',{},(tot[f]||0).toLocaleString('ru-RU'))))]);
-  return el('div',{style:'display:grid;gap:8px'},el('h3',{style:'font-size:15px'},'Эфиры за '+perLabel(d.period)),ctrT(table(cols,rows,'Зачтённых отчётов за месяц пока нет.')));
+  const label=d.from?(d.from.slice(0,7)===d.to.slice(0,7)&&d.from.endsWith('-01')&&d.to===lastDayOf(d.from.slice(0,7))?perLabel(d.period||d.from.slice(0,7)):dmy(d.from)+' — '+dmy(d.to)):perLabel(d.period);
+  return el('div',{style:'display:grid;gap:8px'},el('h3',{style:'font-size:15px'},'Эфиры за '+label),ctrT(table(cols,rows,'Зачтённых отчётов за период пока нет.')));
 }
+const lastDayOf=m=>{const[y,mo]=m.split('-').map(Number);return m+'-'+String(new Date(Date.UTC(y,mo,0)).getUTCDate()).padStart(2,'0')};
 
 /* ---------- Стример: «Смены и отчёты» ---------- */
 async function viewShifts(){
@@ -689,12 +984,12 @@ let accState={period:null,tab:'sum',sel:null};
 async function viewAcc(){
   const root=el('div',{style:'display:grid;gap:14px'}),body=el('div',{style:'display:grid;gap:14px'});
   const monthBar=el('div',{class:'mon2'}),tabBar=el('div',{class:'lc-tabs',role:'tablist'});
-  const TABS=[['sum','Сводка'],['review','Отчёты на проверке'],['bonus','Бонусы и штрафы'],['pay','Выплаты и авансы'],['why','Причины по сменам'],['plan','KPI-план'],['form','Форма отчёта']];
+  const TABS=[['sum','Сводка'],['review','Отчёты на проверке'],['bonus','Бонусы и штрафы'],['pay','Выплаты и авансы'],['exp','Расходы'],['why','Причины по сменам'],['plan','KPI-план'],['form','Форма отчёта']];
   const drawBar=()=>{
     monthBar.replaceChildren(el('button',{type:'button','aria-label':'Предыдущий месяц',onclick:()=>{accState.period=perShift(accState.period,-1);accState.sel=null;drawBar();drawBody()}},'‹'),el('b',{},perLabel(accState.period)),el('button',{type:'button','aria-label':'Следующий месяц',onclick:()=>{accState.period=perShift(accState.period,1);accState.sel=null;drawBar();drawBody()}},'›'));
     tabBar.replaceChildren(...TABS.map(([k,t])=>el('button',{type:'button',role:'tab','aria-selected':k===accState.tab?'true':'false',class:'lc-tab'+(k===accState.tab?' on':''),onclick:()=>{accState.tab=k;drawBar();drawBody();pushHash()}},t)));
   };
-  const drawBody=async()=>{body.replaceChildren(el('div',{class:'mut'},'Загрузка…'));try{body.replaceChildren(...(await ({sum:accSum,review:accReview,bonus:accBonus,pay:accPay,why:accWhy,plan:accPlan,form:accForm})[accState.tab]()).filter(Boolean))}catch(x){if(x.message!=='auth')body.replaceChildren(el('div',{class:'err'},x.message))}};
+  const drawBody=async()=>{body.replaceChildren(el('div',{class:'mut'},'Загрузка…'));try{body.replaceChildren(...(await ({sum:accSum,review:accReview,bonus:accBonus,pay:accPay,exp:accExp,why:accWhy,plan:accPlan,form:accForm})[accState.tab]()).filter(Boolean))}catch(x){if(x.message!=='auth')body.replaceChildren(el('div',{class:'err'},x.message))}};
   if(!accState.period)accState.period=(await api('/kpi/summary')).period;
   drawBar();root.append(tabBar,body);await drawBody();
   accRefresh=drawBody;
@@ -809,6 +1104,24 @@ async function accPay(){
     el('div',{class:'mut sm'},'Реквизиты берутся из карточки сотрудника (раздел «Сотрудники»). Запрошенный аванс не больше $'+sum.plan.advance+', вручную можно выплатить больше. Аванс вычитается из итога.')];
 }
 
+async function accExp(){
+  const d=await api('/expenses?period='+accState.period);
+  const today=kyivToday();
+  const amount=el('input',{type:'text',placeholder:'Сумма, $',inputmode:'decimal',autocomplete:'off'});
+  const comment=el('input',{placeholder:'На что потрачено',maxlength:'300'});
+  const day=el('input',{type:'date',value:today.slice(0,7)===accState.period?today:accState.period+'-01'});
+  const err=el('div',{class:'err',role:'alert'});
+  const add=async()=>{err.textContent='';try{await api('/expenses',{method:'POST',body:{amount:amount.value,comment:comment.value,day:day.value}});toast('Расход записан');accRefresh()}catch(x){err.textContent=x.message}};
+  [amount,comment].forEach(i=>i.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();add()}}));
+  const form=el('div',{class:'card',style:'display:grid;gap:10px'},el('h3',{style:'font-size:14px'},'Записать расход'),
+    el('div',{class:'lc-two'},el('label',{},'Сумма, $',amount),el('label',{},'Комментарий',comment),el('label',{},'Дата',day)),err,
+    el('div',{},el('button',{class:'btn s',type:'button',onclick:add},'Добавить')));
+  const rows=d.rows.map(x=>[td(dmy(x.day).slice(0,5)),el('td',{style:'white-space:normal;text-align:left;min-width:220px'},x.comment),td('−'+usd2(x.amount),'n'),td(x.by||'—'),el('td',{},el('button',{class:'btn o s',type:'button',onclick:async()=>{try{await api('/expenses/'+x.id,{method:'DELETE'});accRefresh()}catch(e){toast(e.message)}}},'Удалить'))]);
+  return[el('div',{class:'head'},el('h3',{style:'font-size:15px'},'Расходы за '+perLabel(accState.period)),el('span',{class:'pill p-bad'},'всего −'+usd2(d.total))),
+    form,ctrT(table(['Дата','На что','Сумма','Записал',''],rows,'За этот месяц расходов нет.')),
+    el('div',{class:'mut sm'},'Расходы вычитаются из чистой прибыли на дашборде. Зарплаты сюда вносить не нужно, они считаются сами.')];
+}
+
 async function accWhy(){
   const rows=await api('/shortfalls?period='+accState.period);
   return[el('div',{class:'head'},el('h3',{style:'font-size:15px'},'Невыполненные дни за '+perLabel(accState.period))),
@@ -820,13 +1133,13 @@ async function accPlan(){
   const p=await api('/kpi/settings');
   const num=(v,min)=>el('input',{type:'number',min:min??'0',step:'any',value:String(v)});
   const f={hours:num(p.hours,1),shiftH:num(p.shiftH,.5),leads:num(p.leads),base:num(p.base),baseLow:num(p.baseLow),price:num(p.price),priceLow:num(p.priceLow),
-    dc:num(p.day.count,1),dm:num(p.day.min),db:num(p.day.bonus),dh:num(p.day.cutoffH),tol:num(Math.round(p.tol*100)),adv:num(p.advance)};
+    dc:num(p.day.count,1),dm:num(p.day.min),db:num(p.day.bonus),dh:num(p.day.cutoffH),tol:num(Math.round(p.tol*100)),adv:num(p.advance),gf:num(p.goals.ftd),gs:num(p.goals.ftdSum),gd:num(p.goals.deposits),gc:num(p.goals.commission),gn:num(p.goals.net)};
   const tiers=p.tiers.map(t=>({from:num(t.from),price:num(t.price)}));
   const ftd=p.ftd.map(t=>({over:num(t.over),bonus:num(t.bonus)}));
   const err=el('div',{class:'err',role:'alert'});
   const lab=(t,i)=>el('label',{},t,i);
   const save=async()=>{err.textContent='';try{await api('/kpi/settings',{method:'PUT',body:{hours:+f.hours.value,shiftH:+f.shiftH.value,leads:+f.leads.value,base:+f.base.value,baseLow:+f.baseLow.value,price:+f.price.value,priceLow:+f.priceLow.value,
-    tiers:tiers.map(t=>({from:+t.from.value,price:+t.price.value})),ftd:ftd.map(t=>({over:+t.over.value,bonus:+t.bonus.value})),day:{count:+f.dc.value,min:+f.dm.value,bonus:+f.db.value,cutoffH:+f.dh.value},tol:+f.tol.value/100,advance:+f.adv.value}});toast('План сохранён');accRefresh()}catch(x){err.textContent=x.message}};
+    tiers:tiers.map(t=>({from:+t.from.value,price:+t.price.value})),ftd:ftd.map(t=>({over:+t.over.value,bonus:+t.bonus.value})),day:{count:+f.dc.value,min:+f.dm.value,bonus:+f.db.value,cutoffH:+f.dh.value},tol:+f.tol.value/100,advance:+f.adv.value,goals:{ftd:+f.gf.value,ftdSum:+f.gs.value,deposits:+f.gd.value,commission:+f.gc.value,net:+f.gn.value}}});toast('План сохранён');accRefresh()}catch(x){err.textContent=x.message}};
   return[el('div',{class:'head'},el('h3',{style:'font-size:15px'},'KPI-план стримера')),
     el('div',{class:'card',style:'display:grid;gap:14px'},
       el('h4',{},'Смены'),el('div',{class:'lc-two'},lab('Часов в месяц (план)',f.hours),lab('Часов в одной смене',f.shiftH),lab('Ставка за смены, $',f.base),lab('Ставка, если смены не выполнены, $',f.baseLow)),
@@ -834,6 +1147,7 @@ async function accPlan(){
       el('div',{class:'mut sm'},'Повышенная цена за каждого лида месяца:'),el('div',{class:'lc-two'},...tiers.map(t=>el('div',{class:'inl'},el('span',{class:'mut sm'},'от'),t.from,el('span',{class:'mut sm'},'лидов, $'),t.price))),
       el('h4',{},'Бонус за FTD (по сумме первого депозита)'),el('div',{class:'lc-two'},...ftd.map(t=>el('div',{class:'inl'},el('span',{class:'mut sm'},'больше $'),t.over,el('span',{class:'mut sm'},'бонус $'),t.bonus))),
       el('h4',{},'Дневной бонус'),el('div',{class:'lc-two'},lab('FTD в день',f.dc),lab('Минимальный депозит, $',f.dm),lab('Бонус, $',f.db),lab('День закрывается в (Киев), час',f.dh)),
+      el('h4',{},'Цели месяца для дашборда'),el('div',{class:'lc-two'},lab('FTD, штук',f.gf),lab('Пополнения по FTD, $',f.gs),lab('Все депозиты (FTD и додепы), $',f.gd),lab('Комиссия, $',f.gc),lab('Чистая прибыль, $',f.gn)),
       el('h4',{},'Прочее'),el('div',{class:'lc-two'},lab('Запас на курс брокера, %',f.tol),lab('Максимальный аванс, $',f.adv)),
       err,el('div',{},el('button',{class:'btn',type:'button',onclick:save},'Сохранить'))),
     el('div',{class:'mut sm'},'Изменения применяются сразу ко всем месяцам, которые ещё считаются на лету. Выплаты за закрытые месяцы лучше фиксировать заметкой.')];

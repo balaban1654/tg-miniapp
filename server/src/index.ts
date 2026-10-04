@@ -67,6 +67,8 @@ app.get<{ Params: { kind: string; slug: string } }>('/:kind(s|b)/:slug', async (
   const { kind, slug } = req.params;
   const r = await db.query('UPDATE links SET clicks = clicks + 1 WHERE slug = $1 RETURNING id', [slug]);
   if (!r.rowCount) return reply.code(404).send('Ссылка не найдена');
+  // Журнал кликов для дашборда по периодам. Ошибка журнала не должна ломать переход
+  void db.query('INSERT INTO link_clicks (link_id) VALUES ($1)', [r.rows[0].id]).catch(() => {});
   return reply.redirect(302, `https://t.me/${config.botUsername}?start=${kind}_${encodeURIComponent(slug)}`);
 });
 

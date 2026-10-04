@@ -404,3 +404,23 @@ CREATE TABLE IF NOT EXISTS shift_shortfalls (
   created_at TIMESTAMPTZ DEFAULT now(),
   UNIQUE (staff_id, day)
 );
+
+-- Расходы компании: админ записывает вручную, сумма в долларах и комментарий. Идут в чистую прибыль на дашборде
+CREATE TABLE IF NOT EXISTS expenses (
+  id         SERIAL PRIMARY KEY,
+  day        DATE NOT NULL,                      -- день расхода по Киеву
+  amount     NUMERIC(12,2) NOT NULL CHECK (amount > 0),
+  comment    TEXT NOT NULL,
+  created_by INT REFERENCES staff(id),
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS expenses_day ON expenses(day);
+
+-- Журнал кликов по ссылкам: нужен, чтобы дашборд считал клики за период (links.clicks остаётся общим счётчиком)
+CREATE TABLE IF NOT EXISTS link_clicks (
+  id      BIGSERIAL PRIMARY KEY,
+  link_id INT NOT NULL REFERENCES links(id) ON DELETE CASCADE,
+  at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS link_clicks_at ON link_clicks(at);
+CREATE INDEX IF NOT EXISTS link_clicks_link ON link_clicks(link_id, at);
