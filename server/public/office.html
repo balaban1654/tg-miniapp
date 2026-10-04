@@ -85,6 +85,7 @@ html{background:#0a0613}
 .kpi-card{display:grid;gap:12px;border-color:var(--acc);background:linear-gradient(180deg,#2a1857,var(--card))}
 .warn-card{display:grid;gap:8px;border-color:var(--warn);max-width:560px}
 .live-dot{display:flex;align-items:center;gap:8px}.live-dot i{width:9px;height:9px;border-radius:50%;background:var(--bad);animation:livep 1.6s infinite}@keyframes livep{70%{box-shadow:0 0 0 8px #ff6b8a00}0%{box-shadow:0 0 0 0 #ff6b8a88}}
+.drop-row{display:flex;gap:8px;align-items:stretch}.drop-row .drop2{flex:1;width:auto}.drop-paste{padding:0 14px;display:grid;place-items:center}.drop2.over{background:#9b5cff33;border-style:solid}
 .drop2{border:1.5px dashed var(--acc);border-radius:12px;padding:14px;text-align:center;color:var(--acc2);background:#9b5cff10;font-weight:600;font-size:13px;cursor:pointer;width:100%}
 .mon2{display:flex;gap:6px;align-items:center}.mon2 button{background:var(--card);border:1px solid var(--line);color:var(--fg);border-radius:9px;width:32px;height:32px;cursor:pointer}.mon2 b{min-width:140px;text-align:center}
 tr.rowc{cursor:pointer}tr.rowc:hover{background:#ffffff08}tr.rowc.on{background:#9b5cff1f}
@@ -1806,10 +1807,22 @@ async function openFinishModal(live,skew,opts={}){
   const file=el('input',{type:'file',accept:'image/jpeg,image/png,image/webp',style:'display:none'});
   const prev=el('div',{style:'display:none'});
   const drop=el('button',{class:'drop2',type:'button',onclick:()=>file.click()},'Загрузить скриншот статистики эфира (обязательно)');
-  file.addEventListener('change',()=>{const f=file.files[0];if(!f)return;
+  const setShot=f=>{if(!f)return;
     if(!/^image\/(jpeg|png|webp)$/.test(f.type)){err.textContent='Нужна картинка JPG, PNG или WebP';return}
     if(f.size>6*1024*1024){err.textContent='Скриншот больше 6 МБ';return}
-    err.textContent='';shot=f;prev.style.display='block';prev.replaceChildren(el('img',{src:URL.createObjectURL(f),alt:'Скриншот',style:'max-height:140px;border-radius:10px'}));drop.textContent='Заменить скриншот'});
+    err.textContent='';shot=f;prev.style.display='block';prev.replaceChildren(el('img',{src:URL.createObjectURL(f),alt:'Скриншот',style:'max-height:140px;border-radius:10px'}));drop.textContent='Заменить скриншот'};
+  file.addEventListener('change',()=>setShot(file.files[0]));
+  ['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('over')}));
+  ['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('over')}));
+  drop.addEventListener('drop',e=>setShot([...(e.dataTransfer?.files||[])].find(f=>f.type.startsWith('image/'))));
+  const pasteBtn=el('button',{class:'btn o drop-paste',type:'button',title:'Вставить из буфера обмена','aria-label':'Вставить изображение из буфера обмена',onclick:async()=>{
+    try{const items=await navigator.clipboard.read();
+      for(const it of items){const t=it.types.find(x=>x.startsWith('image/'));if(t){const bl=await it.getType(t);setShot(new File([bl],'screenshot.'+(t.split('/')[1]||'png'),{type:t}));return}}
+      err.textContent='В буфере нет изображения';
+    }catch(e){err.textContent='Не удалось прочитать буфер: нажмите Ctrl+V (⌘V) на этом окне'}}},svgIcon('<rect x="8" y="3" width="8" height="4" rx="1"/><path d="M16 5h2a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2"/>',18));
+  const onPaste=e=>{const f=[...(e.clipboardData?.files||[])].find(x=>x.type.startsWith('image/'));if(f){e.preventDefault();setShot(f)}};
+  document.addEventListener('paste',onPaste);
+  new MutationObserver((_,o)=>{if(!file.isConnected){document.removeEventListener('paste',onPaste);o.disconnect()}}).observe(document.body,{childList:true,subtree:true});
   const err=el('div',{class:'err',role:'alert'});
   const send=el('button',{class:'btn',type:'button',onclick:async()=>{
     err.textContent='';
@@ -1828,7 +1841,7 @@ async function openFinishModal(live,skew,opts={}){
       el('div',{class:'lc-field'},el('label',{},'Длительность эфира (подставилась с таймера)'),time),
       ...inputs.map(x=>el('div',{class:'lc-field'},el('label',{},x.d.name+(x.d.required?' *':'')),x.i))),
     el('div',{class:'lc-field'},el('label',{},'Комментарий'),comment),
-    file,drop,prev,err,el('div',{class:'lc-actions'},send));
+    file,el('div',{class:'drop-row'},drop,pasteBtn),prev,err,el('div',{class:'lc-actions'},send));
 }
 
 async function reportsTab(){
@@ -1954,10 +1967,22 @@ async function openAddReportModal(){
   const file=el('input',{type:'file',accept:'image/jpeg,image/png,image/webp',style:'display:none'});
   const prev=el('div',{style:'display:none'});
   const drop=el('button',{class:'drop2',type:'button',onclick:()=>file.click()},'Загрузить скриншот статистики эфира (если есть)');
-  file.addEventListener('change',()=>{const f=file.files[0];if(!f)return;
+  const setShot=f=>{if(!f)return;
     if(!/^image\/(jpeg|png|webp)$/.test(f.type)){err.textContent='Нужна картинка JPG, PNG или WebP';return}
     if(f.size>6*1024*1024){err.textContent='Скриншот больше 6 МБ';return}
-    err.textContent='';shot=f;prev.style.display='block';prev.replaceChildren(el('img',{src:URL.createObjectURL(f),alt:'Скриншот',style:'max-height:140px;border-radius:10px'}));drop.textContent='Заменить скриншот'});
+    err.textContent='';shot=f;prev.style.display='block';prev.replaceChildren(el('img',{src:URL.createObjectURL(f),alt:'Скриншот',style:'max-height:140px;border-radius:10px'}));drop.textContent='Заменить скриншот'};
+  file.addEventListener('change',()=>setShot(file.files[0]));
+  ['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('over')}));
+  ['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('over')}));
+  drop.addEventListener('drop',e=>setShot([...(e.dataTransfer?.files||[])].find(f=>f.type.startsWith('image/'))));
+  const pasteBtn=el('button',{class:'btn o drop-paste',type:'button',title:'Вставить из буфера обмена','aria-label':'Вставить изображение из буфера обмена',onclick:async()=>{
+    try{const items=await navigator.clipboard.read();
+      for(const it of items){const t=it.types.find(x=>x.startsWith('image/'));if(t){const bl=await it.getType(t);setShot(new File([bl],'screenshot.'+(t.split('/')[1]||'png'),{type:t}));return}}
+      err.textContent='В буфере нет изображения';
+    }catch(e){err.textContent='Не удалось прочитать буфер: нажмите Ctrl+V (⌘V) на этом окне'}}},svgIcon('<rect x="8" y="3" width="8" height="4" rx="1"/><path d="M16 5h2a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2"/>',18));
+  const onPaste=e=>{const f=[...(e.clipboardData?.files||[])].find(x=>x.type.startsWith('image/'));if(f){e.preventDefault();setShot(f)}};
+  document.addEventListener('paste',onPaste);
+  new MutationObserver((_,o)=>{if(!file.isConnected){document.removeEventListener('paste',onPaste);o.disconnect()}}).observe(document.body,{childList:true,subtree:true});
   const err=el('div',{class:'err',role:'alert'});
   const send=el('button',{class:'btn',type:'button',onclick:async()=>{
     err.textContent='';
@@ -1977,7 +2002,7 @@ async function openAddReportModal(){
       el('div',{class:'lc-field'},el('label',{},'Дата начала эфира'),startDay),el('div',{class:'lc-field'},el('label',{},'Время начала эфира'),startTime),
       ...inputs.map(x=>el('div',{class:'lc-field'},el('label',{},x.d.name),x.i))),
     el('div',{class:'lc-field'},el('label',{},'Комментарий'),comment),
-    file,drop,prev,err,el('div',{class:'lc-actions'},send));
+    file,el('div',{class:'drop-row'},drop,pasteBtn),prev,err,el('div',{class:'lc-actions'},send));
 }
 let reviewFilter={who:'',st:'',sort:'new'};
 async function accReview(){
