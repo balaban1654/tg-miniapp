@@ -1074,7 +1074,7 @@ async function viewLeads(){
     const staffRows=flat?[]:list.filter(isStaff).sort((a,b)=>(ORDER[a.lead_role]??9)-(ORDER[b.lead_role]??9));
     const leadRows=flat?list:list.filter(r=>!isStaff(r));
     const sorted=[...staffRows,...leadRows];
-    const tbl=table(cols,sorted.map(r=>[td(r.username?'@'+r.username:(r.first_name||r.tg_id)),el('td',{class:'n'},el('span',{class:'cp'},String(r.tg_id),el('button',{type:'button',title:'Карточка лида','aria-label':'Карточка лида',onclick:()=>openLeadCard(r.tg_id)},svgIcon(PERSON)))),pocketCell(r),el('td',{},pill(r.status)),...(me.role==='admin'?[accessCell(r)]:[]),...(showOwner?[td(r.owner_name||'не закреплён')]:[]),td(r.link_slug||'—'),td(date(r.created_at)),td(money(r.deposits),'n'),...(showComm?[td(money(r.commission),'n')]:[])]),
+    const tbl=table(cols,sorted.map(r=>[td(r.username?'@'+r.username:(r.first_name||r.tg_id)),el('td',{class:'n'},el('span',{class:'cp'},String(r.tg_id),el('button',{type:'button',title:'Карточка лида','aria-label':'Карточка лида',onclick:()=>openLeadCard(r.tg_id)},svgIcon(PERSON)))),pocketCell(r),el('td',{},isStaff(r)?el('span',{class:'pill p-pur'},({admin:'Админ',moder:'Модер',streamer:'Стример',analyst:'Аналитик',buyer:'Медиабайер',teamlead:'Тимлидер'})[r.lead_role]||r.lead_role):pill(r.status)),...(me.role==='admin'?[accessCell(r)]:[]),...(showOwner?[td(r.owner_name||'не закреплён')]:[]),td(r.link_slug||'—'),td(date(r.created_at)),td(money(r.deposits),'n'),...(showComm?[td(money(r.commission),'n')]:[])]),
       rows.length?'Ничего не найдено. Измените фильтры.':'Лидов пока нет. Они появятся, когда люди перейдут по вашим ссылкам и нажмут «Старт» в боте.');
     tbl.classList.add('ctr');
     const body=tbl.querySelector('tbody');
