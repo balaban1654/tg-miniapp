@@ -86,6 +86,7 @@ html{background:#0a0613}
 .kpi-card{display:grid;gap:12px;border-color:var(--acc);background:linear-gradient(180deg,#2a1857,var(--card))}
 .warn-card{display:grid;gap:8px;border-color:var(--warn);max-width:560px}
 .live-dot{display:flex;align-items:center;gap:8px}.live-dot i{width:9px;height:9px;border-radius:50%;background:var(--bad);animation:livep 1.6s infinite}@keyframes livep{70%{box-shadow:0 0 0 8px #ff6b8a00}0%{box-shadow:0 0 0 0 #ff6b8a88}}
+.shot-w{position:relative;display:inline-block}.shot-w img{display:block;max-height:140px;max-width:100%;border-radius:10px}.shot-del{position:absolute;top:6px;right:6px;width:30px;height:30px;border-radius:8px;border:0;background:#000a;color:#fff;display:grid;place-items:center;cursor:pointer}.shot-del:hover{background:var(--bad,#e5484d)}
 .drop-row{display:flex;gap:8px;align-items:stretch}.drop-row .drop2{flex:1;width:auto}.drop-paste{padding:0 14px;display:grid;place-items:center}.drop2.over{background:#9b5cff33;border-style:solid}
 .drop2{border:1.5px dashed var(--acc);border-radius:12px;padding:14px;text-align:center;color:var(--acc2);background:#9b5cff10;font-weight:600;font-size:13px;cursor:pointer;width:100%}
 .mon2{display:flex;gap:6px;align-items:center}.mon2 button{background:var(--card);border:1px solid var(--line);color:var(--fg);border-radius:9px;width:32px;height:32px;cursor:pointer}.mon2 b{min-width:140px;text-align:center}
@@ -1808,10 +1809,11 @@ async function openFinishModal(live,skew,opts={}){
   const file=el('input',{type:'file',accept:'image/jpeg,image/png,image/webp',style:'display:none'});
   const prev=el('div',{style:'display:none'});
   const drop=el('button',{class:'drop2',type:'button',onclick:()=>file.click()},'Загрузить скриншот статистики эфира (обязательно)');
+  const drop0=drop.textContent;
   const setShot=f=>{if(!f)return;
     if(!/^image\/(jpeg|png|webp)$/.test(f.type)){err.textContent='Нужна картинка JPG, PNG или WebP';return}
     if(f.size>6*1024*1024){err.textContent='Скриншот больше 6 МБ';return}
-    err.textContent='';shot=f;prev.style.display='block';prev.replaceChildren(el('img',{src:URL.createObjectURL(f),alt:'Скриншот',style:'max-height:140px;border-radius:10px'}));drop.textContent='Заменить скриншот'};
+    err.textContent='';shot=f;prev.style.display='block';prev.replaceChildren(el('div',{class:'shot-w'},el('img',{src:URL.createObjectURL(f),alt:'Скриншот'}),el('button',{class:'shot-del',type:'button',title:'Удалить скриншот','aria-label':'Удалить скриншот',onclick:()=>{shot=null;file.value='';prev.style.display='none';prev.replaceChildren();drop.textContent=drop0}},svgIcon('<path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/>',16))));drop.textContent='Заменить скриншот'};
   file.addEventListener('change',()=>setShot(file.files[0]));
   ['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('over')}));
   ['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('over')}));
@@ -1968,10 +1970,11 @@ async function openAddReportModal(){
   const file=el('input',{type:'file',accept:'image/jpeg,image/png,image/webp',style:'display:none'});
   const prev=el('div',{style:'display:none'});
   const drop=el('button',{class:'drop2',type:'button',onclick:()=>file.click()},'Загрузить скриншот статистики эфира (если есть)');
+  const drop0=drop.textContent;
   const setShot=f=>{if(!f)return;
     if(!/^image\/(jpeg|png|webp)$/.test(f.type)){err.textContent='Нужна картинка JPG, PNG или WebP';return}
     if(f.size>6*1024*1024){err.textContent='Скриншот больше 6 МБ';return}
-    err.textContent='';shot=f;prev.style.display='block';prev.replaceChildren(el('img',{src:URL.createObjectURL(f),alt:'Скриншот',style:'max-height:140px;border-radius:10px'}));drop.textContent='Заменить скриншот'};
+    err.textContent='';shot=f;prev.style.display='block';prev.replaceChildren(el('div',{class:'shot-w'},el('img',{src:URL.createObjectURL(f),alt:'Скриншот'}),el('button',{class:'shot-del',type:'button',title:'Удалить скриншот','aria-label':'Удалить скриншот',onclick:()=>{shot=null;file.value='';prev.style.display='none';prev.replaceChildren();drop.textContent=drop0}},svgIcon('<path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/>',16))));drop.textContent='Заменить скриншот'};
   file.addEventListener('change',()=>setShot(file.files[0]));
   ['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('over')}));
   ['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('over')}));
