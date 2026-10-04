@@ -582,7 +582,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
          FROM leads d
          JOIN LATERAL (SELECT direction, kind, text, created_at FROM messages WHERE tg_id = d.tg_id ORDER BY id DESC LIMIT 1) m ON TRUE
          LEFT JOIN staff o ON o.id = d.owner_id
-        WHERE d.removed_at IS NULL AND ${chatScope(me, 'd.owner_id')} AND (d.chat_closed_at IS NULL OR m.created_at > d.chat_closed_at)
+        WHERE d.removed_at IS NULL AND ${chatScope(me, 'd.owner_id')}${me.role === 'admin' ? '' : " AND coalesce(d.lead_role, 'lead') = 'lead'"} AND (d.chat_closed_at IS NULL OR m.created_at > d.chat_closed_at)
         ORDER BY (m.direction = 'in') DESC, m.created_at DESC LIMIT 200`,
     );
     return r.rows.map((x) => ({ ...x, waiting: x.last_dir === 'in' }));
@@ -1398,7 +1398,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
         WHERE d.tg_id = $1 AND (${ownerScope(me, 'd.owner_id')} OR ${chatScope(me, 'd.owner_id')})`,
       [tgId],
     );
-    if (!r.rowCount) return reply.code(404).send({ error: 'Лид не найден' });
+    if (!r.rowCount || (me.role !== 'admin' && r.rows[0].lead_role && r.rows[0].lead_role !== 'lead')) return reply.code(404).send({ error: 'Лид не найден' });
     const ev = await db.query(
       `SELECT type, amount, created_at, raw->>'country' AS country, raw->>'promo' AS promo, raw->>'ac' AS ac
          FROM events WHERE tg_id = $1 AND type IN ('start','reg','ftd','dep','wd') ORDER BY created_at, id`,
