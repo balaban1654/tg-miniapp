@@ -920,8 +920,13 @@ function dxFunnelCopy(model){
       if(model.plain){y+=70;continue}
       y+=46;
       const tot=st.segs.reduce((a,g)=>a+g.w,0),avail=W-P*2-(st.segs.length-1)*4;let px=P;
+      // узкие полоски расширяем до ширины подписи (мелким шрифтом), остальные сжимаем пропорционально
+      x.font='700 18px '+ff;const mins=st.segs.map(g=>x.measureText(g.t).width+20);
+      const wd=st.segs.map(g=>avail*g.w/tot);let fixed=new Array(st.segs.length).fill(false);
+      for(let k=0;k<st.segs.length;k++){let free=avail,fw=0;st.segs.forEach((g,i)=>{if(fixed[i]){free-=wd[i]}else fw+=g.w});let again=false;
+        st.segs.forEach((g,i)=>{if(!fixed[i]){const w=free*g.w/fw;if(w<mins[i]){wd[i]=mins[i];fixed[i]=true;again=true}else wd[i]=w}});if(!again)break}
       if(!st.segs.length){x.fillStyle='#ffffff1a';x.beginPath();x.roundRect(P,y,W-P*2,BH,12);x.fill();x.fillStyle=css('--mut')||'#a89cc8';x.font='700 26px '+ff;x.fillText('нет данных',P+20,y+BH/2+2)}
-      st.segs.forEach((g,i)=>{const w=avail*g.w/tot;x.fillStyle=g.c;x.beginPath();x.roundRect(px,y,w,BH,[i===0?12:6,i===st.segs.length-1?12:6,i===st.segs.length-1?12:6,i===0?12:6]);x.fill();
+      st.segs.forEach((g,i)=>{const w=wd[i];x.fillStyle=g.c;x.beginPath();x.roundRect(px,y,w,BH,[i===0?12:6,i===st.segs.length-1?12:6,i===st.segs.length-1?12:6,i===0?12:6]);x.fill();
         x.save();x.beginPath();x.rect(px,y,w,BH);x.clip();x.fillStyle='#0d0817';let fs=26;x.font='700 '+fs+'px '+ff;while(fs>16&&x.measureText(g.t).width>w-20){fs-=2;x.font='700 '+fs+'px '+ff}x.fillText(g.t,px+10,y+BH/2+2);x.restore();px+=w+4});
       y+=BH+34;
     }
