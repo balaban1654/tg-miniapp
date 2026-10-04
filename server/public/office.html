@@ -818,7 +818,7 @@ function dxLive(d,skew){
     const lvl=dxLvl(s.month.hoursMin,pace);
     const name=el('button',{type:'button',class:'dx-nm','aria-haspopup':'dialog'},s.name);
     dxAttachCard(name,s,d,skew);
-    const head=el('b',{},name,el('span',{class:'dx-hp '+lvl,title:'По графику сегодня '+hw(pace)+' ч'},hw(s.month.hoursMin)+'/'+d.plan.hours+' ч'),el('span',{class:'dx-fc',title:'FTD за месяц'},'FTD '+(s.month.ftd||0)));
+    const head=el('b',{},name,s.role==='streamer'?el('span',{class:'dx-hp '+lvl,title:'По графику сегодня '+hw(pace)+' ч'},hw(s.month.hoursMin)+'/'+d.plan.hours+' ч'):null,el('span',{class:'dx-fc',title:'FTD за месяц'},'FTD '+(s.month.ftd||0)));
     const time=s.live
       ?el('span',{class:'t'},el('span',{'data-live':s.live.started_at},hm(Math.max(0,Math.floor((Date.now()+skew-Date.parse(s.live.started_at))/60000)))))
       :el('span',{class:'t off'},dxOffText(s,d.today));
@@ -1070,12 +1070,12 @@ let dxFlipped=false;
 const IC_FLIP='<path d="M3 12a9 9 0 0 1 15.5-6.2L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15.5 6.2L3 16"/><path d="M3 21v-5h5"/>';
 /* Оборот плитки: те же показатели, что у стримера, но суммарно по всем активным стримерам */
 function dxTeamBack(d){
-  const act=d.streamers.filter(s=>s.active),N=act.length||1,pl=d.plan,pace=d.pace*100,mark=pace<99.5?pace:null;
+  const all=d.streamers.filter(s=>s.active),act=all.filter(s=>s.role==='streamer'),N=act.length||1,pl=d.plan,pace=d.pace*100,mark=pace<99.5?pace:null;
   const lv=pct=>pct>=pace?'ok':pct>=pace*.85?'warn':'bad';
   const sum=f=>act.reduce((a,s)=>a+f(s),0);
   const today=sum(s=>s.todayMin||0),shiftMin=pl.shiftH*60*N,live=act.filter(s=>s.live).length;
   const hours=sum(s=>s.month.hoursMin),planMin=pl.planMin*N,shifts=sum(s=>s.month.shifts),planShifts=pl.hours/pl.shiftH*N;
-  const ftd=sum(s=>s.month.ftd),planLeads=pl.leads*N;
+  const ftd=all.reduce((a,s)=>a+s.month.ftd,0),planLeads=pl.leads*N;
   const hp=hours/planMin*100,sp=shifts/planShifts*100,lp=planLeads?ftd/planLeads*100:0,toGo=planLeads-ftd;
   const b=el('button',{type:'button',class:'dx-ib sm2 dx-flipb',title:'Назад к плану компании','aria-label':'Назад к плану компании'});b.append(svgIcon(IC_FLIP,18));
   return el('div',{class:'card dx-pf'},el('div',{class:'dx-hd'},el('div',{class:'l'},el('span',{class:'dx-lbl'},'Показатели стримеров · '+N+' чел.')),el('div',{style:'display:flex;align-items:center;gap:10px;margin-left:auto'},mark!==null?el('span',{class:'mut',style:'font-size:12px'},'метка: план на сегодня'):null,b)),

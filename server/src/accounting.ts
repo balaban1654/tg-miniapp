@@ -153,7 +153,15 @@ async function kpiCompute(staffId: number, period: string, plan: KpiPlan): Promi
   const dayRows = [...days.entries()].sort().map(([d, v]) => ({ d, n: v.n, all: v.all, hit: v.n >= plan.day.count }));
   const dayBonus = dayRows.filter((x) => x.hit).length * plan.day.bonus;
   const extra = ftdBonus + dayBonus + adjBonus - adjPenalty;
-  const total = r2(act.base + act.leadsPay + extra);
+  // Админу, который стримит, зарплата не начисляется: его FTD, депозиты и комиссия остаются в общем пуле
+  const noPay = (await db.query(`SELECT role FROM staff WHERE id = $1`, [staffId])).rows[0]?.role === 'admin';
+  if (noPay) {
+    for (const m of [act, full, min]) { m.base = 0; m.leadsPay = 0; }
+    ftdBonus = 0;
+  }
+  const dayBonusPaid = noPay ? 0 : dayBonus;
+  const extraPaid = noPay ? 0 : extra;
+  const total = r2(act.base + act.leadsPay + extraPaid);
   return {
     staffId,
     period,
@@ -168,12 +176,12 @@ async function kpiCompute(staffId: number, period: string, plan: KpiPlan): Promi
     full,
     min,
     ftdBonus,
-    dayBonus,
-    adjBonus,
-    adjPenalty,
+    dayBonus: dayBonusPaid,
+    adjBonus: noPay ? 0 : adjBonus,
+    adjPenalty: noPay ? 0 : adjPenalty,
     total,
-    fullTotal: r2(full.base + full.leadsPay + extra),
-    minTotal: r2(min.base + min.leadsPay + extra),
+    fullTotal: r2(full.base + full.leadsPay + extraPaid),
+    minTotal: r2(min.base + min.leadsPay + extraPaid),
     paid,
     due: r2(total - paid),
     tiers: tierStats,
@@ -900,7 +908,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     // Где должны быть сегодня: доля прошедших дней периода
     const pace = ref >= to ? 1 : Math.max(0, Math.min(1, (daysBetween(from, ref) + 1) / rangeDays));
 
-    const staffRows = (await db.query(`SELECT id, name, login, tg_username, active FROM staff WHERE (role = 'streamer' OR streams) ORDER BY id`)).rows as { id: number; name: string; login: string; tg_username: string | null; active: boolean }[];
+    const staffRows = (await db.query(`SELECT id, name, login, tg_username, active, role FROM staff WHERE (role = 'streamer' OR streams) ORDER BY id`)).rows as { id: number; name: string; login: string; tg_username: string | null; active: boolean; role: string }[];
     const ids = staffRows.map((s) => s.id);
 
     const evRange = await aggEvents(from, to);
@@ -977,6 +985,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
         name: s.name,
         login: s.login,
         tg: s.tg_username,
+        role: s.role,
         active: s.active,
         live: lv ? { id: lv.id, started_at: lv.started_at, stream_url: lv.stream_url, elapsed } : null,
         lastEnd: lastEnd.get(s.id) ?? null,
@@ -1019,7 +1028,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     const net = r2(commission - salaries - expenses);
 
     const lagging = out
-      .filter((x) => x.active && paceMin > 0 && x.month.hoursMin < paceMin)
+      .filter((x) => x.role === 'streamer' && x.active && paceMin > 0 && x.month.hoursMin < paceMin)
       .map((x) => ({ id: x.id, name: x.name, hoursMin: x.month.hoursMin, level: x.month.hoursMin < paceMin * 0.85 ? 'bad' : 'warn' }))
       .sort((a, b) => a.hoursMin - b.hoursMin);
 
