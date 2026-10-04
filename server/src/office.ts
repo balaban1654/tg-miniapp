@@ -88,6 +88,9 @@ const num = (v: unknown): number => {
   return Number.isFinite(n) && n >= 0 ? n : 0;
 };
 
+// Какие события считать депозитами: стримеру видны только первые (FTD), без додепов
+const depTypes = (me: Staff): string => (me.role === 'streamer' ? "('ftd')" : "('ftd','dep')");
+
 export async function officeRoutes(app: FastifyInstance): Promise<void> {
   const need = (...roles: Role[]) => async (req: FastifyRequest, reply: FastifyReply) => {
     const me = await staffFromRequest(req);
@@ -295,8 +298,9 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
       byStatus: by,
       total: Object.values(by).reduce((a, b) => a + b, 0),
       clicks: clicks.rows[0].n,
-      deposits: (m.ftd ?? 0) + (m.dep ?? 0),
-      withdrawals: m.wd ?? 0,
+      // Стример видит только первые депозиты (без додепов и выводов)
+      deposits: (m.ftd ?? 0) + (me.role === 'streamer' ? 0 : (m.dep ?? 0)),
+      withdrawals: me.role === 'streamer' ? 0 : (m.wd ?? 0),
       // Комиссия партнёрки видна только админу
       commission: me.role === 'admin' ? (m.comm ?? 0) : null,
     };
@@ -414,6 +418,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
   // Ссылки с результатами по каждой
   app.get('/links', { preHandler: auth }, async (req) => {
     const me = req.staff!;
+    const DT = depTypes(me);
     const r = await db.query(
       `SELECT l.id, l.slug, l.source, l.campaign, l.clicks, l.created_at, s.name AS owner_name, l.owner_id,
               (SELECT count(*)::int FROM leads d WHERE d.link_id = l.id) AS starts,
@@ -421,9 +426,9 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
                  AND EXISTS (SELECT 1 FROM events e WHERE e.tg_id = d.tg_id AND e.type = 'reg')) AS regs,
               (SELECT count(*)::int FROM leads d WHERE d.link_id = l.id AND d.status IN ('ftd','active')) AS ftds,
               coalesce((SELECT sum(e.amount) FROM events e JOIN leads d ON d.tg_id = e.tg_id
-                 WHERE d.link_id = l.id AND e.type IN ('ftd','dep')),0)::float AS deposits,
+                 WHERE d.link_id = l.id AND e.type IN ${DT}),0)::float AS deposits,
               coalesce((SELECT sum(e.amount) FROM events e JOIN leads d ON d.tg_id = e.tg_id
-                 WHERE d.link_id = l.id AND e.type = 'comm'),0)::float AS commission
+                 WHERE d.link_id = l.id AND e.type = 'comm' AND ${me.role === 'streamer' ? 'false' : 'true'}),0)::float AS commission
          FROM links l JOIN staff s ON s.id = l.owner_id
         WHERE ${ownerScope(me, 'l.owner_id')} ORDER BY l.id DESC`,
     );
@@ -435,6 +440,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
   // Итоги по источникам: все ссылки с одним и тем же источником складываются вместе
   app.get('/sources', { preHandler: auth }, async (req) => {
     const me = req.staff!;
+    const DT = depTypes(me);
     const r = await db.query(
       `SELECT coalesce(nullif(l.source,''), 'Без источника') AS source,
               count(DISTINCT l.id)::int AS links,
@@ -446,8 +452,8 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
               count(d.tg_id)::int AS starts,
               count(d.tg_id) FILTER (WHERE EXISTS (SELECT 1 FROM events e WHERE e.tg_id = d.tg_id AND e.type = 'reg'))::int AS regs,
               count(d.tg_id) FILTER (WHERE d.status IN ('ftd','active'))::int AS ftds,
-              coalesce(sum((SELECT sum(e.amount) FROM events e WHERE e.tg_id = d.tg_id AND e.type IN ('ftd','dep'))),0)::float AS deposits,
-              coalesce(sum((SELECT sum(e.amount) FROM events e WHERE e.tg_id = d.tg_id AND e.type = 'comm')),0)::float AS commission
+              coalesce(sum((SELECT sum(e.amount) FROM events e WHERE e.tg_id = d.tg_id AND e.type IN ${DT})),0)::float AS deposits,
+              coalesce(sum((SELECT sum(e.amount) FROM events e WHERE e.tg_id = d.tg_id AND e.type = 'comm' AND ${me.role === 'streamer' ? 'false' : 'true'})),0)::float AS commission
          FROM links l JOIN leads d ON d.link_id = l.id
         WHERE ${ownerScope(me, 'l.owner_id')} GROUP BY 1`,
     );
@@ -1040,6 +1046,8 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
          FROM events WHERE tg_id = $1 AND type IN ('start','reg','ftd','dep','wd') ORDER BY created_at, id`,
       [tgId],
     );
+    // Стример не видит додепы и выводы
+    if (me.role === 'streamer') ev.rows = ev.rows.filter((e) => e.type !== 'dep' && e.type !== 'wd');
     const deposits = ev.rows.filter((e) => e.type === 'ftd' || e.type === 'dep');
     const sum = (rows: any[]) => rows.reduce((t, e) => t + Number(e.amount || 0), 0);
     const last = (k: 'country' | 'promo' | 'ac') => [...ev.rows].reverse().find((e) => e[k])?.[k] ?? null;
@@ -1065,11 +1073,12 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
       vals.push(status);
       extra = ` AND d.status = $1`;
     }
+    const DT = depTypes(me);
     const r = await db.query(
       `SELECT d.tg_id, d.trader_id, d.is_tester, d.lead_role, d.username, d.first_name, d.status, d.access, d.created_at, d.owner_id,
               s.name AS owner_name, l.slug AS link_slug,
-              coalesce((SELECT sum(amount) FROM events e WHERE e.tg_id = d.tg_id AND e.type IN ('ftd','dep')),0) AS deposits,
-              coalesce((SELECT sum(amount) FROM events e WHERE e.tg_id = d.tg_id AND e.type = 'comm'),0) AS commission
+              coalesce((SELECT sum(amount) FROM events e WHERE e.tg_id = d.tg_id AND e.type IN ${DT}),0) AS deposits,
+              coalesce((SELECT sum(amount) FROM events e WHERE e.tg_id = d.tg_id AND e.type = 'comm' AND ${me.role === 'streamer' ? 'false' : 'true'}),0) AS commission
          FROM leads d
          LEFT JOIN staff s ON s.id = d.owner_id
          LEFT JOIN links l ON l.id = d.link_id

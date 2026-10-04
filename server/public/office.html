@@ -364,7 +364,7 @@ function showApp(){
   $('#login').hidden=true;$('#app').hidden=false;
   $('#meName').textContent=me.name+' · '+ROLE[me.role];
   const gb=$('#meGear');if(gb&&!gb.firstChild){gb.append(svgIcon(GEAR,16));gb.onclick=()=>openStaffCard(null)}
-  const items=[['home','Дашборд'],['leads','Лиды'],['links','Ссылки']];
+  const items=[['home','Дашборд'],['leads','Лиды'],...(me.role==='streamer'?[]:[['links','Ссылки']])];
   if(me.role==='admin'||me.role==='teamlead')items.push(['staff',me.role==='admin'?'Сотрудники':'Моя команда']);
   if(['admin','teamlead','streamer'].includes(me.role))items.splice(1,0,['chats','Чаты']);
   if(me.role==='admin')items.splice(1,0,['signals','Сигналы']);
@@ -970,7 +970,8 @@ function pocketCell(r){
     const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
     ['viewBox:0 0 24 24','width:15','height:15','fill:none','stroke:currentColor','stroke-width:2','stroke-linecap:round','stroke-linejoin:round'].forEach(a=>{const[k,...v]=a.split(':');svg.setAttribute(k,v.join(':'))});svg.innerHTML=PENCIL;
     const b=el('button',{type:'button',title:'Присвоить Pocket ID','aria-label':'Изменить Pocket ID',class:'cp-btn',onclick:edit},svg);
-    td.replaceChildren(el('span',{class:'cp'},r.trader_id||'—',me.role==='admin'?b:null));
+    const cp=r.trader_id?el('button',{type:'button',title:'Скопировать Pocket ID','aria-label':'Скопировать Pocket ID',class:'cp-btn',onclick:async()=>{try{await navigator.clipboard.writeText(String(r.trader_id));toast('Pocket ID скопирован')}catch{toast('Выделите и скопируйте вручную')}}},svgIcon(COPYI)):null;
+    td.replaceChildren(el('span',{class:'cp'},r.trader_id||'—',cp,me.role==='admin'?b:null));
   };
   const edit=()=>{
     const inp=el('input',{value:r.trader_id||'',placeholder:'Pocket ID',maxlength:'40',style:'width:130px',
@@ -987,7 +988,7 @@ async function viewLeads(){
   const [rows,legacy]=await Promise.all([api('/leads'),me.role==='admin'?api('/legacy').catch(()=>null):Promise.resolve(null)]);
   const showOwner=me.role==='admin'||me.role==='teamlead';
   const showComm=me.role==='admin';
-  const cols=['Лид','Telegram ID','Pocket ID','Статус',...(me.role==='admin'?['Доступ']:[]),...(showOwner?['Владелец']:[]),'Ссылка','Пришёл','Депозиты',...(showComm?['Комиссия']:[])];
+  const cols=['Лид','Telegram ID','Pocket ID','Статус',...(me.role==='admin'?['Доступ']:[]),...(showOwner?['Владелец']:[]),'Ссылка','Пришёл',me.role==='streamer'?'Депозит':'Депозиты',...(showComm?['Комиссия']:[])];
   // Админ состав сверху: админ, модер, затем остальные роли; потом обычные лиды. При фильтре или своей сортировке показываем общим списком
   const ORDER={admin:0,moder:1,streamer:2,analyst:3,buyer:4};
   const isStaff=r=>r.lead_role&&r.lead_role!=='lead';
@@ -1131,7 +1132,7 @@ async function openLeadCard(tgId){
   const wds=ev.filter(e=>e.type==='wd');
   const step=(t,when,extra)=>el('div',{class:'lc-step'+(when?' done':'')},el('span',{class:'lc-dot'}),el('div',{},el('b',{},t),el('div',{class:'mut sm'},when?fmtDT(when)+(extra?' · '+extra:''):'ещё нет')));
   const origin=[L.link_slug?'ссылка '+L.link_slug:null,L.link_source,L.link_campaign].filter(Boolean).join(' · ')||'не по ссылке';
-  box.replaceChildren(
+  box.replaceChildren(...[
     el('div',{class:'lc-head'},el('div',{},el('h3',{style:'font-size:18px'},name),L.first_name&&L.username?el('div',{class:'mut sm'},L.first_name):null),
       el('div',{style:'display:flex;gap:8px;align-items:center'},pill(L.status),L.access?el('span',{class:'pill p-ok'},'доступ открыт'):el('span',{class:'pill p-pur'},'доступ закрыт'),
         el('button',{class:'btn o s',type:'button','aria-label':'Закрыть',onclick:close},'✕'))),
@@ -1147,15 +1148,16 @@ async function openLeadCard(tgId){
       step('Нажал «Старт» в боте',START),
       step('Регистрация',reg&&reg.created_at),
       step('Первый депозит',ftd&&ftd.created_at,ftd&&ftd.amount!==null?money(ftd.amount):null)),
+    ...(me.role==='streamer'?[el('h4',{class:'lc-h'},'Первый депозит'),ftd&&ftd.amount!==null?el('div',{class:'lc-total'},el('span',{class:'mut sm'},fmtDT(ftd.created_at)),el('b',{style:'font-size:20px'},money(ftd.amount))):el('div',{class:'mut sm'},'Депозита пока нет.')]:[
     el('h4',{class:'lc-h'},'Депозиты'),
     el('div',{class:'lc-total'},el('span',{class:'mut sm'},'Всего пополнено'),el('b',{style:'font-size:20px'},money(d.depositsTotal)),el('span',{class:'mut sm'},d.depositsCount+' '+(d.depositsCount%10===1&&d.depositsCount%100!==11?'депозит':(d.depositsCount%10>=2&&d.depositsCount%10<=4&&(d.depositsCount%100<10||d.depositsCount%100>=20)?'депозита':'депозитов')))),
     deps.length?el('div',{class:'lc-list'},[...deps].reverse().map((e,i,a)=>{
       const isFirst=e===ftd||(!ftd&&e===deps[0]);
-      return el('div',{class:'lc-row'},el('span',{},fmtDT(e.created_at)),el('span',{class:'pill '+(isFirst?'p-ok':'p-pur')},isFirst?'Первый депозит':'Додеп'),el('b',{},e.amount!==null?money(e.amount):'—'))})):el('div',{class:'mut sm'},'Депозитов пока нет.'),
+      return el('div',{class:'lc-row'},el('span',{},fmtDT(e.created_at)),el('span',{class:'pill '+(isFirst?'p-ok':'p-pur')},isFirst?'Первый депозит':'Додеп'),el('b',{},e.amount!==null?money(e.amount):'—'))})):el('div',{class:'mut sm'},'Депозитов пока нет.')]),
     wds.length?[el('h4',{class:'lc-h'},'Выводы · '+money(d.withdrawTotal)),el('div',{class:'lc-list'},wds.map(e=>el('div',{class:'lc-row'},el('span',{},fmtDT(e.created_at)),el('span',{class:'pill p-warn'},'Вывод'),el('b',{},e.amount!==null?money(e.amount):'—'))))]:null,
     el('div',{class:'lc-actions'},
       ['admin','teamlead','streamer'].includes(me.role)?el('button',{class:'btn',type:'button',onclick:()=>{close();pendingChat=L.tg_id;tab='chats';showApp()}},'Открыть чат'):null,
-      el('a',{class:'btn o',href:profileUrl(L),target:'_blank',rel:'noopener',style:'text-decoration:none;display:inline-flex;align-items:center'},'Профиль в Telegram')));
+      el('a',{class:'btn o',href:profileUrl(L),target:'_blank',rel:'noopener',style:'text-decoration:none;display:inline-flex;align-items:center'},'Профиль в Telegram'))].flat().filter(Boolean));
 }
 /** Настройка 2FA: QR и первый код, затем резервные коды. forced=true: без закрытия, пока не включена */
 async function twofaDialog(forced,done){
