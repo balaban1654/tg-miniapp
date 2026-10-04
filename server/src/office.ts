@@ -1076,7 +1076,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     const raw = (req.body as any)?.owner_id;
     const owner = raw === null || raw === '' || raw === undefined ? null : Number(raw);
     if (owner !== null && !(await db.query(`SELECT 1 FROM staff WHERE id = $1 AND active`, [owner])).rowCount) return reply.code(404).send({ error: 'Сотрудник не найден' });
-    const r = await db.query('UPDATE leads SET owner_id = $2 WHERE tg_id = $1 RETURNING tg_id', [Number(req.params.tgId), owner]);
+    const r = await db.query('UPDATE leads SET owner_id = $2, link_id = coalesce(link_id, (SELECT id FROM links WHERE owner_id = $2 ORDER BY id LIMIT 1)) WHERE tg_id = $1 RETURNING tg_id', [Number(req.params.tgId), owner]);
     if (!r.rowCount) return reply.code(404).send({ error: 'Лид не найден' });
     return { ok: true };
   });
@@ -1434,7 +1434,8 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     const DT = depTypes(me);
     const r = await db.query(
       `SELECT d.tg_id, d.trader_id, d.is_tester, d.lead_role, d.username, d.first_name, d.status, d.access, d.created_at, d.owner_id,
-              s.name AS owner_name, l.slug AS link_slug,
+              s.name AS owner_name, coalesce(l.slug, (SELECT slug FROM links WHERE owner_id = d.owner_id ORDER BY id LIMIT 1)) AS link_slug,
+              (SELECT amount FROM events e WHERE e.tg_id = d.tg_id AND e.type = 'ftd' ORDER BY e.created_at, e.id LIMIT 1) AS ftd_amount,
               coalesce((SELECT sum(amount) FROM events e WHERE e.tg_id = d.tg_id AND e.type IN ${DT}),0) AS deposits,
               coalesce((SELECT sum(amount) FROM events e WHERE e.tg_id = d.tg_id AND e.type = 'comm' AND ${me.role === 'streamer' ? 'false' : 'true'}),0) AS commission
          FROM leads d
