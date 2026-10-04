@@ -23,6 +23,27 @@ await seedDefaultRules();
 // Интерфейс Hunter Office и его API
 const officeHtml = readFileSync(resolve(process.cwd(), 'public/office.html'), 'utf8');
 app.get('/office', async (_req, reply) => reply.type('text/html; charset=utf-8').header('Cache-Control', 'no-store').send(officeHtml));
+// Установка Office как приложения (PWA): манифест и сервис-воркер
+const manifest = JSON.stringify({
+  name: 'Hunter Office',
+  short_name: 'Office',
+  description: 'Кабинет команды Hunter AI',
+  lang: 'ru',
+  id: '/office',
+  start_url: '/office',
+  scope: '/',
+  display: 'standalone',
+  orientation: 'any',
+  background_color: '#0b0614',
+  theme_color: '#0d0817',
+  icons: [
+    { src: '/img/office-192.png', sizes: '192x192', type: 'image/png', purpose: 'any maskable' },
+    { src: '/img/office-512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
+  ],
+});
+app.get('/office.webmanifest', async (_req, reply) => reply.type('application/manifest+json; charset=utf-8').header('Cache-Control', 'public, max-age=3600').send(manifest));
+const swJs = readFileSync(resolve(process.cwd(), 'public/office-sw.js'), 'utf8');
+app.get('/office-sw.js', async (_req, reply) => reply.type('text/javascript; charset=utf-8').header('Cache-Control', 'no-cache').send(swJs));
 await app.register(officeRoutes, { prefix: '/api/office' });
 await app.register(postbackRoutes);
 

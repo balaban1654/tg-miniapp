@@ -6,7 +6,12 @@
 <meta name="theme-color" content="#0d0817">
 <title>Hunter Office</title>
 <link rel="icon" type="image/png" href="/img/favicon.png">
-<link rel="apple-touch-icon" href="/img/apple-touch-icon.png">
+<link rel="apple-touch-icon" href="/img/office-180.png">
+<link rel="manifest" href="/office.webmanifest">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Office">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
 <style>
 @font-face{font-family:'Montserrat';font-weight:400;font-style:normal;font-display:swap;src:url('/fonts/Montserrat-Regular.woff2') format('woff2')}
 @font-face{font-family:'Montserrat';font-weight:500;font-style:normal;font-display:swap;src:url('/fonts/Montserrat-Medium.woff2') format('woff2')}
@@ -40,6 +45,11 @@ input,select{background:var(--bg2);border:1px solid var(--line);border-radius:10
 @keyframes fall{to{transform:translateY(calc(100vh + 140px))}}
 @media (prefers-reduced-motion:reduce){.rain i{animation:none}}
 #login .card{width:min(380px,100%);display:grid;gap:14px;padding:24px;border-radius:18px}
+#login #lInstall{display:grid;gap:10px;margin-top:4px}#login #lInstall .hint{margin:0}
+@supports(padding:max(0px)){#login{padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right));padding-top:max(24px,env(safe-area-inset-top));padding-bottom:max(24px,env(safe-area-inset-bottom))}}
+@media(max-width:560px){input,select,textarea{font-size:16px}#login .card{padding:20px}}
+html{-webkit-text-size-adjust:100%;-webkit-tap-highlight-color:transparent}
+@media(display-mode:standalone){html,body{overscroll-behavior-y:none}body{padding-bottom:env(safe-area-inset-bottom)}}
 #login .brand{margin-bottom:6px;gap:12px}#login .brand .logo{width:46px;height:46px;font-size:20px}#login .rem{display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;margin-top:-4px}#login .rem input{width:16px;height:16px;padding:0;accent-color:var(--acc);cursor:pointer}#login .err:empty{display:none}#login .err{min-height:0;margin-top:-4px}#login .btn{margin-top:6px;padding:12px}#login p.hint{margin-top:8px;line-height:1.5}#login .brand .hint{margin-top:3px}
 .brand{display:flex;gap:10px;align-items:center}
 .logo{width:34px;height:34px;border-radius:50%;background:var(--acc);display:grid;place-items:center;font:700 15px var(--fd)}
@@ -277,7 +287,7 @@ textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10
     <div class="err" id="lErr" role="alert"></div>
     <button class="btn" id="lBtn" type="submit">Войти</button>
     <button class="btn o" id="lBack" type="button" hidden>Назад</button>
-    <p class="hint">Установи Office как приложение: на iPhone и iPad нажми «Поделиться» → «На экран Домой», на Android и в Chrome нажми «Установить».</p>
+    <div id="lInstall" hidden><p class="hint" id="lInstallTxt"></p><button class="btn o s" id="lInstallBtn" type="button" hidden>Установить приложение</button></div>
   </form>
 </div>
 
@@ -285,7 +295,7 @@ textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10
   <aside class="side">
     <div class="brand"><div class="logo">H</div><b style="font:700 14px var(--fd)">Hunter Office</b></div>
     <nav class="nav" id="nav"></nav>
-    <div class="me"><div class="me-row"><span id="meName"></span><button class="gear" id="meGear" type="button" title="Моя карточка" aria-label="Моя карточка"></button></div><button class="btn o s" id="logout" type="button">Выйти</button></div>
+    <div class="me"><div class="me-row"><span id="meName"></span><button class="gear" id="meGear" type="button" title="Моя карточка" aria-label="Моя карточка"></button></div><button class="btn o s" id="installBtn" type="button" hidden>Установить приложение</button><button class="btn o s" id="logout" type="button">Выйти</button></div>
   </aside>
   <main id="main"></main>
 </div>
@@ -375,6 +385,41 @@ $('#loginForm').addEventListener('submit',async e=>{
   catch(x){$('#lErr').textContent=x.message;if(x.restart){loginChallenge=null;loginStep(false)}else if(loginChallenge&&!$('#otp').hidden){otpIn().forEach(i=>i.value='');$('#lCode').value='';otpIn()[0].focus()}}
   finally{$('#lBtn').disabled=false}
 });
+/** Установка как приложения: подсказка под устройство, кнопка там, где браузер умеет сам */
+let deferredInstall=null;
+const UA=navigator.userAgent;
+const isIOS=/iPad|iPhone|iPod/.test(UA)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+const isStandalone=()=>matchMedia('(display-mode:standalone)').matches||navigator.standalone===true;
+function installHelp(){
+  if(isIOS)return /CriOS|FxiOS|EdgiOS|OPiOS/.test(UA)
+    ?'Откройте эту страницу в Safari, нажмите «Поделиться» (квадрат со стрелкой) и выберите «На экран Домой».'
+    :'Нажмите «Поделиться» (квадрат со стрелкой внизу экрана) и выберите «На экран Домой».';
+  if(/Android/.test(UA))return 'Откройте меню браузера (три точки) и выберите «Установить приложение» или «Добавить на главный экран».';
+  if(/Edg\//.test(UA))return 'Нажмите значок установки в адресной строке или откройте меню «…» → «Приложения» → «Установить этот сайт как приложение».';
+  if(/Chrome\//.test(UA))return 'Нажмите значок установки справа в адресной строке или меню ⋮ → «Установить Hunter Office».';
+  if(/Safari\//.test(UA)&&!/Chrome|Chromium/.test(UA))return 'В меню «Файл» выберите «Добавить в Dock».';
+  return '';
+}
+async function doInstall(){
+  if(deferredInstall){deferredInstall.prompt();try{await deferredInstall.userChoice}catch{}deferredInstall=null;installUi();return}
+  const t=installHelp();if(!t)return;
+  document.querySelectorAll('.lc-overlay').forEach(x=>x.remove());
+  const ov=el('div',{class:'lc-overlay',role:'dialog','aria-modal':'true'});
+  const close=()=>ov.remove();ov.addEventListener('mousedown',e=>{if(e.target===ov)close()});
+  ov.append(el('div',{class:'lc',style:'width:min(400px,100%)'},el('div',{class:'lc-head'},el('h3',{style:'font-size:18px'},'Установка приложения'),el('button',{class:'btn o s',type:'button','aria-label':'Закрыть',onclick:close},'✕')),el('div',{class:'mut'},t)));
+  document.body.append(ov);
+}
+function installUi(){
+  const can=!isStandalone()&&(deferredInstall||installHelp());
+  const w=$('#lInstall');w.hidden=!can;
+  if(can){$('#lInstallBtn').hidden=!deferredInstall;$('#lInstallTxt').hidden=!!deferredInstall;$('#lInstallTxt').textContent='Установите Office как приложение. '+installHelp()}
+  $('#installBtn').hidden=!can;
+}
+addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredInstall=e;installUi()});
+addEventListener('appinstalled',()=>{deferredInstall=null;installUi()});
+$('#lInstallBtn').onclick=doInstall;$('#installBtn').onclick=doInstall;
+installUi();
+if('serviceWorker' in navigator)addEventListener('load',()=>navigator.serviceWorker.register('/office-sw.js').catch(()=>{}));
 let loginChallenge=null;
 /** «Запомнить меня»: логин храним в браузере, пароль отдаём на хранение самому браузеру (менеджер паролей), в нашем коде его не держим */
 function rememberSave(){
