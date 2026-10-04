@@ -1343,7 +1343,7 @@ const lroleName=k=>(LROLES.find(x=>x[0]===k)||LROLES[0])[1];
 /** Ячейка «Выдать доступ»: при выдаче спрашиваем роль, при повторном нажатии доступ снимается */
 function accessCell(r){
   const td=el('td',{});
-  const set=async(value,role)=>{try{await api('/leads/'+r.tg_id+'/tester',{method:'PATCH',body:{value,role}});render()}catch(x){toast(x.message)}};
+  const set=async(value,role)=>{try{await api('/leads/'+r.tg_id+'/tester',{method:'PATCH',body:{value,role}});render({soft:true})}catch(x){toast(x.message)}};
   const idle=()=>td.replaceChildren(r.is_tester
     ?el('button',{class:'btn s',type:'button',title:'Нажмите, чтобы снять доступ',onclick:()=>set(false)},'Доступ: '+lroleName(r.lead_role))
     :(r.access||r.status==='ftd'||r.status==='active')
@@ -1361,7 +1361,7 @@ const PENCIL='<path d="M4 20h4L19 9a2.8 2.8 0 00-4-4L4 16z"/><path d="M13.5 6.5l
 /** Pocket ID с карандашом: админ может присвоить или поправить номер сам */
 function pocketCell(r){
   const td=el('td',{class:'n'});
-  const save=async v=>{try{await api('/leads/'+r.tg_id+'/trader',{method:'PATCH',body:{trader_id:v}});render()}catch(x){toast(x.message)}};
+  const save=async v=>{try{await api('/leads/'+r.tg_id+'/trader',{method:'PATCH',body:{trader_id:v}});render({soft:true})}catch(x){toast(x.message)}};
   const show=()=>{
     const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
     ['viewBox:0 0 24 24','width:15','height:15','fill:none','stroke:currentColor','stroke-width:2','stroke-linecap:round','stroke-linejoin:round'].forEach(a=>{const[k,...v]=a.split(':');svg.setAttribute(k,v.join(':'))});svg.innerHTML=PENCIL;
@@ -1413,7 +1413,7 @@ function ownerCell(r){
   const edit=()=>{
     const sel=el('select',{'aria-label':'Стример',style:'width:auto'},el('option',{value:''},'Не закреплён'),...leadsStaff.map(s=>el('option',{value:s.id},s.name)));
     sel.value=r.owner_id?String(r.owner_id):'';
-    const save=async()=>{try{await api('/leads/'+r.tg_id+'/owner',{method:'PATCH',body:{owner_id:sel.value?Number(sel.value):null}});render()}catch(x){toast(x.message)}};
+    const save=async()=>{try{await api('/leads/'+r.tg_id+'/owner',{method:'PATCH',body:{owner_id:sel.value?Number(sel.value):null}});render({soft:true})}catch(x){toast(x.message)}};
     td.replaceChildren(el('span',{style:'display:inline-flex;gap:6px;align-items:center'},sel,el('button',{class:'btn s',type:'button',onclick:save},'OK'),el('button',{class:'btn o s',type:'button','aria-label':'Отмена',onclick:show},'✕')));
   };
   show();return td;
@@ -2846,7 +2846,7 @@ async function viewPostbacks(){
       const r=await api('/postbacks/import',{method:'POST',body:{csv:await f.text()}});
       toast('Добавлено '+r.added+', уже было '+r.exists+(r.unknown?', без лида '+r.unknown:'')+(r.errors?', ошибок '+r.errors:''));
     }catch(x){toast(x.message)}
-    render();
+    render({soft:true});
   };
   const time=v=>new Date(v).toLocaleString('ru-RU',{timeZone:'Europe/Kyiv',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit',second:'2-digit'});
   const F=pbState;
@@ -2872,7 +2872,7 @@ async function viewPostbacks(){
       const save=async()=>{
         if(!/^\d{5,15}$/.test(inp.value.trim())){toast('Telegram ID: только цифры');return}
         ok.disabled=true;
-        try{const res=await api('/postbacks/bind',{method:'POST',body:{trader_id:trader,tg_id:inp.value.trim()}});toast('Привязано. Обработано записей: '+res.applied+(res.left?', не удалось: '+res.left:'')+'. Лид теперь в «Лидах»');render()}
+        try{const res=await api('/postbacks/bind',{method:'POST',body:{trader_id:trader,tg_id:inp.value.trim()}});toast('Привязано. Обработано записей: '+res.applied+(res.left?', не удалось: '+res.left:'')+'. Лид теперь в «Лидах»');render({soft:true})}
         catch(x){toast(x.message);ok.disabled=false}
       };
       c.replaceChildren(el('span',{style:'display:inline-flex;gap:6px;align-items:center'},inp,ok,el('button',{class:'btn o s',type:'button','aria-label':'Отмена',onclick:show},'✕')));inp.focus();
@@ -2885,12 +2885,12 @@ async function viewPostbacks(){
       &&(!qq||[r.tg_id,(r.query||{}).trader_id,(r.query||{}).click_id].some(v=>v!=null&&String(v).toLowerCase().includes(qq))));
     const by={new:(a,b)=>new Date(b.created_at)-new Date(a.created_at),old:(a,b)=>new Date(a.created_at)-new Date(b.created_at),sum:(a,b)=>amt(b)-amt(a),sumAsc:(a,b)=>amt(a)-amt(b)};
     list=[...list].sort(by[F.sort]||by.new);
-    holder.replaceChildren(table(['Время','Событие','Telegram ID','Pocket ID',['Сумма','n'],'Результат',''],list.map(r=>{const qq2=r.query||{};return[td(time(r.created_at)),el('td',{},el('span',{class:'pill ev-'+r.event},r.event)),tgCell(r),copyCell(qq2.trader_id),td(qq2.commission||qq2.sumdep||qq2.wdr_sum||qq2.amount||qq2.sum||'—','n'),el('td',{},el('span',{class:'pill '+(r.result==='ok'?'p-ok':(r.result.startsWith('дубль')||r.result.startsWith('пропущен'))?'p-warn':'p-bad')},r.result)),el('td',{},el('button',{class:'btn o s',type:'button',title:'Удалить постбек','aria-label':'Удалить постбек',onclick:()=>pbDeleteDialog(r,render)},svgIcon(TRASH,15)))]}),
+    holder.replaceChildren(table(['Время','Событие','Telegram ID','Pocket ID',['Сумма','n'],'Результат',''],list.map(r=>{const qq2=r.query||{};return[td(time(r.created_at)),el('td',{},el('span',{class:'pill ev-'+r.event},r.event)),tgCell(r),copyCell(qq2.trader_id),td(qq2.commission||qq2.sumdep||qq2.wdr_sum||qq2.amount||qq2.sum||'—','n'),el('td',{},el('span',{class:'pill '+(r.result==='ok'?'p-ok':(r.result.startsWith('дубль')||r.result.startsWith('пропущен'))?'p-warn':'p-bad')},r.result)),el('td',{},el('button',{class:'btn o s',type:'button',title:'Удалить постбек','aria-label':'Удалить постбек',onclick:()=>pbDeleteDialog(r,()=>render({soft:true}))},svgIcon(TRASH,15)))]}),
       rows.length?'Ничего не найдено. Измените фильтры.':'Постбеков пока нет. Когда партнёрка отправит первый, он появится здесь.'));
     cnt.textContent=list.length===rows.length?rows.length+' всего':list.length+' из '+rows.length;
   };
   draw();
-  return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Постбеки'),el('div',{style:'display:flex;gap:8px;align-items:center'},cnt,upBtn,upFile,clearBox,el('button',{class:'btn o s',type:'button',onclick:render},'Обновить'))),bar,holder];
+  return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Постбеки'),el('div',{style:'display:flex;gap:8px;align-items:center'},cnt,upBtn,upFile,clearBox,el('button',{class:'btn o s',type:'button',onclick:()=>render({soft:true})},'Обновить'))),bar,holder];
 }
 
 (async()=>{try{me=await api('/me');readHash();showApp()}catch{showLogin()}})();
