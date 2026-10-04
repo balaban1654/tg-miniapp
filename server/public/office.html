@@ -1126,14 +1126,14 @@ async function viewLinks(){
     el('label',{},'Адрес ссылки',slug),el('label',{},'Источник',src),
     (me.role==='admin'||me.role==='teamlead')?el('label',{},'Владелец',owner):el('span'),
     el('button',{class:'btn',type:'submit'},'Создать'),err);
-  const copyBtn=u=>{const b=el('button',{type:'button',class:'cp-btn',title:'Скопировать ссылку','aria-label':'Скопировать ссылку',style:'background:none;border:0;color:var(--mut);cursor:pointer;padding:2px 4px;margin-left:6px;vertical-align:middle'},svgIcon(COPYI,15));
+  const copyBtn=u=>{const b=el('button',{type:'button',class:'cp-btn',title:'Скопировать ссылку','aria-label':'Скопировать ссылку',style:'background:none;border:0;color:var(--mut);cursor:pointer;padding:2px 4px;margin-left:6px;vertical-align:middle;display:inline-grid'},svgIcon(COPYI,15));
     b.addEventListener('click',async()=>{try{await navigator.clipboard.writeText(u);b.replaceChildren(svgIcon('<path d="M5 12.5l4.5 4.5L19 7.5"/>',15));b.style.color='var(--ok)';toast('Ссылка скопирована')}catch{toast('Выделите ссылку и скопируйте вручную')}setTimeout(()=>{b.replaceChildren(svgIcon(COPYI,15));b.style.color=''},1500)});return b};
-  const srcTable=table(['Источник','Ссылок','Клики','Старты','Регистрации','FTD','Депозиты',...(adm?['Комиссия']:[])],sources.map(x=>[td(x.source),td(x.links,'n'),td(x.clicks,'n'),td(x.starts,'n'),td(x.regs,'n'),td(x.ftds,'n'),td(money(x.deposits),'n'),...(adm?[td(money(x.commission),'n')]:[])]),'Данные по источникам появятся, когда придут первые лиды.');
+  const srcTable=ctrT(table(['Источник','Ссылок','Клики','Старты','Регистрации','FTD','Депозиты',...(adm?['Комиссия']:[])],sources.map(x=>[td(x.source),td(x.links,'n'),td(x.clicks,'n'),td(x.starts,'n'),td(x.regs,'n'),td(x.ftds,'n'),td(money(x.deposits),'n'),...(adm?[td(money(x.commission),'n')]:[])]),'Данные по источникам появятся, когда придут первые лиды.'));
   return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Ссылки')),form,
     el('h3',{style:'font-size:15px'},'По источникам'),srcTable,
     el('h3',{style:'font-size:15px'},'По ссылкам'),
-    table(['Ссылка','Источник','Владелец','Клики','Старты','Рег','FTD','Депозиты',...(adm?['Комиссия']:[])],rows.map(r=>{const u=goUrl(r.slug);return[el('td',{},el('code',{},u),copyBtn(u)),td(r.source||'—'),td(r.owner_name),td(r.clicks,'n'),td(r.starts,'n'),td(r.regs,'n'),td(r.ftds,'n'),td(money(r.deposits),'n'),...(adm?[td(money(r.commission),'n')]:[])]}),
-      'Ссылок пока нет. Создайте первую выше.')];
+    ctrT(table(['Ссылка','Источник','Владелец','Клики','Старты','Рег','FTD','Депозиты',...(adm?['Комиссия']:[])],rows.map(r=>{const u=goUrl(r.slug);return[el('td',{style:'white-space:nowrap'},el('code',{style:'display:inline'},u),copyBtn(u)),td(r.source||'—'),td(r.owner_name),td(r.clicks,'n'),td(r.starts,'n'),td(r.regs,'n'),td(r.ftds,'n'),td(money(r.deposits),'n'),...(adm?[td(money(r.commission),'n')]:[])]}),
+      'Ссылок пока нет. Создайте первую выше.'))];
 }
 
 let staffState={tab:'team'};
@@ -1324,7 +1324,7 @@ const EYE='<path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="1
 const EYEOFF='<path d="M17.9 17.9A10.9 10.9 0 0112 19C5 19 1 12 1 12a18 18 0 015.1-5.9M9.9 5.2A10.9 10.9 0 0112 5c7 0 11 7 11 7a18 18 0 01-2.2 3.2"/><path d="M1 1l22 22"/>';
 /** Значок «скопировать» после текста: копирует строку, на секунду становится галочкой */
 function copyIconBtn(text,msg='Скопировано'){
-  const b=el('button',{type:'button',class:'cp-btn',title:'Скопировать','aria-label':'Скопировать',style:'background:none;border:0;color:var(--mut);cursor:pointer;padding:2px 4px;margin-left:6px;vertical-align:middle'},svgIcon(COPYI,15));
+  const b=el('button',{type:'button',class:'cp-btn',title:'Скопировать','aria-label':'Скопировать',style:'background:none;border:0;color:var(--mut);cursor:pointer;padding:2px 4px;margin-left:6px;vertical-align:middle;display:inline-grid'},svgIcon(COPYI,15));
   b.addEventListener('click',async()=>{try{await navigator.clipboard.writeText(String(text));b.replaceChildren(svgIcon('<path d="M5 12.5l4.5 4.5L19 7.5"/>',15));b.style.color='var(--ok)';toast(msg)}catch{toast('Выделите и скопируйте вручную')}setTimeout(()=>{b.replaceChildren(svgIcon(COPYI,15));b.style.color=''},1500)});
   return b;
 }
