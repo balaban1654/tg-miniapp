@@ -82,6 +82,8 @@ tr.rowc{cursor:pointer}tr.rowc:hover{background:#ffffff08}tr.rowc.on{background:
 .totalc{display:flex;justify-content:space-between;align-items:baseline;gap:12px;border-top:1px solid var(--line);padding-top:12px}
 .two2c{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
 .rev{display:grid;grid-template-columns:110px minmax(0,1fr) auto;gap:14px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;align-items:start}
+.shot-hover{position:fixed;z-index:80;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:6px;box-shadow:0 18px 50px rgba(0,0,0,.65);pointer-events:none;overflow:hidden}.shot-hover img{display:block;width:100%;max-height:calc(100% - 0px);object-fit:contain;border-radius:8px}
+.shot-ov{z-index:70}.shot-box{position:relative;width:fit-content;min-width:260px;max-width:min(900px,90vw);margin:0 auto;max-height:84vh;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px;display:grid;gap:8px;box-shadow:0 20px 60px rgba(0,0,0,.6)}.shot-box img{display:block;max-width:100%;max-height:calc(84vh - 70px);margin:0 auto;object-fit:contain;border-radius:10px}.shot-x{position:absolute;top:10px;right:10px;background:rgba(13,8,23,.8)}
 .shotc{display:block;height:96px;border-radius:9px;overflow:hidden;border:1px solid var(--line)}.shotc img{width:100%;height:100%;object-fit:cover}
 .meta2{display:grid;gap:4px;min-width:0}.kv2{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--mut)}.kv2 b{color:var(--fg)}
 .acts2{display:grid;gap:8px}.acts2 input{width:auto}
@@ -1217,6 +1219,35 @@ const EYE='<path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="1
 const EYEOFF='<path d="M17.9 17.9A10.9 10.9 0 0112 19C5 19 1 12 1 12a18 18 0 015.1-5.9M9.9 5.2A10.9 10.9 0 0112 5c7 0 11 7 11 7a18 18 0 01-2.2 3.2"/><path d="M1 1l22 22"/>';
 const COPYI='<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 01-1-1V4a1 1 0 011-1h10a1 1 0 011 1v1"/>';
 const KEYI='<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/>';
+/** Скриншот: по наведению увеличенный просмотр рядом (на компьютере), по клику открывается окном, не на весь экран */
+function openShot(url){
+  document.querySelectorAll('.shot-hover').forEach(x=>x.remove());
+  document.querySelectorAll('.shot-ov').forEach(x=>x.remove());
+  const ov=el('div',{class:'lc-overlay shot-ov',role:'dialog','aria-modal':'true'});
+  const close=()=>{ov.remove();document.removeEventListener('keydown',onKey)};
+  const onKey=e=>{if(e.key==='Escape')close()};document.addEventListener('keydown',onKey);
+  ov.addEventListener('mousedown',e=>{if(e.target===ov)close()});
+  ov.append(el('div',{class:'shot-box'},el('button',{class:'btn o s shot-x',type:'button','aria-label':'Закрыть',onclick:close},'✕'),el('img',{src:url,alt:'Скриншот'}),
+    el('a',{href:url,target:'_blank',rel:'noopener',class:'mut sm',style:'text-align:center;color:var(--acc2)'},'Открыть в новой вкладке')));
+  document.body.append(ov);
+}
+function shotThumb(url,props={}){
+  const a=el('a',{href:url,target:'_blank',rel:'noopener',...props,onclick:e=>{e.preventDefault();openShot(url)}});
+  if(matchMedia('(hover:hover)').matches){
+    let pop=null;
+    const kill=()=>{if(pop){pop.remove();pop=null}};
+    a.addEventListener('mouseenter',()=>{
+      kill();pop=el('div',{class:'shot-hover'},el('img',{src:url,alt:''}));document.body.append(pop);
+      const r=a.getBoundingClientRect(),w=Math.min(460,innerWidth-24),h=Math.min(560,innerHeight-24);
+      pop.style.width=w+'px';pop.style.maxHeight=h+'px';
+      let x=r.right+12;if(x+w>innerWidth-12)x=Math.max(12,r.left-w-12);
+      let y=Math.min(Math.max(12,r.top),innerHeight-h-12);
+      pop.style.left=x+'px';pop.style.top=Math.max(12,y)+'px';
+    });
+    a.addEventListener('mouseleave',kill);a.addEventListener('click',kill);
+  }
+  return a;
+}
 const GEAR='<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/>';
 /** Карточка сотрудника: id=null это своя (шестерёнка внизу), иначе карточка другого сотрудника для админа */
 async function openStaffCard(id){
@@ -1445,7 +1476,7 @@ async function reportsTab(){
     td(r.declared_min?hmin(r.declared_min)+(r.approved_min&&r.approved_min!==r.declared_min?' → '+hmin(r.approved_min):''):'—'),
     el('td',{style:'white-space:normal;min-width:200px'},fmtF(r),r.comment?el('div',{class:'mut sm'},r.comment):null,r.reject_reason?el('div',{class:'sm',style:'color:var(--bad)'},'Причина отказа: '+r.reject_reason):null),
     el('td',{},el('span',{class:'pill '+REPSTATUS[r.status][1]},REPSTATUS[r.status][0])),
-    el('td',{},r.has_screenshot?el('a',{href:'/api/office/shifts/'+r.id+'/screenshot',target:'_blank',rel:'noopener',style:'color:var(--acc2)'},'скриншот'):'—'),
+    el('td',{},r.has_screenshot?shotThumb('/api/office/shifts/'+r.id+'/screenshot',{style:'color:var(--acc2)'}).appendChild(document.createTextNode('скриншот')).parentNode:'—'),
     el('td',{},del(r))]);
   return[tiles,ctrT(table(['Дата','Время','Показатели','Статус','Скрин',''],trs,'Отчётов пока нет. После смены он появится здесь.')),
     el('div',{class:'mut sm'},'Принятые отчёты хранятся в истории, непринятые можно удалить.')];
@@ -1543,7 +1574,7 @@ async function accReview(){
     const why=el('input',{placeholder:'Причина отказа (необязательно)',style:'width:240px'});
     const act=async(action,extra)=>{try{await api('/shifts/'+r.id+'/review',{method:'POST',body:{action,...extra}});toast(action==='approve'?'Отчёт зачтён':'Отчёт отклонён');accRefresh()}catch(x){toast(x.message)}};
     return el('div',{class:'rev'},
-      el('a',{href:'/api/office/shifts/'+r.id+'/screenshot',target:'_blank',rel:'noopener',class:'shotc'},el('img',{src:'/api/office/shifts/'+r.id+'/screenshot',alt:'Скриншот',loading:'lazy'})),
+      shotThumb('/api/office/shifts/'+r.id+'/screenshot',{class:'shotc',title:'Нажмите, чтобы увеличить'}).appendChild(el('img',{src:'/api/office/shifts/'+r.id+'/screenshot',alt:'Скриншот',loading:'lazy'})).parentNode,
       el('div',{class:'meta2'},el('div',{},el('b',{},r.staff_name),' ',el('span',{class:'mut sm'},new Date(r.day+'T12:00:00').toLocaleDateString('ru-RU',{day:'numeric',month:'short'})),' ',el('span',{class:'pill p-pur'},'заявлено '+hmin(r.declared_min))),
         el('div',{class:'kv2'},...r.fields.filter(f=>f.value!==null&&f.value!=='').map(f=>el('span',{},f.name+': ',el('b',{},typeof f.value==='number'?f.value.toLocaleString('ru-RU'):f.value)))),
         el('div',{class:'mut sm'},r.stream_url),r.comment?el('div',{class:'sm'},r.comment):null),
