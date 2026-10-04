@@ -455,3 +455,15 @@ CREATE TABLE IF NOT EXISTS kpi_closed (
 );
 -- Месяц, который админ открыл заново: автоматически его больше не закрываем, только вручную
 CREATE TABLE IF NOT EXISTS month_holds (period TEXT PRIMARY KEY);
+
+-- 2FA (TOTP): подтверждённый секрет, ожидающий подтверждения, последний использованный шаг, хэши резервных кодов
+ALTER TABLE staff ADD COLUMN IF NOT EXISTS totp_secret   TEXT;
+ALTER TABLE staff ADD COLUMN IF NOT EXISTS totp_pending  TEXT;
+ALTER TABLE staff ADD COLUMN IF NOT EXISTS totp_last     BIGINT NOT NULL DEFAULT 0;
+ALTER TABLE staff ADD COLUMN IF NOT EXISTS recovery_codes TEXT[] NOT NULL DEFAULT '{}';
+CREATE TABLE IF NOT EXISTS login_challenges (
+  token_hash TEXT PRIMARY KEY,
+  staff_id   INT NOT NULL REFERENCES staff(id) ON DELETE CASCADE,
+  tries      INT NOT NULL DEFAULT 0,
+  expires_at TIMESTAMPTZ NOT NULL
+);

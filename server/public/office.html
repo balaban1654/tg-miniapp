@@ -260,8 +260,10 @@ textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10
     <div class="brand"><div class="logo">H</div><div><h1 style="font-size:18px">Hunter Office</h1><div class="hint">Кабинет команды Hunter AI</div></div></div>
     <label>Логин<input id="lLogin" name="username" autocomplete="username" required></label>
     <label>Пароль<input id="lPass" name="password" type="password" autocomplete="current-password" required></label>
+    <label id="lCodeW" hidden>Код из приложения-аутентификатора<input id="lCode" name="otp" inputmode="text" autocomplete="one-time-code" maxlength="11" placeholder="6 цифр или резервный код"></label>
     <div class="err" id="lErr" role="alert"></div>
     <button class="btn" id="lBtn" type="submit">Войти</button>
+    <button class="btn o" id="lBack" type="button" hidden>Назад</button>
     <p class="hint">Установи Office как приложение: на iPhone и iPad нажми «Поделиться» → «На экран Домой», на Android и в Chrome нажми «Установить».</p>
   </form>
 </div>
@@ -290,8 +292,9 @@ window.addEventListener('popstate',()=>{if(!me)return;readHash();showApp()});
 async function api(path,opts={}){
   const r=await fetch('/api/office'+path,{credentials:'same-origin',headers:{'content-type':'application/json'},...opts,body:opts.body?JSON.stringify(opts.body):(opts.method&&opts.method!=='GET'?'{}':undefined)});
   const data=await r.json().catch(()=>({}));
-  if(r.status===401&&path!=='/login'){showLogin();throw new Error('auth')}
-  if(!r.ok)throw new Error(data.error||'Ошибка '+r.status);
+  if(r.status===401&&!path.startsWith('/login')){showLogin();throw new Error('auth')}
+  if(r.status===403&&data.code==='totp_setup'&&me){me.totp=false;showApp();throw new Error(data.error)}
+  if(!r.ok){const e=new Error(data.error||'Ошибка '+r.status);e.restart=data.restart;throw e}
   return data;
 }
 function el(tag,props={},...kids){
@@ -327,6 +330,8 @@ const ICONS={
   mytasks:'<circle cx="12" cy="12" r="9"/><path d="M8 12.5l3 3 5-6"/>'};
 const icon=k=>{const s=document.createElementNS('http://www.w3.org/2000/svg','svg');s.setAttribute('viewBox','0 0 24 24');s.setAttribute('width','18');s.setAttribute('height','18');s.setAttribute('fill','none');s.setAttribute('stroke','currentColor');s.setAttribute('stroke-width','2');s.setAttribute('stroke-linecap','round');s.setAttribute('stroke-linejoin','round');s.setAttribute('aria-hidden','true');s.innerHTML=ICONS[k]||'';return s};
 function showApp(){
+  if(me.totp===false&&['admin','teamlead'].includes(me.role)){$('#login').hidden=true;$('#app').hidden=true;twofaDialog(true);return}
+  document.querySelectorAll('.tf-overlay').forEach(x=>x.remove());
   $('#login').hidden=true;$('#app').hidden=false;
   $('#meName').textContent=me.name+' · '+ROLE[me.role];
   const gb=$('#meGear');if(gb&&!gb.firstChild){gb.append(svgIcon(GEAR,16));gb.onclick=()=>openStaffCard(null)}
@@ -345,10 +350,23 @@ function showApp(){
 
 $('#loginForm').addEventListener('submit',async e=>{
   e.preventDefault();$('#lErr').textContent='';$('#lBtn').disabled=true;
-  try{await api('/login',{method:'POST',body:{login:$('#lLogin').value,password:$('#lPass').value}});me=await api('/me');readHash();showApp()}
-  catch(x){$('#lErr').textContent=x.message}
+  try{
+    if(loginChallenge){await api('/login/totp',{method:'POST',body:{challenge:loginChallenge,code:$('#lCode').value}})}
+    else{
+      const r=await api('/login',{method:'POST',body:{login:$('#lLogin').value,password:$('#lPass').value}});
+      if(r.need_totp){loginChallenge=r.challenge;loginStep(true);return}
+    }
+    loginChallenge=null;loginStep(false);me=await api('/me');readHash();showApp()}
+  catch(x){$('#lErr').textContent=x.message;if(x.restart){loginChallenge=null;loginStep(false)}}
   finally{$('#lBtn').disabled=false}
 });
+let loginChallenge=null;
+function loginStep(second){
+  $('#lCodeW').hidden=!second;$('#lBack').hidden=!second;
+  $('#lLogin').closest('label').hidden=second;$('#lPass').closest('label').hidden=second;
+  $('#lCode').value='';if(second)$('#lCode').focus();
+}
+$('#lBack').onclick=()=>{loginChallenge=null;loginStep(false);$('#lErr').textContent=''};
 $('#logout').addEventListener('click',async()=>{try{await api('/logout',{method:'POST'})}catch{}showLogin()});
 
 /** render({soft:true}) обновляет страницу на месте: без «Загрузка…» и с сохранением прокрутки, чтобы экран не дёргался */
@@ -1027,6 +1045,40 @@ async function openLeadCard(tgId){
       ['admin','teamlead','streamer'].includes(me.role)?el('button',{class:'btn',type:'button',onclick:()=>{close();pendingChat=L.tg_id;tab='chats';showApp()}},'Открыть чат'):null,
       el('a',{class:'btn o',href:profileUrl(L),target:'_blank',rel:'noopener',style:'text-decoration:none;display:inline-flex;align-items:center'},'Профиль в Telegram')));
 }
+/** Настройка 2FA: QR и первый код, затем резервные коды. forced=true: без закрытия, пока не включена */
+async function twofaDialog(forced,done){
+  document.querySelectorAll('.tf-overlay').forEach(x=>x.remove());
+  const ov=el('div',{class:'lc-overlay tf-overlay',role:'dialog','aria-modal':'true'});
+  const box=el('div',{class:'lc',style:'width:min(460px,100%)'});ov.append(box);document.body.append(ov);
+  const close=()=>{ov.remove();if(done)done()};
+  const head=t=>el('div',{class:'lc-head'},el('h3',{style:'font-size:18px'},t),forced?null:el('button',{class:'btn o s',type:'button','aria-label':'Закрыть',onclick:close},'✕'));
+  let s;try{s=await api('/profile/2fa/setup',{method:'POST'})}catch(x){box.replaceChildren(head('Двухфакторная защита'),el('div',{class:'err'},x.message));return}
+  const qr=el('div',{style:'background:#fff;border-radius:12px;padding:8px;width:216px;height:216px;margin:0 auto'});qr.innerHTML=s.qr;
+  const code=el('input',{inputmode:'numeric',autocomplete:'one-time-code',maxlength:'7',placeholder:'6 цифр из приложения',style:'text-align:center;letter-spacing:3px;font-size:18px'});
+  const msg=el('div',{class:'err',role:'alert'});
+  const go=async()=>{
+    try{
+      const r=await api('/profile/2fa/enable',{method:'POST',body:{code:code.value}});
+      if(me)me.totp=true;
+      const txt=r.recovery_codes.join('\n');
+      box.replaceChildren(head('Резервные коды'),
+        el('div',{class:'mut sm'},'Каждый код подходит один раз, если потеряете телефон. Сохраните их сейчас: потом они не покажутся.'),
+        el('pre',{style:'background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:12px;text-align:center;font-size:16px;line-height:1.7;margin:0'},txt),
+        el('div',{class:'lc-actions'},
+          el('button',{class:'btn o',type:'button',onclick:async e=>{try{await navigator.clipboard.writeText(txt);e.target.textContent='Скопировано'}catch{e.target.textContent='Выделите и скопируйте вручную'}}},'Скопировать'),
+          el('button',{class:'btn',type:'button',onclick:()=>{ov.remove();if(done)done();else if(me)showApp()}},'Я сохранил(а), продолжить')));
+    }catch(x){msg.textContent=x.message}
+  };
+  code.addEventListener('keydown',e=>{if(e.key==='Enter')go()});
+  box.replaceChildren(head(forced?'Включите двухфакторную защиту':'Включить двухфакторную защиту'),
+    forced?el('div',{class:'mut sm'},'Для вашей роли она обязательна: без неё доступ в кабинет закрыт.'):null,
+    el('div',{class:'mut sm',style:'white-space:pre-line'},'1. Установите на телефон Google Authenticator, Authy или 1Password.\n2. Отсканируйте QR-код (или введите ключ вручную).\n3. Введите 6-значный код из приложения.'),
+    qr,el('div',{class:'mut sm',style:'text-align:center;word-break:break-all'},'Ключ: ',el('code',{},s.secret)),
+    code,msg,
+    el('div',{class:'lc-actions'},el('button',{class:'btn',type:'button',onclick:go},'Включить'),
+      forced?el('button',{class:'btn o',type:'button',onclick:async()=>{try{await api('/logout',{method:'POST'})}catch{}ov.remove();showLogin()}},'Выйти'):null));
+  code.focus();
+}
 const GEAR='<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/>';
 /** Карточка сотрудника: id=null это своя (шестерёнка внизу), иначе карточка другого сотрудника для админа */
 async function openStaffCard(id){
@@ -1066,11 +1118,25 @@ async function openStaffCard(id){
   };
   // Вкладки: личные данные, выплаты, безопасность. Поля хранятся все сразу, «Сохранить» отправляет их вместе
   const saveRow=()=>el('div',{class:'lc-actions'},el('button',{class:'btn',type:'button',onclick:save},'Сохранить'),msg);
+  // Двухфакторная защита: своя настраивается здесь, чужую админ может только сбросить
+  const tf=el('div',{class:'lc-field',style:'border-top:1px solid var(--line);padding-top:12px'});
+  const tfDraw=async()=>{
+    const m=el('div',{class:'err',role:'alert'});
+    if(!self){tf.replaceChildren(el('label',{},'Двухфакторная защита'),el('div',{class:'lc-actions'},el('button',{class:'btn o s',type:'button',onclick:async()=>{if(!confirm('Сбросить 2FA? Сотрудник выйдет из кабинета и при входе настроит её заново.'))return;try{await api('/staff/'+id+'/2fa/reset',{method:'POST'});toast('2FA сброшена')}catch(x){m.textContent=x.message}}},'Сбросить 2FA'),m));return}
+    let st;try{st=await api('/profile/2fa')}catch(x){tf.replaceChildren(el('div',{class:'err'},x.message));return}
+    if(!st.enabled){tf.replaceChildren(el('label',{},'Двухфакторная защита'),el('div',{class:'mut sm'},'Выключена. Вход только по паролю.'),el('div',{class:'lc-actions'},el('button',{class:'btn',type:'button',onclick:()=>twofaDialog(false,tfDraw)},'Включить')));return}
+    const pass=inp('password','','Пароль'),c=inp('text','','Код из приложения');pass.autocomplete='off';
+    tf.replaceChildren(el('label',{},'Двухфакторная защита'),el('div',{class:'ok-msg sm'},'Включена. Резервных кодов осталось: '+st.recovery_left),
+      st.required?el('div',{class:'mut sm'},'Для вашей роли обязательна, отключить нельзя.'):el('div',{class:'lc-two'},fld('Пароль',pass),fld('Код из приложения',c)),
+      st.required?null:el('div',{class:'lc-actions'},el('button',{class:'btn o',type:'button',onclick:async()=>{try{await api('/profile/2fa/disable',{method:'POST',body:{password:pass.value,code:c.value}});toast('2FA отключена');tfDraw()}catch(x){m.textContent=x.message}}},'Отключить'),m));
+  };
+  tfDraw();
   const panes={
     personal:()=>[el('div',{class:'lc-two'},fld('ФИО',f.full),fld('Дата рождения',f.birth),fld('Город',f.city)),saveRow()],
     payout:()=>[el('div',{class:'lc-two'},fld('Куда выплачивать',f.method),fld('Адрес кошелька / реквизиты',f.wallet)),saveRow()],
     security:()=>[el('div',{class:'lc-two'},...(self?[fld('Текущий пароль',pw.cur)]:[]),fld('Новый пароль',pw.n1),fld('Повторите',pw.n2)),
-      el('div',{class:'lc-actions'},el('button',{class:'btn o',type:'button',onclick:changePw},self?'Сменить пароль':'Сбросить пароль'),pmsg)]
+      el('div',{class:'lc-actions'},el('button',{class:'btn o',type:'button',onclick:changePw},self?'Сменить пароль':'Сбросить пароль'),pmsg),
+      tf]
   };
   const TABS=[['personal','Личные данные'],['payout','Выплаты'],['security','Безопасность']];
   let cur='personal';

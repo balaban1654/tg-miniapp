@@ -1,10 +1,13 @@
+import QRCode from 'qrcode';
+import { newSecret, otpUri, verifyTotp, newRecoveryCodes } from './totp.js';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { InputFile } from 'grammy';
 import { db } from './db.js';
 import { bot } from './bot.js';
 import { config } from './config.js';
 import { createBroadcast, segmentWhere, SEGMENTS, type Button } from './push.js';
-import { randomInt } from 'node:crypto';
+import { randomInt, randomBytes, createHash } from 'node:crypto';
+const sha256 = (v: string) => createHash('sha256').update(v).digest('hex');
 import { accountingRoutes } from './accounting.js';
 import {
   type Staff,
@@ -14,6 +17,7 @@ import {
   destroySession,
   hashPassword,
   loginBlocked,
+  TOTP_REQUIRED,
   loginFailed,
   loginOk,
   setSessionCookie,
@@ -90,6 +94,10 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     if (!me) return reply.code(401).send({ error: 'Требуется вход' });
     if (roles.length && !roles.includes(me.role)) return reply.code(403).send({ error: 'Нет доступа' });
     req.staff = me;
+    // Обязательная 2FA: пока не включена, пускаем только на /me, настройку 2FA и выход
+    if (!me.totp && TOTP_REQUIRED.includes(me.role) && !/^\/api\/office\/(me|logout|profile\/2fa)/.test(req.url)) {
+      return reply.code(403).send({ error: 'Включите двухфакторную защиту', code: 'totp_setup' });
+    }
   };
   const auth = need();
 
@@ -100,7 +108,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     const key = `${req.ip}|${login.toLowerCase()}`;
     if (loginBlocked(key)) return reply.code(429).send({ error: 'Слишком много попыток. Подождите 15 минут.' });
 
-    const r = await db.query('SELECT id, password_hash, active FROM staff WHERE lower(login) = lower($1)', [login]);
+    const r = await db.query('SELECT id, password_hash, active, totp_secret FROM staff WHERE lower(login) = lower($1)', [login]);
     const row = r.rows[0];
     // Проверяем пароль даже если пользователя нет, чтобы время ответа не выдавало логины
     const ok = await verifyPassword(password, row?.password_hash ?? 'aa:bb');
@@ -108,9 +116,50 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
       loginFailed(key);
       return reply.code(401).send({ error: 'Неверный логин или пароль' });
     }
+    if (row.totp_secret) {
+      // Пароль верный, нужен второй шаг: код из приложения. Ключ попыток тот же (ip+login), пароль не сбрасывает счётчик
+      const ch = randomBytes(24).toString('hex');
+      await db.query(`INSERT INTO login_challenges (token_hash, staff_id, expires_at) VALUES ($1,$2, now() + interval '5 minutes')`, [sha256(ch), row.id]);
+      await db.query('DELETE FROM login_challenges WHERE expires_at < now()');
+      return { need_totp: true, challenge: ch };
+    }
     loginOk(key);
     setSessionCookie(reply, await createSession(row.id));
     return { ok: true };
+  });
+
+  // Второй шаг входа: код из приложения или резервный код
+  app.post('/login/totp', async (req, reply) => {
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const ch = typeof body.challenge === 'string' ? body.challenge : '';
+    const code = str(body.code, 20);
+    const bad = () => reply.code(401).send({ error: 'Неверный код' });
+    const c = (await db.query(
+      `UPDATE login_challenges SET tries = tries + 1 WHERE token_hash = $1 AND expires_at > now() AND tries < 5 RETURNING staff_id`,
+      [sha256(ch)],
+    )).rows[0];
+    if (!c) return reply.code(401).send({ error: 'Время входа истекло, введите логин и пароль заново', restart: true });
+    const st = (await db.query('SELECT id, login, active, totp_secret, totp_last, recovery_codes FROM staff WHERE id = $1', [c.staff_id])).rows[0];
+    if (!st || !st.active || !st.totp_secret) return bad();
+    const key = `${req.ip}|${String(st.login).toLowerCase()}`;
+    if (loginBlocked(key)) return reply.code(429).send({ error: 'Слишком много попыток. Подождите 15 минут.' });
+    let ok = false;
+    const step = verifyTotp(st.totp_secret, code);
+    if (step !== null && step > Number(st.totp_last)) {
+      // Одноразовость: тот же шаг второй раз не принимаем
+      ok = (await db.query('UPDATE staff SET totp_last = $2 WHERE id = $1 AND totp_last < $2', [st.id, step])).rowCount === 1;
+    } else if (/^[0-9a-f]{5}-?[0-9a-f]{5}$/i.test(code)) {
+      const h = sha256(code.toLowerCase().replace('-', ''));
+      ok = (await db.query('UPDATE staff SET recovery_codes = array_remove(recovery_codes, $2) WHERE id = $1 AND $2 = ANY(recovery_codes)', [st.id, h])).rowCount === 1;
+    }
+    if (!ok) {
+      loginFailed(key);
+      return bad();
+    }
+    loginOk(key);
+    await db.query('DELETE FROM login_challenges WHERE token_hash = $1', [sha256(ch)]);
+    setSessionCookie(reply, await createSession(st.id));
+    return { ok: true, recovery_left: st.recovery_codes.length - (step === null ? 1 : 0) };
   });
 
   app.post('/logout', async (req, reply) => {
@@ -144,6 +193,50 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     const row = (await db.query('SELECT password_hash FROM staff WHERE id = $1', [req.staff!.id])).rows[0];
     if (!row || !(await verifyPassword(cur, row.password_hash))) return reply.code(403).send({ error: 'Текущий пароль неверный' });
     await db.query('UPDATE staff SET password_hash = $2 WHERE id = $1', [req.staff!.id, await hashPassword(next)]);
+    return { ok: true };
+  });
+  // 2FA: статус, настройка (секрет + QR), включение по первому коду, отключение, сброс админом
+  app.get('/profile/2fa', { preHandler: auth }, async (req) => {
+    const r = (await db.query('SELECT totp_secret IS NOT NULL AS on, cardinality(recovery_codes) AS left FROM staff WHERE id = $1', [req.staff!.id])).rows[0];
+    return { enabled: r.on, recovery_left: r.left, required: TOTP_REQUIRED.includes(req.staff!.role) };
+  });
+  app.post('/profile/2fa/setup', { preHandler: auth }, async (req, reply) => {
+    if (req.staff!.totp) return reply.code(400).send({ error: 'Двухфакторная защита уже включена' });
+    const secret = newSecret();
+    await db.query('UPDATE staff SET totp_pending = $2 WHERE id = $1', [req.staff!.id, secret]);
+    const uri = otpUri(secret, req.staff!.login);
+    return { secret, uri, qr: await QRCode.toString(uri, { type: 'svg', margin: 1, width: 200 }) };
+  });
+  app.post('/profile/2fa/enable', { preHandler: auth }, async (req, reply) => {
+    const code = str(((req.body ?? {}) as Record<string, unknown>).code, 20);
+    const st = (await db.query('SELECT totp_pending FROM staff WHERE id = $1', [req.staff!.id])).rows[0];
+    if (!st?.totp_pending) return reply.code(400).send({ error: 'Начните настройку заново' });
+    const step = verifyTotp(st.totp_pending, code);
+    if (step === null) return reply.code(400).send({ error: 'Неверный код. Проверьте время на телефоне и попробуйте ещё раз.' });
+    const codes = newRecoveryCodes();
+    await db.query(
+      `UPDATE staff SET totp_secret = totp_pending, totp_pending = NULL, totp_last = $2, recovery_codes = $3 WHERE id = $1`,
+      [req.staff!.id, step, codes.map((c) => sha256(c.replace('-', '')))],
+    );
+    return { ok: true, recovery_codes: codes };
+  });
+  app.post('/profile/2fa/disable', { preHandler: auth }, async (req, reply) => {
+    if (TOTP_REQUIRED.includes(req.staff!.role)) return reply.code(403).send({ error: 'Для вашей роли двухфакторная защита обязательна' });
+    const b = (req.body ?? {}) as Record<string, unknown>;
+    const st = (await db.query('SELECT password_hash, totp_secret FROM staff WHERE id = $1', [req.staff!.id])).rows[0];
+    const pw = typeof b.password === 'string' ? b.password : '';
+    if (!st?.totp_secret || !(await verifyPassword(pw, st.password_hash))) return reply.code(403).send({ error: 'Неверный пароль' });
+    if (verifyTotp(st.totp_secret, str(b.code, 20)) === null) return reply.code(403).send({ error: 'Неверный код' });
+    await db.query(`UPDATE staff SET totp_secret = NULL, totp_pending = NULL, recovery_codes = '{}', totp_last = 0 WHERE id = $1`, [req.staff!.id]);
+    return { ok: true };
+  });
+  // Админ сбрасывает 2FA сотруднику, потерявшему телефон: тот при входе настроит её заново
+  app.post<{ Params: { id: string } }>('/staff/:id/2fa/reset', { preHandler: need('admin') }, async (req, reply) => {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) return reply.code(400).send({ error: 'Неверный id' });
+    if (id === req.staff!.id) return reply.code(400).send({ error: 'Свою 2FA админ сбрасывает через сервер' });
+    await db.query(`UPDATE staff SET totp_secret = NULL, totp_pending = NULL, recovery_codes = '{}', totp_last = 0 WHERE id = $1`, [id]);
+    await db.query('DELETE FROM sessions WHERE staff_id = $1', [id]);
     return { ok: true };
   });
   // Карточка любого сотрудника для админа

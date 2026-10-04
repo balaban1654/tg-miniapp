@@ -14,7 +14,11 @@ export interface Staff {
   name: string;
   role: Role;
   parent_id: number | null;
+  totp: boolean;
 }
+
+/** Роли, которым 2FA обязательна: без неё доступны только настройка 2FA и выход */
+export const TOTP_REQUIRED: Role[] = ['admin', 'teamlead'];
 
 export const COOKIE = 'hunter_session';
 const SESSION_DAYS = 14;
@@ -62,7 +66,7 @@ export async function staffFromRequest(req: FastifyRequest): Promise<Staff | nul
   const token = req.cookies[COOKIE];
   if (!token) return null;
   const r = await db.query(
-    `SELECT s.id, s.login, s.name, s.role, s.parent_id
+    `SELECT s.id, s.login, s.name, s.role, s.parent_id, (s.totp_secret IS NOT NULL) AS totp
        FROM sessions x JOIN staff s ON s.id = x.staff_id
       WHERE x.token_hash = $1 AND x.expires_at > now() AND s.active`,
     [sha(token)],
