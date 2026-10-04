@@ -1853,13 +1853,13 @@ async function accForm(){
     box.replaceChildren(el('div',{class:'frow2 fhead2'},el('span',{},'Поле'),el('span',{},'Тип'),el('span',{},'Обязательно'),el('span',{},'На дашборде'),el('span',{},'Показывать'),el('span',{},'')),
       ...rows.map((r,i)=>el('div',{class:'frow2'},r.name,r.kind,el('label',{class:'chk'},r.req),el('label',{class:'chk'},r.dash),el('label',{class:'chk'},r.act),
         el('span',{class:'inl'},el('button',{class:'btn o s',type:'button','aria-label':'Выше',onclick:()=>{if(i){[rows[i-1],rows[i]]=[rows[i],rows[i-1]];draw()}}},'↑'),el('button',{class:'btn o s',type:'button','aria-label':'Ниже',onclick:()=>{if(i<rows.length-1){[rows[i+1],rows[i]]=[rows[i],rows[i+1]];draw()}}},'↓'),
-          r.id?null:el('button',{class:'btn o s',type:'button','aria-label':'Убрать',onclick:()=>{rows.splice(i,1);draw()}},'✕')))));
+          el('button',{class:'btn o s',type:'button',title:'Удалить поле','aria-label':'Удалить поле',style:'color:var(--bad)',onclick:()=>{if(r.id&&!confirm('Удалить поле «'+(r.name.value||'без названия')+'»? В старых отчётах его значения останутся.'))return;rows.splice(i,1);draw();if(r.id)toast('Поле удалится после нажатия «Сохранить»')}},'✕')))));
   };
   draw();
   const err=el('div',{class:'err',role:'alert'});
   return[el('div',{class:'head'},el('h3',{style:'font-size:15px'},'Форма отчёта о смене'),el('button',{class:'btn o s',type:'button',onclick:()=>{rows.push({id:null,name:el('input',{value:'',placeholder:'Название поля',maxlength:'60'}),kind:el('select',{},el('option',{value:'number'},'число'),el('option',{value:'text'},'текст'),el('option',{value:'link'},'ссылка')),req:el('input',{type:'checkbox'}),dash:el('input',{type:'checkbox'}),act:Object.assign(el('input',{type:'checkbox'}),{checked:true})});draw()}},'Добавить поле')),
     box,err,el('div',{},el('button',{class:'btn',type:'button',onclick:async()=>{err.textContent='';try{await api('/report-fields',{method:'PUT',body:{fields:rows.map(r=>({id:r.id,name:r.name.value,kind:r.kind.value,required:r.req.checked,on_dashboard:r.dash.checked,active:r.act.checked}))}});toast('Форма сохранена');accRefresh()}catch(x){err.textContent=x.message}}},'Сохранить')),
-    el('div',{class:'mut sm'},'«На дашборде» работает для числовых полей: их суммы по зачтённым отчётам показываются на общем дашборде. Скриншот в форме есть всегда. Убранные поля скрываются, в старых отчётах значения остаются.')];
+    el('div',{class:'mut sm'},'«На дашборде» работает для числовых полей: их суммы по зачтённым отчётам показываются на общем дашборде. Скриншот в форме есть всегда. Удалённые поля исчезают из формы, в старых отчётах их значения остаются.')];
 }
 
 let pendingChat=null;

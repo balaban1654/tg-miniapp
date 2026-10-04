@@ -327,8 +327,8 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
       rows.push({ id: Number(f.id) || null, name, kind, required: Boolean(f.required), on_dashboard: Boolean(f.on_dashboard) && kind === 'number', active: f.active !== false, sort: i + 1 });
     }
     const keep = rows.map((r) => r.id).filter(Boolean);
-    // Удалённые из списка поля просто скрываем: старые отчёты хранят значения вместе с названиями
-    await db.query(`UPDATE report_fields SET active = FALSE WHERE NOT (id = ANY($1::int[]))`, [keep]);
+    // Удалённые из списка поля удаляем совсем: старые отчёты хранят значения вместе с названиями, они не пострадают
+    await db.query(`DELETE FROM report_fields WHERE NOT (id = ANY($1::int[]))`, [keep]);
     for (const r of rows) {
       if (r.id) await db.query('UPDATE report_fields SET name=$2, kind=$3, required=$4, on_dashboard=$5, active=$6, sort=$7 WHERE id=$1', [r.id, r.name, r.kind, r.required, r.on_dashboard, r.active, r.sort]);
       else await db.query('INSERT INTO report_fields (name, kind, required, on_dashboard, active, sort) VALUES ($1,$2,$3,$4,$5,$6)', [r.name, r.kind, r.required, r.on_dashboard, r.active, r.sort]);
