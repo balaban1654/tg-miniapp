@@ -219,6 +219,26 @@ textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10
  .side .brand{flex:1 1 0}
  .side-menu #installBtn[hidden]{display:none!important}
 }
+
+/* Бухгалтерия на телефоне: таблицы превращаются в карточки, ничего не уезжает за край экрана */
+@media(max-width:700px){
+ .accv{overflow-x:hidden}
+ .accv .head{flex-wrap:wrap;gap:6px 10px}.accv .mut.sm,.accv .head span{overflow-wrap:anywhere}
+ .accv input,.accv select,.accv textarea{max-width:100%}
+ .accv .tbl{overflow:visible;border:0;background:none;border-radius:0}
+ .accv .tbl table,.accv .tbl tbody,.accv .tbl tr,.accv .tbl td{display:block;width:100%;min-width:0!important}
+ .accv .tbl thead{display:none}
+ .accv .tbl tbody tr{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:8px 12px;margin-bottom:10px}
+ .accv .tbl td{display:flex!important;justify-content:space-between;align-items:center;gap:12px;padding:6px 0;border:0!important;text-align:right!important;white-space:normal!important;min-width:0!important;width:100%}
+ .accv .tbl td+td{border-top:1px solid var(--line)!important}
+ .accv .tbl td::before{content:attr(data-l);flex:none;max-width:42%;color:var(--mut);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;text-align:left}
+ .accv .tbl td[data-l='']::before{display:none}.accv .tbl td[data-l='']{justify-content:flex-end}
+ .accv .tbl td:first-child{font-weight:700;font-size:15px;justify-content:flex-start;text-align:left!important}.accv .tbl td:first-child::before{display:none}
+ .accv .tbl tr.sum-row{border-color:var(--acc)}
+ .accv .tbl img{max-width:100%}
+ .accv input[placeholder^='Причина']{width:100%!important}.accv .btn{min-height:40px}
+ .accv .rev,.accv .frow2{grid-template-columns:minmax(0,1fr)}
+}
 /* дашборд админа */
 .dx{display:grid;gap:16px;min-width:0}
 .dx-top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
@@ -409,7 +429,11 @@ const date=v=>new Date(v).toLocaleDateString('ru-RU',{timeZone:'Europe/Kyiv',day
 const pill=(st)=>{const[t,c]=STATUS[st]||[st,'p-pur'];return el('span',{class:'pill '+c},t)};
 function table(cols,rows,empty){
   if(!rows.length)return el('div',{class:'card empty'},empty);
-  return el('div',{class:'tbl'},el('table',{},el('thead',{},el('tr',{},cols.map(c=>Array.isArray(c)?el('th',{class:c[1]},c[0]):el('th',{},c)))),el('tbody',{},rows.map(r=>el('tr',{},r.map(c=>c instanceof Node?c:el('td',{},c)))))));
+  const names=cols.map(c=>Array.isArray(c)?c[0]:c);
+  const box=el('div',{class:'tbl'},el('table',{},el('thead',{},el('tr',{},cols.map(c=>Array.isArray(c)?el('th',{class:c[1]},c[0]):el('th',{},c)))),el('tbody',{},rows.map(r=>el('tr',{},r.map(c=>c instanceof Node?c:el('td',{},c)))))));
+  // подписи колонок для карточного вида таблиц на телефоне
+  box.querySelectorAll('tbody tr').forEach(tr=>[...tr.children].forEach((td,i)=>td.setAttribute('data-l',names[i]||'')));
+  return box;
 }
 const td=(v,cls)=>el('td',{class:cls||''},v);
 
@@ -716,7 +740,7 @@ async function render(opt){
   document.querySelectorAll('body > .dx-pop').forEach(x=>x.remove());dxReg.length=0;
   pushHash();
   const soft=!!(opt&&opt.soft===true);
-  const m=$('#main'),y=window.scrollY,mt=m.scrollTop;
+  const m=$('#main'),y=window.scrollY,mt=m.scrollTop;m.classList.toggle('accv',tab==='acc');
   if(!soft)m.replaceChildren(el('div',{class:'mut'},'Загрузка…'));
   try{
     if(tab==='home')m.replaceChildren(...await viewHome());
@@ -2128,6 +2152,7 @@ async function viewAcc(){
   const drawBar=()=>{
     monthBar.replaceChildren(el('button',{type:'button','aria-label':'Предыдущий месяц',onclick:()=>{accState.period=perShift(accState.period,-1);accState.sel=null;drawBar();drawBody();drawStatus()}},'‹'),el('b',{},perLabel(accState.period)),el('button',{type:'button','aria-label':'Следующий месяц',onclick:()=>{accState.period=perShift(accState.period,1);accState.sel=null;drawBar();drawBody();drawStatus()}},'›'));
     tabBar.replaceChildren(...TABS.map(([k,t])=>el('button',{type:'button',role:'tab','aria-selected':k===accState.tab?'true':'false',class:'lc-tab'+(k===accState.tab?' on':''),onclick:()=>{accState.tab=k;drawBar();drawBody();pushHash()}},t)));
+    requestAnimationFrame(()=>{const on=tabBar.querySelector('.on');if(on&&on.scrollIntoView)on.scrollIntoView({inline:'center',block:'nearest'})});
   };
   const stat=el('div',{class:'card',style:'display:flex;gap:12px;align-items:center;flex-wrap:wrap;justify-content:space-between;padding:12px 16px'});
   const fmtClose=v=>new Date(v).toLocaleString('ru-RU',{timeZone:'Europe/Kyiv',day:'numeric',month:'long',hour:'2-digit',minute:'2-digit'});
