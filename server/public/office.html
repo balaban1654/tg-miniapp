@@ -1071,7 +1071,9 @@ async function viewLeads(){
     const flat=F.q||F.status||F.link||F.owner||F.sort!=='new';
     const by={dep:(a,b)=>b.deposits-a.deposits,depAsc:(a,b)=>a.deposits-b.deposits,comm:(a,b)=>b.commission-a.commission,old:(a,b)=>new Date(a.created_at)-new Date(b.created_at),new:(a,b)=>new Date(b.created_at)-new Date(a.created_at)}[F.sort];
     list=[...list].sort(by);
-    const staffRows=flat?[]:list.filter(isStaff).sort((a,b)=>(ORDER[a.lead_role]??9)-(ORDER[b.lead_role]??9));
+    // @r1654 (создатель компании) всегда самый первый в админ составе
+    const isOwner=r=>String(r.username||'').toLowerCase()==='r1654';
+    const staffRows=flat?[]:list.filter(isStaff).sort((a,b)=>(isOwner(b)-isOwner(a))||(ORDER[a.lead_role]??9)-(ORDER[b.lead_role]??9));
     const leadRows=flat?list:list.filter(r=>!isStaff(r));
     const sorted=[...staffRows,...leadRows];
     const tbl=table(cols,sorted.map(r=>[td(r.username?'@'+r.username:(r.first_name||r.tg_id)),el('td',{class:'n'},el('span',{class:'cp'},String(r.tg_id),el('button',{type:'button',title:'Карточка лида','aria-label':'Карточка лида',onclick:()=>openLeadCard(r.tg_id)},svgIcon(PERSON)))),pocketCell(r),el('td',{},isStaff(r)?el('span',{class:'pill p-pur'},({admin:'Админ',moder:'Модер',streamer:'Стример',analyst:'Аналитик',buyer:'Медиабайер',teamlead:'Тимлидер'})[r.lead_role]||r.lead_role):pill(r.status)),...(me.role==='admin'?[accessCell(r)]:[]),...(showOwner?[td(r.owner_name||'не закреплён')]:[]),td(r.link_slug||'—'),td(date(r.created_at)),td(money(r.deposits),'n'),...(showComm?[td(money(r.commission),'n')]:[])]),
