@@ -476,8 +476,8 @@ async function requestCard(){
     const t=()=>{if(left<=0){btn.disabled=false;hint.textContent='';return}hint.textContent='Следующий анализ можно получить через '+left+' сек.';left--};
     t();timers.push(setInterval(t,1000));
   }
-  return el('div',{class:'card hero'},heroArt(),el('h3',{style:'font-size:15px'},'Торговый анализ по запросу'),
-    el('div',{class:'sm',style:'line-height:1.5'},'Выберите валютную пару и экспирацию. Мы разберём рыночную структуру, импульс и ликвидность, определим направление сделки и точный момент входа. Это аналитическое мнение, а не гарантия доходности: соблюдайте риск-менеджмент.'),btn,hint);
+  return el('div',{class:'card hero'},heroArt(),el('h3',{style:'font-size:15px'},'Точный вход по вашей паре'),
+    el('div',{class:'sm',style:'line-height:1.5'},'Выберите пару и экспирацию. Hunter AI разберёт структуру рынка, импульс и ликвидность и назовёт направление и точную минуту входа.'),btn,hint);
 }
 async function signalPairs(){
   clearTimers();
