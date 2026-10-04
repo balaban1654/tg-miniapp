@@ -1023,6 +1023,51 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     return { ok: true, ...out, unknownIds: out.unknownIds.slice(0, 200) };
   });
 
+  // Привязка Telegram ID к Pocket ID прямо из журнала постбеков. Лид заводится (или находится), все пропущенные
+  // постбеки этого Pocket ID обрабатываются заново и попадают ему в статистику
+  app.post('/postbacks/bind', { preHandler: need('admin') }, async (req, reply) => {
+    const b = (req.body ?? {}) as Record<string, unknown>;
+    const trader = str(b.trader_id, 40);
+    const tgRaw = str(b.tg_id, 20);
+    if (!trader || !/^[A-Za-z0-9_-]+$/.test(trader)) return reply.code(400).send({ error: 'Нет Pocket ID' });
+    if (!/^\d{5,15}$/.test(tgRaw)) return reply.code(400).send({ error: 'Telegram ID: только цифры' });
+    if (!config.postbackSecret || config.postbackSecret.length < 16) return reply.code(500).send({ error: 'На сервере не задан POSTBACK_SECRET (от 16 символов)' });
+    const tgId = Number(tgRaw);
+    const other = (await db.query('SELECT tg_id FROM leads WHERE trader_id = $1 AND tg_id <> $2 LIMIT 1', [trader, tgId])).rows[0];
+    if (other) return reply.code(409).send({ error: 'Этот Pocket ID уже привязан к Telegram ID ' + other.tg_id });
+    const lead = (await db.query('SELECT trader_id FROM leads WHERE tg_id = $1', [tgId])).rows[0];
+    if (lead && lead.trader_id && lead.trader_id !== trader) return reply.code(409).send({ error: 'У этого Telegram ID уже другой Pocket ID: ' + lead.trader_id });
+    if (lead) await db.query('UPDATE leads SET trader_id = $2 WHERE tg_id = $1', [tgId, trader]);
+    else await db.query(`INSERT INTO leads (tg_id, trader_id, status) VALUES ($1,$2,'new')`, [tgId, trader]);
+    const rows = (await db.query(
+      `SELECT id, event, query, created_at FROM postback_log WHERE query->>'trader_id' = $1 AND result LIKE 'пропущен%' ORDER BY created_at, id`, [trader],
+    )).rows as { id: string; event: string; query: Record<string, string>; created_at: string }[];
+    let applied = 0, left = 0;
+    for (const r of rows) {
+      const qp = r.query ?? {};
+      const amount = qp.sumdep ?? qp.commission ?? qp.wdr_sum ?? qp.amount ?? '';
+      const tx = qp.txid && String(qp.txid).startsWith('imp-') ? String(qp.txid) : 'imp-' + createHash('sha1').update([r.event, trader, qp.date_time ?? '', amount].join('|')).digest('hex').slice(0, 16);
+      await db.query('DELETE FROM postback_log WHERE id = $1', [r.id]);
+      const q = new URLSearchParams({ secret: config.postbackSecret, txid: tx, click_id: String(tgId) });
+      for (const [k, v] of Object.entries(qp)) if (k !== 'secret' && k !== 'txid' && k !== 'click_id' && v !== '') q.set(k, String(v));
+      const res = await app.inject({ method: 'GET', url: `/postback/${r.event}?${q.toString()}` });
+      const o = res.json() as { ok?: boolean; ignored?: boolean; duplicate?: boolean };
+      await db.query(`UPDATE postback_log SET created_at = $2 WHERE query->>'txid' = $1`, [tx, r.created_at]);
+      if (!o.ignored && !o.duplicate) { await db.query('UPDATE events SET created_at = $2 WHERE external_id = $1', [`${r.event}:${tx}`, r.created_at]); applied++; } else left++;
+    }
+    return { ok: true, applied, left };
+  });
+
+  // Закрепление лида за стримером (или снятие)
+  app.patch<{ Params: { tgId: string } }>('/leads/:tgId/owner', { preHandler: need('admin') }, async (req, reply) => {
+    const raw = (req.body as any)?.owner_id;
+    const owner = raw === null || raw === '' || raw === undefined ? null : Number(raw);
+    if (owner !== null && !(await db.query(`SELECT 1 FROM staff WHERE id = $1 AND active`, [owner])).rowCount) return reply.code(404).send({ error: 'Сотрудник не найден' });
+    const r = await db.query('UPDATE leads SET owner_id = $2 WHERE tg_id = $1 RETURNING tg_id', [Number(req.params.tgId), owner]);
+    if (!r.rowCount) return reply.code(404).send({ error: 'Лид не найден' });
+    return { ok: true };
+  });
+
   // Удаление одного постбека: запись журнала, а с флагом with_event ещё и событие (депозит/комиссия) из базы
   app.delete<{ Params: { id: string }; Querystring: { with_event?: string } }>('/postbacks/:id', { preHandler: need('admin') }, async (req, reply) => {
     const id = Number(req.params.id);
@@ -1039,7 +1084,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
   // Журнал постбеков для админа
   app.get('/postbacks', { preHandler: need('admin') }, async () => {
     const r = await db.query(
-      `SELECT id, event, query, tg_id, result, created_at, event_id FROM postback_log ORDER BY created_at DESC, id DESC LIMIT 100`,
+      `SELECT id, event, query, tg_id, result, created_at, event_id FROM postback_log ORDER BY created_at DESC, id DESC LIMIT 1500`,
     );
     return r.rows;
   });

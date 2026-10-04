@@ -40,6 +40,12 @@ export async function attachLead(
     await db.query(`INSERT INTO events (tg_id, type) VALUES ($1,'start')`, [tgId]);
     return { lead: ins.rows[0], isNew: true };
   }
+  // Лид мог быть заведён вручную из постбеков (только Telegram ID и Pocket ID): дописываем юзернейм, имя, ссылку и владельца
+  await db.query(
+    `UPDATE leads SET username = coalesce($2, username), first_name = coalesce($3, first_name), link_id = coalesce(link_id, $4), owner_id = coalesce(owner_id, $5) WHERE tg_id = $1`,
+    [tgId, username ?? null, firstName ?? null, linkId, ownerId],
+  );
+  await db.query(`INSERT INTO events (tg_id, type) SELECT $1, 'start' WHERE NOT EXISTS (SELECT 1 FROM events WHERE tg_id = $1 AND type = 'start')`, [tgId]);
   const cur = await db.query('SELECT * FROM leads WHERE tg_id = $1', [tgId]);
   return { lead: cur.rows[0], isNew: false };
 }

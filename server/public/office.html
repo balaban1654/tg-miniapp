@@ -1375,9 +1375,24 @@ function delLeadCell(r){
   if(r.lead_role&&r.lead_role!=='lead')return el('td',{});
   return el('td',{},el('button',{class:'btn o s',type:'button',title:'Удалить лида','aria-label':'Удалить лида',onclick:()=>delLeadDialog(r,()=>{const i=leadsRows.indexOf(r);if(i>=0)leadsRows.splice(i,1);leadsRedraw()})},svgIcon(TRASH,15)));
 }
-let leadsRows=[],leadsRedraw=()=>{};
+let leadsRows=[],leadsRedraw=()=>{},leadsStaff=[];
+function ownerCell(r){
+  const td=el('td',{});
+  const show=()=>{
+    const b=el('button',{type:'button',class:'cp-btn',title:'Закрепить за стримером','aria-label':'Закрепить за стримером',onclick:edit},svgIcon('<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',15));
+    td.replaceChildren(el('span',{class:'cp'},r.owner_name||'не закреплён',b));
+  };
+  const edit=()=>{
+    const sel=el('select',{'aria-label':'Стример',style:'width:auto'},el('option',{value:''},'Не закреплён'),...leadsStaff.map(s=>el('option',{value:s.id},s.name)));
+    sel.value=r.owner_id?String(r.owner_id):'';
+    const save=async()=>{try{await api('/leads/'+r.tg_id+'/owner',{method:'PATCH',body:{owner_id:sel.value?Number(sel.value):null}});render()}catch(x){toast(x.message)}};
+    td.replaceChildren(el('span',{style:'display:inline-flex;gap:6px;align-items:center'},sel,el('button',{class:'btn s',type:'button',onclick:save},'OK'),el('button',{class:'btn o s',type:'button','aria-label':'Отмена',onclick:show},'✕')));
+  };
+  show();return td;
+}
 async function viewLeads(){
-  const [rows,legacy]=await Promise.all([api('/leads'),me.role==='admin'?api('/legacy').catch(()=>null):Promise.resolve(null)]);
+  const [rows,legacy,owners0]=await Promise.all([api('/leads'),me.role==='admin'?api('/legacy').catch(()=>null):Promise.resolve(null),me.role==='admin'?streamersList().catch(()=>[]):Promise.resolve([])]);
+  leadsStaff=owners0;
   const showOwner=me.role==='admin'||me.role==='teamlead';
   const showComm=me.role==='admin';
   const cols=['Лид','Telegram ID','Pocket ID','Статус',...(me.role==='admin'?['Доступ']:[]),...(showOwner?['Владелец']:[]),'Ссылка','Пришёл',me.role==='streamer'?'Депозит':'Депозиты',...(showComm?['Комиссия']:[]),...(me.role==='admin'?['']:[])];
@@ -1406,7 +1421,7 @@ async function viewLeads(){
     const staffRows=flat?[]:list.filter(isStaff).sort((a,b)=>(isOwner(b)-isOwner(a))||(ORDER[a.lead_role]??9)-(ORDER[b.lead_role]??9));
     const leadRows=flat?list:list.filter(r=>!isStaff(r));
     const sorted=[...staffRows,...leadRows];
-    const tbl=table(cols,sorted.map(r=>[td(r.username?'@'+r.username:(r.first_name||r.tg_id)),el('td',{class:'n'},el('span',{class:'cp'},String(r.tg_id),el('button',{type:'button',title:'Карточка лида','aria-label':'Карточка лида',onclick:()=>openLeadCard(r.tg_id)},svgIcon(PERSON)))),pocketCell(r),el('td',{},isStaff(r)?el('span',{class:'pill p-pur'},({admin:'Админ',moder:'Модер',streamer:'Стример',analyst:'Аналитик',buyer:'Медиабайер',teamlead:'Тимлидер'})[r.lead_role]||r.lead_role):pill(r.status)),...(me.role==='admin'?[accessCell(r)]:[]),...(showOwner?[td(r.owner_name||'не закреплён')]:[]),td(r.link_slug||'—'),td(date(r.created_at)),td(money(r.deposits),'n'),...(showComm?[td(money(r.commission),'n')]:[]),...(me.role==='admin'?[delLeadCell(r)]:[])]),
+    const tbl=table(cols,sorted.map(r=>[td(r.username?'@'+r.username:(r.first_name||r.tg_id)),el('td',{class:'n'},el('span',{class:'cp'},String(r.tg_id),el('button',{type:'button',title:'Карточка лида','aria-label':'Карточка лида',onclick:()=>openLeadCard(r.tg_id)},svgIcon(PERSON)))),pocketCell(r),el('td',{},isStaff(r)?el('span',{class:'pill p-pur'},({admin:'Админ',moder:'Модер',streamer:'Стример',analyst:'Аналитик',buyer:'Медиабайер',teamlead:'Тимлидер'})[r.lead_role]||r.lead_role):pill(r.status)),...(me.role==='admin'?[accessCell(r)]:[]),...(showOwner?[me.role==='admin'&&!isStaff(r)?ownerCell(r):td(r.owner_name||'не закреплён')]:[]),td(r.link_slug||'—'),td(date(r.created_at)),td(money(r.deposits),'n'),...(showComm?[td(money(r.commission),'n')]:[]),...(me.role==='admin'?[delLeadCell(r)]:[])]),
       rows.length?'Ничего не найдено. Измените фильтры.':'Лидов пока нет. Они появятся, когда люди перейдут по вашим ссылкам и нажмут «Старт» в боте.');
     tbl.classList.add('ctr');
     const body=tbl.querySelector('tbody');
@@ -2782,6 +2797,7 @@ function pbDeleteDialog(r,done){
     err));
   document.body.append(ov);
 }
+let pbState={q:'',ev:'',res:'',sort:'new'};
 async function viewPostbacks(){
   const rows=await api('/postbacks');
   const clearBox=el('span',{});
@@ -2805,9 +2821,48 @@ async function viewPostbacks(){
     render();
   };
   const time=v=>new Date(v).toLocaleString('ru-RU',{timeZone:'Europe/Kyiv',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit',second:'2-digit'});
-  return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Постбеки'),el('div',{style:'display:flex;gap:8px;align-items:center'},upBtn,upFile,clearBox,el('button',{class:'btn o s',type:'button',onclick:render},'Обновить'))),
-    table(['Время','Событие','Telegram ID','Pocket ID',['Сумма','n'],'Результат',''],rows.map(r=>{const qq=r.query||{};return[td(time(r.created_at)),el('td',{},el('span',{class:'pill p-pur'},r.event)),copyCell(r.tg_id||qq.click_id),copyCell(qq.trader_id),td(qq.commission||qq.sumdep||qq.wdr_sum||qq.amount||qq.sum||'—','n'),el('td',{},el('span',{class:'pill '+(r.result==='ok'?'p-ok':(r.result.startsWith('дубль')||r.result.startsWith('пропущен'))?'p-warn':'p-bad')},r.result)),el('td',{},el('button',{class:'btn o s',type:'button',title:'Удалить постбек','aria-label':'Удалить постбек',onclick:()=>pbDeleteDialog(r,render)},svgIcon(TRASH,15)))]}),
-      'Постбеков пока нет. Когда партнёрка отправит первый, он появится здесь.')];
+  const F=pbState;
+  const kind=r=>r.result==='ok'?'ok':r.result.startsWith('дубль')?'dup':r.result.startsWith('пропущен')?'skip':'err';
+  const amt=r=>{const qq=r.query||{};return Number(qq.commission||qq.sumdep||qq.wdr_sum||qq.amount||qq.sum||0)||0};
+  const sel=(opts,key,all)=>{const x=el('select',{onchange:()=>{F[key]=x.value;draw()}},...(all?[el('option',{value:''},all)]:[]),...opts.map(([v,t])=>el('option',{value:v},t)));x.value=F[key];return x};
+  const qin=el('input',{type:'search',placeholder:'Поиск: Pocket ID, Telegram ID',value:F.q,oninput:()=>{F.q=qin.value;draw()}});
+  const bar=el('div',{class:'lf'},qin,
+    sel([['reg','Регистрация (reg)'],['ftd','Первый депозит (ftd)'],['dep','Депозит (dep)'],['comm','Комиссия (comm)'],['wd','Вывод (wd)']],'ev','Все события'),
+    sel([['ok','Принятые'],['skip','Пропущенные (нет лида)'],['dup','Дубли'],['err','С ошибкой']],'res','Все результаты'),
+    sel([['new','Сначала новые'],['old','Сначала старые'],['sum','Сумма: больше → меньше'],['sumAsc','Сумма: меньше → больше']],'sort'),
+    el('button',{class:'btn o s',type:'button',onclick:()=>{Object.assign(F,{q:'',ev:'',res:'',sort:'new'});render()}},'Сбросить'));
+  const holder=el('div',{});const cnt=el('span',{class:'mut'},'');
+  // Telegram ID: если его нет, можно вписать вручную. Привяжется ко всем записям этого Pocket ID, лид заведётся в «Лидах»
+  const tgCell=r=>{
+    const qq=r.query||{},v=r.tg_id||qq.click_id,trader=qq.trader_id;
+    if(v||!trader)return copyCell(v);
+    const c=el('td',{});
+    const show=()=>c.replaceChildren(el('button',{class:'btn o s',type:'button',title:'Привязать Telegram ID к этому Pocket ID',onclick:edit},'Указать'));
+    const edit=()=>{
+      const inp=el('input',{placeholder:'Telegram ID',inputmode:'numeric',maxlength:'15',style:'width:130px',onkeydown:e=>{if(e.key==='Enter')save();if(e.key==='Escape')show()}});
+      const ok=el('button',{class:'btn s',type:'button',onclick:()=>save()},'OK');
+      const save=async()=>{
+        if(!/^\d{5,15}$/.test(inp.value.trim())){toast('Telegram ID: только цифры');return}
+        ok.disabled=true;
+        try{const res=await api('/postbacks/bind',{method:'POST',body:{trader_id:trader,tg_id:inp.value.trim()}});toast('Привязано. Обработано записей: '+res.applied+(res.left?', не удалось: '+res.left:'')+'. Лид теперь в «Лидах»');render()}
+        catch(x){toast(x.message);ok.disabled=false}
+      };
+      c.replaceChildren(el('span',{style:'display:inline-flex;gap:6px;align-items:center'},inp,ok,el('button',{class:'btn o s',type:'button','aria-label':'Отмена',onclick:show},'✕')));inp.focus();
+    };
+    show();return c;
+  };
+  const draw=()=>{
+    const qq=F.q.trim().toLowerCase();
+    let list=rows.filter(r=>(!F.ev||r.event===F.ev)&&(!F.res||kind(r)===F.res)
+      &&(!qq||[r.tg_id,(r.query||{}).trader_id,(r.query||{}).click_id].some(v=>v!=null&&String(v).toLowerCase().includes(qq))));
+    const by={new:(a,b)=>new Date(b.created_at)-new Date(a.created_at),old:(a,b)=>new Date(a.created_at)-new Date(b.created_at),sum:(a,b)=>amt(b)-amt(a),sumAsc:(a,b)=>amt(a)-amt(b)};
+    list=[...list].sort(by[F.sort]||by.new);
+    holder.replaceChildren(table(['Время','Событие','Telegram ID','Pocket ID',['Сумма','n'],'Результат',''],list.map(r=>{const qq2=r.query||{};return[td(time(r.created_at)),el('td',{},el('span',{class:'pill p-pur'},r.event)),tgCell(r),copyCell(qq2.trader_id),td(qq2.commission||qq2.sumdep||qq2.wdr_sum||qq2.amount||qq2.sum||'—','n'),el('td',{},el('span',{class:'pill '+(r.result==='ok'?'p-ok':(r.result.startsWith('дубль')||r.result.startsWith('пропущен'))?'p-warn':'p-bad')},r.result)),el('td',{},el('button',{class:'btn o s',type:'button',title:'Удалить постбек','aria-label':'Удалить постбек',onclick:()=>pbDeleteDialog(r,render)},svgIcon(TRASH,15)))]}),
+      rows.length?'Ничего не найдено. Измените фильтры.':'Постбеков пока нет. Когда партнёрка отправит первый, он появится здесь.'));
+    cnt.textContent=list.length===rows.length?rows.length+' всего':list.length+' из '+rows.length;
+  };
+  draw();
+  return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Постбеки'),el('div',{style:'display:flex;gap:8px;align-items:center'},cnt,upBtn,upFile,clearBox,el('button',{class:'btn o s',type:'button',onclick:render},'Обновить'))),bar,holder];
 }
 
 (async()=>{try{me=await api('/me');readHash();showApp()}catch{showLogin()}})();
