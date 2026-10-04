@@ -980,7 +980,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
       ((await db.query(`SELECT staff_id, count(*)::int AS n FROM shift_reports WHERE status = 'pending' GROUP BY staff_id`)).rows as { staff_id: number; n: number }[]).map((r) => [r.staff_id, r.n]),
     );
     const shortBy = new Map(
-      ((await db.query(`SELECT staff_id, count(*)::int AS n FROM shift_shortfalls WHERE reason IS NULL AND to_char(day, 'YYYY-MM') = $1 GROUP BY staff_id`, [refMonth])).rows as { staff_id: number; n: number }[]).map((r) => [r.staff_id, r.n]),
+      ((await db.query(`SELECT staff_id, count(*)::int AS n FROM shift_shortfalls WHERE reason IS NULL AND accepted_at IS NULL AND penalty_id IS NULL AND staff_id IN (SELECT id FROM staff WHERE role <> 'admin') AND to_char(day, 'YYYY-MM') = $1 GROUP BY staff_id`, [refMonth])).rows as { staff_id: number; n: number }[]).map((r) => [r.staff_id, r.n]),
     );
     const advances = (await db.query(`SELECT r.id, r.staff_id, s.name AS staff_name, r.amount::float AS amount FROM advance_requests r JOIN staff s ON s.id = r.staff_id WHERE r.status = 'pending' ORDER BY r.id`)).rows as { id: number; staff_id: number; staff_name: string; amount: number }[];
 
