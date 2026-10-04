@@ -74,13 +74,25 @@ function ownerScope(me: Staff, col: string): string {
   return `${col} = ${me.id}`;
 }
 
-/** Чаты видят: админ все; тимлидер и стример неразобранные и свои (тимлидер ещё и команды). */
+/**
+ * Чаты видят: админ все. Стример видит своих и неразобранных (без владельца, кто первым ответил, тот забирает).
+ * Новые лиды другого стримера (ещё без регистрации) закрыты, пока у него идёт смена и ещё 15 минут после её конца.
+ * Когда это время прошло и клиенту никто не ответил, чат открывается всем стримерам (владелец при этом не меняется).
+ */
 function chatScope(me: Staff, col: string): string {
   if (me.role === 'admin') return 'TRUE';
+  const d = col.replace(/\.owner_id$/, '');
   if (me.role === 'teamlead') {
     return `(${col} IS NULL OR ${col} = ${me.id} OR ${col} IN (SELECT id FROM staff WHERE parent_id = ${me.id}))`;
   }
-  if (me.role === 'streamer') return `(${col} IS NULL OR ${col} = ${me.id})`;
+  if (me.role === 'streamer') {
+    return `(${col} IS NULL OR ${col} = ${me.id} OR (
+      ${d}.status = 'new' AND coalesce(${d}.lead_role, 'lead') = 'lead'
+      AND (SELECT direction FROM messages WHERE tg_id = ${d}.tg_id ORDER BY id DESC LIMIT 1) = 'in'
+      AND NOT EXISTS (SELECT 1 FROM shift_reports r WHERE r.staff_id = ${col}
+        AND (r.status = 'live' OR (r.ended_at IS NOT NULL AND r.ended_at > now() - interval '15 minutes')))
+    ))`;
+  }
   return 'FALSE';
 }
 

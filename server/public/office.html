@@ -2513,7 +2513,7 @@ async function viewChats(){
   head.replaceChildren(el('span',{class:'mut'},'Выберите чат слева'));
   if(pendingChat){const id=pendingChat;pendingChat=null;await openChat(id)}
   poll=setInterval(()=>{loadList().catch(()=>{});loadThread().catch(()=>{})},6000);
-  return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Чаты поддержки'),el('span',{class:'mut sm'},'Кто первым ответит неразобранному клиенту, тот его и забирает')),wrap];
+  return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Чаты поддержки'),el('span',{class:'mut sm'},me.role==='admin'?'Вы видите все чаты':'Неразобранного клиента забирает тот, кто ответил первым. Новые клиенты другого стримера открываются всем, если у него закончилась смена больше 15 минут назад и никто не ответил')),wrap];
 }
 
 const TRIG={start:'Нажал /start',no_reg:'Нет регистрации',no_deposit:'Регистрация без депозита',ftd:'Депозит получен',inactive:'Давно не заходил'};
