@@ -1846,7 +1846,7 @@ async function openStaffCard(id){
   tfDraw();
   const panes={
     personal:()=>[el('div',{class:'lc-two'},fld('ФИО',f.full),fld('Дата рождения',f.birth),fld('Город',f.city)),
-      d.role==='admin'&&me.role==='admin'?el('label',{style:'display:flex;gap:8px;align-items:center;font-size:13px;color:var(--fg)'},f.streams,'Тоже стримит: смены, отчёты, часы и зарплата считаются как у стримера'):null,saveRow()],
+      d.role==='admin'&&me.role==='admin'?el('label',{style:'display:flex;gap:8px;align-items:center;font-size:13px;color:var(--fg)'},f.streams,'Тоже стримит: его постбеки (регистрации, FTD, депозиты, комиссия) идут в общие показатели; смены, часы и зарплата у админа не считаются'):null,saveRow()],
     payout:()=>[el('div',{class:'lc-two'},fld('Куда выплачивать',f.method),fld('Адрес кошелька / реквизиты',f.wallet)),saveRow()],
     security:()=>[el('div',{class:'lc-two'},...(self?[fld('Текущий пароль',pw.cur)]:[]),fld('Новый пароль',pw.n1),fld('Повторите',pw.n2)),
       el('div',{class:'lc-actions'},el('button',{class:'btn o',type:'button',onclick:changePw},self?'Сменить пароль':'Сбросить пароль'),pmsg),
