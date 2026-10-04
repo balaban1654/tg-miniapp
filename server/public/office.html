@@ -279,7 +279,7 @@ textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10
 .dx-av{width:44px;height:44px;border-radius:50%;background:#9b5cff33;color:var(--acc2);display:grid;place-items:center;flex:none}
 .dx-st{display:inline-flex;font-size:12px;font-weight:700;padding:4px 10px;border-radius:99px;background:#3ddc9722;color:var(--ok)}.dx-st.off{background:#ffffff14;color:var(--mut)}
 .dx-x{width:32px;height:32px;border:1px solid var(--line);border-radius:8px;background:none;color:var(--mut);cursor:pointer;font-size:18px;line-height:1}.dx-x:hover{color:var(--acc2);border-color:var(--acc)}
-.dx-sg{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.dx-sg .c{border:1px solid var(--line);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:2px;min-width:0}.dx-sg .c span{font-size:12px;color:var(--mut)}.dx-sg .c b{font-size:19px;white-space:nowrap}
+.dx-sg{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.dx-sg .c{border:1px solid var(--line);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:2px;min-width:0;align-items:center;justify-content:center;text-align:center}.dx-sg .c span{font-size:12px;color:var(--mut)}.dx-sg .c b{font-size:19px;white-space:nowrap}
 .dx-sec{font:700 12px var(--fm);letter-spacing:.06em;text-transform:uppercase;color:var(--mut)}.dx-sec.big{font:700 22px var(--fd);letter-spacing:-.01em;text-transform:none;color:var(--fg)}
 .dx-sal{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:6px 24px}.dx-scol{display:flex;flex-direction:column;gap:6px}
 .dx-sh{font-size:12px;color:var(--mut);text-transform:uppercase;letter-spacing:.06em;margin-top:6px}.dx-scol .dx-sh:first-child{margin-top:0}
@@ -917,7 +917,7 @@ function dxModal(btn,s,d,skew,mode){
     el('div',{},el('div',{class:'dx-hd'},el('div',{class:'dx-sec'},'Часы за месяц'),el('div',{class:'dx-hv'},left!==null?el('span',{class:'dx-cl'},'До закрытия: '+hm(left)):null,el('b',{style:'color:'+col},hw(hrs)+' / '+plan.hours+' ч'))),
       el('div',{class:'dx-bar',style:'margin:13px 0 0'},el('i',{style:'width:'+Math.min(100,pct)+'%;background:'+col}),el('u',{style:'left:'+Math.min(100,pp)+'%'})),
       el('div',{class:'dx-meta',style:'margin-top:13px'},el('span',{},pct+'% плана'),el('span',{},'по графику на сегодня '+hw(pace)+' ч'))),
-    el('div',{class:'dx-sg'},...[['Смен',m.shifts],['FTD',m.ftd],['FTD $',usd0(m.ftdSum)],['Все депозиты',usd0(m.deposits)]].map(([a,b])=>el('div',{class:'c'},el('span',{},a),el('b',{},String(b))))),
+    el('div',{class:'dx-sg'},...[['Смен',m.shifts],['FTD',m.ftd],['FTD $',usd0(m.ftdSum)],['Total $',usd0(m.deposits)]].map(([a,b])=>el('div',{class:'c'},el('span',{},a),el('b',{},String(b))))),
     el('div',{style:'display:grid;gap:8px'},el('div',{class:'dx-sec big'},'Зарплата за месяц'),
       el('div',{class:'dx-sal'},
         el('div',{class:'dx-scol'},el('div',{class:'dx-sh'},'База'),row('Ставка ('+m.shifts+' смен)',hv(dxPair([m.baseMin,m.baseFull]))),row('Лиды ('+m.ftd+')',hv(dxPair([m.leadsMin,m.leadsFull])))),
