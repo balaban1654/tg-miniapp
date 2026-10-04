@@ -1183,7 +1183,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     const shiftMin = plan.shiftH * 60;
 
     // Коллеги: имена, часы за месяц и эфир, без денег и без карточек
-    const colRows = (await db.query(`SELECT id, name FROM staff WHERE (role = 'streamer' OR streams) AND active AND id <> $1 ORDER BY id`, [me.id])).rows as { id: number; name: string }[];
+    const colRows = (await db.query(`SELECT id, name, role FROM staff WHERE (role = 'streamer' OR streams) AND active AND id <> $1 ORDER BY id`, [me.id])).rows as { id: number; name: string; role: string }[];
     const liveBy = new Map(((await db.query(`SELECT DISTINCT ON (staff_id) staff_id, started_at, stream_url FROM shift_reports WHERE status = 'live' ORDER BY staff_id, id DESC`)).rows as any[]).map((r) => [r.staff_id, r]));
     const lastBy = new Map(((await db.query(`SELECT DISTINCT ON (staff_id) staff_id, ended_at, coalesce(approved_min, declared_min) AS m FROM shift_reports WHERE status <> 'live' AND ended_at IS NOT NULL ORDER BY staff_id, ended_at DESC`)).rows as any[]).map((r) => [r.staff_id, r]));
     const hoursBy = new Map(((await db.query(`SELECT staff_id, coalesce(sum(approved_min), 0)::int AS m FROM shift_reports WHERE status = 'approved' AND to_char(day, 'YYYY-MM') = $1 GROUP BY staff_id`, [refMonth])).rows as any[]).map((r) => [r.staff_id, r.m]));
@@ -1199,7 +1199,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
       .map((c) => {
         const lv = liveBy.get(c.id) ?? null;
         const ls = lastBy.get(c.id) ?? null;
-        return { id: c.id, name: c.name, hoursMin: hoursBy.get(c.id) ?? 0, ftd: ftdBy.get(c.id) ?? 0, live: lv ? { started_at: lv.started_at, stream_url: lv.stream_url } : null, lastEnd: ls?.ended_at ?? null, lastMin: ls?.m ?? null };
+        return { id: c.id, name: c.name, role: c.role, hoursMin: hoursBy.get(c.id) ?? 0, ftd: ftdBy.get(c.id) ?? 0, live: lv ? { started_at: lv.started_at, stream_url: lv.stream_url } : null, lastEnd: ls?.ended_at ?? null, lastMin: ls?.m ?? null };
       })
       .sort((a, b) => (b.live ? Date.now() - Date.parse(b.live.started_at) + 1e12 : 0) - (a.live ? Date.now() - Date.parse(a.live.started_at) + 1e12 : 0) || (Date.parse(b.lastEnd ?? '0') || 0) - (Date.parse(a.lastEnd ?? '0') || 0));
 
@@ -1226,7 +1226,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
       range: { from, to, ref, refMonth, whole: from.endsWith('-01') && to === lastOfMonth(from.slice(0, 7)) },
       plan: { hours: plan.hours, shiftH: plan.shiftH, leads: plan.leads, planMin, paceMin, pace, dayCount: plan.day.count, advance: plan.advance },
       me: { id: me.id, name: me.name },
-      month: { period: refMonth, hoursMin: k.hoursMin, shifts: k.shifts, planShifts: plan.hours / plan.shiftH, ftd: k.ftdCount },
+      month: { period: refMonth, hoursMin: k.hoursMin, totalMin: k.hoursMin + (refMonth === today.slice(0, 7) ? t.pendingToday + elapsed : 0), shifts: k.shifts, planShifts: plan.hours / plan.shiftH, ftd: k.ftdCount },
       today_: { minutes: todayMin, shiftMin, minLeft: Math.max(0, shiftMin - todayMin), live },
       funnel: { clicks, regs: ev.reg, ftd: ev.ftd },
       // Просмотры, подписчики и т. д. только самого стримера за период

@@ -1196,7 +1196,7 @@ async function plansGoals(){
 const DXS={new:['Новые','#9b5cff'],registered:['Регистрации','#ffd54d'],ftd:['FTD','#3ddc97'],active:['Активные','#4da3ff'],churned:['Отвал','#ff6b8a']};
 const IC_CHECK='<circle cx="12" cy="12" r="9"/><path d="M8 12.5l3 3 5-6"/>',IC_ALERT='<path d="M12 3l9.5 17h-19z"/><path d="M12 10v4M12 17.2v.1"/>';
 function dxLiveCard(c,d,skew){
-  const head=el('b',{},el('span',{style:'font-weight:600'},c.name),el('span',{class:'dx-fc',title:'FTD за месяц'},'FTD '+(c.ftd||0)));
+  const head=el('b',{},el('span',{style:'font-weight:600'},c.name),c.role==='streamer'?el('span',{class:'dx-hp '+dxLvl(c.hoursMin,d.plan.paceMin),title:'По графику сегодня '+hw(d.plan.paceMin)+' ч'},hw(c.hoursMin)+'/'+d.plan.hours+' ч'):null,el('span',{class:'dx-fc',title:'FTD за месяц'},'FTD '+(c.ftd||0)));
   if(!c.live)return el('div',{class:'dx-lc'},head,el('span',{class:'t off'},dxOffText(c,d.today)));
   const time=el('span',{class:'t'},el('span',{'data-live':c.live.started_at},hm(Math.max(0,Math.floor((Date.now()+skew-Date.parse(c.live.started_at))/60000)))));
   const link=c.live.stream_url?el('a',{class:'dx-go big',href:c.live.stream_url,target:'_blank',rel:'noopener',title:'Открыть эфир','aria-label':'Открыть эфир'},svgIcon(IC_EXT,18)):null;
@@ -1230,7 +1230,7 @@ function smMetrics(d){
   return el('div',{class:'card dx-pf'},el('div',{class:'dx-hd'},el('div',{class:'l'},el('span',{class:'dx-lbl'},'Мои показатели за '+(d.range.whole?'месяц':perLabel(m.period).toLowerCase())),dxPopBtn('Общий план команды',IC_RINGS,smRings(d),'pl'),dxPopBtn('Воронка',IC_FUNNEL,smFunnel(d),'pl wide'),dxPopBtn('Просмотры, подписчики, комментарии и лайки',IC_HEART,smSocial(d),'pl')),mark!==null?el('span',{class:'mut',style:'font-size:12px'},'метка: план на сегодня'):null),
     smTile('Сегодня в эфире',hm(t.minutes),'/ '+fmtH(t.shiftMin)+' ч',t.minutes/t.shiftMin*100,null,t.live?'идёт эфир':'','','ok'),
     smTile('Часы в эфире',hw(m.hoursMin),'/ '+pl.hours+' ч',hp,mark,Math.round(hp)+'% плана','по графику '+hw(pl.paceMin)+' ч',lv(hp)),
-    smTile('Закрытых смен',String(m.shifts),'/ '+n0(m.planShifts),sp,mark,Math.round(sp)+'% плана','смена = '+fmtH(pl.shiftH*60)+' ч',lv(sp),t.minLeft>0?'до закрытия смены '+hm(t.minLeft):'смена закрыта',t.minLeft>0?'warn':'ok'),
+    smTile('Закрытых смен',String(m.shifts),'/ '+n0(m.planShifts),sp,mark,Math.round(sp)+'% плана','смена = '+fmtH(pl.shiftH*60)+' ч',lv(sp),'до закрытия смены '+hm(t.shiftMin-((m.totalMin??m.hoursMin)%t.shiftMin)),'warn'),
     smTile('Лиды (FTD)',String(m.ftd),'/ '+pl.leads,lp,mark,Math.round(lp)+'% плана',toGo>0?'ещё '+toGo+' до плана':'план выполнен',lv(lp)));
 }
 function smLeads(d){
