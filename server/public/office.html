@@ -393,7 +393,7 @@ function showApp(){
   if(me.role==='analyst'){items.length=0;items.push(['signals','Сигналы']);if(tab!=='signals')tab='signals'}
   if(me.role==='admin')items.push(['push','Пуши'],['media','Медиа'],['pb','Постбеки']);
   if(me.role==='streamer')items.splice(items.length,0,['shifts','Смены и отчёты'],['mytasks','Мои задачи']);
-  if(me.role==='admin')items.splice(items.findIndex(x=>x[0]==='push'),0,['acc','Бухгалтерия'],['plans','Планы и задачи']);
+  if(me.role==='admin'){items.splice(items.findIndex(x=>x[0]==='push'),0,['acc','Бухгалтерия']);items.splice(1,0,['plans','Планы и задачи'])}
   if(tab==='links'&&me.role==='admin'){tab='staff';staffState.tab='links'}
   if(!items.some(x=>x[0]===tab)){tab=items[0][0];history.replaceState(null,'','#'+hashPath())}
   const nav=$('#nav');
