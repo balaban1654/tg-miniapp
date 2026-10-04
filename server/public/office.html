@@ -30,7 +30,8 @@ button,input,select{font:inherit;color:inherit}
 .btn{background:var(--acc);color:#fff;border:0;border-radius:11px;padding:10px 16px;font-weight:700;cursor:pointer}
 .btn:hover{background:#a975ff}.btn.o{background:none;border:1px solid var(--acc);color:var(--acc2)}.btn.s{padding:5px 11px;font-size:12px;border-radius:8px}
 .btn:disabled{opacity:.5;cursor:default}
-.btn:focus-visible,input:focus-visible,select:focus-visible,.nav button:focus-visible{outline:2px solid var(--acc2);outline-offset:2px}
+.btn:focus-visible,.nav button:focus-visible{outline:2px solid var(--acc2);outline-offset:2px}
+input:focus,select:focus,textarea:focus,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:none;box-shadow:none}
 label{display:grid;gap:5px;color:var(--mut);font-size:13px}
 input,select{background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;width:100%}
 .err{color:var(--bad);min-height:1.4em;font-size:13px}
@@ -2046,6 +2047,7 @@ async function accReview(){
     el('div',{class:'head',style:'margin-top:6px'},el('h3',{style:'font-size:15px'},'Проверенные за '+perLabel(accState.period)),el('button',{class:'btn s',type:'button',onclick:openAddReportModal},'Добавить отчёт')),histBar,histHold];
 }
 
+async function allStaffList(){return(await api('/staff')).filter(s=>s.active)}
 async function streamersList(){return(await api('/staff')).filter(s=>(s.role==='streamer'||s.streams)&&s.active)}
 
 async function accBonus(){
@@ -2056,7 +2058,7 @@ async function accBonus(){
   const comment=el('input',{placeholder:'За что (видите только вы)',maxlength:'500'});
   const err=el('div',{class:'err',role:'alert'});
   const form=el('div',{class:'card',style:'display:grid;gap:10px'},el('h3',{style:'font-size:14px'},'Добавить'),
-    el('div',{class:'lc-two'},el('label',{},'Стример',who),el('label',{},'Тип',kind),el('label',{},'Сумма',amount),el('label',{},'Комментарий',comment)),err,
+    el('div',{class:'lc-two'},el('label',{},'Сотрудник',who),el('label',{},'Тип',kind),el('label',{},'Сумма',amount),el('label',{},'Комментарий',comment)),err,
     el('div',{},el('button',{class:'btn s',type:'button',onclick:async()=>{err.textContent='';try{await api('/adjustments',{method:'POST',body:{staff_id:Number(who.value),kind:kind.value,amount:Number(amount.value),comment:comment.value,period:accState.period}});toast('Добавлено');accRefresh()}catch(x){err.textContent=x.message}}},'Добавить')));
   const rows=list.map(a=>[td(a.d),td(a.staff_name),el('td',{},el('span',{class:'pill '+(a.kind==='bonus'?'p-ok':'p-bad')},a.kind==='bonus'?'бонус':'штраф')),td(usd2(a.kind==='bonus'?a.amount:-a.amount),'n'),el('td',{style:'white-space:normal;text-align:left'},a.comment||'—'),el('td',{},ms.closed?'':el('button',{class:'btn o s',type:'button',onclick:async()=>{try{await api('/adjustments/'+a.id,{method:'DELETE'});accRefresh()}catch(x){toast(x.message)}}},'Удалить'))]);
   const lockNote=el('div',{class:'card warn-card'},el('b',{},'🔒 Месяц закрыт'),el('div',{class:'mut sm'},'Бонусы и штрафы за закрытый месяц менять нельзя. Откройте месяц заново (кнопка вверху), внесите изменения и закройте снова.'));
@@ -2065,7 +2067,7 @@ async function accBonus(){
 }
 
 async function accPay(){
-  const [sum,advs,st]=await Promise.all([api('/kpi/summary?period='+accState.period),api('/advances'),streamersList()]);
+  const [sum,advs,st]=await Promise.all([api('/kpi/summary?period='+accState.period),api('/advances'),allStaffList()]);
   const cards=await Promise.all(sum.rows.map(r=>api('/staff/'+r.staff.id+'/card').catch(()=>({}))));
   const advBox=advs.length?el('div',{class:'card',style:'display:grid;gap:8px;border-color:var(--acc)'},el('h4',{},'Запросы аванса'),...advs.map(a=>el('div',{class:'inl',style:'justify-content:space-between'},
     el('div',{},el('b',{},a.staff_name+' запросил '+usd2(a.amount)),el('div',{class:'mut sm'},perLabel(a.period))),
@@ -2077,7 +2079,7 @@ async function accPay(){
   const note=el('input',{placeholder:'Заметка (необязательно)',maxlength:'300'});
   const err=el('div',{class:'err',role:'alert'});
   const form=el('div',{class:'card',style:'display:grid;gap:10px'},el('h3',{style:'font-size:14px'},'Записать выплату'),
-    el('div',{class:'lc-two'},el('label',{},'Стример',who),el('label',{},'Тип',kind),el('label',{},'Сумма',amount),el('label',{},'Заметка',note)),err,
+    el('div',{class:'lc-two'},el('label',{},'Сотрудник',who),el('label',{},'Тип',kind),el('label',{},'Сумма',amount),el('label',{},'Заметка',note)),err,
     el('div',{},el('button',{class:'btn s',type:'button',onclick:async()=>{err.textContent='';try{await api('/payouts',{method:'POST',body:{staff_id:Number(who.value),kind:kind.value,amount:Number(amount.value),note:note.value,period:accState.period}});toast('Выплата записана');accRefresh()}catch(x){err.textContent=x.message}}},'Записать')));
   return[el('div',{class:'head'},el('h3',{style:'font-size:15px'},'Выплаты за '+perLabel(accState.period)),el('span',{class:'pill p-pur'},'выплаты с 5 по 10 число следующего месяца')),
     advBox,ctrT(table(['Стример','Итого','Выплачено','К выплате','Куда','Реквизиты'],rows,'Стримеров пока нет.')),form,

@@ -690,7 +690,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     const amount = Math.abs(Number(b.amount));
     if (!kind || !Number.isFinite(amount) || amount <= 0 || amount > 100000) return reply.code(400).send({ error: 'Укажите тип и сумму' });
     const sid = Number(b.staff_id);
-    if (!(await db.query(`SELECT 1 FROM staff WHERE id = $1 AND (role = 'streamer' OR streams)`, [sid])).rowCount) return reply.code(404).send({ error: 'Стример не найден' });
+    if (!(await db.query(`SELECT 1 FROM staff WHERE id = $1 AND active`, [sid])).rowCount) return reply.code(404).send({ error: 'Сотрудник не найден' });
     const period = PERIOD.test(String(b.period)) ? String(b.period) : await currentPeriod();
     if (await isClosed(period)) return reply.code(409).send({ error: 'Месяц закрыт, бонусы и штрафы менять нельзя. Откройте месяц заново в Бухгалтерии.' });
     await db.query('INSERT INTO staff_adjustments (staff_id, period, kind, amount, comment, created_by) VALUES ($1,$2,$3,$4,$5,$6)', [sid, period, kind, amount, str(b.comment, 500) || null, req.staff!.id]);
