@@ -976,6 +976,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
         lastEnd: lastEnd.get(s.id) ?? null,
         lastMin: lastLen.get(s.id) ?? null,
         minLeft: lv ? Math.max(0, plan.shiftH * 60 - doneToday) : null,
+        todayMin: doneToday,
         pending: pendingBy.get(s.id) ?? 0,
         range: { clicks: clicks.get(s.id) ?? 0, regs: a.reg, ftd: a.ftd, ftdSum: a.ftdSum, dep: a.dep, depSum: a.depSum, deposits: a.ftdSum + a.depSum, commission: a.comm, salary: r2(salary), paid: r2(paid) },
         month: {
@@ -1020,7 +1021,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
       now: nowIso,
       today,
       range: { from, to, days: rangeDays, all: allTime, ref, refMonth, whole: months.length === 1 && months[0].w === 1 },
-      plan: { hours: plan.hours, shiftH: plan.shiftH, paceMin, planMin: plan.hours * 60, dayCount: plan.day.count },
+      plan: { hours: plan.hours, shiftH: plan.shiftH, leads: plan.leads, paceMin, planMin: plan.hours * 60, dayCount: plan.day.count },
       pace,
       goals,
       goalsMonthly: g,

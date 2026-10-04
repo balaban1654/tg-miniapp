@@ -929,13 +929,44 @@ function dxPlanFact(d){
     ['Пополнения по FTD',t.ftdSum,g&&g.ftdSum,usd0,'средний FTD '+usd0(avg)],
     ['Все депозиты (FTD + додепы)',t.deposits,g&&g.deposits,usd0,'додепы '+usd0(t.depSum)+' · '+Math.round(dShare)+'%'],
     ['Комиссия получена',t.commission,g&&g.commission,usd0,cShare.toFixed(1).replace('.',',')+'% от депозитов']];
-  return el('div',{class:'card dx-pf'},el('div',{class:'dx-hd'},el('div',{class:'l'},el('span',{class:'dx-lbl'},title),...icons),showMark?el('span',{class:'mut',style:'font-size:12px'},'метка: план на сегодня'):null),
+  const flipBtn=()=>{const b=el('button',{type:'button',class:'dx-ib sm2',title:'Показатели стримеров','aria-label':'Показатели стримеров'});b.append(svgIcon(IC_FLIP,18));return b};
+  const wrap=el('div',{class:'dx-flip'});
+  const fb=flipBtn();icons.push(fb);
+  const front=el('div',{class:'card dx-pf'},el('div',{class:'dx-hd'},el('div',{class:'l'},el('span',{class:'dx-lbl'},title),...icons),showMark?el('span',{class:'mut',style:'font-size:12px'},'метка: план на сегодня'):null),
     ...rows.map(([n,v,goal,f,note])=>{
       const pct=goal>0?v/goal*100:null,cls=pct===null?'':pct>=pace*100?'ok':pct>=pace*85?'warn':'bad';
       return el('div',{class:'dx-m'},el('div',{class:'dx-lbl'},n),el('div',{class:'v'},f(v),goal>0?el('small',{},' / '+f(goal)):null),
         pct!==null?el('div',{class:'dx-bar'},el('i',{style:'width:'+Math.min(100,pct)+'%'}),showMark?el('u',{style:'left:'+(pace*100)+'%'}):null):null,
         el('div',{class:'dx-meta'},el('span',{class:cls},pct!==null?Math.round(pct)+'% плана':''),el('span',{},note)));
     }));
+  const show=back=>{
+    if(!back){wrap.replaceChildren(front);wrap.classList.remove('back');return}
+    const h=front.offsetHeight;const bk=dxTeamBack(d);bk.style.minHeight=h+'px';
+    bk.querySelector('.dx-flipb').onclick=()=>{dxFlipped=false;show(false)};
+    wrap.replaceChildren(bk);wrap.classList.add('back');
+  };
+  fb.onclick=()=>{dxFlipped=true;show(true)};
+  wrap.append(front);
+  if(dxFlipped)requestAnimationFrame(()=>{if(wrap.isConnected)show(true)});
+  return wrap;
+}
+let dxFlipped=false;
+const IC_FLIP='<path d="M3 12a9 9 0 0 1 15.5-6.2L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15.5 6.2L3 16"/><path d="M3 21v-5h5"/>';
+/* Оборот плитки: те же показатели, что у стримера, но суммарно по всем активным стримерам */
+function dxTeamBack(d){
+  const act=d.streamers.filter(s=>s.active),N=act.length||1,pl=d.plan,pace=d.pace*100,mark=pace<99.5?pace:null;
+  const lv=pct=>pct>=pace?'ok':pct>=pace*.85?'warn':'bad';
+  const sum=f=>act.reduce((a,s)=>a+f(s),0);
+  const today=sum(s=>s.todayMin||0),shiftMin=pl.shiftH*60*N,live=act.filter(s=>s.live).length;
+  const hours=sum(s=>s.month.hoursMin),planMin=pl.planMin*N,shifts=sum(s=>s.month.shifts),planShifts=pl.hours/pl.shiftH*N;
+  const ftd=sum(s=>s.month.ftd),planLeads=pl.leads*N;
+  const hp=hours/planMin*100,sp=shifts/planShifts*100,lp=planLeads?ftd/planLeads*100:0,toGo=planLeads-ftd;
+  const b=el('button',{type:'button',class:'dx-ib sm2 dx-flipb',title:'Назад к плану компании','aria-label':'Назад к плану компании'});b.append(svgIcon(IC_FLIP,18));
+  return el('div',{class:'card dx-pf'},el('div',{class:'dx-hd'},el('div',{class:'l'},el('span',{class:'dx-lbl'},'Показатели стримеров · '+N+' чел.'),b),mark!==null?el('span',{class:'mut',style:'font-size:12px'},'метка: план на сегодня'):null),
+    smTile('Сегодня в эфире',hm(today),'/ '+fmtH(shiftMin)+' ч',today/shiftMin*100,null,live?'сейчас в эфире: '+live:'никто не в эфире',Math.round(today/shiftMin*100)+'% дневного плана',live?'ok':''),
+    smTile('Часы в эфире',hw(hours),'/ '+n0(pl.hours*N)+' ч',hp,mark,Math.round(hp)+'% плана','по графику '+hw(pl.paceMin*N)+' ч',lv(hp)),
+    smTile('Закрытых смен',String(shifts),'/ '+n0(planShifts),sp,mark,Math.round(sp)+'% плана','смена = '+fmtH(pl.shiftH*60)+' ч',lv(sp)),
+    smTile('Лиды (FTD)',String(ftd),'/ '+planLeads,lp,mark,Math.round(lp)+'% плана',toGo>0?'ещё '+toGo+' до плана':'план выполнен',lv(lp)));
 }
 function dxNet(d){
   const t=d.totals;
