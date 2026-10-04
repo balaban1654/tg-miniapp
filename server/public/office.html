@@ -198,6 +198,24 @@ textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10
  .side{position:static;height:auto;flex-direction:row;flex-wrap:wrap;align-items:center;padding:10px;border-right:0;border-bottom:1px solid var(--line)}
  .side{flex-wrap:wrap;row-gap:8px;padding-top:calc(10px + env(safe-area-inset-top,0px));padding-left:max(10px,env(safe-area-inset-left,0px));padding-right:max(10px,env(safe-area-inset-right,0px))}.side .brand{padding:0;flex:1 1 0;min-width:0}.side .brand .logo{flex:none}.side .brand b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.nav{grid-auto-flow:column;overflow-x:auto;min-width:0;max-width:100%;flex:1 1 100%;order:3}.me{margin:0 0 0 auto;padding:0;display:flex;align-items:center;gap:8px;flex:0 1 auto;min-width:0}.me-row{min-width:0;gap:4px}#meName{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:34vw}@media(max-width:560px){.mrole{display:none}}.me .btn.s{padding:6px 12px;line-height:1.2;white-space:nowrap}#installBtn{padding:6px 9px!important}#installBtn .ilbl{display:none}#installBtn .iic{display:block}
 }
+
+.burger{display:none}.side-menu{display:contents}
+@media(max-width:760px){
+ .side{position:sticky;top:0;z-index:60;flex-wrap:nowrap;background:#0a0613}
+ .burger{display:grid;place-items:center;flex:none;width:42px;height:42px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--fg);cursor:pointer;padding:0}
+ .burger[aria-expanded=true]{border-color:var(--acc);color:var(--acc2)}
+ .side-menu{display:none;position:absolute;left:0;right:0;top:100%;z-index:70;flex-direction:column;gap:10px;padding:10px max(10px,env(safe-area-inset-left,0px)) 14px;background:#0a0613;border-bottom:1px solid var(--line);box-shadow:0 18px 44px rgba(0,0,0,.6);max-height:calc(100vh - 70px);max-height:calc(100dvh - 70px);overflow-y:auto;overscroll-behavior:contain}
+ .side.open .side-menu{display:flex}
+ .side-menu .nav{grid-auto-flow:row;overflow:visible;flex:none;order:0;max-width:none;width:100%}
+ .side-menu .nav button{width:100%;justify-content:flex-start;padding:12px 12px;font-size:15px}
+ .side-menu .me{margin:0;flex:none;display:grid;gap:10px;padding:10px 4px 0;border-top:1px solid var(--line);width:100%}
+ .side-menu .me-row{justify-content:flex-start;gap:10px;font-size:14px}
+ .side-menu #meName{max-width:none;white-space:normal}
+ .side-menu .me .btn.s{width:100%;padding:11px 12px}
+ .side-menu #installBtn .ilbl{display:inline}.side-menu #installBtn .iic{display:inline-block}.side-menu #installBtn{display:flex;justify-content:center;gap:8px;align-items:center}
+ .side .brand{flex:1 1 0}
+ .side-menu #installBtn[hidden]{display:none!important}
+}
 /* дашборд админа */
 .dx{display:grid;gap:16px;min-width:0}
 .dx-top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
@@ -335,8 +353,11 @@ textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10
 <div id="app" hidden>
   <aside class="side">
     <div class="brand"><div class="logo">H</div><b style="font:700 14px var(--fd)">Hunter Office</b></div>
+    <button class="burger" id="burger" type="button" aria-label="Меню" aria-expanded="false" aria-controls="sideMenu"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+    <div class="side-menu" id="sideMenu">
     <nav class="nav" id="nav"></nav>
     <div class="me"><div class="me-row"><span id="meName"></span><button class="gear" id="meGear" type="button" title="Моя карточка" aria-label="Моя карточка"></button><button class="gear" id="meNav" type="button" title="Настроить меню" aria-label="Настроить меню" hidden></button></div><button class="btn o s" id="installBtn" type="button" hidden title="Установить приложение" aria-label="Установить приложение"><svg class="iic" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg><span class="ilbl">Установить приложение</span></button><button class="btn o s" id="logout" type="button">Выйти</button></div>
+      </div>
   </aside>
   <main id="main"></main>
 </div>
@@ -1555,6 +1576,16 @@ async function staffTeam(){
 const ctrT=t=>{t.classList.add('ctr');return t};
 let poll=null;
 function stopPoll(){if(poll){clearInterval(poll);poll=null}}
+
+/* Мобильное меню: гамбургер справа раскрывает весь список пунктов, внизу имя, настройки и выход */
+(function(){
+  const side=document.querySelector('.side'),btn=document.getElementById('burger');if(!side||!btn)return;
+  const set=o=>{side.classList.toggle('open',o);btn.setAttribute('aria-expanded',o?'true':'false')};
+  btn.addEventListener('click',e=>{e.stopPropagation();set(!side.classList.contains('open'))});
+  document.addEventListener('click',e=>{if(!side.classList.contains('open'))return;const inside=e.target.closest('.side-menu');if(!inside||e.target.closest('.nav button:not(.grp),#logout,#meGear,#meNav'))set(false)});
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')set(false)});
+  window.addEventListener('resize',()=>{if(window.innerWidth>760)set(false)});
+})();
 let chatsLabel='Чаты',leadsLabel='Лиды';
 async function updateBadge(){
   if(!me)return;
