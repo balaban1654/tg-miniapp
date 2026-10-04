@@ -485,3 +485,11 @@ CREATE TABLE IF NOT EXISTS login_challenges (
 
 -- Лид снят с миниапп (доступ отозван), но события и постбеки остаются: по ним считаются зарплаты
 ALTER TABLE leads ADD COLUMN IF NOT EXISTS removed_at TIMESTAMPTZ;
+
+-- Один раз: все лиды с депозитом получают доступ к миниапп (дальше его выдаёт постбек автоматически)
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM app_flags WHERE key = 'ftd_access_backfill') THEN
+    UPDATE leads SET access = TRUE WHERE status IN ('ftd','active') AND NOT coalesce(access, FALSE) AND removed_at IS NULL;
+    INSERT INTO app_flags (key) VALUES ('ftd_access_backfill');
+  END IF;
+END $$;
