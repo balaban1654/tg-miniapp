@@ -1220,8 +1220,8 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
       month: { period: refMonth, hoursMin: k.hoursMin, shifts: k.shifts, planShifts: plan.hours / plan.shiftH, ftd: k.ftdCount },
       today_: { minutes: todayMin, shiftMin, minLeft: Math.max(0, shiftMin - todayMin), live },
       funnel: { clicks, regs: ev.reg, ftd: ev.ftd },
-      // Суммарные просмотры, подписчики и т. д. по всем стримерам за период: общий показатель без разбивки по людям
-      social: { fields: socialFs.fields, totals: socialFs.fields.map((f: string) => socialFs.rows.reduce((a, r) => a + (r.sums[f] ?? 0), 0)) },
+      // Просмотры, подписчики и т. д. только самого стримера за период
+      social: { fields: socialFs.fields, totals: socialFs.fields.map((f: string) => socialFs.rows.filter((r) => r.staff_id === me.id).reduce((a, r) => a + (r.sums[f] ?? 0), 0)) },
       clicksSince,
       byStatus,
       colleagues,

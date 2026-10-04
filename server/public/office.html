@@ -948,11 +948,11 @@ function dxSocial(d){
   }).catch(()=>box.replaceChildren(el('div',{class:'mut sm'},'Не удалось загрузить')));
   return box;
 }
-/* Стример: те же суммарные показатели всей команды, без разбивки по людям */
+/* Стример: его собственные просмотры, подписчики, комментарии и лайки за период */
 function smSocial(d){
   const S=d.social||{fields:[],totals:[]};
   if(!S.fields.length)return el('div',{class:'mut sm'},'Полей для дашборда пока нет');
-  return el('div',{style:'display:grid;gap:12px;min-width:240px'},el('div',{class:'dx-lbl'},'Охваты всех стримеров за период'),
+  return el('div',{style:'display:grid;gap:12px;min-width:240px'},el('div',{class:'dx-lbl'},'Мои охваты за период'),
     ...S.fields.map((f,i)=>el('div',{class:'dx-fsh'},el('span',{class:'dx-lbl'},f),el('b',{style:'font-size:22px'},(S.totals[i]||0).toLocaleString('ru-RU')))));
 }
 function dxColorOf(d){const ids=d.streamers.map(s=>s.id).sort((a,b)=>a-b);return id=>DXC[ids.indexOf(id)%DXC.length]}
