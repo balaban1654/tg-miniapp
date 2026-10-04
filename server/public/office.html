@@ -199,6 +199,8 @@ textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10
  .side{flex-wrap:wrap;row-gap:8px;padding-top:calc(10px + env(safe-area-inset-top,0px));padding-left:max(10px,env(safe-area-inset-left,0px));padding-right:max(10px,env(safe-area-inset-right,0px))}.side .brand{padding:0;flex:1 1 0;min-width:0}.side .brand .logo{flex:none}.side .brand b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.nav{grid-auto-flow:column;overflow-x:auto;min-width:0;max-width:100%;flex:1 1 100%;order:3}.me{margin:0 0 0 auto;padding:0;display:flex;align-items:center;gap:8px;flex:0 1 auto;min-width:0}.me-row{min-width:0;gap:4px}#meName{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:34vw}@media(max-width:560px){.mrole{display:none}}.me .btn.s{padding:6px 12px;line-height:1.2;white-space:nowrap}#installBtn{padding:6px 9px!important}#installBtn .ilbl{display:none}#installBtn .iic{display:block}
 }
 
+.dx-ib.only-m{display:none}
+@media(max-width:760px){.only-d,.dx-hd .mark{display:none!important}.dx-ib.only-m{display:grid}.dx-hd .l{flex-wrap:wrap}.dx-hd .l .dx-lbl{flex:1 0 100%}}
 .burger{display:none}.side-menu{display:contents}
 @media(max-width:760px){
  .side{position:sticky;top:0;z-index:60;flex-wrap:nowrap;background:#0a0613}
@@ -1071,8 +1073,8 @@ function dxPlanFact(d){
     ['Комиссия получена',t.commission,g&&g.commission,usd0,cShare.toFixed(1).replace('.',',')+'% от депозитов']];
   const flipBtn=()=>{const b=el('button',{type:'button',class:'dx-ib sm2',title:'Показатели стримеров','aria-label':'Показатели стримеров'});b.append(svgIcon(IC_FLIP,18));return b};
   const wrap=el('div',{class:'dx-flip'});
-  const fb=flipBtn();
-  const front=el('div',{class:'card dx-pf'},el('div',{class:'dx-hd'},el('div',{class:'l'},el('span',{class:'dx-lbl'},title),...icons),el('div',{style:'display:flex;align-items:center;gap:10px;margin-left:auto'},showMark?el('span',{class:'mut',style:'font-size:12px'},'метка: план на сегодня'):null,fb)),
+  const fb=flipBtn(),fbm=flipBtn();fb.classList.add('only-d');fbm.classList.add('only-m');icons.push(fbm);
+  const front=el('div',{class:'card dx-pf'},el('div',{class:'dx-hd'},el('div',{class:'l'},el('span',{class:'dx-lbl'},title),...icons),el('div',{style:'display:flex;align-items:center;gap:10px;margin-left:auto'},showMark?el('span',{class:'mut mark',style:'font-size:12px'},'метка: план на сегодня'):null,fb)),
     ...rows.map(([n,v,goal,f,note])=>{
       const pct=goal>0?v/goal*100:null,cls=pct===null?'':pct>=pace*100?'ok':pct>=pace*85?'warn':'bad';
       return el('div',{class:'dx-m'},el('div',{class:'dx-lbl'},n),el('div',{class:'v'},f(v),goal>0?el('small',{},' / '+f(goal)):null),
@@ -1082,10 +1084,10 @@ function dxPlanFact(d){
   const show=back=>{
     if(!back){wrap.replaceChildren(front);wrap.classList.remove('back');return}
     const h=front.offsetHeight;const bk=dxTeamBack(d);bk.style.minHeight=h+'px';
-    bk.querySelector('.dx-flipb').onclick=()=>{dxFlipped=false;show(false)};
+    bk.querySelectorAll('.dx-flipb').forEach(x=>x.onclick=()=>{dxFlipped=false;show(false)});
     wrap.replaceChildren(bk);wrap.classList.add('back');
   };
-  fb.onclick=()=>{dxFlipped=true;show(true)};
+  fb.onclick=fbm.onclick=()=>{dxFlipped=true;show(true)};
   wrap.append(front);
   if(dxFlipped)requestAnimationFrame(()=>{if(wrap.isConnected)show(true)});
   return wrap;
@@ -1102,7 +1104,8 @@ function dxTeamBack(d){
   const ftd=all.reduce((a,s)=>a+s.month.ftd,0),planLeads=pl.leads*N;
   const hp=hours/planMin*100,sp=shifts/planShifts*100,lp=planLeads?ftd/planLeads*100:0,toGo=planLeads-ftd;
   const b=el('button',{type:'button',class:'dx-ib sm2 dx-flipb',title:'Назад к плану компании','aria-label':'Назад к плану компании'});b.append(svgIcon(IC_FLIP,18));
-  return el('div',{class:'card dx-pf'},el('div',{class:'dx-hd'},el('div',{class:'l'},el('span',{class:'dx-lbl'},'Показатели стримеров · '+N+' чел.')),el('div',{style:'display:flex;align-items:center;gap:10px;margin-left:auto'},mark!==null?el('span',{class:'mut',style:'font-size:12px'},'метка: план на сегодня'):null,b)),
+  const bm=el('button',{type:'button',class:'dx-ib sm2 dx-flipb only-m',title:'Назад к плану компании','aria-label':'Назад к плану компании'});bm.append(svgIcon(IC_FLIP,18));b.classList.add('only-d');
+  return el('div',{class:'card dx-pf'},el('div',{class:'dx-hd'},el('div',{class:'l'},el('span',{class:'dx-lbl'},'Показатели стримеров · '+N+' чел.'),bm),el('div',{style:'display:flex;align-items:center;gap:10px;margin-left:auto'},mark!==null?el('span',{class:'mut mark',style:'font-size:12px'},'метка: план на сегодня'):null,b)),
     smTile('Сегодня в эфире',hm(today),'/ '+fmtH(shiftMin)+' ч',today/shiftMin*100,null,live?'сейчас в эфире: '+live:'никто не в эфире',Math.round(today/shiftMin*100)+'% дневного плана',live?'ok':''),
     smTile('Часы в эфире',hw(hours),'/ '+n0(pl.hours*N)+' ч',hp,mark,Math.round(hp)+'% плана','по графику '+hw(pl.paceMin*N)+' ч',lv(hp)),
     smTile('Закрытых смен',String(shifts),'/ '+n0(planShifts),sp,mark,Math.round(sp)+'% плана','смена = '+fmtH(pl.shiftH*60)+' ч',lv(sp)),
@@ -1250,7 +1253,7 @@ function smMetrics(d){
   const lv=pct=>pct>=pace?'ok':pct>=pace*.85?'warn':'bad';
   const hp=m.hoursMin/pl.planMin*100,sp=m.shifts/m.planShifts*100,lp=m.ftd/pl.leads*100;
   const toGo=pl.leads-m.ftd;
-  return el('div',{class:'card dx-pf'},el('div',{class:'dx-hd'},el('div',{class:'l'},el('span',{class:'dx-lbl'},'Мои показатели за '+(d.range.whole?'месяц':perLabel(m.period).toLowerCase())),dxPopBtn('Общий план команды',IC_RINGS,smRings(d),'pl'),dxPopBtn('Воронка',IC_FUNNEL,smFunnel(d),'pl wide'),dxPopBtn('Просмотры, подписчики, комментарии и лайки',IC_HEART,smSocial(d),'pl')),mark!==null?el('span',{class:'mut',style:'font-size:12px'},'метка: план на сегодня'):null),
+  return el('div',{class:'card dx-pf'},el('div',{class:'dx-hd'},el('div',{class:'l'},el('span',{class:'dx-lbl'},'Мои показатели за '+(d.range.whole?'месяц':perLabel(m.period).toLowerCase())),dxPopBtn('Общий план команды',IC_RINGS,smRings(d),'pl'),dxPopBtn('Воронка',IC_FUNNEL,smFunnel(d),'pl wide'),dxPopBtn('Просмотры, подписчики, комментарии и лайки',IC_HEART,smSocial(d),'pl')),mark!==null?el('span',{class:'mut mark',style:'font-size:12px'},'метка: план на сегодня'):null),
     smTile('Сегодня в эфире',hm(t.minutes),'/ '+fmtH(t.shiftMin)+' ч',t.minutes/t.shiftMin*100,null,t.live?'идёт эфир':'','','ok'),
     smTile('Часы в эфире',hw(m.hoursMin),'/ '+pl.hours+' ч',hp,mark,Math.round(hp)+'% плана','по графику '+hw(pl.paceMin)+' ч',lv(hp)),
     smTile('Закрытых смен',String(m.shifts),'/ '+n0(m.planShifts),sp,mark,Math.round(sp)+'% плана','смена = '+fmtH(pl.shiftH*60)+' ч',lv(sp),'до закрытия смены '+hm(t.shiftMin-((m.totalMin??m.hoursMin)%t.shiftMin)),'warn'),
