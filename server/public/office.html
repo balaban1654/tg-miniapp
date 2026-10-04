@@ -2720,7 +2720,7 @@ function pbManualDialog(done){
     try{
       const r=await api('/postbacks/import',{method:'POST',body:{csv:await f.text()}});
       drop.textContent='Готово: '+f.name;
-      res.replaceChildren(...[el('div',{},'Постбеков на наш адрес в файле: ',el('b',{},String(r.total))),
+      res.replaceChildren(...[el('div',{},'Постбеков официального бота Pocket в файле: ',el('b',{},String(r.total))),
         el('div',{style:'color:var(--ok)'},'Добавлено: '+r.added),
         el('div',{class:'mut'},'Уже были в базе: '+r.exists),
         r.unknown?el('div',{style:'color:var(--warn)'},'Клиент не из бота (Pocket ID не привязан ни к одному лиду): '+r.unknown+(r.unknownIds.length?' · '+r.unknownIds.slice(0,12).join(', ')+(r.unknownIds.length>12?'…':''):'')):null,

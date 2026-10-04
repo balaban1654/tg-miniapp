@@ -956,8 +956,8 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     return { ok: true };
   });
 
-  // Импорт выгрузки постбеков из партнёрки (CSV «postbacks_logs»). Берём только строки, отправленные на наш /postback/*:
-  // остальные адреса в выгрузке (старый бот, make.com) дублируют те же события. Уже принятые не задваиваются
+  // Импорт выгрузки постбеков из партнёрки (CSV «postbacks_logs»). Берём только строки официального бота Pocket
+  // (partner-bot.affpartners.io): остальные адреса дублируют те же события. Уже принятые не задваиваются
   app.post('/postbacks/import', { preHandler: need('admin') }, async (req, reply) => {
     const text = String(((req.body ?? {}) as any).csv ?? '').replace(/^\uFEFF/, '');
     if (!text.trim()) return reply.code(400).send({ error: 'Файл пустой' });
@@ -984,10 +984,12 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     for (const r of table) {
       let u: URL;
       try { u = new URL(r[iUrl]); } catch { continue; }
-      const m = /^\/postback\/(reg|ftd|dep|wd|comm)$/.exec(u.pathname);
-      if (!m) continue;
+      // Источник правды: официальный бот Pocket (partner-bot.affpartners.io). Остальные адреса в выгрузке дублируют его события
+      if (!/(^|\.)affpartners\.io$/i.test(u.hostname)) continue;
+      const kind = /\/(registration|ftd|redeposit|commission)$/.exec(u.pathname);
+      if (!kind) continue;
       out.total++;
-      const event = m[1];
+      const event = ({ registration: 'reg', ftd: 'ftd', redeposit: 'dep', commission: 'comm' } as Record<string, string>)[kind[1]];
       const qp = u.searchParams;
       const dt = (qp.get('date_time') ?? '').trim();
       const trader = (qp.get('trader_id') ?? '').trim();
