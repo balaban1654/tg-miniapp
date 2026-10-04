@@ -1385,14 +1385,13 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     return { ok: true, deleted: r.rowCount };
   });
 
-  // Цифра у пункта «Лиды»: сегодняшние лиды с депозитом (ftd + dep/активные) и отдельно те, что пока только зарегистрировались
+  // Цифра у пункта «Лиды»: все лиды с депозитом (ftd + активные) и отдельно те, что пока только зарегистрировались
   app.get('/leads/today', { preHandler: auth }, async (req) => {
     const me = req.staff!;
     const r = await db.query(
       `SELECT count(*) FILTER (WHERE status IN ('ftd','active'))::int AS paid, count(*) FILTER (WHERE status = 'registered')::int AS reg
          FROM leads d
-        WHERE d.removed_at IS NULL AND coalesce(d.lead_role, 'lead') = 'lead' AND ${ownerScope(me, 'd.owner_id')}
-          AND (d.created_at AT TIME ZONE 'Europe/Kyiv')::date = (now() AT TIME ZONE 'Europe/Kyiv')::date`,
+        WHERE d.removed_at IS NULL AND coalesce(d.lead_role, 'lead') = 'lead' AND ${ownerScope(me, 'd.owner_id')}`,
     );
     return r.rows[0];
   });
