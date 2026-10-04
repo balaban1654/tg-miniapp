@@ -157,6 +157,11 @@ textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10
 .dx-lc{display:flex;flex-direction:column;padding:7px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg2);min-width:0}
 .dx-lc b{font-weight:600;font-size:14px}.dx-lc .t{font-size:18px;font-weight:700;color:var(--ok);display:flex;align-items:center;gap:6px}.dx-lc .t.off{color:var(--mut);font-size:14px;font-weight:500}
 .dx-nm{background:none;border:0;padding:0;color:var(--fg);font-weight:600;cursor:pointer;border-bottom:1px dashed var(--mut)}.dx-nm:hover,.dx-nm.on{color:var(--acc2);border-bottom-color:var(--acc2)}
+.dx-lc.live{flex-direction:row;align-items:center;gap:16px}.dx-lcl{display:flex;flex-direction:column;min-width:0}
+.dx-lvx{display:flex;flex-direction:column;align-items:center;gap:3px}
+.dx-liv{font:800 9px var(--fm);letter-spacing:.14em;color:var(--bad);animation:dxlv 1.3s ease-in-out infinite}@keyframes dxlv{0%,100%{opacity:1}50%{opacity:.25}}
+.dx-go.big{padding:6px;border:1px solid var(--line);border-radius:9px;color:var(--mut)}.dx-go.big:hover{color:var(--acc2);border-color:var(--acc)}
+@media(prefers-reduced-motion:reduce){.dx-liv{animation:none}}
 .dx-hp{font-size:12px;font-weight:500;margin-left:4px}.dx-hp.ok{color:var(--ok)}.dx-hp.warn{color:var(--warn)}.dx-hp.bad{color:var(--bad)}
 .dx-go{display:inline-flex;color:var(--mut);padding:2px;border-radius:5px}.dx-go:hover{color:var(--acc2)}
 .dx-cols{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:16px;align-items:stretch}
@@ -478,9 +483,11 @@ function dxLive(d,skew){
     dxAttachCard(name,s,d,skew);
     const head=el('b',{},name,el('span',{class:'dx-hp '+lvl,title:'По графику сегодня '+fmtH(pace)+' ч'},fmtH(s.month.hoursMin)+'/'+d.plan.hours+' ч'));
     const time=s.live
-      ?el('span',{class:'t'},el('span',{'data-live':s.live.started_at},hm(Math.max(0,Math.floor((Date.now()+skew-Date.parse(s.live.started_at))/60000)))),s.live.stream_url?el('a',{class:'dx-go',href:s.live.stream_url,target:'_blank',rel:'noopener',title:'Открыть эфир','aria-label':'Открыть эфир'},svgIcon(IC_EXT,14)):null)
+      ?el('span',{class:'t'},el('span',{'data-live':s.live.started_at},hm(Math.max(0,Math.floor((Date.now()+skew-Date.parse(s.live.started_at))/60000)))))
       :el('span',{class:'t off'},dxOffText(s,d.today));
-    return el('div',{class:'dx-lc'},head,time);
+    if(!s.live)return el('div',{class:'dx-lc'},head,time);
+    const link=s.live.stream_url?el('a',{class:'dx-go big',href:s.live.stream_url,target:'_blank',rel:'noopener',title:'Открыть эфир','aria-label':'Открыть эфир'},svgIcon(IC_EXT,22)):null;
+    return el('div',{class:'dx-lc live'},el('div',{class:'dx-lcl'},head,time),el('div',{class:'dx-lvx'},el('span',{class:'dx-liv'},'LIVE'),link));
   });
   return el('div',{class:'card dx-live'},...(cards.length?cards:[el('span',{class:'mut'},'Стримеров пока нет. Добавьте их в разделе «Сотрудники».')]));
 }
