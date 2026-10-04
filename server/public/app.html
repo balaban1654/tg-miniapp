@@ -109,6 +109,7 @@ main{flex:1;padding:6px 16px 96px;display:grid;gap:12px;align-content:start}
 .val{display:inline-block}.bump{animation:bump .38s ease-out}
 @keyframes bump{40%{transform:scale(1.14);color:var(--ok)}}
 .ck{background:var(--card);border-radius:16px;overflow:hidden}.ck .i{display:flex;align-items:center;gap:12px;padding:15px 16px;border-bottom:1px solid var(--line)}.ck .i:last-child{border-bottom:0}
+.wait{width:28px;height:28px;border-radius:50%;border:3px solid #ffffff14;flex:none}
 .spin{width:28px;height:28px;border-radius:50%;border:3px solid #ffffff22;border-top-color:var(--acc2);animation:rot .8s linear infinite;flex:none}
 .tick{width:28px;height:28px;border-radius:50%;background:var(--ok);color:#06210f;display:grid;place-items:center;font-weight:800;flex:none;animation:bump .4s ease-out}
 @keyframes rot{to{transform:rotate(360deg)}}
@@ -520,20 +521,44 @@ async function signalPairs(){
   shell('Анализ',[el('button',{class:'back',type:'button',onclick:()=>{tab='home';render()}},'‹ Назад'),box,go,
     el('div',{class:'note'},'Перед началом торговли проверяйте процент выплаты на платформе Pocket Option: он может меняться.')]);
 }
+/** Шаги «анализа»: каждый длится 3–5 секунд, по очереди; сигнал запрашивается в самом конце, чтобы время входа считалось от момента показа */
+const ANALYSIS=[
+  ['Котировки и ликвидность','Загружаем тиковые данные и глубину рынка по паре'],
+  ['Рыночная структура','Определяем тренд, диапазон и ключевые уровни поддержки и сопротивления'],
+  ['Волатильность и объёмы','Считаем ATR и профиль объёма на старших таймфреймах'],
+  ['Осцилляторы','RSI, Stochastic и MACD: ищем дивергенции и зоны перекупленности'],
+  ['Скользящие и Bollinger Bands','EMA 9/21/50, ширина полос и импульс пробоя'],
+  ['Price Action','Свечные паттерны, ложные пробои и реакция цены на уровни'],
+  ['Настройки терминала и время входа','Сверяем таймфрейм, экспирацию и подбираем точку входа']
+];
 async function signalPrep(pair,sec){
   clearTimers();
   const buzzL=()=>{try{if(tg&&tg.HapticFeedback)tg.HapticFeedback.impactOccurred('light');else if(navigator.vibrate)navigator.vibrate(12)}catch{}};
-  const labels=['Пара из списка','Настройки терминала','Время входа'];
-  const rows=labels.map(l=>{const ic=el('span',{class:'spin'}),st2=el('span',{class:'sm'},'…');return{ic,st2,node:el('div',{class:'i'},ic,el('b',{style:'flex:1'},l),st2)}});
+  const durs=ANALYSIS.map(()=>3000+Math.floor(Math.random()*2001));   // 3–5 секунд на шаг
+  const total=durs.reduce((a,b)=>a+b,0);
+  const rows=ANALYSIS.map(([l,cap])=>{
+    const ic=el('span',{class:'wait'}),st2=el('span',{class:'sm'},'ожидание');
+    return{ic,st2,node:el('div',{class:'i'},ic,el('div',{style:'flex:1;min-width:0'},el('b',{},l),el('div',{class:'sm',style:'margin-top:2px;line-height:1.35'},cap)),st2)};
+  });
+  const tip=el('div',{class:'fs-tip'},'Анализируем '+pair+' · '+fmtDur(sec)+'…');
+  const bar=el('i',{style:'display:block;height:100%;width:0;background:var(--acc2);border-radius:99px;transition:width .5s linear'});
   const holder=el('div',{});
-  shell('Анализ',[el('div',{class:'fs-tip'},'Анализируем '+pair+' · '+fmtDur(sec)+'…'),el('div',{class:'ck'},rows.map(r=>r.node)),holder]);
-  const req=api('/signals/request',{method:'POST',body:{pair,expiry_sec:sec}}).then(r=>({r:{...r,skew:Date.parse(r.now)-Date.now()}}),e=>({e}));   // разницу часов считаем сразу по ответу, а не после анимации
-  rows.forEach((r,i)=>timers.push(setTimeout(()=>{r.ic.className='tick';r.ic.textContent='✓';r.st2.textContent='готово';r.st2.style.color='var(--ok)';buzzL()},(i+1)*2000)));
+  shell('Анализ',[tip,el('div',{style:'height:4px;background:#ffffff1a;border-radius:99px;overflow:hidden'},bar),el('div',{class:'ck'},rows.map(r=>r.node)),holder]);
+  let req=null;
+  let at=0;
+  rows.forEach((r,i)=>{
+    timers.push(setTimeout(()=>{r.ic.className='spin';r.st2.textContent='проверяем…';tip.textContent='Шаг '+(i+1)+' из '+rows.length+' · '+pair+' · '+fmtDur(sec);bar.style.width=Math.round(i/rows.length*100)+'%';if(i>2){try{r.node.scrollIntoView({behavior:'smooth',block:'center'})}catch{}}},at));
+    at+=durs[i];
+    timers.push(setTimeout(()=>{r.ic.className='tick';r.ic.textContent='✓';r.st2.textContent='готово';r.st2.style.color='var(--ok)';bar.style.width=Math.round((i+1)/rows.length*100)+'%';buzzL()},at));
+  });
+  // Сигнал создаём в самом конце: время входа отсчитывается от запроса, а анализ идёт заметно дольше прежних 6 секунд
+  timers.push(setTimeout(()=>{req=api('/signals/request',{method:'POST',body:{pair,expiry_sec:sec}}).then(r=>({r:{...r,skew:Date.parse(r.now)-Date.now()}}),e=>({e}))},Math.max(0,total-400)));
   timers.push(setTimeout(async()=>{
+    while(!req)await new Promise(r=>setTimeout(r,50));
     const res=await req;
     if(res.e){toast(res.e.message);signalPairs();return}
     buzzL();signalResult(res.r);
-  },6300));
+  },total+300));
 }
 /** Карточка сигнала по запросу: две карточки. Первая: параметры сигнала и «Открыть Pocket Option». Вторая: отсчёт, расписание, оценка */
 function signalLive(sg,skew,cfg){
