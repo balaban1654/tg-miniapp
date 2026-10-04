@@ -467,7 +467,7 @@ function drawNav(){
   const nav=$('#nav');if(!nav||!me)return;
   const lay=reconcileLayout(me.nav_layout,navItems,me.role);
   const label=k=>(navItems.find(x=>x[0]===k)||[])[1]||k;
-  const mkBtn=(k,ic,sub)=>el('button',{type:'button','data-t':k,class:(k===tab?'on':'')+(sub?' sub':''),onclick:()=>{tab=k;showApp();render()}},ic?iconNamed(ic):icon(k),el('span',{class:'lbl'},k==='chats'?chatsLabel:label(k)),k==='mytasks'?el('span',{class:'nbadge',id:'tasksBadge',hidden:''}):null);
+  const mkBtn=(k,ic,sub)=>el('button',{type:'button','data-t':k,class:(k===tab?'on':'')+(sub?' sub':''),onclick:()=>{tab=k;showApp();render()}},ic?iconNamed(ic):icon(k),el('span',{class:'lbl'},k==='chats'?chatsLabel:k==='leads'?leadsLabel:label(k)),k==='mytasks'?el('span',{class:'nbadge',id:'tasksBadge',hidden:''}):null);
   const out=[];
   for(const n of lay.nodes){
     if(n.t==='i'){out.push(mkBtn(n.k,n.icon,false));continue}
@@ -1554,12 +1554,13 @@ async function staffTeam(){
 const ctrT=t=>{t.classList.add('ctr');return t};
 let poll=null;
 function stopPoll(){if(poll){clearInterval(poll);poll=null}}
-let chatsLabel='Чаты';
+let chatsLabel='Чаты',leadsLabel='Лиды';
 async function updateBadge(){
   if(!me)return;
   if(['admin','teamlead','streamer'].includes(me.role)){
     try{const c=await api('/chats');const n=c.filter(x=>x.waiting).length;chatsLabel='Чаты '+c.length+(n?' ('+n+')':'');const b=document.querySelector('[data-t=chats] .lbl');if(b&&b.textContent!==chatsLabel)b.textContent=chatsLabel}catch{}
   }
+  try{const t=await api('/leads/today');leadsLabel='Лиды '+t.paid+(t.reg?' ('+t.reg+')':'');const b=document.querySelector('[data-t=leads] .lbl');if(b&&b.textContent!==leadsLabel)b.textContent=leadsLabel}catch{}
   if(me.role==='streamer')await setTasksBadge();
 }
 /** Цифра у пункта «Мои задачи»: сколько задач ещё не закрыто */
