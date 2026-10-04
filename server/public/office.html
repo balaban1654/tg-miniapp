@@ -2890,9 +2890,10 @@ async function viewPostbacks(){
       rows.length?'Ничего не найдено. Измените фильтры.':'Постбеков пока нет. Когда партнёрка отправит первый, он появится здесь.'));
     // Итого по показанным записям: по каждому событию отдельно, а строка «Итого» внизу таблицы, когда выбрано одно событие
     const by2={};list.forEach(r=>{const o=by2[r.event]||(by2[r.event]={n:0,s:0});o.n++;o.s+=amt(r)});
-    const types=Object.keys(by2).filter(k=>k!=='reg');
+    const ORDER=['reg','ftd','dep','comm','wd'];
+    const types=ORDER.filter(k=>by2[k]&&k!=='reg');
     const usd=v=>'$'+v.toLocaleString('ru-RU',{minimumFractionDigits:2,maximumFractionDigits:2});
-    totBox.replaceChildren(...types.map(k=>el('span',{class:'pb-tot'},el('span',{class:'pill ev-'+k},k),el('b',{},usd(by2[k].s)),el('span',{class:'mut sm'},by2[k].n+' шт'))));
+    totBox.replaceChildren(...ORDER.filter(k=>by2[k]).map(k=>el('span',{class:'pb-tot'},el('span',{class:'pill ev-'+k},k),k==='reg'?el('b',{},by2[k].n+' шт'):el('b',{},usd(by2[k].s)),k==='reg'?null:el('span',{class:'mut sm'},by2[k].n+' шт'))));
     const tb=holder.querySelector('tbody');
     if(tb&&list.length&&types.length===1&&Object.keys(by2).length===1){
       const tr=el('tr',{class:'sum-row'},el('td',{},'Итого'),el('td',{},el('span',{class:'pill ev-'+types[0]},types[0])),el('td',{}),el('td',{}),el('td',{class:'n'},usd(by2[types[0]].s)),el('td',{},by2[types[0]].n+' шт'),el('td',{}));
