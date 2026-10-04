@@ -63,6 +63,14 @@ html{background:#0a0613}
 .nav{display:grid;gap:3px}
 .nav button{display:flex;align-items:center;gap:10px;text-align:left;white-space:nowrap;background:none;border:0;border-radius:9px;padding:9px 12px;color:var(--mut);font-weight:600;cursor:pointer}
 .nav button.on{background:var(--card2);color:var(--fg)}
+.ne-list{display:grid;gap:6px;max-height:55vh;overflow:auto;padding:2px}
+.ne-row{display:flex;align-items:center;gap:8px;background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:6px 8px}.ne-row.sub{margin-left:26px}.ne-row.ne-folder{background:var(--card2)}.ne-row.dragging{opacity:.4}.ne-row.over{border-color:var(--acc);box-shadow:0 0 0 2px #9b5cff55}
+.ne-h{cursor:grab;color:var(--mut);font-size:16px;line-height:1;user-select:none;padding:0 2px}.ne-t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ne-name{flex:1;min-width:0;padding:6px 8px}
+.ne-ib{background:none;border:1px solid var(--line);color:var(--acc2);border-radius:8px;width:34px;height:34px;display:grid;place-items:center;cursor:pointer;flex:none}.ne-ib:hover{border-color:var(--acc)}
+.ne-st{padding:4px 9px}.ne-sel{width:auto;max-width:150px;padding:5px 6px;font-size:12px}
+.ne-pick{display:flex;flex-wrap:wrap;gap:6px;padding:8px;background:var(--bg);border:1px dashed var(--line);border-radius:10px}.ne-ic{background:none;border:1px solid var(--line);color:var(--fg);border-radius:8px;width:36px;height:36px;display:grid;place-items:center;cursor:pointer}.ne-ic:hover,.ne-ic.on{border-color:var(--acc);background:#9b5cff22}
+.ne-empty{padding:2px 8px 2px 34px}
+@media(max-width:560px){.ne-row{flex-wrap:wrap}.ne-sel{max-width:100%;flex:1 1 100%}}
 .nav button.grp{justify-content:flex-start}.nav button.grp .chv{margin-left:auto;transition:transform .15s;font-size:16px;line-height:1}.nav button.grp[aria-expanded=true] .chv{transform:rotate(90deg)}.nav button.grp.act{color:var(--fg)}.nav button.sub{padding-left:26px;font-size:13.5px}.nav button.sub svg{width:16px;height:16px}
 @media(max-width:760px){.nav button.sub{padding-left:12px}.nav button.grp .chv{margin-left:4px}}
 .nbadge{margin-left:auto;min-width:19px;height:19px;border-radius:99px;background:var(--bad);color:#fff;font:700 11px var(--fm);display:grid;place-items:center;padding:0 6px}
@@ -320,7 +328,7 @@ textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10
   <aside class="side">
     <div class="brand"><div class="logo">H</div><b style="font:700 14px var(--fd)">Hunter Office</b></div>
     <nav class="nav" id="nav"></nav>
-    <div class="me"><div class="me-row"><span id="meName"></span><button class="gear" id="meGear" type="button" title="Моя карточка" aria-label="Моя карточка"></button></div><button class="btn o s" id="installBtn" type="button" hidden title="Установить приложение" aria-label="Установить приложение"><svg class="iic" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg><span class="ilbl">Установить приложение</span></button><button class="btn o s" id="logout" type="button">Выйти</button></div>
+    <div class="me"><div class="me-row"><span id="meName"></span><button class="gear" id="meGear" type="button" title="Моя карточка" aria-label="Моя карточка"></button><button class="gear" id="meNav" type="button" title="Настроить меню" aria-label="Настроить меню" hidden></button></div><button class="btn o s" id="installBtn" type="button" hidden title="Установить приложение" aria-label="Установить приложение"><svg class="iic" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg><span class="ilbl">Установить приложение</span></button><button class="btn o s" id="logout" type="button">Выйти</button></div>
   </aside>
   <main id="main"></main>
 </div>
@@ -387,6 +395,7 @@ function showApp(){
   $('#login').hidden=true;$('#app').hidden=false;
   $('#meName').replaceChildren(me.name,el('span',{class:'mrole'},' · '+ROLE[me.role]));
   const gb=$('#meGear');if(gb&&!gb.firstChild){gb.append(svgIcon(GEAR,16));gb.onclick=()=>openStaffCard(null)}
+  const nb=$('#meNav');if(nb){if(!nb.firstChild){nb.append(svgIcon('<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><path d="M14 17.5h7M17.5 14v7"/>',16));nb.onclick=openNavEditor}nb.hidden=me.role!=='admin'}
   const items=[['home','Дашборд'],['leads','Лиды'],];
   if(me.role==='admin'||me.role==='teamlead')items.push(['staff',me.role==='admin'?'Сотрудники':'Моя команда']);
   if(['admin','teamlead','streamer'].includes(me.role))items.splice(1,0,['chats','Чаты']);
@@ -398,22 +407,181 @@ function showApp(){
   if(me.role==='admin'){items.splice(items.findIndex(x=>x[0]==='push'),0,['acc','Бухгалтерия']);items.splice(1,0,['plans','Планы и задачи'])}
   if(tab==='links'&&me.role==='admin'){tab='staff';staffState.tab='links'}
   if(!items.some(x=>x[0]===tab)){tab=items[0][0];history.replaceState(null,'','#'+hashPath())}
-  const nav=$('#nav');
-  const GROUP=['signals','staff','push','media'];   // у админа эти разделы свёрнуты в «Настройки»
-  const grouped=me.role==='admin';
-  const mkBtn=([k,t],sub)=>el('button',{type:'button','data-t':k,class:(k===tab?'on':'')+(sub?' sub':''),onclick:()=>{tab=k;showApp();render()}},icon(k),el('span',{class:'lbl'},k==='chats'?chatsLabel:t),k==='mytasks'?el('span',{class:'nbadge',id:'tasksBadge',hidden:''}):null);
-  const drawNav=()=>{
-    if(!grouped){nav.replaceChildren(...items.map(i=>mkBtn(i)));return}
-    const inGroup=GROUP.includes(tab);
-    let open=false;try{open=localStorage.getItem('hunterNavSettings')==='1'}catch{}
-    if(inGroup)open=true;
-    const main=items.filter(x=>!GROUP.includes(x[0])),subs=GROUP.map(k=>items.find(x=>x[0]===k)).filter(Boolean);
-    const gb=el('button',{type:'button',class:'grp'+(inGroup?' act':''),'aria-expanded':String(open),onclick:()=>{if(inGroup)return;open=!open;try{localStorage.setItem('hunterNavSettings',open?'1':'0')}catch{}drawNav()}},icon('settings'),el('span',{class:'lbl'},'Настройки'),el('span',{class:'chv'},'›'));
-    nav.replaceChildren(...main.map(i=>mkBtn(i)),gb,...(open?subs.map(i=>mkBtn(i,true)):[]));
-  };
+  navItems=items;
   drawNav();
   render();updateBadge();
 }
+
+/* ---------- Боковое меню: свой порядок, папки и значки ---------- */
+let navItems=[];
+const ICON_EXTRA={
+  star:'<path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/>',
+  folder:'<path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>',
+  bolt:'<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>',
+  flag:'<path d="M5 21V4M5 4h11l-2 4 2 4H5"/>',
+  calendar:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
+  dollar:'<path d="M12 3v18M16 7.5C15 6.5 13.7 6 12 6c-2.2 0-4 1-4 2.8 0 4 8 2 8 6.2 0 1.8-1.8 2.9-4 2.9-1.8 0-3.2-.6-4.2-1.6"/>',
+  shield:'<path d="M12 3l8 3v6c0 4.5-3.2 7.8-8 9-4.8-1.2-8-4.5-8-9V6z"/>',
+  heart:'<path d="M12 20s-7-4.4-9-9.2C1.8 7.4 3.7 4.5 6.8 4.5c1.9 0 3.2 1 5.2 3 2-2 3.3-3 5.2-3 3.1 0 5 2.9 3.8 6.3-2 4.8-9 9.2-9 9.2z"/>',
+  globe:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/>',
+  tag:'<path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="8.5" r="1"/>',
+  mail:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/>',
+  bookmark:'<path d="M6 3h12v18l-6-4-6 4z"/>',
+  key:'<circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M16 7l3 3"/>',
+  camera:'<rect x="3" y="7" width="18" height="13" rx="2"/><circle cx="12" cy="13" r="3.5"/><path d="M8 7l1.5-3h5L16 7"/>',
+  bars:'<path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/>'
+};
+const ICON_ALL={...ICONS,...ICON_EXTRA};
+const ICON_NAMES=['home','star','folder','chats','leads','links','staff','acc','plans','mytasks','shifts','push','media','pb','signals','settings','bolt','flag','calendar','dollar','shield','heart','globe','tag','mail','bookmark','key','camera','bars'];
+const iconNamed=n=>{const s=document.createElementNS('http://www.w3.org/2000/svg','svg');s.setAttribute('viewBox','0 0 24 24');s.setAttribute('width','18');s.setAttribute('height','18');s.setAttribute('fill','none');s.setAttribute('stroke','currentColor');s.setAttribute('stroke-width','2');s.setAttribute('stroke-linecap','round');s.setAttribute('stroke-linejoin','round');s.setAttribute('aria-hidden','true');s.innerHTML=ICON_ALL[n]||ICON_ALL.star;return s};
+const cloneJ=o=>JSON.parse(JSON.stringify(o));
+/** Стандартная раскладка: у админа четыре раздела спрятаны в папку «Настройки» */
+function defaultLayout(items,role){
+  const keys=items.map(x=>x[0]);
+  if(role==='admin'){const G=['signals','staff','push','media'];
+    return{v:1,nodes:[...keys.filter(k=>!G.includes(k)).map(k=>({t:'i',k})),{t:'f',id:'settings',title:'Настройки',icon:'settings',items:G.filter(k=>keys.includes(k)).map(k=>({k}))}]}}
+  return{v:1,nodes:keys.map(k=>({t:'i',k}))};
+}
+/** Сохранённая раскладка, приведённая к доступным разделам: лишние убираем, новые добавляем в конец */
+function reconcileLayout(lay,items,role){
+  const keys=new Set(items.map(x=>x[0]));
+  const base=lay&&Array.isArray(lay.nodes)?cloneJ(lay):defaultLayout(items,role);
+  const seen=new Set();
+  const nodes=[];
+  for(const n of base.nodes){
+    if(n.t==='i'){if(keys.has(n.k)&&!seen.has(n.k)){seen.add(n.k);nodes.push(n)}}
+    else if(n.t==='f'){n.items=(n.items||[]).filter(x=>keys.has(x.k)&&!seen.has(x.k));n.items.forEach(x=>seen.add(x.k));nodes.push(n)}
+  }
+  for(const k of keys)if(!seen.has(k))nodes.push({t:'i',k});
+  return{v:1,nodes};
+}
+function drawNav(){
+  const nav=$('#nav');if(!nav||!me)return;
+  const lay=reconcileLayout(me.nav_layout,navItems,me.role);
+  const label=k=>(navItems.find(x=>x[0]===k)||[])[1]||k;
+  const mkBtn=(k,ic,sub)=>el('button',{type:'button','data-t':k,class:(k===tab?'on':'')+(sub?' sub':''),onclick:()=>{tab=k;showApp();render()}},ic?iconNamed(ic):icon(k),el('span',{class:'lbl'},k==='chats'?chatsLabel:label(k)),k==='mytasks'?el('span',{class:'nbadge',id:'tasksBadge',hidden:''}):null);
+  const out=[];
+  for(const n of lay.nodes){
+    if(n.t==='i'){out.push(mkBtn(n.k,n.icon,false));continue}
+    if(!n.items.length)continue;
+    const inGroup=n.items.some(x=>x.k===tab);
+    let open=false;try{open=localStorage.getItem('hunterNav_'+n.id)==='1'}catch{}
+    if(inGroup)open=true;
+    out.push(el('button',{type:'button',class:'grp'+(inGroup?' act':''),'aria-expanded':String(open),onclick:()=>{if(inGroup)return;try{localStorage.setItem('hunterNav_'+n.id,open?'0':'1')}catch{}drawNav()}},iconNamed(n.icon||'folder'),el('span',{class:'lbl'},n.title),el('span',{class:'chv'},'›')));
+    if(open)n.items.forEach(x=>out.push(mkBtn(x.k,x.icon,true)));
+  }
+  nav.replaceChildren(...out);
+}
+/** Окно «Настроить меню»: перетаскивание, стрелки, папки и значки. Вкладка «Стримеры» для админа */
+async function openNavEditor(){
+  document.querySelectorAll('.lc-overlay').forEach(x=>x.remove());
+  const ov=el('div',{class:'lc-overlay',role:'dialog','aria-modal':'true'});
+  const close=()=>{ov.remove();document.removeEventListener('keydown',onKey)};
+  const onKey=e=>{if(e.key==='Escape')close()};document.addEventListener('keydown',onKey);
+  ov.addEventListener('mousedown',e=>{if(e.target===ov)close()});
+  const box=el('div',{class:'lc',style:'width:min(640px,100%)'});ov.append(box);document.body.append(ov);
+  const STREAMER_ITEMS=[['home','Дашборд'],['chats','Чаты'],['leads','Лиды'],['shifts','Смены и отчёты'],['mytasks','Мои задачи']];
+  let target='me',streamerLay;
+  try{streamerLay=(await api('/nav/streamer')).layout}catch{streamerLay=null}
+  let nodes,avail,pick=null,drag=null;
+  const load=()=>{
+    if(target==='me'){avail=navItems;nodes=reconcileLayout(me.nav_layout,navItems,me.role).nodes}
+    else{avail=STREAMER_ITEMS;nodes=reconcileLayout(streamerLay,STREAMER_ITEMS,'streamer').nodes}
+    pick=null;
+  };
+  const lbl=k=>(avail.find(x=>x[0]===k)||[])[1]||k;
+  const folders=()=>nodes.filter(n=>n.t==='f');
+  // поиск узла: {list,idx,folder}
+  const where=id=>{for(let i=0;i<nodes.length;i++){const n=nodes[i];if((n.t==='i'&&n.k===id)||(n.t==='f'&&n.id===id))return{list:nodes,idx:i,folder:null};if(n.t==='f')for(let j=0;j<n.items.length;j++)if(n.items[j].k===id)return{list:n.items,idx:j,folder:n}}return null};
+  const take=id=>{const w=where(id);if(!w)return null;const [x]=w.list.splice(w.idx,1);return w.folder?{t:'i',k:x.k,...(x.icon?{icon:x.icon}:{})}:x};
+  const putItem=(x,list,idx)=>{list.splice(idx<0?list.length:idx,0,x.t==='i'?(list===nodes?x:{k:x.k,...(x.icon?{icon:x.icon}:{})}):x)};
+  const moveBefore=(src,dst)=>{
+    if(src===dst)return;const wd=where(dst);if(!wd)return;
+    const x=take(src);if(!x)return;
+    const w2=where(dst);
+    if(x.t==='f'){const at=w2.folder?nodes.indexOf(w2.folder):w2.idx;nodes.splice(at,0,x)}
+    else putItem(x,w2.list,w2.idx);
+  };
+  const intoFolder=(src,fid)=>{const f=nodes.find(n=>n.t==='f'&&n.id===fid);if(!f)return;const x=take(src);if(!x||x.t==='f'){if(x)nodes.push(x);return}f.items.push({k:x.k,...(x.icon?{icon:x.icon}:{})})};
+  const step=(id,dir)=>{const w=where(id);if(!w)return;const j=w.idx+dir;if(j<0||j>=w.list.length)return;[w.list[w.idx],w.list[j]]=[w.list[j],w.list[w.idx]]};
+  const toRoot=id=>{const x=take(id);if(x)nodes.push(x)};
+  const delFolder=id=>{const i=nodes.findIndex(n=>n.t==='f'&&n.id===id);if(i<0)return;const f=nodes[i];nodes.splice(i,1,...f.items.map(x=>({t:'i',...x})))};
+  const picker=id=>{
+    const w=where(id);const cur=(w&&(w.folder?w.list[w.idx].icon:w.list[w.idx].icon))||'';
+    return el('div',{class:'ne-pick'},...ICON_NAMES.map(n=>el('button',{type:'button',class:'ne-ic'+(cur===n?' on':''),title:n,onclick:()=>{const t=where(id).list[where(id).idx];t.icon=n;pick=null;draw()}},iconNamed(n))));
+  };
+  const rowCommon=(id,isFolder)=>{
+    const w=where(id),n=w.list[w.idx];
+    const handle=el('span',{class:'ne-h',title:'Перетащить'},'⠿');
+    const ib=el('button',{type:'button',class:'ne-ib',title:'Выбрать значок',onclick:()=>{pick=pick===id?null:id;draw()}},iconNamed(n.icon||(isFolder?'folder':id)));
+    const up=el('button',{type:'button',class:'btn o s ne-st',title:'Выше','aria-label':'Выше',onclick:()=>{step(id,-1);draw()}},'↑');
+    const dn=el('button',{type:'button',class:'btn o s ne-st',title:'Ниже','aria-label':'Ниже',onclick:()=>{step(id,1);draw()}},'↓');
+    return{handle,ib,up,dn};
+  };
+  const dnd=(row,id,isFolder)=>{
+    row.draggable=true;
+    row.addEventListener('dragstart',e=>{drag=id;e.dataTransfer.effectAllowed='move';try{e.dataTransfer.setData('text/plain',id)}catch{}row.classList.add('dragging')});
+    row.addEventListener('dragend',()=>{drag=null;row.classList.remove('dragging');box.querySelectorAll('.over').forEach(x=>x.classList.remove('over'))});
+    row.addEventListener('dragover',e=>{if(drag&&drag!==id){e.preventDefault();row.classList.add('over')}});
+    row.addEventListener('dragleave',()=>row.classList.remove('over'));
+    row.addEventListener('drop',e=>{e.preventDefault();row.classList.remove('over');if(!drag||drag===id)return;
+      const src=where(drag);const srcIsFolder=src&&!src.folder&&nodes[src.idx]&&nodes[src.idx].t==='f';
+      if(isFolder&&!srcIsFolder)intoFolder(drag,id);else moveBefore(drag,id);
+      drag=null;draw()});
+  };
+  const itemRow=(k,sub)=>{
+    const c=rowCommon(k,false);
+    const sel=el('select',{class:'ne-sel',title:'Куда положить','aria-label':'Куда положить',onchange:()=>{if(sel.value==='')toRoot(k);else intoFolder(k,sel.value);draw()}},el('option',{value:''},'Вне папок'),...folders().map(f=>el('option',{value:f.id},'в папку «'+f.title+'»')));
+    sel.value=sub?sub.id:'';
+    const row=el('div',{class:'ne-row'+(sub?' sub':'')},c.handle,c.ib,el('span',{class:'ne-t'},lbl(k)),c.up,c.dn,sel);
+    dnd(row,k,false);return row;
+  };
+  const folderRow=f=>{
+    const c=rowCommon(f.id,true);
+    const name=el('input',{class:'ne-name',value:f.title,maxlength:'30','aria-label':'Название папки',oninput:()=>{f.title=name.value}});
+    const del=el('button',{type:'button',class:'btn o s',style:'color:var(--bad)',title:'Удалить папку (разделы вернутся в меню)','aria-label':'Удалить папку',onclick:()=>{delFolder(f.id);draw()}},'✕');
+    const row=el('div',{class:'ne-row ne-folder'},c.handle,c.ib,name,c.up,c.dn,del);
+    dnd(row,f.id,true);return row;
+  };
+  const list=el('div',{class:'ne-list'});
+  const draw=()=>{
+    const out=[];
+    for(const n of nodes){
+      if(n.t==='i'){out.push(itemRow(n.k,null));if(pick===n.k)out.push(picker(n.k))}
+      else{out.push(folderRow(n));if(pick===n.id)out.push(picker(n.id));
+        if(!n.items.length)out.push(el('div',{class:'ne-empty mut sm'},'Папка пустая: перетащите сюда разделы или выберите «в папку» у раздела'));
+        for(const it of n.items){out.push(itemRow(it.k,n));if(pick===it.k)out.push(picker(it.k))}}
+    }
+    list.replaceChildren(...out);
+  };
+  const err=el('div',{class:'err',role:'alert'});
+  const save=async()=>{
+    err.textContent='';
+    const layout={v:1,nodes:cloneJ(nodes)};
+    try{
+      if(target==='me'){await api('/profile/nav',{method:'PUT',body:{layout}});me.nav_layout=layout;drawNav();updateBadge()}
+      else{await api('/nav/streamer',{method:'PUT',body:{layout}});streamerLay=layout}
+      toast(target==='me'?'Меню сохранено':'Меню стримеров сохранено');if(target==='me')close();
+    }catch(x){err.textContent=x.message}
+  };
+  const reset=async()=>{
+    if(!confirm(target==='me'?'Вернуть стандартное меню?':'Вернуть стримерам стандартное меню?'))return;
+    try{
+      if(target==='me'){await api('/profile/nav',{method:'PUT',body:{layout:null}});me.nav_layout=null;drawNav();updateBadge();close();toast('Меню сброшено')}
+      else{await api('/nav/streamer',{method:'PUT',body:{layout:null}});streamerLay=null;load();draw();toast('Меню стримеров сброшено')}
+    }catch(x){err.textContent=x.message}
+  };
+  const addFolder=()=>{nodes.push({t:'f',id:'f'+Date.now().toString(36),title:'Новая папка',icon:'folder',items:[]});draw();const ins=list.querySelectorAll('.ne-name');if(ins.length){const l=ins[ins.length-1];l.focus();l.select()}};
+  const tabs=el('div',{class:'lc-tabs',role:'tablist'});
+  const drawTabs=()=>tabs.replaceChildren(...[['me','Моё меню'],['streamer','Стримеры']].map(([k,t])=>el('button',{type:'button',role:'tab','aria-selected':String(k===target),class:'lc-tab'+(k===target?' on':''),onclick:()=>{target=k;load();drawTabs();draw();hint.textContent=k==='me'?'Перетащите разделы мышью или двигайте стрелками. Папки можно создавать и переименовывать, значок выбирается по нажатию на него.':'Это меню увидят все стримеры. Настройте порядок, папки и значки так же. Сами стримеры меню изменить не могут.'}},t)));
+  const hint=el('div',{class:'mut sm'},'Перетащите разделы мышью или двигайте стрелками. Папки можно создавать и переименовывать, значок выбирается по нажатию на него.');
+  load();drawTabs();draw();
+  box.replaceChildren(el('div',{class:'lc-head'},el('h3',{style:'font-size:18px'},'Настроить меню'),el('button',{class:'btn o s',type:'button','aria-label':'Закрыть',onclick:close},'✕')),
+    me.role==='admin'?tabs:null,hint,list,err,
+    el('div',{class:'lc-actions'},el('button',{class:'btn',type:'button',onclick:save},'Сохранить'),el('button',{class:'btn o',type:'button',onclick:addFolder},'+ Папка'),el('button',{class:'btn o',type:'button',style:'margin-left:auto',onclick:reset},'Сбросить')));
+  box.replaceChildren(...[...box.childNodes].filter(Boolean));
+}
+
 
 $('#loginForm').addEventListener('submit',async e=>{
   e.preventDefault();$('#lErr').textContent='';$('#lBtn').disabled=true;

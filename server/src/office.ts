@@ -174,7 +174,15 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     return { ok: true };
   });
 
-  app.get('/me', { preHandler: auth }, async (req) => req.staff);
+  app.get('/me', { preHandler: auth }, async (req) => {
+    const me = req.staff!;
+    // Стримеры видят меню, которое настроил для них админ
+    if (me.role === 'streamer') {
+      const d = (await db.query(`SELECT layout FROM nav_defaults WHERE role = 'streamer'`)).rows[0];
+      return { ...me, nav_layout: d?.layout ?? null };
+    }
+    return me;
+  });
 
   // Своя карточка: личные данные и реквизиты выплат
   app.get('/profile', { preHandler: auth }, async (req) => {
@@ -191,6 +199,54 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     await db.query(`UPDATE staff SET ${keys2.map((k, i) => `${k} = $${i + 2}`).join(', ')} WHERE id = $1`, [req.staff!.id, ...keys2.map((k) => f.cols[k])]);
     return { ok: true };
   });
+  // Боковое меню: порядок, папки, значки. layout = null сбрасывает на стандартное
+  const cleanNav = (lay: unknown): { error: string } | { layout: unknown } => {
+    const ICON = /^[a-z0-9_-]{1,24}$/;
+    const KEY = /^[a-z0-9_-]{1,24}$/;
+    const err = { error: 'Неверная раскладка меню' };
+    if (!lay || typeof lay !== 'object' || !Array.isArray((lay as any).nodes) || (lay as any).nodes.length > 60) return err;
+    const nodes: unknown[] = [];
+    for (const n of (lay as any).nodes) {
+      if (n?.t === 'i') {
+        if (!KEY.test(String(n.k))) return err;
+        nodes.push({ t: 'i', k: String(n.k), ...(n.icon && ICON.test(String(n.icon)) ? { icon: String(n.icon) } : {}) });
+      } else if (n?.t === 'f') {
+        if (!KEY.test(String(n.id)) || !Array.isArray(n.items) || n.items.length > 40) return err;
+        const items: unknown[] = [];
+        for (const it of n.items) {
+          if (!KEY.test(String(it?.k))) return err;
+          items.push({ k: String(it.k), ...(it.icon && ICON.test(String(it.icon)) ? { icon: String(it.icon) } : {}) });
+        }
+        nodes.push({ t: 'f', id: String(n.id), title: str(n.title, 30) || 'Папка', icon: ICON.test(String(n.icon)) ? String(n.icon) : 'folder', items });
+      } else return err;
+    }
+    return { layout: { v: 1, nodes } };
+  };
+  app.put('/profile/nav', { preHandler: auth }, async (req, reply) => {
+    const lay = ((req.body ?? {}) as Record<string, unknown>).layout;
+    if (lay === null) {
+      await db.query('UPDATE staff SET nav_layout = NULL WHERE id = $1', [req.staff!.id]);
+      return { ok: true };
+    }
+    const c = cleanNav(lay);
+    if ('error' in c) return reply.code(400).send({ error: c.error });
+    await db.query('UPDATE staff SET nav_layout = $2::jsonb WHERE id = $1', [req.staff!.id, JSON.stringify(c.layout)]);
+    return { ok: true };
+  });
+  // Меню стримеров настраивает админ: одна раскладка для всех стримеров
+  app.get('/nav/streamer', { preHandler: need('admin') }, async () => ({ layout: (await db.query(`SELECT layout FROM nav_defaults WHERE role = 'streamer'`)).rows[0]?.layout ?? null }));
+  app.put('/nav/streamer', { preHandler: need('admin') }, async (req, reply) => {
+    const lay = ((req.body ?? {}) as Record<string, unknown>).layout;
+    if (lay === null) {
+      await db.query(`DELETE FROM nav_defaults WHERE role = 'streamer'`);
+      return { ok: true };
+    }
+    const c = cleanNav(lay);
+    if ('error' in c) return reply.code(400).send({ error: c.error });
+    await db.query(`INSERT INTO nav_defaults (role, layout) VALUES ('streamer', $1::jsonb) ON CONFLICT (role) DO UPDATE SET layout = EXCLUDED.layout`, [JSON.stringify(c.layout)]);
+    return { ok: true };
+  });
+
   // Смена своего пароля: нужен текущий
   app.post('/profile/password', { preHandler: auth }, async (req, reply) => {
     const b = (req.body ?? {}) as Record<string, unknown>;
