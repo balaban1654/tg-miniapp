@@ -1129,11 +1129,15 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     const liveBy = new Map(((await db.query(`SELECT DISTINCT ON (staff_id) staff_id, started_at, stream_url FROM shift_reports WHERE status = 'live' ORDER BY staff_id, id DESC`)).rows as any[]).map((r) => [r.staff_id, r]));
     const lastBy = new Map(((await db.query(`SELECT DISTINCT ON (staff_id) staff_id, ended_at, coalesce(approved_min, declared_min) AS m FROM shift_reports WHERE status <> 'live' AND ended_at IS NOT NULL ORDER BY staff_id, ended_at DESC`)).rows as any[]).map((r) => [r.staff_id, r]));
     const hoursBy = new Map(((await db.query(`SELECT staff_id, coalesce(sum(approved_min), 0)::int AS m FROM shift_reports WHERE status = 'approved' AND to_char(day, 'YYYY-MM') = $1 GROUP BY staff_id`, [refMonth])).rows as any[]).map((r) => [r.staff_id, r.m]));
+    // FTD за месяц по стримерам (только количество, без денег)
+    const ftdBy = new Map(
+      ((await db.query(`SELECT d.owner_id, count(*)::int AS n FROM events e JOIN leads d ON d.tg_id = e.tg_id WHERE e.type = 'ftd' AND d.lead_role = 'lead' AND d.owner_id IS NOT NULL AND to_char(e.created_at AT TIME ZONE '${TZ}', 'YYYY-MM') = $1 GROUP BY d.owner_id`, [refMonth])).rows as any[]).map((r) => [r.owner_id, r.n]),
+    );
     const colleagues = colRows
       .map((c) => {
         const lv = liveBy.get(c.id) ?? null;
         const ls = lastBy.get(c.id) ?? null;
-        return { id: c.id, name: c.name, hoursMin: hoursBy.get(c.id) ?? 0, live: lv ? { started_at: lv.started_at, stream_url: lv.stream_url } : null, lastEnd: ls?.ended_at ?? null, lastMin: ls?.m ?? null };
+        return { id: c.id, name: c.name, hoursMin: hoursBy.get(c.id) ?? 0, ftd: ftdBy.get(c.id) ?? 0, live: lv ? { started_at: lv.started_at, stream_url: lv.stream_url } : null, lastEnd: ls?.ended_at ?? null, lastMin: ls?.m ?? null };
       })
       .sort((a, b) => (b.live ? Date.now() - Date.parse(b.live.started_at) + 1e12 : 0) - (a.live ? Date.now() - Date.parse(a.live.started_at) + 1e12 : 0) || (Date.parse(b.lastEnd ?? '0') || 0) - (Date.parse(a.lastEnd ?? '0') || 0));
 
@@ -1165,6 +1169,8 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
       clicksSince,
       byStatus,
       colleagues,
+      // Общий план команды: часы всех стримеров и FTD против плана на команду (цель по FTD берётся из целей компании)
+      team: { size: colRows.length + 1, hoursMin: k.hoursMin + colRows.reduce((a, c) => a + (hoursBy.get(c.id) ?? 0), 0), ftd: k.ftdCount + colRows.reduce((a, c) => a + (ftdBy.get(c.id) ?? 0), 0), ftdGoal: plan.goals.ftd },
       salary: {
         period: refMonth,
         base: [k.min.base, k.full.base],
