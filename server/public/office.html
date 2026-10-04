@@ -164,7 +164,8 @@ textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10
 .bub video{max-width:260px;width:100%;border-radius:8px;display:block;margin-bottom:4px}.bub video.vnote{width:200px;height:200px;border-radius:50%;object-fit:cover}.bub audio{width:250px;max-width:100%;display:block;margin-bottom:4px}.bub .fl{display:inline-flex;gap:6px;align-items:center;color:var(--acc2);text-decoration:none;margin-bottom:4px}.bub img{cursor:zoom-in}
 .vn-stage{position:relative;width:min(300px,70vw);height:min(300px,70vw);margin:0 auto}.vn-ov video{width:100%;height:100%;object-fit:cover;border-radius:50%;background:#000;display:block}.vn-flip{position:absolute;right:-6px;bottom:-6px;width:46px;height:46px;padding:0;border-radius:50%;display:grid;place-items:center;background:var(--card2)}.vn-ov video.mir{transform:scaleX(-1)}
 .reply textarea{flex:1;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px;resize:none;font:inherit;color:inherit;min-height:44px;max-height:120px}
-@media(max-width:760px){.reply{flex-wrap:wrap}.reply textarea{flex:1 1 100%;order:-1}.reply>.btn:last-child{margin-left:auto}.recbar{order:-1;flex:1 1 100%}.chat-wrap{grid-template-columns:1fr;height:auto}.chat-list{max-height:220px}.chat-thread{height:60vh}}
+@media(max-width:760px){.reply{flex-wrap:wrap}.reply textarea{flex:1 1 100%;order:-1}.reply>.btn:last-child{margin-left:auto}.recbar{order:-1;flex:1 1 100%}.chat-wrap{grid-template-columns:minmax(0,1fr);height:auto}.chat-list{max-height:none;overflow:visible}.chat-thread{height:calc(100dvh - 130px);min-height:420px}.chat-wrap:not(.open) .chat-thread{display:none}.chat-wrap.open .chat-list{display:none}.chat-thread .chat-back{display:inline-flex}}
+.chat-back{display:none;align-items:center;gap:6px;width:fit-content;background:none;border:0;color:var(--acc2);font-weight:700;padding:0 0 6px;cursor:pointer}
 @media(max-width:760px){
  #app{grid-template-columns:minmax(0,1fr)}
  .side{position:static;height:auto;flex-direction:row;flex-wrap:wrap;align-items:center;padding:10px;border-right:0;border-bottom:1px solid var(--line)}
@@ -1858,6 +1859,7 @@ async function viewChats(){
   }
   vidBtn.addEventListener('click',()=>videoNoteDialog());
   const err=el('div',{class:'err',role:'alert',style:'padding:0 12px'});
+  const backBtn=el('button',{class:'chat-back',type:'button',onclick:()=>{active=null;wrap.classList.remove('open');loadList().catch(()=>{});window.scrollTo(0,0)}},'‹ Все чаты');
   const thread=el('div',{class:'chat-thread'},head,msgs,el('div',{},err,prev,el('div',{class:'reply'},attachBtn,micBtn,vidBtn,fileIn,ta,recBar,sendBtn)));
   // Перетаскивание файлов в окно переписки
   ['dragenter','dragover'].forEach(ev=>thread.addEventListener(ev,e=>{if(e.dataTransfer&&[...e.dataTransfer.types].includes('Files')){e.preventDefault();thread.classList.add('drag')}}));
@@ -1877,7 +1879,7 @@ async function viewChats(){
     const d=await api('/chats/'+active);
     const near=msgs.scrollHeight-msgs.scrollTop-msgs.clientHeight<80;
     const L={href:profileUrl(d.lead),target:'_blank',rel:'noopener',title:'Открыть профиль в Telegram',style:'color:#6cb4ff;text-decoration:none'};
-    head.replaceChildren(el('div',{},d.lead.username?[d.lead.first_name?el('b',{style:'margin-right:8px'},d.lead.first_name):null,el('a',{...L,style:L.style+';font-weight:600'},'@'+d.lead.username)]:el('a',{...L,style:L.style+';font-weight:700'},cname(d.lead))),el('span',{class:'mut sm'},'Telegram ID '+d.lead.tg_id+' · Pocket ID '+(d.lead.trader_id||'нет')+' · '+(d.lead.owner_name?'ведёт '+d.lead.owner_name:'не закреплён')));
+    head.replaceChildren(backBtn,el('div',{},d.lead.username?[d.lead.first_name?el('b',{style:'margin-right:8px'},d.lead.first_name):null,el('a',{...L,style:L.style+';font-weight:600'},'@'+d.lead.username)]:el('a',{...L,style:L.style+';font-weight:700'},cname(d.lead))),el('span',{class:'mut sm'},'Telegram ID '+d.lead.tg_id+' · Pocket ID '+(d.lead.trader_id||'нет')+' · '+(d.lead.owner_name?'ведёт '+d.lead.owner_name:'не закреплён')));
     msgs.replaceChildren(...d.messages.map(m=>{
       const body=[];
       const url='/api/office/chats/'+d.lead.tg_id+'/file/'+m.id;
@@ -1901,7 +1903,7 @@ async function viewChats(){
     }));
     if(near||!msgs.dataset.init){msgs.scrollTop=msgs.scrollHeight;msgs.dataset.init='1'}
   }
-  async function openChat(id){active=id;msgs.dataset.init='';err.textContent='';try{await loadThread();await loadList()}catch(e){err.textContent=e.message}}
+  async function openChat(id){active=id;wrap.classList.add('open');window.scrollTo(0,0);msgs.dataset.init='';err.textContent='';try{await loadThread();await loadList()}catch(e){err.textContent=e.message}}
   async function send(){
     const text=ta.value.trim();if((!text&&!queue.length)||!active)return;
     if(rec)return;
@@ -1932,11 +1934,12 @@ async function viewChats(){
   sendBtn.addEventListener('click',send);
   ta.addEventListener('paste',e=>{const fs=[...(e.clipboardData?.files||[])];if(fs.length){e.preventDefault();addFiles(fs)}});
   ta.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send()}});
+  const wrap=el('div',{class:'chat-wrap'},list,thread);
   await loadList();
   head.replaceChildren(el('span',{class:'mut'},'Выберите чат слева'));
   if(pendingChat){const id=pendingChat;pendingChat=null;await openChat(id)}
   poll=setInterval(()=>{loadList().catch(()=>{});loadThread().catch(()=>{})},6000);
-  return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Чаты поддержки'),el('span',{class:'mut sm'},'Кто первым ответит неразобранному клиенту, тот его и забирает')),el('div',{class:'chat-wrap'},list,thread)];
+  return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Чаты поддержки'),el('span',{class:'mut sm'},'Кто первым ответит неразобранному клиенту, тот его и забирает')),wrap];
 }
 
 const TRIG={start:'Нажал /start',no_reg:'Нет регистрации',no_deposit:'Регистрация без депозита',ftd:'Депозит получен',inactive:'Давно не заходил'};
