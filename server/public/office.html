@@ -528,7 +528,7 @@ const addDay=(s,n)=>{const d=new Date(s+'T00:00:00Z');d.setUTCDate(d.getUTCDate(
 const usd0=n=>(n<0?'−':'')+'$'+Math.abs(Math.round(Number(n)||0)).toLocaleString('ru-RU');
 const sgn0=n=>(n<0?'−':'+')+'$'+Math.abs(Math.round(Number(n)||0)).toLocaleString('ru-RU');
 const n0=n=>Math.round(Number(n)||0).toLocaleString('ru-RU');
-const hm=m=>Math.floor(m/60)+' ч '+String(Math.round(m)%60).padStart(2,'0')+' мин';
+const hm=m=>{const r=Math.round(m);return Math.floor(r/60)+' ч '+String(r%60).padStart(2,'0')+' мин'};
 const fmtH=m=>{const h=m/60;return Number.isInteger(h)?String(h):h.toFixed(1).replace('.',',')};
 const dmy=s=>s.split('-').reverse().join('.');
 const dxMonths=['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
@@ -640,7 +640,7 @@ function dxLive(d,skew){
     const lvl=dxLvl(s.month.hoursMin,pace);
     const name=el('button',{type:'button',class:'dx-nm','aria-haspopup':'dialog'},s.name);
     dxAttachCard(name,s,d,skew);
-    const head=el('b',{},name,el('span',{class:'dx-hp '+lvl,title:'По графику сегодня '+fmtH(pace)+' ч'},fmtH(s.month.hoursMin)+'/'+d.plan.hours+' ч'));
+    const head=el('b',{},name,el('span',{class:'dx-hp '+lvl,title:'По графику сегодня '+hm(pace)},hm(s.month.hoursMin)+'/'+d.plan.hours+' ч'));
     const time=s.live
       ?el('span',{class:'t'},el('span',{'data-live':s.live.started_at},hm(Math.max(0,Math.floor((Date.now()+skew-Date.parse(s.live.started_at))/60000)))))
       :el('span',{class:'t off'},dxOffText(s,d.today));
@@ -672,7 +672,7 @@ function dxModal(btn,s,d,skew,mode){
   const cost=tot(1),profit=m.commission-cost,ratio=cost>0?m.commission/cost:99;
   let vcls='g',vt='Выгоден',vx='приносит $'+ratio.toFixed(1).replace('.',',')+' комиссии на каждый $1 зарплаты';
   if(ratio<1){vcls='r';vt='Убыточен';vx='зарплата больше комиссии'}else if(ratio<2){vcls='y';vt='На грани';vx='комиссия лишь в '+ratio.toFixed(1).replace('.',',')+' раза больше зарплаты'}
-  if(hrs<pace*.85&&vcls==='g')vx+='. Но сильно отстаёт по часам, '+fmtH(hrs)+' из '+plan.hours;
+  if(hrs<pace*.85&&vcls==='g')vx+='. Но сильно отстаёт по часам, '+hm(hrs)+' из '+plan.hours+' ч';
   const hv=(v,cls)=>el('b',{class:cls||''},v);
   const row=(a,b)=>el('div',{class:'dx-row'},el('span',{},a),b);
   let left=null;
@@ -695,9 +695,9 @@ function dxModal(btn,s,d,skew,mode){
     el('div',{class:'dx-mh'},el('div',{class:'dx-av'},svgIcon('<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',24)),el('div',{},el('h2',{},s.name),el('div',{class:'tg'},s.tg?'@'+String(s.tg).replace(/^@/,''):s.login)),el('div',{class:'dx-sp'}),
       el('div',{class:'dx-hr'},el('div',{class:'dx-hr1'},el('span',{class:'dx-st'+(s.live?'':' off')},s.live?'в эфире '+hm(Math.max(0,Math.floor((Date.now()+skew-Date.parse(s.live.started_at))/60000))):'не в эфире · '+dxOffText(s,d.today)),x),openLink||closeLink)),
     openForm,closeForm,
-    el('div',{},el('div',{class:'dx-hd'},el('div',{class:'dx-sec'},'Часы за месяц'),el('div',{class:'dx-hv'},left!==null?el('span',{class:'dx-cl'},'До закрытия: '+left+' мин'):null,el('b',{style:'color:'+col},fmtH(hrs)+' / '+plan.hours+' ч'))),
+    el('div',{},el('div',{class:'dx-hd'},el('div',{class:'dx-sec'},'Часы за месяц'),el('div',{class:'dx-hv'},left!==null?el('span',{class:'dx-cl'},'До закрытия: '+left+' мин'):null,el('b',{style:'color:'+col},hm(hrs)+' / '+plan.hours+' ч'))),
       el('div',{class:'dx-bar',style:'margin:13px 0 0'},el('i',{style:'width:'+Math.min(100,pct)+'%;background:'+col}),el('u',{style:'left:'+Math.min(100,pp)+'%'})),
-      el('div',{class:'dx-meta',style:'margin-top:13px'},el('span',{},pct+'% плана'),el('span',{},'по графику на сегодня '+fmtH(pace)+' ч'))),
+      el('div',{class:'dx-meta',style:'margin-top:13px'},el('span',{},pct+'% плана'),el('span',{},'по графику на сегодня '+hm(pace)))),
     el('div',{class:'dx-sg'},...[['Смен',m.shifts],['FTD',m.ftd],['FTD $',usd0(m.ftdSum)],['Все депозиты',usd0(m.deposits)]].map(([a,b])=>el('div',{class:'c'},el('span',{},a),el('b',{},String(b))))),
     el('div',{style:'display:grid;gap:8px'},el('div',{class:'dx-sec big'},'Зарплата за месяц'),
       el('div',{class:'dx-sal'},
@@ -783,7 +783,7 @@ function dxNet(d){
 function dxTasks(d){
   const T=d.tasks,rows=[];
   const names=(a,f)=>a.map(f).join(' · ');
-  const hlag=T.lagging.map(x=>x.name+' '+fmtH(x.hoursMin)+'/'+d.plan.hours+' ч').join(' · ');
+  const hlag=T.lagging.map(x=>x.name+' '+hm(x.hoursMin)+'/'+d.plan.hours+' ч').join(' · ');
   if(T.pending.length)rows.push([T.pending.reduce((a,x)=>a+x.n,0),'w','Отчёты ждут проверки',names(T.pending,x=>x.name+' '+x.n),'acc','review']);
   if(T.advances.length)rows.push([T.advances.length,'w','Заявка на аванс',names(T.advances,x=>x.staff_name+' · '+usd0(x.amount)),'acc','pay']);
   if(T.lagging.length)rows.push([T.lagging.length,T.lagging.some(x=>x.level==='bad')?'r':'w','Стримеры отстают от плана',hlag,'acc','sum']);
@@ -875,7 +875,7 @@ const DXS={new:['Новые','#9b5cff'],registered:['Регистрации','#4
 const IC_CHECK='<circle cx="12" cy="12" r="9"/><path d="M8 12.5l3 3 5-6"/>',IC_ALERT='<path d="M12 3l9.5 17h-19z"/><path d="M12 10v4M12 17.2v.1"/>';
 function dxLiveCard(c,d,skew){
   const lvl=dxLvl(c.hoursMin,d.plan.paceMin);
-  const head=el('b',{},el('span',{style:'font-weight:600'},c.name),el('span',{class:'dx-hp '+lvl,title:'По графику сегодня '+fmtH(d.plan.paceMin)+' ч'},fmtH(c.hoursMin)+'/'+d.plan.hours+' ч'));
+  const head=el('b',{},el('span',{style:'font-weight:600'},c.name),el('span',{class:'dx-hp '+lvl,title:'По графику сегодня '+hm(d.plan.paceMin)},hm(c.hoursMin)+'/'+d.plan.hours+' ч'));
   if(!c.live)return el('div',{class:'dx-lc'},head,el('span',{class:'t off'},dxOffText(c,d.today)));
   const time=el('span',{class:'t'},el('span',{'data-live':c.live.started_at},hm(Math.max(0,Math.floor((Date.now()+skew-Date.parse(c.live.started_at))/60000)))));
   const link=c.live.stream_url?el('a',{class:'dx-go big',href:c.live.stream_url,target:'_blank',rel:'noopener',title:'Открыть эфир','aria-label':'Открыть эфир'},svgIcon(IC_EXT,18)):null;
@@ -896,7 +896,7 @@ function smMetrics(d){
   const hp=m.hoursMin/pl.planMin*100,sp=m.shifts/m.planShifts*100,lp=m.ftd/pl.leads*100;
   const toGo=pl.leads-m.ftd;
   return el('div',{class:'card dx-pf'},el('div',{class:'dx-hd'},el('div',{class:'l'},el('span',{class:'dx-lbl'},'Мои показатели за '+(d.range.whole?'месяц':perLabel(m.period).toLowerCase())),dxPopBtn('Воронка',IC_FUNNEL,smFunnel(d),'pl wide')),mark!==null?el('span',{class:'mut',style:'font-size:12px'},'метка: план на сегодня'):null),
-    smTile('Часы в эфире',fmtH(m.hoursMin),'/ '+pl.hours+' ч',hp,mark,Math.round(hp)+'% плана','по графику '+fmtH(pl.paceMin)+' ч',lv(hp)),
+    smTile('Часы в эфире',hm(m.hoursMin),'/ '+pl.hours+' ч',hp,mark,Math.round(hp)+'% плана','по графику '+hm(pl.paceMin),lv(hp)),
     smTile('Закрытых смен',String(m.shifts),'/ '+n0(m.planShifts),sp,mark,Math.round(sp)+'% плана','смена = '+fmtH(pl.shiftH*60)+' ч',lv(sp)),
     smTile('Лиды (FTD)',String(m.ftd),'/ '+pl.leads,lp,mark,Math.round(lp)+'% плана',toGo>0?'ещё '+toGo+' до плана':'план выполнен',lv(lp)),
     smTile('Сегодня в эфире',hm(t.minutes),'/ '+fmtH(t.shiftMin)+' ч',t.minutes/t.shiftMin*100,null,t.minLeft>0?'до закрытия смены '+t.minLeft+' мин':'смена закрыта',t.live?'идёт эфир':'',t.minLeft>0?'warn':'ok'));
