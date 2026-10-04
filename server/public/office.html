@@ -200,7 +200,8 @@ textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10
 }
 
 .dx-ib.only-m{display:none}
-@media(max-width:760px){.only-d,.dx-hd .mark{display:none!important}.dx-ib.only-m{display:grid}.dx-hd .l{flex-wrap:wrap}.dx-hd .l .dx-lbl{flex:1 0 100%}}
+@media(max-width:760px){.only-d,.dx-hd .mark{display:none!important}.dx-ib.only-m{display:grid}.dx-ext{display:none}.dx-hd{flex-wrap:nowrap}.dx-hd .l{flex:1 1 auto;min-width:0;flex-wrap:wrap;gap:6px 8px}.dx-hd .l .dx-lbl{flex:1 1 auto;min-width:0}.dx-hd .l .dx-pw,.dx-hd .l>.dx-ib{flex:none}}
+@media(max-width:560px){.dx-pop,.dx-pop.wide{width:calc(100vw - 24px);padding:10px;gap:8px}.dx-seg2{height:24px}.dx-seg2 span{padding:0 5px;font-size:10.5px}.dx-fk b{font-size:15px}.dx-fsh b{font-size:14px}.dx-pop .dx-lbl{font-size:11px}}
 .burger{display:none}.side-menu{display:contents}
 @media(max-width:760px){
  .side{position:sticky;top:0;z-index:60;flex-wrap:nowrap;background:#0a0613}
@@ -1074,7 +1075,7 @@ function dxPlanFact(d){
   const flipBtn=()=>{const b=el('button',{type:'button',class:'dx-ib sm2',title:'Показатели стримеров','aria-label':'Показатели стримеров'});b.append(svgIcon(IC_FLIP,18));return b};
   const wrap=el('div',{class:'dx-flip'});
   const fb=flipBtn(),fbm=flipBtn();fb.classList.add('only-d');fbm.classList.add('only-m');icons.push(fbm);
-  const front=el('div',{class:'card dx-pf'},el('div',{class:'dx-hd'},el('div',{class:'l'},el('span',{class:'dx-lbl'},title),...icons),el('div',{style:'display:flex;align-items:center;gap:10px;margin-left:auto'},showMark?el('span',{class:'mut mark',style:'font-size:12px'},'метка: план на сегодня'):null,fb)),
+  const front=el('div',{class:'card dx-pf'},el('div',{class:'dx-hd'},el('div',{class:'l'},el('span',{class:'dx-lbl'},title.endsWith(' за месяц')?[title.slice(0,-9),el('span',{class:'dx-ext'},' за месяц')]:title),...icons),el('div',{style:'display:flex;align-items:center;gap:10px;margin-left:auto'},showMark?el('span',{class:'mut mark',style:'font-size:12px'},'метка: план на сегодня'):null,fb)),
     ...rows.map(([n,v,goal,f,note])=>{
       const pct=goal>0?v/goal*100:null,cls=pct===null?'':pct>=pace*100?'ok':pct>=pace*85?'warn':'bad';
       return el('div',{class:'dx-m'},el('div',{class:'dx-lbl'},n),el('div',{class:'v'},f(v),goal>0?el('small',{},' / '+f(goal)):null),
@@ -1253,7 +1254,7 @@ function smMetrics(d){
   const lv=pct=>pct>=pace?'ok':pct>=pace*.85?'warn':'bad';
   const hp=m.hoursMin/pl.planMin*100,sp=m.shifts/m.planShifts*100,lp=m.ftd/pl.leads*100;
   const toGo=pl.leads-m.ftd;
-  return el('div',{class:'card dx-pf'},el('div',{class:'dx-hd'},el('div',{class:'l'},el('span',{class:'dx-lbl'},'Мои показатели за '+(d.range.whole?'месяц':perLabel(m.period).toLowerCase())),dxPopBtn('Общий план команды',IC_RINGS,smRings(d),'pl'),dxPopBtn('Воронка',IC_FUNNEL,smFunnel(d),'pl wide'),dxPopBtn('Просмотры, подписчики, комментарии и лайки',IC_HEART,smSocial(d),'pl')),mark!==null?el('span',{class:'mut mark',style:'font-size:12px'},'метка: план на сегодня'):null),
+  return el('div',{class:'card dx-pf'},el('div',{class:'dx-hd'},el('div',{class:'l'},el('span',{class:'dx-lbl'},'Мои показатели',el('span',{class:'dx-ext'},' за '+(d.range.whole?'месяц':perLabel(m.period).toLowerCase()))),dxPopBtn('Общий план команды',IC_RINGS,smRings(d),'pl'),dxPopBtn('Воронка',IC_FUNNEL,smFunnel(d),'pl wide'),dxPopBtn('Просмотры, подписчики, комментарии и лайки',IC_HEART,smSocial(d),'pl')),mark!==null?el('span',{class:'mut mark',style:'font-size:12px'},'метка: план на сегодня'):null),
     smTile('Сегодня в эфире',hm(t.minutes),'/ '+fmtH(t.shiftMin)+' ч',t.minutes/t.shiftMin*100,null,t.live?'идёт эфир':'','','ok'),
     smTile('Часы в эфире',hw(m.hoursMin),'/ '+pl.hours+' ч',hp,mark,Math.round(hp)+'% плана','по графику '+hw(pl.paceMin)+' ч',lv(hp)),
     smTile('Закрытых смен',String(m.shifts),'/ '+n0(m.planShifts),sp,mark,Math.round(sp)+'% плана','смена = '+fmtH(pl.shiftH*60)+' ч',lv(sp),'до закрытия смены '+hm(t.shiftMin-((m.totalMin??m.hoursMin)%t.shiftMin)),'warn'),
