@@ -107,14 +107,20 @@ export async function postbackRoutes(app: FastifyInstance): Promise<void> {
       const enough = amount === null || tot >= config.minDeposit * 0.9;
       if (enough) {
         if (event === 'ftd' || (event === 'dep' && !['ftd', 'active'].includes(cur.status))) {
-          // Первый достаточный депозит: открываем анализ
-          await db.query(`UPDATE leads SET status = 'ftd', access = (removed_at IS NULL) WHERE tg_id = $1`, [tgId]);
+          // Первый достаточный депозит: открываем анализ. Лид из старого бота приходит сразу с додепом без FTD:
+          // он «активный» (его первый депозит был раньше), а не FTD
+          await db.query(`UPDATE leads SET status = $2, access = (removed_at IS NULL) WHERE tg_id = $1`, [tgId, event === 'ftd' ? 'ftd' : 'active']);
         } else {
           await db.query(`UPDATE leads SET status = 'active' WHERE tg_id = $1 AND status = 'ftd'`, [tgId]);
         }
       } else if (cur.status === 'new') {
         await db.query(`UPDATE leads SET status = 'registered' WHERE tg_id = $1`, [tgId]);
       }
+    }
+
+    // Комиссия по клиенту значит, что он торгует на своих депозитах (перенос из старого бота): статус «активный» и доступ
+    if (event === 'comm' && amount && ['new', 'registered'].includes(cur.status)) {
+      await db.query(`UPDATE leads SET status = 'active', access = (removed_at IS NULL) WHERE tg_id = $1`, [tgId]);
     }
 
     // Пуши по событию (например «Депозит получен») уходят сразу. Сбой пуша не должен ломать постбек

@@ -501,3 +501,14 @@ ALTER TABLE postback_log ADD COLUMN IF NOT EXISTS event_id BIGINT;
 INSERT INTO nav_defaults (role, layout)
   SELECT 'admin', nav_layout FROM staff WHERE role = 'admin' AND nav_layout IS NOT NULL ORDER BY id LIMIT 1
   ON CONFLICT (role) DO NOTHING;
+
+-- Один раз: лиды из старого бота (есть додепы или комиссия, но нет FTD) становятся «активными» и получают доступ
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM app_flags WHERE key = 'legacy_leads_active') THEN
+    UPDATE leads SET status = 'active', access = TRUE
+     WHERE removed_at IS NULL AND status IN ('new','registered','ftd')
+       AND NOT EXISTS (SELECT 1 FROM events e WHERE e.tg_id = leads.tg_id AND e.type = 'ftd')
+       AND EXISTS (SELECT 1 FROM events e WHERE e.tg_id = leads.tg_id AND (e.type = 'dep' OR (e.type = 'comm' AND e.amount > 0)));
+    INSERT INTO app_flags (key) VALUES ('legacy_leads_active');
+  END IF;
+END $$;
