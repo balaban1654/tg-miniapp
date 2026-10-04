@@ -482,3 +482,6 @@ CREATE TABLE IF NOT EXISTS login_challenges (
   tries      INT NOT NULL DEFAULT 0,
   expires_at TIMESTAMPTZ NOT NULL
 );
+
+-- Лид снят с миниапп (доступ отозван), но события и постбеки остаются: по ним считаются зарплаты
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS removed_at TIMESTAMPTZ;

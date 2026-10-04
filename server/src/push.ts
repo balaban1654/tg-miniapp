@@ -172,7 +172,7 @@ async function dueTargets(rule: Rule, limit: number, tgId?: string): Promise<Tar
   const r = await db.query(
     `SELECT d.tg_id, d.first_name, d.username, d.region, d.tz, o.name AS owner_name, o.po_promo, o.po_link, o.po_link_ru
        FROM leads d LEFT JOIN staff o ON o.id = d.owner_id
-      WHERE d.bot_started AND NOT d.bot_blocked AND ${COND[rule.trigger]}
+      WHERE d.removed_at IS NULL AND d.bot_started AND NOT d.bot_blocked AND ${COND[rule.trigger]}
         AND (${t}) + ($1 || ' minutes')::interval <= now()
         AND (${t}) + ($1 || ' minutes')::interval >= $2
         AND NOT EXISTS (SELECT 1 FROM push_log l WHERE l.rule_id = $3 AND l.tg_id = d.tg_id)
@@ -242,7 +242,7 @@ export const SEGMENTS: Record<string, string> = {
 
 export function segmentWhere(segment: string, ownerId?: number | null): { sql: string; params: unknown[] } {
   const params: unknown[] = [];
-  let sql = `d.bot_started AND NOT d.bot_blocked AND ${SEGMENTS[segment] ?? 'FALSE'}`;
+  let sql = `d.removed_at IS NULL AND d.bot_started AND NOT d.bot_blocked AND ${SEGMENTS[segment] ?? 'FALSE'}`;
   if (ownerId) {
     params.push(ownerId);
     sql += ` AND d.owner_id = $1`;

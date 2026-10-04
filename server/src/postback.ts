@@ -107,7 +107,7 @@ export async function postbackRoutes(app: FastifyInstance): Promise<void> {
       if (enough) {
         if (event === 'ftd' || (event === 'dep' && !['ftd', 'active'].includes(cur.status))) {
           // Первый достаточный депозит: открываем анализ
-          await db.query(`UPDATE leads SET status = 'ftd', access = TRUE WHERE tg_id = $1`, [tgId]);
+          await db.query(`UPDATE leads SET status = 'ftd', access = (removed_at IS NULL) WHERE tg_id = $1`, [tgId]);
         } else {
           await db.query(`UPDATE leads SET status = 'active' WHERE tg_id = $1 AND status = 'ftd'`, [tgId]);
         }

@@ -574,7 +574,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
          FROM leads d
          JOIN LATERAL (SELECT direction, kind, text, created_at FROM messages WHERE tg_id = d.tg_id ORDER BY id DESC LIMIT 1) m ON TRUE
          LEFT JOIN staff o ON o.id = d.owner_id
-        WHERE ${chatScope(me, 'd.owner_id')} AND (d.chat_closed_at IS NULL OR m.created_at > d.chat_closed_at)
+        WHERE d.removed_at IS NULL AND ${chatScope(me, 'd.owner_id')} AND (d.chat_closed_at IS NULL OR m.created_at > d.chat_closed_at)
         ORDER BY (m.direction = 'in') DESC, m.created_at DESC LIMIT 200`,
     );
     return r.rows.map((x) => ({ ...x, waiting: x.last_dir === 'in' }));
@@ -1266,7 +1266,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
          FROM leads d
          LEFT JOIN staff s ON s.id = d.owner_id
          LEFT JOIN links l ON l.id = d.link_id
-        WHERE ${ownerScope(me, 'd.owner_id')}${extra}
+        WHERE d.removed_at IS NULL AND ${ownerScope(me, 'd.owner_id')}${extra}
         ORDER BY d.created_at DESC LIMIT 300`,
       vals,
     );
@@ -1281,6 +1281,37 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     return r.rows.map((x) =>
       x.lead_role && x.lead_role !== 'lead' ? { ...x, deposits: 0, commission: 0, owner_id: main?.id ?? x.owner_id, owner_name: main?.name ?? x.owner_name, link_slug: main?.slug ?? x.link_slug } : x,
     );
+  });
+
+  // Удаление лида: mode=revoke — снять с миниапп, события и постбеки остаются (по ним считаются зарплаты);
+  // mode=full — стереть лида и всё, что с ним связано, включая постбеки
+  app.delete<{ Params: { tgId: string }; Querystring: { mode?: string } }>('/leads/:tgId', { preHandler: need('admin') }, async (req, reply) => {
+    const tgId = Number(req.params.tgId);
+    const lead = (await db.query('SELECT lead_role, trader_id FROM leads WHERE tg_id = $1', [tgId])).rows[0];
+    if (!lead) return reply.code(404).send({ error: 'Лид не найден' });
+    if (lead.lead_role && lead.lead_role !== 'lead') return reply.code(400).send({ error: 'Сотрудника из админ состава удалить нельзя: сначала снимите ему доступ' });
+    if (req.query.mode === 'revoke') {
+      await db.query(`UPDATE leads SET access = FALSE, is_tester = FALSE, removed_at = now() WHERE tg_id = $1`, [tgId]);
+      await db.query(`UPDATE legacy_ids SET claimed_by = NULL, claimed_at = NULL WHERE claimed_by = $1`, [tgId]);
+      return { ok: true, mode: 'revoke' };
+    }
+    if (req.query.mode !== 'full') return reply.code(400).send({ error: 'Укажите режим удаления' });
+    const c = await db.connect();
+    try {
+      await c.query('BEGIN');
+      for (const t of ['events', 'deals', 'lesson_progress', 'messages', 'push_log', 'broadcast_jobs', 'signal_steps', 'postback_log']) {
+        await c.query(`DELETE FROM ${t} WHERE tg_id = $1`, [tgId]);
+      }
+      await c.query(`UPDATE legacy_ids SET claimed_by = NULL, claimed_at = NULL WHERE claimed_by = $1`, [tgId]);
+      await c.query('DELETE FROM leads WHERE tg_id = $1', [tgId]);
+      await c.query('COMMIT');
+    } catch (e) {
+      await c.query('ROLLBACK').catch(() => {});
+      throw e;
+    } finally {
+      c.release();
+    }
+    return { ok: true, mode: 'full' };
   });
 
   await accountingRoutes(app, { need, str, num });
