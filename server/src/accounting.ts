@@ -352,6 +352,19 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     return { live, now: new Date().toISOString(), ...(await todayInfo(me.id)), fields: await fieldsDef(true) };
   });
 
+  // Админ открывает смену за стримера (например, когда тот забыл): та же ссылка на эфир, дальше стример заканчивает смену сам
+  app.post('/shifts/start-for', { preHandler: admin }, async (req, reply) => {
+    const b = (req.body ?? {}) as Record<string, unknown>;
+    const sid = Number(b.staff_id);
+    const url = str(b.stream_url, 500).match(/https?:\/\/[^\s]+/i)?.[0] ?? '';
+    if (!/^https?:\/\/[^\s]+\.[^\s]+$/i.test(url)) return reply.code(400).send({ error: 'Вставьте ссылку на эфир, например https://tiktok.com/@name/live' });
+    const st = (await db.query(`SELECT id FROM staff WHERE id = $1 AND role = 'streamer' AND active`, [sid])).rows[0];
+    if (!st) return reply.code(404).send({ error: 'Стример не найден' });
+    if ((await db.query(`SELECT 1 FROM shift_reports WHERE staff_id = $1 AND status = 'live'`, [sid])).rowCount) return reply.code(409).send({ error: 'У этого стримера смена уже идёт' });
+    const r = await db.query(`INSERT INTO shift_reports (staff_id, stream_url, day) VALUES ($1,$2,(now() AT TIME ZONE '${TZ}')::date) RETURNING id`, [sid, url]);
+    return { ok: true, id: r.rows[0].id };
+  });
+
   app.post('/shifts/start', { preHandler: stream }, async (req, reply) => {
     const me = req.staff!;
     // Из вставленного текста берём первую ссылку (TikTok и другие делятся текстом со ссылкой внутри)

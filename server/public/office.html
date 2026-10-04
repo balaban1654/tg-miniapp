@@ -237,7 +237,7 @@ textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10
 .dx-ovl.hv{background:none;pointer-events:none;padding:0;overflow:visible}
 .dx-md{width:min(560px,100%);background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px;display:flex;flex-direction:column;gap:16px;margin-block:auto;box-shadow:0 24px 60px rgba(0,0,0,.6)}
 .dx-ovl.hv .dx-md{pointer-events:auto;position:fixed;margin:0;max-height:calc(100vh - 24px);overflow:auto}
-.dx-mh{display:flex;align-items:center;gap:12px}.dx-mh h2{font-size:20px}.dx-mh .tg{font-size:12px;color:var(--mut)}.dx-sp{flex:1}
+.dx-mh{display:flex;align-items:flex-start;gap:12px}.dx-hr{display:grid;gap:6px;justify-items:end}.dx-hr1{display:flex;align-items:center;gap:8px}.dx-open{background:none;border:0;color:var(--acc2);font:700 12px var(--fb,inherit);cursor:pointer;padding:0;text-decoration:underline dotted;text-underline-offset:3px}.dx-of{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--bg2)}.dx-of input{flex:1 1 220px;min-width:0}.dx-of[hidden]{display:none}.dx-of .er{flex:1 1 100%;color:var(--bad);font-size:12px;min-height:0}.dx-mh h2{font-size:20px}.dx-mh .tg{font-size:12px;color:var(--mut)}.dx-sp{flex:1}
 .dx-av{width:44px;height:44px;border-radius:50%;background:#9b5cff33;color:var(--acc2);display:grid;place-items:center;flex:none}
 .dx-st{display:inline-flex;font-size:12px;font-weight:700;padding:4px 10px;border-radius:99px;background:#3ddc9722;color:var(--ok)}.dx-st.off{background:#ffffff14;color:var(--mut)}
 .dx-x{width:32px;height:32px;border:1px solid var(--line);border-radius:8px;background:none;color:var(--mut);cursor:pointer;font-size:18px;line-height:1}.dx-x:hover{color:var(--acc2);border-color:var(--acc)}
@@ -678,9 +678,17 @@ function dxModal(btn,s,d,skew,mode){
   let left=null;
   if(s.live&&s.minLeft!==null){const extra=Math.max(0,Math.floor((Date.now()+skew-Date.parse(d.now))/60000));left=Math.max(0,s.minLeft-extra)}
   const x=el('button',{type:'button',class:'dx-x','aria-label':'Закрыть',onclick:dxCloseModal},'×');
+  // Открыть смену за стримера: ссылка на эфир и «Начать смену», как у самого стримера
+  const ofUrl=el('input',{type:'text',inputmode:'url',autocapitalize:'off',autocomplete:'off',placeholder:'Ссылка на эфир TikTok, например https://tiktok.com/@name/live'});
+  const ofErr=el('div',{class:'er',role:'alert'});
+  const ofGo=el('button',{class:'btn s',type:'button',onclick:async()=>{ofErr.textContent='';ofGo.disabled=true;try{await api('/shifts/start-for',{method:'POST',body:{staff_id:s.id,stream_url:ofUrl.value}});toast('Смена открыта: '+s.name);dxCloseModal();render({soft:true})}catch(e){ofErr.textContent=e.message;ofGo.disabled=false}}},'Начать смену');
+  ofUrl.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();ofGo.click()}});
+  const openForm=el('div',{class:'dx-of',hidden:''},ofUrl,ofGo,ofErr);
+  const openLink=s.live?null:el('button',{type:'button',class:'dx-open',onclick:()=>{openForm.hidden=!openForm.hidden;md.dataset.pin=openForm.hidden?'':'1';if(!openForm.hidden)ofUrl.focus()}},'Открыть смену');
   const md=el('div',{class:'dx-md',role:'dialog','aria-modal':'true','aria-label':s.name},
     el('div',{class:'dx-mh'},el('div',{class:'dx-av'},svgIcon('<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',24)),el('div',{},el('h2',{},s.name),el('div',{class:'tg'},s.tg?'@'+String(s.tg).replace(/^@/,''):s.login)),el('div',{class:'dx-sp'}),
-      el('span',{class:'dx-st'+(s.live?'':' off')},s.live?'в эфире '+hm(Math.max(0,Math.floor((Date.now()+skew-Date.parse(s.live.started_at))/60000))):'не в эфире · '+dxOffText(s,d.today)),x),
+      el('div',{class:'dx-hr'},el('div',{class:'dx-hr1'},el('span',{class:'dx-st'+(s.live?'':' off')},s.live?'в эфире '+hm(Math.max(0,Math.floor((Date.now()+skew-Date.parse(s.live.started_at))/60000))):'не в эфире · '+dxOffText(s,d.today)),x),openLink)),
+    openForm,
     el('div',{},el('div',{class:'dx-hd'},el('div',{class:'dx-sec'},'Часы за месяц'),el('div',{class:'dx-hv'},left!==null?el('span',{class:'dx-cl'},'До закрытия: '+left+' мин'):null,el('b',{style:'color:'+col},fmtH(hrs)+' / '+plan.hours+' ч'))),
       el('div',{class:'dx-bar',style:'margin:13px 0 0'},el('i',{style:'width:'+Math.min(100,pct)+'%;background:'+col}),el('u',{style:'left:'+Math.min(100,pp)+'%'})),
       el('div',{class:'dx-meta',style:'margin-top:13px'},el('span',{},pct+'% плана'),el('span',{},'по графику на сегодня '+fmtH(pace)+' ч'))),
@@ -700,7 +708,7 @@ function dxModal(btn,s,d,skew,mode){
     const r=btn.getBoundingClientRect(),w=Math.min(560,innerWidth-32);
     md.style.width=w+'px';md.style.left=Math.max(16,Math.min(r.left,innerWidth-w-16))+'px';md.style.top=Math.max(12,Math.min(r.bottom+10,innerHeight-220))+'px';
     md.addEventListener('mouseenter',()=>{clearTimeout(dxHoverT);dxHoverT=null});
-    md.addEventListener('mouseleave',()=>{clearTimeout(dxHoverT);dxHoverT=setTimeout(dxCloseModal,260)});
+    md.addEventListener('mouseleave',()=>{if(md.dataset.pin)return;clearTimeout(dxHoverT);dxHoverT=setTimeout(dxCloseModal,260)});
   }else ov.addEventListener('click',e=>{if(e.target===ov)dxCloseModal()});
   document.body.append(ov);btn.classList.add('on');
   if(mode!=='hover')x.focus();
