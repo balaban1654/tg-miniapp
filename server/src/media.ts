@@ -39,7 +39,9 @@ export const toVoice = (b: Buffer) => ffmpeg(b, 'ogg', ['-vn', '-c:a', 'libopus'
 /** Кружок для Telegram: квадрат по центру, до 640 px, MP4 H.264, не дольше минуты */
 export const toVideoNote = (b: Buffer) =>
   ffmpeg(b, 'mp4', [
-    '-vf', 'crop=min(iw\\,ih):min(iw\\,ih),scale=480:480',
+    // fps=30: постоянная частота кадров, иначе запись с телефона (переменная частота) в Telegram идёт рывками
+    '-vf', 'fps=30,crop=min(iw\\,ih):min(iw\\,ih),scale=480:480:flags=lanczos',
+    '-g', '60',
     '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '26', '-pix_fmt', 'yuv420p',
     '-c:a', 'aac', '-b:a', '64k', '-movflags', '+faststart', '-t', '60',
   ]);

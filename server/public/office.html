@@ -162,7 +162,7 @@ textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10
 .recbar{flex:1;display:flex;align-items:center;gap:10px;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:0 12px;min-height:46px}.recdot{width:10px;height:10px;border-radius:50%;background:#ff3b4e;animation:blink 1s infinite}@keyframes blink{50%{opacity:.25}}
 .chat-thread.drag{outline:2px dashed var(--acc);outline-offset:-6px}
 .bub video{max-width:260px;width:100%;border-radius:8px;display:block;margin-bottom:4px}.bub video.vnote{width:200px;height:200px;border-radius:50%;object-fit:cover}.bub audio{width:250px;max-width:100%;display:block;margin-bottom:4px}.bub .fl{display:inline-flex;gap:6px;align-items:center;color:var(--acc2);text-decoration:none;margin-bottom:4px}.bub img{cursor:zoom-in}
-.vn-ov video{width:min(300px,70vw);height:min(300px,70vw);object-fit:cover;border-radius:50%;background:#000;display:block;margin:0 auto}.vn-ov video.mir{transform:scaleX(-1)}
+.vn-stage{position:relative;width:min(300px,70vw);height:min(300px,70vw);margin:0 auto}.vn-ov video{width:100%;height:100%;object-fit:cover;border-radius:50%;background:#000;display:block}.vn-flip{position:absolute;right:-6px;bottom:-6px;width:46px;height:46px;padding:0;border-radius:50%;display:grid;place-items:center;background:var(--card2)}.vn-ov video.mir{transform:scaleX(-1)}
 .reply textarea{flex:1;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px;resize:none;font:inherit;color:inherit;min-height:44px;max-height:120px}
 @media(max-width:760px){.reply{flex-wrap:wrap}.reply textarea{flex:1 1 100%;order:-1}.reply>.btn:last-child{margin-left:auto}.recbar{order:-1;flex:1 1 100%}.chat-wrap{grid-template-columns:1fr;height:auto}.chat-list{max-height:220px}.chat-thread{height:60vh}}
 @media(max-width:760px){
@@ -1803,27 +1803,40 @@ async function viewChats(){
   }
   micBtn.addEventListener('click',startVoice);
   // Видео-кружок: окно с камерой, запись до 60 секунд, сервер вырезает квадрат и переводит в формат Telegram
-  async function videoNoteDialog(){
+  async function videoNoteDialog(facing='user'){
     if(!navigator.mediaDevices||!window.MediaRecorder){err.textContent='Этот браузер не умеет записывать видео';return}
-    let stream;try{stream=await navigator.mediaDevices.getUserMedia({video:{width:{ideal:640},height:{ideal:640},facingMode:'user'},audio:true})}catch{err.textContent='Нет доступа к камере или микрофону. Разрешите их в настройках браузера.';return}
+    // Квадратный поток с постоянной частотой кадров: так запись не дёргается
+    const getStream=f=>navigator.mediaDevices.getUserMedia({video:{width:{ideal:720},height:{ideal:720},aspectRatio:{ideal:1},frameRate:{ideal:30,max:30},facingMode:{ideal:f}},audio:{echoCancellation:true,noiseSuppression:true}});
+    let stream;try{stream=await getStream(facing)}catch{err.textContent='Нет доступа к камере или микрофону. Разрешите их в настройках браузера.';return}
     document.querySelectorAll('.vn-ov').forEach(x=>x.remove());
     const ov=el('div',{class:'lc-overlay vn-ov',role:'dialog','aria-modal':'true'});
-    const vid=el('video',{class:'mir',autoplay:'',muted:'',playsinline:''});vid.srcObject=stream;vid.muted=true;
-    const msg=el('div',{class:'mut sm',style:'text-align:center'},'Нажмите круглую кнопку, чтобы начать запись (до 60 секунд)');
+    const vid=el('video',{autoplay:'',muted:'',playsinline:''});vid.srcObject=stream;vid.muted=true;
+    const mirror=()=>vid.classList.toggle('mir',facing==='user');mirror();
+    const msg=el('div',{class:'mut sm',style:'text-align:center'},'Нажмите красную кнопку, чтобы начать запись (до 60 секунд)');
     const actions=el('div',{class:'lc-actions',style:'justify-content:center'});
-    const box=el('div',{class:'lc',style:'width:min(380px,100%)'},el('div',{class:'lc-head'},el('h3',{style:'font-size:18px'},'Видео-кружок')),vid,msg,actions);
+    const flip=el('button',{class:'btn o vn-flip',type:'button',title:'Переключить камеру (передняя и основная)','aria-label':'Переключить камеру'},svgIcon('<path d="M20 7h-3.2l-1.6-2H8.8L7.2 7H4a1 1 0 00-1 1v10a1 1 0 001 1h16a1 1 0 001-1V8a1 1 0 00-1-1z"/><path d="M9 13a3.2 3.2 0 015.6-2.1M15 13a3.2 3.2 0 01-5.6 2.1M14.8 9.4v1.9h-1.9M9.2 16.6v-1.9h1.9"/>',22));
+    const stage=el('div',{class:'vn-stage'},vid,flip);
+    const box=el('div',{class:'lc',style:'width:min(380px,100%)'},el('div',{class:'lc-head'},el('h3',{style:'font-size:18px'},'Видео-кружок')),stage,msg,actions);
     ov.append(box);document.body.append(ov);
-    let mr=null,chunks=[],blobUrl=null,result=null,tick=null;
+    let mr=null,chunks=[],blobUrl=null,result=null,tick=null,flipping=false;
     const stop=()=>{clearInterval(tick);stream.getTracks().forEach(t=>t.stop())};
     const close=()=>{if(mr&&mr.state!=='inactive'){mr.onstop=null;mr.stop()}stop();if(blobUrl)URL.revokeObjectURL(blobUrl);ov.remove()};
     ov.addEventListener('mousedown',e=>{if(e.target===ov&&!(mr&&mr.state==='recording'))close()});
+    flip.addEventListener('click',async()=>{
+      if(flipping||(mr&&mr.state==='recording'))return;flipping=true;
+      const next=facing==='user'?'environment':'user';
+      try{const ns=await getStream(next);stream.getTracks().forEach(t=>t.stop());stream=ns;facing=next;vid.srcObject=ns;mirror()}
+      catch{msg.textContent='Не удалось переключить камеру: возможно, она одна'}
+      flipping=false;
+    });
     const idle=()=>actions.replaceChildren(el('button',{class:'btn',type:'button',onclick:begin,style:'background:#ff3b4e;border-color:#ff3b4e'},'● Начать запись'),el('button',{class:'btn o',type:'button',onclick:close},'Отмена'));
     function begin(){
       chunks=[];const types=['video/mp4','video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'];
       const mt=types.find(t=>MediaRecorder.isTypeSupported(t));
-      mr=new MediaRecorder(stream,mt?{mimeType:mt}:undefined);
+      mr=new MediaRecorder(stream,{...(mt?{mimeType:mt}:{}),videoBitsPerSecond:2500000,audioBitsPerSecond:64000});
       mr.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};
       let t0=Date.now();
+      flip.hidden=true;
       mr.onstop=()=>{
         clearInterval(tick);
         result=new Blob(chunks,{type:mr.mimeType||'video/webm'});blobUrl=URL.createObjectURL(result);
@@ -1831,10 +1844,11 @@ async function viewChats(){
         vid.srcObject=null;vid.classList.remove('mir');vid.muted=false;vid.src=blobUrl;vid.loop=true;vid.play().catch(()=>{});
         msg.textContent='Так увидит клиент. Нажмите на кружок, чтобы остановить или продолжить.';
         vid.onclick=()=>vid.paused?vid.play():vid.pause();
+        const keep=facing;
         actions.replaceChildren(el('button',{class:'btn',type:'button',onclick:()=>{addFiles([new File([result],'circle',{type:result.type})],'video_note');if(blobUrl)URL.revokeObjectURL(blobUrl);ov.remove()}},'Добавить к сообщению'),
-          el('button',{class:'btn o',type:'button',onclick:()=>{ov.remove();videoNoteDialog()}},'Переснять'));
+          el('button',{class:'btn o',type:'button',onclick:()=>{ov.remove();videoNoteDialog(keep)}},'Переснять'));
       };
-      mr.start();
+      mr.start(1000);
       const timer=el('b',{class:'mono'},'0:00');
       tick=setInterval(()=>{const s=Math.floor((Date.now()-t0)/1000);timer.textContent=Math.floor(s/60)+':'+String(s%60).padStart(2,'0');if(s>=60)mr.stop()},250);
       msg.replaceChildren('Идёт запись ',timer,' из 1:00');
@@ -1842,7 +1856,7 @@ async function viewChats(){
     }
     idle();
   }
-  vidBtn.addEventListener('click',videoNoteDialog);
+  vidBtn.addEventListener('click',()=>videoNoteDialog());
   const err=el('div',{class:'err',role:'alert',style:'padding:0 12px'});
   const thread=el('div',{class:'chat-thread'},head,msgs,el('div',{},err,prev,el('div',{class:'reply'},attachBtn,micBtn,vidBtn,fileIn,ta,recBar,sendBtn)));
   // Перетаскивание файлов в окно переписки
