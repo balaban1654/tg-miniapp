@@ -1171,12 +1171,12 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     const liveBy = new Map(((await db.query(`SELECT DISTINCT ON (staff_id) staff_id, started_at, stream_url FROM shift_reports WHERE status = 'live' ORDER BY staff_id, id DESC`)).rows as any[]).map((r) => [r.staff_id, r]));
     const lastBy = new Map(((await db.query(`SELECT DISTINCT ON (staff_id) staff_id, ended_at, coalesce(approved_min, declared_min) AS m FROM shift_reports WHERE status <> 'live' AND ended_at IS NOT NULL ORDER BY staff_id, ended_at DESC`)).rows as any[]).map((r) => [r.staff_id, r]));
     const hoursBy = new Map(((await db.query(`SELECT staff_id, coalesce(sum(approved_min), 0)::int AS m FROM shift_reports WHERE status = 'approved' AND to_char(day, 'YYYY-MM') = $1 GROUP BY staff_id`, [refMonth])).rows as any[]).map((r) => [r.staff_id, r.m]));
-    // FTD за месяц по стримерам (только количество, без денег)
+    // Стример видит только суммы FTD: додепы в его данные не попадают. FTD за месяц по стримерам (только количество, без денег)
     const ftdBy = new Map(
       ((await db.query(`SELECT d.owner_id, count(*)::int AS n FROM events e JOIN leads d ON d.tg_id = e.tg_id WHERE e.type = 'ftd' AND d.lead_role = 'lead' AND d.owner_id IS NOT NULL AND to_char(e.created_at AT TIME ZONE '${TZ}', 'YYYY-MM') = $1 GROUP BY d.owner_id`, [refMonth])).rows as any[]).map((r) => [r.owner_id, r.n]),
     );
     const teamDeposits = Number(
-      (await db.query(`SELECT coalesce(sum(e.amount), 0)::float AS s FROM events e JOIN leads d ON d.tg_id = e.tg_id WHERE e.type IN ('ftd','dep') AND d.lead_role = 'lead' AND d.owner_id IS NOT NULL AND to_char(e.created_at AT TIME ZONE '${TZ}', 'YYYY-MM') = $1`, [refMonth])).rows[0].s,
+      (await db.query(`SELECT coalesce(sum(e.amount), 0)::float AS s FROM events e JOIN leads d ON d.tg_id = e.tg_id WHERE e.type = 'ftd' AND d.lead_role = 'lead' AND d.owner_id IS NOT NULL AND to_char(e.created_at AT TIME ZONE '${TZ}', 'YYYY-MM') = $1`, [refMonth])).rows[0].s,
     );
     const colleagues = colRows
       .map((c) => {
@@ -1210,7 +1210,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
       me: { id: me.id, name: me.name },
       month: { period: refMonth, hoursMin: k.hoursMin, shifts: k.shifts, planShifts: plan.hours / plan.shiftH, ftd: k.ftdCount },
       today_: { minutes: todayMin, shiftMin, minLeft: Math.max(0, shiftMin - todayMin), live },
-      funnel: { clicks, regs: ev.reg, ftd: ev.ftd, dep: ev.dep },
+      funnel: { clicks, regs: ev.reg, ftd: ev.ftd },
       clicksSince,
       byStatus,
       colleagues,
