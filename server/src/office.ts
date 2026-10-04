@@ -1440,7 +1440,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
          FROM leads d
          LEFT JOIN staff s ON s.id = d.owner_id
          LEFT JOIN links l ON l.id = d.link_id
-        WHERE d.removed_at IS NULL AND ${ownerScope(me, 'd.owner_id')}${extra}
+        WHERE d.removed_at IS NULL AND ${ownerScope(me, 'd.owner_id')}${me.role === 'admin' ? '' : " AND coalesce(d.lead_role, 'lead') = 'lead'"}${extra}
         ORDER BY d.created_at DESC LIMIT 300`,
       vals,
     );
