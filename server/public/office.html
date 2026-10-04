@@ -32,6 +32,9 @@ input,select{background:var(--bg2);border:1px solid var(--line);border-radius:10
 .ok{color:var(--ok)}.bad{color:var(--bad)}.mut{color:var(--mut)}
 /* вход */
 #login{min-height:100vh;display:grid;place-items:center;padding:24px 16px;position:relative;overflow:hidden;background:radial-gradient(900px 600px at 50% 28%,#2a1659 0%,#150b2b 45%,#0b0614 100%)}
+#login .otp{display:grid;grid-template-columns:repeat(6,1fr);gap:8px}#login .otp input{padding:12px 0;text-align:center;font-size:22px;font-weight:700;caret-color:var(--acc2)}#login .otp input:focus{border-color:var(--acc)}
+#login [hidden]{display:none!important}
+#login .lnk{background:none;border:0;color:var(--acc2);font-size:12px;cursor:pointer;text-align:left;padding:4px 0;margin-top:4px}#login .lnk:hover{text-decoration:underline}
 #login .card{position:relative;z-index:1;background:rgba(28,18,51,.88);backdrop-filter:blur(6px)}
 .rain{position:absolute;inset:0;pointer-events:none;overflow:hidden}.rain i{position:absolute;top:-60px;width:5px;border-radius:2px;animation:fall linear infinite}.rain i::before{content:"";position:absolute;left:50%;top:-10px;bottom:-10px;width:1px;background:inherit;transform:translateX(-50%)}
 @keyframes fall{to{transform:translateY(calc(100vh + 140px))}}
@@ -266,7 +269,10 @@ textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10
     <div class="brand"><div class="logo">H</div><div><h1 style="font-size:18px">Hunter Office</h1><div class="hint">Кабинет команды Hunter AI</div></div></div>
     <label>Логин<input id="lLogin" name="username" autocomplete="username" required></label>
     <label>Пароль<input id="lPass" name="password" type="password" autocomplete="current-password" required></label>
-    <label id="lCodeW" hidden>Код из приложения-аутентификатора<input id="lCode" name="otp" inputmode="text" autocomplete="one-time-code" maxlength="11" placeholder="6 цифр или резервный код"></label>
+    <div id="lCodeW" class="lc-field" hidden><label id="lCodeL">Код из приложения-аутентификатора</label>
+      <div class="otp" id="otp"><input inputmode="numeric" maxlength="1" aria-label="Цифра 1" autocomplete="one-time-code"><input inputmode="numeric" maxlength="1" aria-label="Цифра 2" autocomplete="off"><input inputmode="numeric" maxlength="1" aria-label="Цифра 3" autocomplete="off"><input inputmode="numeric" maxlength="1" aria-label="Цифра 4" autocomplete="off"><input inputmode="numeric" maxlength="1" aria-label="Цифра 5" autocomplete="off"><input inputmode="numeric" maxlength="1" aria-label="Цифра 6" autocomplete="off"></div>
+      <input id="lCode" name="otp" maxlength="11" placeholder="Резервный код" autocomplete="off" hidden>
+      <button class="lnk" id="lRec" type="button">Нет доступа к приложению? Ввести резервный код</button></div>
     <div class="err" id="lErr" role="alert"></div>
     <button class="btn" id="lBtn" type="submit">Войти</button>
     <button class="btn o" id="lBack" type="button" hidden>Назад</button>
@@ -365,15 +371,32 @@ $('#loginForm').addEventListener('submit',async e=>{
       if(r.need_totp){loginChallenge=r.challenge;loginStep(true);return}
     }
     loginChallenge=null;loginStep(false);me=await api('/me');readHash();showApp()}
-  catch(x){$('#lErr').textContent=x.message;if(x.restart){loginChallenge=null;loginStep(false)}}
+  catch(x){$('#lErr').textContent=x.message;if(x.restart){loginChallenge=null;loginStep(false)}else if(loginChallenge&&!$('#otp').hidden){otpIn().forEach(i=>i.value='');$('#lCode').value='';otpIn()[0].focus()}}
   finally{$('#lBtn').disabled=false}
 });
 let loginChallenge=null;
+const otpIn=()=>[...document.querySelectorAll('#otp input')];
+function otpMode(rec){
+  $('#otp').hidden=rec;$('#lCode').hidden=!rec;$('#lRec').textContent=rec?'Вернуться к коду из приложения':'Нет доступа к приложению? Ввести резервный код';
+  $('#lCodeL').textContent=rec?'Резервный код':'Код из приложения-аутентификатора';
+  $('#lCode').value='';otpIn().forEach(i=>i.value='');(rec?$('#lCode'):otpIn()[0]).focus();
+}
 function loginStep(second){
   $('#lCodeW').hidden=!second;$('#lBack').hidden=!second;
   $('#lLogin').closest('label').hidden=second;$('#lPass').closest('label').hidden=second;
-  $('#lCode').value='';if(second)$('#lCode').focus();
+  if(second){otpMode(false)}else{$('#lCode').value='';otpIn().forEach(i=>i.value='')}
 }
+$('#lRec').onclick=()=>otpMode(!$('#otp').hidden);
+(function(){const ins=otpIn();
+  const sync=()=>{$('#lCode').value=ins.map(i=>i.value).join('');if($('#lCode').value.length===6)$('#loginForm').requestSubmit()};
+  ins.forEach((inp,k)=>{
+    inp.addEventListener('input',()=>{inp.value=inp.value.replace(/\D/g,'').slice(-1);if(inp.value&&ins[k+1])ins[k+1].focus();sync()});
+    inp.addEventListener('keydown',e=>{if(e.key==='Backspace'&&!inp.value&&ins[k-1]){ins[k-1].value='';ins[k-1].focus();e.preventDefault()}
+      else if(e.key==='ArrowLeft'&&ins[k-1])ins[k-1].focus();else if(e.key==='ArrowRight'&&ins[k+1])ins[k+1].focus()});
+    inp.addEventListener('focus',()=>inp.select());
+    inp.addEventListener('paste',e=>{const d=(e.clipboardData.getData('text')||'').replace(/\D/g,'').slice(0,6);if(!d)return;e.preventDefault();ins.forEach((x,i)=>x.value=d[i]||'');(ins[Math.min(d.length,5)]).focus();sync()});
+  });
+})();
 $('#lBack').onclick=()=>{loginChallenge=null;loginStep(false);$('#lErr').textContent=''};
 $('#logout').addEventListener('click',async()=>{try{await api('/logout',{method:'POST'})}catch{}showLogin()});
 
