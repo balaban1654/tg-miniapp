@@ -240,6 +240,17 @@ textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10
  .rb-pop{position:fixed;left:12px;right:12px;top:auto;margin-top:8px;grid-template-columns:1fr;max-height:80vh;overflow:auto}
  .rb-ps{flex-direction:row;flex-wrap:wrap;padding-top:0}.rb-cal{grid-template-columns:1fr}.rb-cal .rb-m:first-child{display:none}.rb-nav.mob{display:grid}
 }
+/* дашборд стримера и задачи */
+.dx-ic{display:grid;place-items:center;width:34px;height:34px;border-radius:99px;flex:none}.dx-ic.a{background:#9b5cff26;color:var(--acc2)}.dx-ic.w{background:#ffb84d26;color:var(--warn)}.dx-ic.r{background:#ff6b8a26;color:var(--bad)}.dx-ic.ok{background:#3ddc9726;color:var(--ok)}
+.dx-seg2 .dx-seg2{height:auto}
+.sm-pay{display:flex;flex-direction:column;gap:14px}.sm-pay .big2{font:700 34px var(--fm);letter-spacing:-.03em;line-height:1}.sm-pay .big2 .dx-dm{font-size:24px}.sm-pay .big2 span:last-child{color:var(--ok)}
+.sm-pay .cap{font-size:12px;color:var(--mut);margin-top:4px}
+.sm-pay .cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:6px 20px}.sm-pay .col2{display:flex;flex-direction:column;gap:6px}
+.sm-pay .h{font-size:12px;color:var(--mut);text-transform:uppercase;letter-spacing:.06em;margin-top:6px}.sm-pay .col2 .h:first-child{margin-top:0}.sm-pay .col2 .h.push{margin-top:auto}
+.sm-pay .dx-row{white-space:nowrap;border-bottom:1px solid var(--line);padding-bottom:6px}
+.sm-adv{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 14px;border-radius:12px;background:#3ddc9722}.sm-adv.off{background:#ffffff0f}.sm-adv .tx{flex:1;min-width:180px;font-size:13px;color:var(--mut)}.sm-adv .tx b{color:var(--fg)}
+@media(max-width:560px){.sm-pay .cols{grid-template-columns:minmax(0,1fr)}}
+.dx-tk .dx-tx{text-align:left}
 </style>
 </head>
 <body>
@@ -271,9 +282,9 @@ const STATUS={new:['Новый','p-pur'],registered:['Регистрация','p
 let me=null,tab='home';
 /* Адрес страницы: у каждого раздела своя ссылка (#/leads, #/acc/review), при обновлении остаёмся на месте */
 const ACC_TABS=['sum','review','bonus','pay','exp','why','plan','form'];
-function hashPath(){return '/'+tab+(tab==='acc'?'/'+accState.tab:'')}
+function hashPath(){return '/'+tab+(tab==='acc'?'/'+accState.tab:tab==='plans'?'/'+plansState.tab:'')}
 function pushHash(){const h='#'+hashPath();if(location.hash!==h)history.pushState(null,'',h)}
-function readHash(){const[,t,sub]=(location.hash||'').split('/');if(!t)return;tab=t;if(t==='acc'&&ACC_TABS.includes(sub))accState.tab=sub}
+function readHash(){const[,t,sub]=(location.hash||'').split('/');if(!t)return;tab=t;if(t==='acc'&&ACC_TABS.includes(sub))accState.tab=sub;if(t==='plans'&&PLANS_TABS.includes(sub))plansState.tab=sub}
 window.addEventListener('popstate',()=>{if(!me)return;readHash();showApp()});
 
 async function api(path,opts={}){
@@ -312,6 +323,7 @@ const ICONS={
   pb:'<path d="M4 12h5l2-6 3 12 2-6h4"/>',
   shifts:'<circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3 2"/>',
   acc:'<rect x="3" y="6" width="18" height="13" rx="2.5"/><path d="M3 10h18M16 15h2"/>',
+  plans:'<path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 6l1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2"/>',
   notifs:'<path d="M6 16V11a6 6 0 1112 0v5l1.5 2h-15z"/><path d="M10 21a2 2 0 004 0"/>'};
 const icon=k=>{const s=document.createElementNS('http://www.w3.org/2000/svg','svg');s.setAttribute('viewBox','0 0 24 24');s.setAttribute('width','18');s.setAttribute('height','18');s.setAttribute('fill','none');s.setAttribute('stroke','currentColor');s.setAttribute('stroke-width','2');s.setAttribute('stroke-linecap','round');s.setAttribute('stroke-linejoin','round');s.setAttribute('aria-hidden','true');s.innerHTML=ICONS[k]||'';return s};
 function showApp(){
@@ -326,7 +338,7 @@ function showApp(){
   if(me.role==='analyst'){items.length=0;items.push(['signals','Сигналы']);if(tab!=='signals'&&tab!=='notifs')tab='signals'}
   if(me.role==='admin')items.push(['push','Пуши'],['media','Медиа'],['pb','Постбеки']);
   if(me.role==='streamer')items.splice(items.length,0,['shifts','Смены и отчёты']);
-  if(me.role==='admin')items.splice(items.findIndex(x=>x[0]==='push'),0,['acc','Бухгалтерия']);
+  if(me.role==='admin')items.splice(items.findIndex(x=>x[0]==='push'),0,['acc','Бухгалтерия'],['plans','Планы и задачи']);
   items.push(['notifs','Уведомления']);
   if(!items.some(x=>x[0]===tab)){tab=items[0][0];history.replaceState(null,'','#'+hashPath())}
   const nav=$('#nav');nav.replaceChildren(...items.map(([k,t])=>el('button',{type:'button','data-t':k,class:k===tab?'on':'',onclick:()=>{tab=k;showApp();render()}},icon(k),el('span',{class:'lbl'},k==='chats'?chatsLabel:t))));
@@ -362,6 +374,7 @@ async function render(opt){
     else if(tab==='notifs')m.replaceChildren(...await viewNotifs());
     else if(tab==='shifts')m.replaceChildren(...await viewShifts());
     else if(tab==='acc')m.replaceChildren(...await viewAcc());
+    else if(tab==='plans')m.replaceChildren(...await viewPlans());
   }catch(x){if(x.message!=='auth')m.replaceChildren(el('div',{class:'err'},x.message))}
   if(soft){window.scrollTo(0,y);m.scrollTop=mt}
 }
@@ -546,7 +559,7 @@ function dxModal(btn,s,d,skew,mode){
   document.body.append(ov);btn.classList.add('on');
   if(mode!=='hover')x.focus();
 }
-function dxGo(t,sub){tab=t;if(sub)accState.tab=sub;showApp()}
+function dxGo(t,sub){tab=t;if(sub&&t==='acc')accState.tab=sub;if(sub&&t==='plans')plansState.tab=sub;showApp()}
 
 function dxColorOf(d){const ids=d.streamers.map(s=>s.id).sort((a,b)=>a-b);return id=>DXC[ids.indexOf(id)%DXC.length]}
 function dxFunnel(d){
@@ -615,6 +628,8 @@ function dxTasks(d){
   if(T.advances.length)rows.push([T.advances.length,'w','Заявка на аванс',names(T.advances,x=>x.staff_name+' · '+usd0(x.amount)),'acc','pay']);
   if(T.lagging.length)rows.push([T.lagging.length,T.lagging.some(x=>x.level==='bad')?'r':'w','Стримеры отстают от плана',hlag,'acc','sum']);
   if(T.shortfalls.length)rows.push([T.shortfalls.reduce((a,x)=>a+x.n,0),'w','Недобор часов без причины',names(T.shortfalls,x=>x.name+' '+x.n),'acc','why']);
+  if((T.tasksDone||[]).length)rows.push([T.tasksDone.length,'w','Задачи ждут принятия',names(T.tasksDone,x=>x.staff_name+': '+x.title),'plans','tasks']);
+  if((T.tasksOverdue||[]).length)rows.push([T.tasksOverdue.length,'r','Просрочены задачи',names(T.tasksOverdue,x=>x.staff_name+': '+x.title),'plans','tasks']);
   const list=el('div',{class:'dx-tl'},...(rows.length?rows.map(([n,c,t,s,tb,sub])=>el('button',{type:'button',class:'dx-tk',onclick:()=>dxGo(tb,sub)},el('b',{class:'dx-bd '+c},String(n)),el('span',{class:'dx-tx'},el('span',{class:'tt'},t),el('span',{class:'ts'},s)),svgIcon(IC_CHEV,16))):[el('div',{class:'dx-ok'},'Всё в порядке: задач нет')]));
   return el('div',{class:'card dx-tasks'},el('div',{class:'dx-lbl'},'Требует внимания'),list);
 }
@@ -631,13 +646,176 @@ async function adminDash(){
   return[el('div',{class:'dx'},dxHead(dxRangeLabel({from:d.range.from,to:d.range.to},d.today),()=>render({soft:true})),dxLive(d,skew),el('div',{class:'dx-cols'},el('div',{class:'dx-col'},dxPlanFact(d)),el('div',{class:'dx-col'},dxNet(d),dxTasks(d))),fs)];
 }
 
+/* ---------- Планы и задачи (админ) ---------- */
+const PLANS_TABS=['tasks','goals'];
+let plansState={tab:'tasks',filter:null},plansRefresh=()=>{};
+async function viewPlans(){
+  const root=el('div',{style:'display:grid;gap:14px'}),body=el('div',{style:'display:grid;gap:14px'}),bar=el('div',{class:'lc-tabs',role:'tablist'});
+  const TABS=[['tasks','Задачи'],['goals','Планы']];
+  const drawBar=()=>bar.replaceChildren(...TABS.map(([k,t])=>el('button',{type:'button',role:'tab','aria-selected':String(k===plansState.tab),class:'lc-tab'+(k===plansState.tab?' on':''),onclick:()=>{plansState.tab=k;drawBar();drawBody();pushHash()}},t)));
+  const drawBody=async()=>{body.replaceChildren(el('div',{class:'mut'},'Загрузка…'));try{body.replaceChildren(...(await (plansState.tab==='goals'?plansGoals:plansTasks)()).filter(Boolean))}catch(x){if(x.message!=='auth')body.replaceChildren(el('div',{class:'err'},x.message))}};
+  drawBar();root.append(bar,body);plansRefresh=drawBody;await drawBody();
+  return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Планы и задачи')),root];
+}
+const TASKST={open:['в работе','p-pur'],done:['ждёт принятия','p-warn'],accepted:['принята','p-ok']};
+async function plansTasks(){
+  const [staffAll,tasks]=await Promise.all([api('/staff'),api('/tasks')]);
+  const staff=staffAll.filter(s=>s.active&&s.role!=='admin');
+  const today=kyivToday();
+  const who=el('select',{},el('option',{value:'all'},'Все стримеры'),...staff.map(s=>el('option',{value:s.id},s.name+' · '+ROLE[s.role])));
+  const title=el('input',{placeholder:'Что нужно сделать',maxlength:'200'});
+  const details=el('input',{placeholder:'Подробности (необязательно)',maxlength:'2000'});
+  const due=el('input',{type:'date'});
+  const err=el('div',{class:'err',role:'alert'});
+  const add=async()=>{err.textContent='';try{const body={title:title.value,details:details.value,due:due.value||null};if(who.value==='all')body.all_streamers=true;else body.staff_ids=[Number(who.value)];const r=await api('/tasks',{method:'POST',body});toast(r.count>1?'Задача поставлена: '+r.count+' сотрудников':'Задача поставлена');plansRefresh()}catch(x){err.textContent=x.message}};
+  title.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();add()}});
+  const form=el('div',{class:'card',style:'display:grid;gap:10px'},el('h3',{style:'font-size:14px'},'Новая задача'),
+    el('div',{class:'lc-two'},el('label',{},'Кому',who),el('label',{},'Задача',title),el('label',{},'Подробности',details),el('label',{},'Срок',due)),err,
+    el('div',{},el('button',{class:'btn s',type:'button',onclick:add},'Поставить задачу')));
+  const cnt=k=>tasks.filter(t=>t.status===k).length;
+  if(!plansState.filter)plansState.filter=cnt('done')?'done':'open';
+  const F=[['done','Ждут принятия'],['open','Открытые'],['accepted','Принятые'],['all','Все']];
+  const chips=el('div',{class:'inl'},...F.map(([k,t])=>el('button',{type:'button',class:'btn s'+(plansState.filter===k?'':' o'),onclick:()=>{plansState.filter=k;plansRefresh()}},t+(k==='all'?'':' · '+cnt(k)))));
+  const list=tasks.filter(t=>plansState.filter==='all'||t.status===plansState.filter);
+  const act=(id,action)=>async()=>{try{await api('/tasks/'+id,{method:'PATCH',body:{action}});toast(action==='accept'?'Задача принята':'Задача возвращена в работу');plansRefresh()}catch(x){toast(x.message)}};
+  const rows=list.map(t=>{
+    const over=t.status==='open'&&t.due&&t.due<today;
+    return[td(t.staff_name),el('td',{style:'white-space:normal;text-align:left;min-width:240px'},el('b',{},t.title),t.details?el('div',{class:'mut sm'},t.details):null),
+      el('td',{},t.due?el('span',{class:'pill '+(over?'p-bad':'p-pur')},dmy(t.due).slice(0,5)):'—'),
+      el('td',{},el('span',{class:'pill '+TASKST[t.status][1]},TASKST[t.status][0])),
+      el('td',{},el('div',{class:'inl',style:'justify-content:center'},
+        t.status==='done'?el('button',{class:'btn s',type:'button',onclick:act(t.id,'accept')},'Принять'):null,
+        t.status==='done'||t.status==='accepted'?el('button',{class:'btn o s',type:'button',onclick:act(t.id,'reopen')},'Вернуть'):null,
+        el('button',{class:'btn o s',type:'button',onclick:async()=>{try{await api('/tasks/'+t.id,{method:'DELETE'});plansRefresh()}catch(x){toast(x.message)}}},'Удалить')))];
+  });
+  return[form,el('div',{class:'head'},el('h3',{style:'font-size:15px'},'Задачи'),chips),ctrT(table(['Сотрудник','Задача','Срок','Статус',''],rows,plansState.filter==='done'?'Выполненных задач, которые ждут принятия, нет.':'Задач нет.')),
+    el('div',{class:'mut sm'},'Сотрудник отмечает задачу выполненной, она попадает к вам в «Требует внимания» на дашборде. Принятая задача уходит из его списка.')];
+}
+async function plansGoals(){
+  const p=await api('/kpi/settings');
+  const num=(v,min)=>el('input',{type:'number',min:min??'0',step:'any',value:String(v)});
+  const f={hours:num(p.hours,1),shiftH:num(p.shiftH,.5),leads:num(p.leads),gf:num(p.goals.ftd),gs:num(p.goals.ftdSum),gd:num(p.goals.deposits),gc:num(p.goals.commission),gn:num(p.goals.net)};
+  const lab=(t,i)=>el('label',{},t,i);
+  const err1=el('div',{class:'err',role:'alert'}),err2=el('div',{class:'err',role:'alert'});
+  const save=async(body,err,msg)=>{err.textContent='';try{await api('/kpi/settings',{method:'PUT',body});toast(msg);plansRefresh()}catch(x){err.textContent=x.message}};
+  return[el('div',{class:'head'},el('h3',{style:'font-size:15px'},'Планы и цели')),
+    el('div',{class:'card',style:'display:grid;gap:12px'},el('h4',{},'План стримера на месяц'),
+      el('div',{class:'lc-two'},lab('Часов в эфире за месяц',f.hours),lab('Часов в одной смене',f.shiftH),lab('Минимум лидов (FTD) за месяц',f.leads)),err1,
+      el('div',{},el('button',{class:'btn',type:'button',onclick:()=>save({hours:+f.hours.value,shiftH:+f.shiftH.value,leads:+f.leads.value},err1,'План стримера сохранён')},'Сохранить')),
+      el('div',{class:'mut sm'},'Эти цифры видят стримеры в «Моих показателях» и они же идут в расчёт KPI. Ставки и бонусы настраиваются в Бухгалтерии, вкладка «KPI-план».')),
+    el('div',{class:'card',style:'display:grid;gap:12px'},el('h4',{},'Цели компании на месяц (план/факт на дашборде)'),
+      el('div',{class:'lc-two'},lab('FTD, штук',f.gf),lab('Пополнения по FTD, $',f.gs),lab('Все депозиты (FTD и додепы), $',f.gd),lab('Комиссия, $',f.gc),lab('Чистая прибыль, $',f.gn)),err2,
+      el('div',{},el('button',{class:'btn',type:'button',onclick:()=>save({goals:{ftd:+f.gf.value,ftdSum:+f.gs.value,deposits:+f.gd.value,commission:+f.gc.value,net:+f.gn.value}},err2,'Цели сохранены')},'Сохранить')),
+      el('div',{class:'mut sm'},'Для периода меньше месяца цели пересчитываются пропорционально дням. Метка на полоске показывает, где вы должны быть сегодня.'))];
+}
+
+/* ---------- Дашборд стримера ---------- */
+const DXS={new:['Новые','#9b5cff'],registered:['Регистрации','#4da3ff'],ftd:['FTD','#2dd4bf'],active:['Активные','#3ddc97'],churned:['Отвал','#ff6b8a']};
+const IC_CHECK='<circle cx="12" cy="12" r="9"/><path d="M8 12.5l3 3 5-6"/>',IC_ALERT='<path d="M12 3l9.5 17h-19z"/><path d="M12 10v4M12 17.2v.1"/>';
+function dxLiveCard(c,d,skew){
+  const lvl=dxLvl(c.hoursMin,d.plan.paceMin);
+  const head=el('b',{},el('span',{style:'font-weight:600'},c.name),el('span',{class:'dx-hp '+lvl,title:'По графику сегодня '+fmtH(d.plan.paceMin)+' ч'},fmtH(c.hoursMin)+'/'+d.plan.hours+' ч'));
+  if(!c.live)return el('div',{class:'dx-lc'},head,el('span',{class:'t off'},dxOffText(c,d.today)));
+  const time=el('span',{class:'t'},el('span',{'data-live':c.live.started_at},hm(Math.max(0,Math.floor((Date.now()+skew-Date.parse(c.live.started_at))/60000)))));
+  const link=c.live.stream_url?el('a',{class:'dx-go big',href:c.live.stream_url,target:'_blank',rel:'noopener',title:'Открыть эфир','aria-label':'Открыть эфир'},svgIcon(IC_EXT,18)):null;
+  return el('div',{class:'dx-lc live'},el('div',{class:'dx-lcl'},head,time),el('div',{class:'dx-lvx'},el('span',{class:'dx-liv'},'LIVE'),link));
+}
+const smTile=(lbl,v,small,pct,mark,left,right,cls)=>el('div',{class:'dx-m'},el('div',{class:'dx-lbl'},lbl),el('div',{class:'v'},v,small?el('small',{},' '+small):null),
+  el('div',{class:'dx-bar'},el('i',{style:'width:'+Math.min(100,pct)+'%'}),mark!==null?el('u',{style:'left:'+mark+'%'}):null),el('div',{class:'dx-meta'},el('span',{class:cls},left),el('span',{},right)));
+function smFunnel(d){
+  const f=d.funnel,ctr=f.clicks?f.regs/f.clicks*100:null,rtd=f.regs?f.ftd/f.regs*100:null,pc=v=>v===null?'—':v.toFixed(1).replace('.',',')+'%';
+  const stages=[['Клики',f.clicks],['Регистрации',f.regs],['FTD',f.ftd],['Додепы',f.dep]];
+  const note=d.clicksSince&&d.range.from<d.clicksSince?el('div',{class:'mut sm'},'Клики считаются с '+dmy(d.clicksSince)+': раньше их время не записывалось.'):null;
+  return[el('div',{class:'dx-fk'},el('b',{title:'Из клика в регистрацию'},'CTR: '+pc(ctr)),el('b',{title:'Из регистрации в депозит'},'RTD: '+pc(rtd))),
+    ...stages.map(([n,v])=>el('div',{class:'dx-fs'},el('div',{class:'dx-fsh'},el('span',{class:'dx-lbl'},n),el('b',{},n0(v))),el('div',{class:'dx-seg2'},el('span',{style:'flex:1;background:var(--acc)'},n0(v))))),note].filter(Boolean);
+}
+function smMetrics(d){
+  const m=d.month,pl=d.plan,pace=pl.pace*100,mark=pace<99.5?pace:null,t=d.today_;
+  const lv=pct=>pct>=pace?'ok':pct>=pace*.85?'warn':'bad';
+  const hp=m.hoursMin/pl.planMin*100,sp=m.shifts/m.planShifts*100,lp=m.ftd/pl.leads*100;
+  const toGo=pl.leads-m.ftd;
+  return el('div',{class:'card dx-pf'},el('div',{class:'dx-hd'},el('div',{class:'l'},el('span',{class:'dx-lbl'},'Мои показатели за '+(d.range.whole?'месяц':perLabel(m.period).toLowerCase())),dxPopBtn('Воронка',IC_FUNNEL,smFunnel(d),'pl wide')),mark!==null?el('span',{class:'mut',style:'font-size:12px'},'метка: план на сегодня'):null),
+    smTile('Часы в эфире',fmtH(m.hoursMin),'/ '+pl.hours+' ч',hp,mark,Math.round(hp)+'% плана','по графику '+fmtH(pl.paceMin)+' ч',lv(hp)),
+    smTile('Закрытых смен',String(m.shifts),'/ '+n0(m.planShifts),sp,mark,Math.round(sp)+'% плана','смена = '+fmtH(pl.shiftH*60)+' ч',lv(sp)),
+    smTile('Лиды (FTD)',String(m.ftd),'/ '+pl.leads,lp,mark,Math.round(lp)+'% плана',toGo>0?'ещё '+toGo+' до плана':'план выполнен',lv(lp)),
+    smTile('Сегодня в эфире',hm(t.minutes),'/ '+fmtH(t.shiftMin)+' ч',t.minutes/t.shiftMin*100,null,t.minLeft>0?'до закрытия смены '+t.minLeft+' мин':'смена закрыта',t.live?'идёт эфир':'',t.minLeft>0?'warn':'ok'));
+}
+function smLeads(d){
+  const b=d.byStatus,total=Object.values(b).reduce((a,x)=>a+x,0),f=d.funnel;
+  const segs=Object.keys(DXS).filter(k=>b[k]).map(k=>el('span',{style:'flex:'+b[k]+' 1 auto;background:'+DXS[k][1]},DXS[k][0]+' '+b[k]));
+  const pc=v=>v===null?'—':v.toFixed(1).replace('.',',')+'%';
+  return el('div',{class:'card',style:'display:grid;gap:12px'},el('div',{class:'dx-lbl'},'Мои лиды по статусам'),
+    el('div',{class:'dx-seg2',style:'height:30px',role:'img','aria-label':Object.keys(DXS).filter(k=>b[k]).map(k=>DXS[k][0]+' '+b[k]).join(', ')},...(segs.length?segs:[el('span',{style:'flex:1;background:#ffffff1a;color:var(--mut)'},'Лидов за период нет')])),
+    el('div',{class:'dx-row',style:'flex-wrap:wrap;gap:8px 18px;justify-content:space-between'},el('span',{},'Всего лидов ',el('b',{},String(total))),el('span',{},'RTD ',el('b',{},pc(f.regs?f.ftd/f.regs*100:null))),el('span',{},'Отвал ',el('b',{},pc(total?(b.churned||0)/total*100:null)))));
+}
+function smSalary(d){
+  const s=d.salary,tot=i=>s.base[i]+s.leads[i]+s.ftdBonus+s.dayBonus+s.bonus-s.penalty,pay=[tot(0)-s.paid,tot(1)-s.paid];
+  const pr=(a,b)=>el('span',{},el('span',{class:'dx-dm'},usd0(a)),el('span',{class:'dx-sl'},'/'),el('span',{},usd0(b)));
+  const row=(a,v)=>el('div',{class:'dx-row'},el('span',{},a),v);
+  const sg=n=>n?sgn0(n):'$0';
+  let adv;
+  const a=s.advance;
+  if(a&&a.request)adv=el('div',{class:'sm-adv'},el('div',{class:'tx'},el('b',{},a.request.status==='paid'?'Аванс '+usd0(a.request.amount)+' выплачен.':'Аванс '+usd0(a.request.amount)+' запрошен.'),a.request.status==='paid'?' Получить можно один раз в месяц.':' Ждёт выплаты.'),el('button',{class:'btn',type:'button',disabled:''},'Запросить аванс'));
+  else if(a)adv=el('div',{class:'sm-adv'+(a.can?'':' off')},el('div',{class:'tx'},a.can?el('b',{},'Аванс '+usd0(a.amount)+' доступен. '):null,a.can?'По минимальным ставкам уже накопилось '+usd0(s.totalMin)+'. Получить можно один раз в месяц.':'До аванса осталось '+usd0(a.amount-s.totalMin)+' по минимальным ставкам. Получить можно один раз в месяц.'),
+    el('button',{class:'btn',type:'button',disabled:a.can?null:'',onclick:async e=>{e.currentTarget.disabled=true;try{await api('/advance/request',{method:'POST'});toast('Аванс запрошен');render({soft:true})}catch(x){toast(x.message);e.currentTarget.disabled=false}}},'Запросить аванс'));
+  return el('div',{class:'card sm-pay'},el('div',{class:'dx-lbl'},'Моя зарплата за месяц'),
+    el('div',{style:'margin-top:8px'},el('div',{class:'big2'},pr(pay[0],pay[1])),el('div',{class:'cap'},'к выплате: если план не выполнен / если выполнен')),
+    el('div',{class:'cols'},
+      el('div',{class:'col2'},el('div',{class:'h'},'База'),row('Ставка ('+s.shifts+' смен)',el('b',{},pr(s.base[0],s.base[1]))),row('Лиды ('+s.leadsN+')',el('b',{},pr(s.leads[0],s.leads[1]))),el('div',{class:'h'},'Бонусы'),row('FTD (суммы больше)',el('b',{},sg(s.ftdBonus))),row('Дневной ('+d.plan.dayCount+' FTD)',el('b',{},sg(s.dayBonus))),row('Премии',el('b',{},sg(s.bonus)))),
+      el('div',{class:'col2'},el('div',{class:'h'},'Итого начислено'),row('По минимальным',el('b',{},usd0(tot(0)))),row('По полным',el('b',{},usd0(tot(1)))),el('div',{class:'h push'},'Удержания'),row('Штрафы',el('b',{class:s.penalty?'dx-neg':''},s.penalty?sgn0(-s.penalty):'$0')),row('Выплачено (аванс)',el('b',{},s.paid?sgn0(-s.paid):'$0')))),
+    adv);
+}
+function smTasks(d){
+  const items=[];
+  const alertRow=(c,t,s)=>el('button',{type:'button',class:'dx-tk',onclick:()=>dxGo('shifts')},el('span',{class:'dx-ic '+c},svgIcon(IC_ALERT,18)),el('span',{class:'dx-tx'},el('span',{class:'tt'},t),el('span',{class:'ts'},s)),svgIcon(IC_CHEV,16));
+  d.alerts.rejected.forEach(x=>items.push(alertRow('r','Отчёт за '+dxDay(x.day)+' отклонён',x.reject_reason||'Исправьте и отправьте снова')));
+  d.alerts.shortfalls.forEach(x=>items.push(alertRow('w','Недобор часов '+dxDay(x.day),'Напишите причину, её прочтёт руководитель')));
+  d.tasks.forEach(t=>{
+    const done=t.status==='done',over=!done&&t.due&&t.due<d.today;
+    const sub=done?'Отправлено на проверку. Нажмите, чтобы вернуть в работу':[t.details,t.due?'до '+dxDay(t.due):''].filter(Boolean).join(' · ')||'Без срока';
+    items.push(el('button',{type:'button',class:'dx-tk',title:done?'Вернуть в работу':'Отметить выполненной',onclick:async()=>{try{await api('/tasks/'+t.id+(done?'/undo':'/done'),{method:'POST'});toast(done?'Задача снова в работе':'Задача отправлена на проверку');render({soft:true})}catch(x){toast(x.message)}}},
+      el('span',{class:'dx-ic '+(done?'ok':'a')},svgIcon(IC_CHECK,18)),el('span',{class:'dx-tx'},el('span',{class:'tt',style:done?'text-decoration:line-through;color:var(--mut)':''},t.title),el('span',{class:'ts',style:over?'color:var(--bad)':''},sub))));
+  });
+  return el('div',{class:'card dx-tasks'},el('div',{class:'dx-lbl'},'Мои задачи'),el('div',{class:'dx-tl'},...(items.length?items:[el('div',{class:'dx-ok'},'Задач нет. Отличная работа')])));
+}
+function smLast(d){
+  const cols=['Дата','Время','Статус',...d.fields];
+  const rows=d.last.map(r=>[td(dxDay(r.day)),td(r.minutes?hm(r.minutes):'—'),el('td',{},el('span',{class:'pill '+(REPSTATUS[r.status]||['',''])[1]},(REPSTATUS[r.status]||[r.status])[0])),...d.fields.map(f=>td(r.values[f]===undefined||r.values[f]===null?'—':Number(r.values[f]).toLocaleString('ru-RU'),'n'))]);
+  return el('div',{style:'display:grid;gap:8px'},el('div',{class:'dx-hd'},el('h3',{style:'font-size:15px'},'Мои последние эфиры'),el('a',{href:'#/shifts',style:'color:var(--acc2);font-weight:700;font-size:12px;text-decoration:none',onclick:e=>{e.preventDefault();dxGo('shifts')}},'Смены и отчёты →')),ctrT(table(cols,rows,'За выбранный период отчётов нет.')));
+}
+async function streamerDash(){
+  dxReg.length=0;dxCloseModal();
+  const r=dxCur();
+  const d=await api('/my/dashboard?from='+r.from+'&to='+r.to);
+  const skew=Date.parse(d.now)-Date.now();
+  stopPoll();
+  poll=setInterval(()=>{
+    document.querySelectorAll('[data-live]').forEach(n=>{n.textContent=hm(Math.max(0,Math.floor((Date.now()+skew-Date.parse(n.dataset.live))/60000)))});
+    if(dxReg.every(([,p])=>p.hidden)&&Date.now()+skew-Date.parse(d.now)>90000)render({soft:true});
+  },20000);
+  const strip=d.colleagues.length?el('div',{class:'card dx-live'},...d.colleagues.map(c=>dxLiveCard(c,d,skew))):null;
+  return[el('div',{class:'dx'},dxHead(dxRangeLabel({from:d.range.from,to:d.range.to},d.today),()=>render({soft:true})),strip,
+    el('div',{class:'dx-cols'},el('div',{class:'dx-col'},smMetrics(d),smLeads(d)),el('div',{class:'dx-col'},smSalary(d),smTasks(d))),smLast(d))];
+}
+/* задачи для остальных ролей */
+async function simpleTasksCard(){
+  const list=await api('/tasks/mine').catch(()=>[]);
+  if(!list.length)return null;
+  const today=kyivToday();
+  return el('div',{class:'card',style:'display:grid;gap:8px'},el('div',{class:'dx-lbl'},'Мои задачи'),...list.map(t=>{
+    const done=t.status==='done',over=!done&&t.due&&t.due<today;
+    return el('button',{type:'button',class:'dx-tk',onclick:async()=>{try{await api('/tasks/'+t.id+(done?'/undo':'/done'),{method:'POST'});render({soft:true})}catch(x){toast(x.message)}}},
+      el('span',{class:'dx-ic '+(done?'ok':'a')},svgIcon(IC_CHECK,18)),el('span',{class:'dx-tx'},el('span',{class:'tt',style:done?'text-decoration:line-through;color:var(--mut)':''},t.title),el('span',{class:'ts',style:over?'color:var(--bad)':''},done?'Отправлено на проверку':[t.details,t.due?'до '+dxDay(t.due):''].filter(Boolean).join(' · ')||'Без срока')))}));
+}
+
 async function viewHome(){
   if(me.role==='admin')return adminDash();
+  if(me.role==='streamer')return streamerDash();
   dxReg.length=0;
   const r=dxCur();
   const s=await api('/stats?from='+r.from+'&to='+r.to);const b=s.byStatus;
   const k=(t,v)=>el('div',{class:'kpi'},el('small',{},t),el('b',{},String(v)));
-  const kpi=me.role==='streamer'?await kpiCardBlock().catch(()=>null):null;
+  const kpi=await simpleTasksCard();
   return[el('div',{class:'dx'},dxHead(dxRangeLabel(r),()=>render({soft:true})),kpi,
     el('div',{class:'kpis'},k('Клики по ссылкам',s.clicks),k('Лиды',s.total),k('Регистрации',(b.registered||0)+(b.ftd||0)+(b.active||0)),k('FTD',(b.ftd||0)+(b.active||0)),k('Отвал',b.churned||0)),
     el('div',{class:'kpis'},k('Депозиты',money(s.deposits)),k('Выводы',money(s.withdrawals))))];
@@ -1200,22 +1378,21 @@ async function accWhy(){
 async function accPlan(){
   const p=await api('/kpi/settings');
   const num=(v,min)=>el('input',{type:'number',min:min??'0',step:'any',value:String(v)});
-  const f={hours:num(p.hours,1),shiftH:num(p.shiftH,.5),leads:num(p.leads),base:num(p.base),baseLow:num(p.baseLow),price:num(p.price),priceLow:num(p.priceLow),
-    dc:num(p.day.count,1),dm:num(p.day.min),db:num(p.day.bonus),dh:num(p.day.cutoffH),tol:num(Math.round(p.tol*100)),adv:num(p.advance),gf:num(p.goals.ftd),gs:num(p.goals.ftdSum),gd:num(p.goals.deposits),gc:num(p.goals.commission),gn:num(p.goals.net)};
+  const f={base:num(p.base),baseLow:num(p.baseLow),price:num(p.price),priceLow:num(p.priceLow),
+    dc:num(p.day.count,1),dm:num(p.day.min),db:num(p.day.bonus),dh:num(p.day.cutoffH),tol:num(Math.round(p.tol*100)),adv:num(p.advance)};
   const tiers=p.tiers.map(t=>({from:num(t.from),price:num(t.price)}));
   const ftd=p.ftd.map(t=>({over:num(t.over),bonus:num(t.bonus)}));
   const err=el('div',{class:'err',role:'alert'});
   const lab=(t,i)=>el('label',{},t,i);
-  const save=async()=>{err.textContent='';try{await api('/kpi/settings',{method:'PUT',body:{hours:+f.hours.value,shiftH:+f.shiftH.value,leads:+f.leads.value,base:+f.base.value,baseLow:+f.baseLow.value,price:+f.price.value,priceLow:+f.priceLow.value,
-    tiers:tiers.map(t=>({from:+t.from.value,price:+t.price.value})),ftd:ftd.map(t=>({over:+t.over.value,bonus:+t.bonus.value})),day:{count:+f.dc.value,min:+f.dm.value,bonus:+f.db.value,cutoffH:+f.dh.value},tol:+f.tol.value/100,advance:+f.adv.value,goals:{ftd:+f.gf.value,ftdSum:+f.gs.value,deposits:+f.gd.value,commission:+f.gc.value,net:+f.gn.value}}});toast('План сохранён');accRefresh()}catch(x){err.textContent=x.message}};
-  return[el('div',{class:'head'},el('h3',{style:'font-size:15px'},'KPI-план стримера')),
+  const save=async()=>{err.textContent='';try{await api('/kpi/settings',{method:'PUT',body:{base:+f.base.value,baseLow:+f.baseLow.value,price:+f.price.value,priceLow:+f.priceLow.value,
+    tiers:tiers.map(t=>({from:+t.from.value,price:+t.price.value})),ftd:ftd.map(t=>({over:+t.over.value,bonus:+t.bonus.value})),day:{count:+f.dc.value,min:+f.dm.value,bonus:+f.db.value,cutoffH:+f.dh.value},tol:+f.tol.value/100,advance:+f.adv.value}});toast('План сохранён');accRefresh()}catch(x){err.textContent=x.message}};
+  return[el('div',{class:'head'},el('h3',{style:'font-size:15px'},'KPI-план стримера: ставки и бонусы')),
     el('div',{class:'card',style:'display:grid;gap:14px'},
-      el('h4',{},'Смены'),el('div',{class:'lc-two'},lab('Часов в месяц (план)',f.hours),lab('Часов в одной смене',f.shiftH),lab('Ставка за смены, $',f.base),lab('Ставка, если смены не выполнены, $',f.baseLow)),
-      el('h4',{},'Лиды (FTD)'),el('div',{class:'lc-two'},lab('Минимум лидов',f.leads),lab('Цена лида, $',f.price),lab('Цена лида, если план не выполнен, $',f.priceLow)),
+      el('h4',{},'Смены'),el('div',{class:'lc-two'},lab('Ставка за смены, $',f.base),lab('Ставка, если смены не выполнены, $',f.baseLow)),
+      el('h4',{},'Лиды (FTD)'),el('div',{class:'lc-two'},lab('Цена лида, $',f.price),lab('Цена лида, если план не выполнен, $',f.priceLow)),
       el('div',{class:'mut sm'},'Повышенная цена за каждого лида месяца:'),el('div',{class:'lc-two'},...tiers.map(t=>el('div',{class:'inl'},el('span',{class:'mut sm'},'от'),t.from,el('span',{class:'mut sm'},'лидов, $'),t.price))),
       el('h4',{},'Бонус за FTD (по сумме первого депозита)'),el('div',{class:'lc-two'},...ftd.map(t=>el('div',{class:'inl'},el('span',{class:'mut sm'},'больше $'),t.over,el('span',{class:'mut sm'},'бонус $'),t.bonus))),
       el('h4',{},'Дневной бонус'),el('div',{class:'lc-two'},lab('FTD в день',f.dc),lab('Минимальный депозит, $',f.dm),lab('Бонус, $',f.db),lab('День закрывается в (Киев), час',f.dh)),
-      el('h4',{},'Цели месяца для дашборда'),el('div',{class:'lc-two'},lab('FTD, штук',f.gf),lab('Пополнения по FTD, $',f.gs),lab('Все депозиты (FTD и додепы), $',f.gd),lab('Комиссия, $',f.gc),lab('Чистая прибыль, $',f.gn)),
       el('h4',{},'Прочее'),el('div',{class:'lc-two'},lab('Запас на курс брокера, %',f.tol),lab('Максимальный аванс, $',f.adv)),
       err,el('div',{},el('button',{class:'btn',type:'button',onclick:save},'Сохранить'))),
     el('div',{class:'mut sm'},'Изменения применяются сразу ко всем месяцам, которые ещё считаются на лету. Выплаты за закрытые месяцы лучше фиксировать заметкой.')];

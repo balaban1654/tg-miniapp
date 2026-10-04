@@ -830,7 +830,173 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
         advances,
         lagging,
         shortfalls: out.filter((x) => shortBy.get(x.id)).map((x) => ({ id: x.id, name: x.name, n: shortBy.get(x.id) as number })),
+        tasksDone: (await db.query(`SELECT t.id, s.name AS staff_name, t.title FROM staff_tasks t JOIN staff s ON s.id = t.staff_id WHERE t.status = 'done' ORDER BY t.done_at`)).rows,
+        tasksOverdue: (await db.query(`SELECT t.id, s.name AS staff_name, t.title FROM staff_tasks t JOIN staff s ON s.id = t.staff_id WHERE t.status = 'open' AND t.due < $1::date ORDER BY t.due`, [today])).rows,
       },
+    };
+  });
+
+  // ----- Задачи сотрудникам -----
+  const taskRow = (r: any) => ({ id: r.id, staff_id: r.staff_id, staff_name: r.staff_name, title: r.title, details: r.details, due: r.due, status: r.status, created_at: r.created_at, done_at: r.done_at, accepted_at: r.accepted_at });
+  const TASK_COLS = `t.id, t.staff_id, s.name AS staff_name, t.title, t.details, to_char(t.due, 'YYYY-MM-DD') AS due, t.status, t.created_at, t.done_at, t.accepted_at`;
+
+  app.get<{ Querystring: { status?: string } }>('/tasks', { preHandler: admin }, async (req) => {
+    const st = ['open', 'done', 'accepted'].includes(String(req.query.status)) ? String(req.query.status) : null;
+    const rows = (
+      await db.query(
+        `SELECT ${TASK_COLS} FROM staff_tasks t JOIN staff s ON s.id = t.staff_id WHERE ($1::text IS NULL OR t.status = $1)
+          ORDER BY (t.status = 'done') DESC, (t.status = 'open') DESC, t.due NULLS LAST, t.id DESC LIMIT 500`,
+        [st],
+      )
+    ).rows;
+    return rows.map(taskRow);
+  });
+  app.post('/tasks', { preHandler: admin }, async (req, reply) => {
+    const b = (req.body ?? {}) as Record<string, any>;
+    const title = str(b.title, 200);
+    if (!title) return reply.code(400).send({ error: 'Напишите, что нужно сделать' });
+    const details = str(b.details, 2000) || null;
+    const due = DATE.test(String(b.due)) ? String(b.due) : null;
+    let ids: number[] = [];
+    if (b.all_streamers) ids = (await db.query(`SELECT id FROM staff WHERE role = 'streamer' AND active`)).rows.map((r: any) => r.id);
+    else if (Array.isArray(b.staff_ids)) ids = b.staff_ids.map(Number).filter((n: number) => Number.isInteger(n) && n > 0);
+    if (!ids.length) return reply.code(400).send({ error: 'Выберите, кому поставить задачу' });
+    const ok = (await db.query(`SELECT id FROM staff WHERE id = ANY($1::int[]) AND active AND role <> 'admin'`, [ids])).rows.map((r: any) => r.id);
+    if (!ok.length) return reply.code(404).send({ error: 'Сотрудники не найдены' });
+    for (const id of ok) await db.query('INSERT INTO staff_tasks (staff_id, title, details, due, created_by) VALUES ($1,$2,$3,$4::date,$5)', [id, title, details, due, req.staff!.id]);
+    return { ok: true, count: ok.length };
+  });
+  app.patch<{ Params: { id: string } }>('/tasks/:id', { preHandler: admin }, async (req, reply) => {
+    const b = (req.body ?? {}) as Record<string, any>;
+    const id = Number(req.params.id);
+    if (b.action === 'accept') {
+      const r = await db.query(`UPDATE staff_tasks SET status = 'accepted', accepted_at = now(), done_at = coalesce(done_at, now()) WHERE id = $1 RETURNING id`, [id]);
+      if (!r.rowCount) return reply.code(404).send({ error: 'Задача не найдена' });
+    } else if (b.action === 'reopen') {
+      const r = await db.query(`UPDATE staff_tasks SET status = 'open', done_at = NULL, accepted_at = NULL WHERE id = $1 RETURNING id`, [id]);
+      if (!r.rowCount) return reply.code(404).send({ error: 'Задача не найдена' });
+    } else return reply.code(400).send({ error: 'Неизвестное действие' });
+    return { ok: true };
+  });
+  app.delete<{ Params: { id: string } }>('/tasks/:id', { preHandler: admin }, async (req) => {
+    await db.query('DELETE FROM staff_tasks WHERE id = $1', [Number(req.params.id)]);
+    return { ok: true };
+  });
+  // Свои задачи: открытые и ждущие принятия
+  app.get('/tasks/mine', { preHandler: anyStaff }, async (req) => {
+    const rows = (await db.query(`SELECT ${TASK_COLS} FROM staff_tasks t JOIN staff s ON s.id = t.staff_id WHERE t.staff_id = $1 AND t.status <> 'accepted' ORDER BY (t.status = 'open') DESC, t.due NULLS LAST, t.id DESC`, [req.staff!.id])).rows;
+    return rows.map(taskRow);
+  });
+  app.post<{ Params: { id: string } }>('/tasks/:id/done', { preHandler: anyStaff }, async (req, reply) => {
+    const r = await db.query(`UPDATE staff_tasks SET status = 'done', done_at = now() WHERE id = $1 AND staff_id = $2 AND status = 'open' RETURNING id`, [Number(req.params.id), req.staff!.id]);
+    if (!r.rowCount) return reply.code(404).send({ error: 'Задача не найдена или уже отмечена' });
+    return { ok: true };
+  });
+  app.post<{ Params: { id: string } }>('/tasks/:id/undo', { preHandler: anyStaff }, async (req, reply) => {
+    const r = await db.query(`UPDATE staff_tasks SET status = 'open', done_at = NULL WHERE id = $1 AND staff_id = $2 AND status = 'done' RETURNING id`, [Number(req.params.id), req.staff!.id]);
+    if (!r.rowCount) return reply.code(404).send({ error: 'Задачу уже приняли или она не отмечена' });
+    return { ok: true };
+  });
+
+  // ----- Дашборд стримера: только его данные и список коллег без денег -----
+  app.get<{ Querystring: { from?: string; to?: string } }>('/my/dashboard', { preHandler: stream }, async (req) => {
+    const me = req.staff!;
+    const plan = await getPlan();
+    const today = (await db.query(`SELECT to_char((now() AT TIME ZONE '${TZ}')::date, 'YYYY-MM-DD') AS d`)).rows[0].d as string;
+    let from: string;
+    let to: string;
+    if (DATE.test(String(req.query.from)) && DATE.test(String(req.query.to))) {
+      from = String(req.query.from);
+      to = String(req.query.to);
+      if (from > to) [from, to] = [to, from];
+      if (daysBetween(from, to) > 800) from = addDays(to, -800);
+    } else {
+      from = `${today.slice(0, 7)}-01`;
+      to = lastOfMonth(today.slice(0, 7));
+    }
+    const ref = to > today ? today : to;
+    const refMonth = ref.slice(0, 7);
+    const curMonth = today.slice(0, 7);
+    const k = await kpiFor(me.id, refMonth, plan);
+    const planMin = plan.hours * 60;
+    const paceMin = planMin * (refMonth === curMonth ? Number(today.slice(8, 10)) / monthLen(refMonth) : 1);
+    const pace = refMonth === curMonth ? Number(today.slice(8, 10)) / monthLen(refMonth) : 1;
+
+    const ev = (await aggEvents(from, to)).get(me.id) ?? emptyAgg();
+    const clicks = Number(
+      (await db.query(`SELECT count(*)::int AS n FROM link_clicks c JOIN links l ON l.id = c.link_id WHERE l.owner_id = $1 AND (c.at AT TIME ZONE '${TZ}')::date BETWEEN $2::date AND $3::date`, [me.id, from, to])).rows[0].n,
+    );
+    const clicksSince = (await db.query(`SELECT to_char(min(at AT TIME ZONE '${TZ}'), 'YYYY-MM-DD') AS d FROM link_clicks`)).rows[0].d as string | null;
+    const byStatus: Record<string, number> = {};
+    for (const r of (await db.query(`SELECT status, count(*)::int AS n FROM leads WHERE owner_id = $1 AND (created_at AT TIME ZONE '${TZ}')::date BETWEEN $2::date AND $3::date GROUP BY status`, [me.id, from, to])).rows) byStatus[r.status] = r.n;
+
+    const live = (await db.query(`SELECT id, stream_url, started_at FROM shift_reports WHERE staff_id = $1 AND status = 'live' ORDER BY id DESC LIMIT 1`, [me.id])).rows[0] ?? null;
+    const t = await todayInfo(me.id);
+    const elapsed = live ? Math.max(0, Math.floor((Date.now() - Date.parse(live.started_at)) / 60000)) : 0;
+    const todayMin = t.approvedToday + t.pendingToday + elapsed;
+    const shiftMin = plan.shiftH * 60;
+
+    // Коллеги: имена, часы за месяц и эфир, без денег и без карточек
+    const colRows = (await db.query(`SELECT id, name FROM staff WHERE role = 'streamer' AND active AND id <> $1 ORDER BY id`, [me.id])).rows as { id: number; name: string }[];
+    const liveBy = new Map(((await db.query(`SELECT DISTINCT ON (staff_id) staff_id, started_at, stream_url FROM shift_reports WHERE status = 'live' ORDER BY staff_id, id DESC`)).rows as any[]).map((r) => [r.staff_id, r]));
+    const lastBy = new Map(((await db.query(`SELECT DISTINCT ON (staff_id) staff_id, ended_at, coalesce(approved_min, declared_min) AS m FROM shift_reports WHERE status <> 'live' AND ended_at IS NOT NULL ORDER BY staff_id, ended_at DESC`)).rows as any[]).map((r) => [r.staff_id, r]));
+    const hoursBy = new Map(((await db.query(`SELECT staff_id, coalesce(sum(approved_min), 0)::int AS m FROM shift_reports WHERE status = 'approved' AND to_char(day, 'YYYY-MM') = $1 GROUP BY staff_id`, [refMonth])).rows as any[]).map((r) => [r.staff_id, r.m]));
+    const colleagues = colRows
+      .map((c) => {
+        const lv = liveBy.get(c.id) ?? null;
+        const ls = lastBy.get(c.id) ?? null;
+        return { id: c.id, name: c.name, hoursMin: hoursBy.get(c.id) ?? 0, live: lv ? { started_at: lv.started_at, stream_url: lv.stream_url } : null, lastEnd: ls?.ended_at ?? null, lastMin: ls?.m ?? null };
+      })
+      .sort((a, b) => (b.live ? Date.now() - Date.parse(b.live.started_at) + 1e12 : 0) - (a.live ? Date.now() - Date.parse(a.live.started_at) + 1e12 : 0) || (Date.parse(b.lastEnd ?? '0') || 0) - (Date.parse(a.lastEnd ?? '0') || 0));
+
+    const adv = await advState(me.id, curMonth, (await kpiFor(me.id, curMonth, plan)).minTotal, plan);
+
+    // Задачи: от админа и то, что требует внимания по смене
+    const tasks = (await db.query(`SELECT ${TASK_COLS} FROM staff_tasks t JOIN staff s ON s.id = t.staff_id WHERE t.staff_id = $1 AND t.status <> 'accepted' ORDER BY (t.status = 'open') DESC, t.due NULLS LAST, t.id DESC`, [me.id])).rows.map(taskRow);
+    const rejected = (await db.query(`SELECT id, to_char(day, 'YYYY-MM-DD') AS day, reject_reason FROM shift_reports WHERE staff_id = $1 AND status = 'rejected' AND day >= (now() AT TIME ZONE '${TZ}')::date - 14 ORDER BY day DESC`, [me.id])).rows;
+    const short = (await db.query(`SELECT to_char(day, 'YYYY-MM-DD') AS day, minutes FROM shift_shortfalls WHERE staff_id = $1 AND reason IS NULL ORDER BY day`, [me.id])).rows;
+
+    const defs = ((await fieldsDef(true)) as any[]).filter((d) => d.on_dashboard);
+    const last = (
+      await db.query(
+        `SELECT id, to_char(day, 'YYYY-MM-DD') AS day, status, coalesce(approved_min, declared_min) AS minutes, fields, reject_reason
+           FROM shift_reports WHERE staff_id = $1 AND status <> 'live' AND day BETWEEN $2::date AND $3::date ORDER BY day DESC, id DESC LIMIT 8`,
+        [me.id, from, to],
+      )
+    ).rows;
+
+    return {
+      now: new Date().toISOString(),
+      today,
+      range: { from, to, ref, refMonth, whole: from.endsWith('-01') && to === lastOfMonth(from.slice(0, 7)) },
+      plan: { hours: plan.hours, shiftH: plan.shiftH, leads: plan.leads, planMin, paceMin, pace, dayCount: plan.day.count, advance: plan.advance },
+      me: { id: me.id, name: me.name },
+      month: { period: refMonth, hoursMin: k.hoursMin, shifts: k.shifts, planShifts: plan.hours / plan.shiftH, ftd: k.ftdCount },
+      today_: { minutes: todayMin, shiftMin, minLeft: Math.max(0, shiftMin - todayMin), live },
+      funnel: { clicks, regs: ev.reg, ftd: ev.ftd, dep: ev.dep },
+      clicksSince,
+      byStatus,
+      colleagues,
+      salary: {
+        period: refMonth,
+        base: [k.min.base, k.full.base],
+        leads: [k.min.leadsPay, k.full.leadsPay],
+        leadsN: k.ftdCount,
+        shifts: k.shifts,
+        ftdBonus: k.ftdBonus,
+        dayBonus: k.dayBonus,
+        bonus: k.adjBonus,
+        penalty: k.adjPenalty,
+        paid: k.paid,
+        totalMin: k.minTotal,
+        totalFull: k.fullTotal,
+        advance: refMonth === curMonth ? adv : null,
+        minForAdvance: plan.advance,
+      },
+      tasks,
+      alerts: { rejected, shortfalls: short },
+      fields: defs.map((d) => d.name),
+      last: last.map((r: any) => ({ id: r.id, day: r.day, status: r.status, minutes: r.minutes, reject_reason: r.reject_reason, values: Object.fromEntries((r.fields as any[]).filter((f) => f.kind === 'number').map((f) => [f.name, f.value])) })),
     };
   });
 }

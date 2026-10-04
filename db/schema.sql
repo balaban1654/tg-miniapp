@@ -424,3 +424,18 @@ CREATE TABLE IF NOT EXISTS link_clicks (
 );
 CREATE INDEX IF NOT EXISTS link_clicks_at ON link_clicks(at);
 CREATE INDEX IF NOT EXISTS link_clicks_link ON link_clicks(link_id, at);
+
+-- Задачи сотрудникам: ставит админ, сотрудник отмечает выполненной, админ принимает или возвращает
+CREATE TABLE IF NOT EXISTS staff_tasks (
+  id          SERIAL PRIMARY KEY,
+  staff_id    INT NOT NULL REFERENCES staff(id) ON DELETE CASCADE,
+  title       TEXT NOT NULL,
+  details     TEXT,
+  due         DATE,
+  status      TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open','done','accepted')),
+  created_by  INT REFERENCES staff(id),
+  created_at  TIMESTAMPTZ DEFAULT now(),
+  done_at     TIMESTAMPTZ,
+  accepted_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS staff_tasks_staff ON staff_tasks(staff_id, status);
