@@ -1107,9 +1107,15 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // Журнал постбеков для админа
-  app.get('/postbacks', { preHandler: need('admin') }, async () => {
+  app.get<{ Querystring: { from?: string; to?: string } }>('/postbacks', { preHandler: need('admin') }, async (req) => {
+    const ok = (v?: string) => (v && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null);
+    const from = ok(req.query.from), to = ok(req.query.to);
     const r = await db.query(
-      `SELECT id, event, query, tg_id, result, created_at, event_id FROM postback_log ORDER BY created_at DESC, id DESC LIMIT 1500`,
+      `SELECT id, event, query, tg_id, result, created_at, event_id FROM postback_log
+        WHERE ($1::date IS NULL OR (created_at AT TIME ZONE 'Europe/Kyiv')::date >= $1::date)
+          AND ($2::date IS NULL OR (created_at AT TIME ZONE 'Europe/Kyiv')::date <= $2::date)
+        ORDER BY created_at DESC, id DESC LIMIT 5000`,
+      [from, to],
     );
     return r.rows;
   });

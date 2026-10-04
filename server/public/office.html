@@ -2863,7 +2863,8 @@ function pbDeleteDialog(r,done){
 }
 let pbState={q:'',ev:'',res:'',sort:'new'};
 async function viewPostbacks(){
-  const rows=await api('/postbacks');
+  const rng=dxCur();
+  const rows=await api('/postbacks?from='+rng.from+'&to='+rng.to);
   const clearBox=el('span',{});
   const askBtn=el('button',{class:'btn o s',type:'button',onclick:()=>{askBtn.hidden=true;sure.hidden=false}},'Очистить журнал');
   const sure=el('span',{hidden:'',style:'display:inline-flex;gap:6px;align-items:center'},el('span',{class:'mut'},'Удалить все записи журнала?'),
@@ -2937,7 +2938,7 @@ async function viewPostbacks(){
     cnt.textContent=list.length===rows.length?rows.length+' всего':list.length+' из '+rows.length;
   };
   draw();
-  return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Постбеки'),el('div',{style:'display:flex;gap:8px;align-items:center'},cnt,upBtn,upFile,clearBox,el('button',{class:'btn o s',type:'button',onclick:()=>render({soft:true})},'Обновить'))),bar,totBox,holder];
+  return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Постбеки'),el('div',{style:'display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end'},cnt,rangeBar(()=>render({soft:true})),upBtn,upFile,clearBox,el('button',{class:'btn o s',type:'button',onclick:()=>render({soft:true})},'Обновить'))),bar,totBox,holder];
 }
 
 (async()=>{try{me=await api('/me');readHash();showApp()}catch{showLogin()}})();
