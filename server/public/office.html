@@ -2767,8 +2767,22 @@ async function viewPostbacks(){
     el('button',{class:'btn s',type:'button',onclick:async()=>{await api('/postbacks',{method:'DELETE'});render()}},'Да, удалить'),
     el('button',{class:'btn o s',type:'button',onclick:()=>{sure.hidden=true;askBtn.hidden=false}},'Отмена'));
   clearBox.append(askBtn,sure);
+  const upFile=el('input',{type:'file',accept:'.csv,text/csv',style:'display:none'});
+  const upBtn=el('button',{class:'btn s',type:'button',title:'Загрузить файл с постбеками (CSV)','aria-label':'Загрузить файл с постбеками',onclick:()=>upFile.click()});
+  upBtn.append(svgIcon('<path d="M12 16V4M7 9l5-5 5 5"/><path d="M5 20h14"/>',18));
+  upFile.onchange=async()=>{
+    const f=upFile.files[0];upFile.value='';if(!f)return;
+    if(!/\.csv$/i.test(f.name)){toast('Нужен файл CSV. Если у вас Excel, сохраните таблицу как CSV');return}
+    if(f.size>8*1024*1024){toast('Файл больше 8 МБ');return}
+    upBtn.disabled=true;toast('Загружаю '+f.name+'…');
+    try{
+      const r=await api('/postbacks/import',{method:'POST',body:{csv:await f.text()}});
+      toast('Добавлено '+r.added+', уже было '+r.exists+(r.unknown?', без лида '+r.unknown:'')+(r.errors?', ошибок '+r.errors:''));
+    }catch(x){toast(x.message)}
+    render();
+  };
   const time=v=>new Date(v).toLocaleString('ru-RU',{timeZone:'Europe/Kyiv',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit',second:'2-digit'});
-  return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Постбеки'),el('div',{style:'display:flex;gap:8px;align-items:center'},el('button',{class:'btn s',type:'button',onclick:()=>pbManualDialog(render)},'+ Добавить постбек'),clearBox,el('button',{class:'btn o s',type:'button',onclick:render},'Обновить'))),
+  return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Постбеки'),el('div',{style:'display:flex;gap:8px;align-items:center'},upBtn,upFile,clearBox,el('button',{class:'btn o s',type:'button',onclick:render},'Обновить'))),
     table(['Время','Событие','Telegram ID','Pocket ID',['Сумма','n'],'Результат',''],rows.map(r=>{const qq=r.query||{};return[td(time(r.created_at)),el('td',{},el('span',{class:'pill p-pur'},r.event)),copyCell(r.tg_id||qq.click_id),copyCell(qq.trader_id),td(qq.commission||qq.sumdep||qq.wdr_sum||qq.amount||qq.sum||'—','n'),el('td',{},el('span',{class:'pill '+(r.result==='ok'?'p-ok':(r.result.startsWith('дубль')||r.result.startsWith('пропущен'))?'p-warn':'p-bad')},r.result)),el('td',{},el('button',{class:'btn o s',type:'button',title:'Удалить постбек','aria-label':'Удалить постбек',onclick:()=>pbDeleteDialog(r,render)},svgIcon(TRASH,15)))]}),
       'Постбеков пока нет. Когда партнёрка отправит первый, он появится здесь.')];
 }
