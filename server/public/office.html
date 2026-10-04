@@ -1440,7 +1440,7 @@ async function viewLeads(){
   const holder=el('div',{});const cnt=el('span',{class:'mut'},'');
   const draw=()=>{
     const qq=F.q.trim().toLowerCase().replace(/^@/,'');
-    let list=rows.filter(r=>(!F.status||r.status===F.status)&&(!F.link||r.link_slug===F.link)&&(!F.owner||String(r.owner_id)===F.owner)
+    let list=rows.filter(r=>(!F.status||(r.status===F.status&&!isStaff(r)))&&(!F.link||r.link_slug===F.link)&&(!F.owner||String(r.owner_id)===F.owner)
       &&(!qq||[r.username,r.first_name,r.tg_id,r.trader_id].some(v=>v!=null&&String(v).toLowerCase().includes(qq))));
     const flat=F.q||F.status||F.link||F.owner||F.sort!=='new';
     const by={dep:(a,b)=>b.deposits-a.deposits,depAsc:(a,b)=>a.deposits-b.deposits,comm:(a,b)=>b.commission-a.commission,old:(a,b)=>new Date(a.created_at)-new Date(b.created_at),new:(a,b)=>new Date(b.created_at)-new Date(a.created_at)}[F.sort];
