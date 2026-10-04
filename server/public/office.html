@@ -238,7 +238,7 @@ textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10
 .dx-bd{display:grid;place-items:center;min-width:34px;height:34px;border-radius:99px;color:#fff;font-size:15px;font-weight:700;flex:none}.dx-bd.w{background:#d98a0b}.dx-bd.r{background:#d6455d}
 .dx-tx{display:flex;flex-direction:column;gap:2px;flex:1;min-width:0}.dx-tx .tt{font-size:15px;font-weight:600}.dx-tx .ts{font-size:13px;color:var(--mut)}
 .dx-ok{padding:18px 0;color:var(--mut);text-align:center}
-.dx-rings{display:flex;justify-content:center}.dx-rg{position:relative;width:min(100%,300px);aspect-ratio:1;margin:0 auto}.dx-rg svg{width:100%;height:100%;display:block;transform:rotate(-90deg)}
+.dx-rings{display:flex;justify-content:center}.dx-rcopy{position:absolute;top:10px;right:10px}.dx-rg{position:relative;width:min(100%,300px);aspect-ratio:1;margin:0 auto}.dx-rg svg{width:100%;height:100%;display:block;transform:rotate(-90deg)}
 .dx-rg .tr{fill:none;stroke:#ffffff1a;stroke-width:14}.dx-rg .pr{fill:none;stroke-width:14;stroke-linecap:round}
 .dx-rg .ctr{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;text-align:center}
 .dx-cv{display:flex;flex-direction:column;align-items:center}.dx-cv b{font-size:16px;line-height:1.1}.dx-cv span{font-size:12px;color:var(--mut);display:inline-flex;align-items:center;gap:6px}.dx-cv i{width:9px;height:9px;border-radius:50%}
@@ -910,6 +910,32 @@ function dxFunnel(d){
         el('div',{class:'dx-seg2',role:'img','aria-label':n+': '+rows.map(s=>s.name+' '+n0(s.range[k])).join(', ')+', всего '+n0(t[k])},...(rows.length?rows.map(s=>el('span',{style:'flex:'+s.range[k]+' 1 auto;background:'+C(s.id),title:s.name+': '+n0(s.range[k])},s.name+' '+n0(s.range[k]))):[el('span',{style:'flex:1;background:#ffffff1a;color:var(--mut)'},'нет данных')])));
     }),note].filter(Boolean);
 }
+const IC_COPY='<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/>';
+/* Кнопка «копировать кольца картинкой»: рисуем квадрат на canvas и кладём PNG в буфер обмена */
+function dxRingCopy(p1,p2,ftdTxt,depTxt){
+  const b=el('button',{type:'button',class:'dx-ib sm2 dx-rcopy',title:'Скопировать картинкой','aria-label':'Скопировать кольца картинкой'});b.append(svgIcon(IC_COPY,18));
+  const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const draw=()=>{
+    const S=1000,k=S/220,c=document.createElement('canvas');c.width=c.height=S;const x=c.getContext('2d');
+    x.fillStyle=css('--card')||'#1c1233';x.fillRect(0,0,S,S);
+    const ring=(r,p,col)=>{x.lineWidth=14*k;x.lineCap='round';x.strokeStyle='#ffffff1a';x.beginPath();x.arc(S/2,S/2,r*k,0,Math.PI*2);x.stroke();
+      if(p>0){x.strokeStyle=col;x.beginPath();x.arc(S/2,S/2,r*k,-Math.PI/2,-Math.PI/2+Math.PI*2*Math.min(1,p));x.stroke()}};
+    ring(98,p1,css('--acc')||'#9b5cff');ring(74,p2,css('--ok')||'#3ddc97');
+    x.textAlign='center';x.textBaseline='middle';const ff='Montserrat, system-ui, sans-serif';
+    const line=(t,y,col,lbl)=>{x.fillStyle=css('--fg')||'#fff';x.font='700 56px '+ff;x.fillText(t,S/2,y);x.fillStyle=css('--mut')||'#a89cc8';x.font='500 36px '+ff;x.fillText(lbl,S/2+0,y+56);
+      const w=x.measureText(lbl).width;x.fillStyle=col;x.beginPath();x.arc(S/2-w/2-26,y+57,10,0,Math.PI*2);x.fill()};
+    line(ftdTxt,S/2-70,css('--ok')||'#3ddc97','FTD');line(depTxt,S/2+90,css('--acc')||'#9b5cff','депозиты');
+    return c;
+  };
+  b.onclick=async e=>{e.stopPropagation();
+    try{
+      const c=draw();
+      const blob=await new Promise(r=>c.toBlob(r,'image/png'));
+      await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]);
+      toast('Картинка скопирована, можно вставлять в чат');
+    }catch(err){toast('Не удалось скопировать картинку: браузер не разрешил доступ к буферу')}};
+  return b;
+}
 function dxRings(d){
   const g=d.goals,t=d.totals;
   const R1=98,R2=74,c1=2*Math.PI*R1,c2=2*Math.PI*R2;
@@ -917,7 +943,7 @@ function dxRings(d){
   const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox','0 0 220 220');
   svg.innerHTML='<circle class="tr" cx="110" cy="110" r="'+R1+'"/><circle class="pr" cx="110" cy="110" r="'+R1+'" stroke="var(--acc)" stroke-dasharray="'+(c1*p1).toFixed(1)+' '+c1.toFixed(1)+'"/><circle class="tr" cx="110" cy="110" r="'+R2+'"/><circle class="pr" cx="110" cy="110" r="'+R2+'" stroke="var(--ok)" stroke-dasharray="'+(c2*p2).toFixed(1)+' '+c2.toFixed(1)+'"/>';
   const cv=(c,a,b)=>el('div',{class:'dx-cv'},el('b',{},a),el('span',{},el('i',{style:'background:'+c}),b));
-  return el('div',{class:'dx-rings'},el('div',{class:'dx-rg',role:'img','aria-label':'Все депозиты '+Math.round(p1*100)+'% плана, FTD '+Math.round(p2*100)+'% плана'},svg,el('div',{class:'ctr'},cv('var(--ok)',n0(t.ftd)+' / '+n0(g.ftd),'FTD'),cv('var(--acc)',usd0(t.deposits)+' / '+usd0(g.deposits),'депозиты'))));
+  return el('div',{class:'dx-rings'},dxRingCopy(p1,p2,n0(t.ftd)+' / '+n0(g.ftd),usd0(t.deposits)+' / '+usd0(g.deposits)),el('div',{class:'dx-rg',role:'img','aria-label':'Все депозиты '+Math.round(p1*100)+'% плана, FTD '+Math.round(p2*100)+'% плана'},svg,el('div',{class:'ctr'},cv('var(--ok)',n0(t.ftd)+' / '+n0(g.ftd),'FTD'),cv('var(--acc)',usd0(t.deposits)+' / '+usd0(g.deposits),'депозиты'))));
 }
 function dxPlanFact(d){
   const g=d.goals,t=d.totals,pace=d.pace,showMark=g&&pace<0.995;
@@ -1104,7 +1130,7 @@ function smRings(d){
   const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox','0 0 220 220');
   svg.innerHTML='<circle class="tr" cx="110" cy="110" r="'+R1+'"/><circle class="pr" cx="110" cy="110" r="'+R1+'" stroke="var(--acc)" stroke-dasharray="'+(c1*p1).toFixed(1)+' '+c1.toFixed(1)+'"/><circle class="tr" cx="110" cy="110" r="'+R2+'"/><circle class="pr" cx="110" cy="110" r="'+R2+'" stroke="var(--ok)" stroke-dasharray="'+(c2*p2).toFixed(1)+' '+c2.toFixed(1)+'"/>';
   const cv=(c,a,b)=>el('div',{class:'dx-cv'},el('b',{},a),el('span',{},el('i',{style:'background:'+c}),b));
-  return el('div',{class:'dx-rings'},el('div',{class:'dx-rg',role:'img','aria-label':'Депозиты команды '+Math.round(p1*100)+'% плана, FTD '+Math.round(p2*100)+'% плана'},svg,el('div',{class:'ctr'},cv('var(--ok)',n0(T.ftd)+' / '+n0(T.ftdGoal),'FTD'),cv('var(--acc)',usd0(T.deposits)+' / '+usd0(T.depositsGoal),'депозиты'))));
+  return el('div',{class:'dx-rings'},dxRingCopy(p1,p2,n0(T.ftd)+' / '+n0(T.ftdGoal),usd0(T.deposits)+' / '+usd0(T.depositsGoal)),el('div',{class:'dx-rg',role:'img','aria-label':'Депозиты команды '+Math.round(p1*100)+'% плана, FTD '+Math.round(p2*100)+'% плана'},svg,el('div',{class:'ctr'},cv('var(--ok)',n0(T.ftd)+' / '+n0(T.ftdGoal),'FTD'),cv('var(--acc)',usd0(T.deposits)+' / '+usd0(T.depositsGoal),'депозиты'))));
 }
 function smMetrics(d){
   const m=d.month,pl=d.plan,pace=pl.pace*100,mark=pace<99.5?pace:null,t=d.today_;
