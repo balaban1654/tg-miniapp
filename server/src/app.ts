@@ -526,14 +526,19 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
   });
 
   app.get('/media', { preHandler: auth }, async () => {
-    const r = await db.query(`SELECT id, kind, title, subtitle, url, country, contact_url FROM media_items WHERE active ORDER BY sort, id`);
+    // live: ссылка на эфир, пока у привязанного стримера идёт смена
+    const r = await db.query(
+      `SELECT m.id, m.kind, m.title, m.subtitle, m.url, m.country, m.contact_url,
+              (SELECT s.stream_url FROM shift_reports s WHERE s.staff_id = m.staff_id AND s.status = 'live' ORDER BY s.id DESC LIMIT 1) AS live_url
+         FROM media_items m WHERE m.active ORDER BY m.sort, m.id`,
+    );
     const rows = await Promise.all(
       r.rows.map(async (x) => {
         const handle = tgHandle(x.url);
         const info = handle ? await Promise.race([tgInfo(handle), new Promise<null>((ok) => setTimeout(() => ok(null), 3000))]) : null;
         const contact = x.contact_url ? tgHandle(x.contact_url) : null;
         // Аватарка трейдера: его личный аккаунт, если ссылка указана, иначе канал
-        return { ...x, contact_url: undefined, contact: contact ? { handle: contact, url: x.contact_url } : null, photo: handle || contact ? `/api/app/media/${x.id}/photo?v=${contact ?? handle}` : null, channelTitle: info?.title ?? null, members: info?.members ?? null };
+        return { ...x, contact_url: undefined, live_url: undefined, live: /^https?:\/\//i.test(x.live_url ?? '') ? x.live_url : null, contact: contact ? { handle: contact, url: x.contact_url } : null, photo: handle || contact ? `/api/app/media/${x.id}/photo?v=${contact ?? handle}` : null, channelTitle: info?.title ?? null, members: info?.members ?? null };
       }),
     );
     return { traders: rows.filter((x) => x.kind === 'trader'), channels: rows.filter((x) => x.kind === 'channel') };

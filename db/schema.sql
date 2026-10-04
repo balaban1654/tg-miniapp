@@ -115,6 +115,8 @@ CREATE TABLE IF NOT EXISTS media_items (
 
 ALTER TABLE media_items ADD COLUMN IF NOT EXISTS country TEXT;
 ALTER TABLE media_items ADD COLUMN IF NOT EXISTS contact_url TEXT;
+-- Стример, чей эфир показываем на аватарке трейдера (красное кольцо и переход на эфир, пока идёт его смена)
+ALTER TABLE media_items ADD COLUMN IF NOT EXISTS staff_id INT REFERENCES staff(id) ON DELETE SET NULL;
 
 -- Чат поддержки через бота: сообщения клиентов и ответы команды
 CREATE TABLE IF NOT EXISTS messages (

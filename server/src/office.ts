@@ -747,7 +747,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
 
   // Медиа для Mini App: трейдеры и каналы
   app.get('/media', { preHandler: need('admin') }, async () => {
-    return (await db.query('SELECT id, kind, title, subtitle, url, country, contact_url, sort, active FROM media_items ORDER BY kind DESC, sort, id')).rows;
+    return (await db.query('SELECT id, kind, title, subtitle, url, country, contact_url, staff_id, sort, active FROM media_items ORDER BY kind DESC, sort, id')).rows;
   });
   function cleanMedia(b: Record<string, unknown>) {
     const kind = str(b.kind, 10);
@@ -760,14 +760,15 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     if (country && !/^[A-Z]{2}$/.test(country)) return 'Неверная страна';
     const contact = str(b.contact_url, 300);
     if (contact && !/^https:\/\/t\.me\/[A-Za-z][A-Za-z0-9_]{3,31}\/?$/.test(contact)) return 'Личка: ссылка вида https://t.me/имя';
-    return { kind, title, url, subtitle: str(b.subtitle, 80) || null, country: country || null, contact_url: contact || null, sort: Math.trunc(num(b.sort)) };
+    const staffId = Number(b.staff_id);
+    return { kind, title, url, subtitle: str(b.subtitle, 80) || null, country: country || null, contact_url: contact || null, staff_id: Number.isInteger(staffId) && staffId > 0 ? staffId : null, sort: Math.trunc(num(b.sort)) };
   }
   app.post('/media', { preHandler: need('admin') }, async (req, reply) => {
     const m = cleanMedia((req.body ?? {}) as Record<string, unknown>);
     if (typeof m === 'string') return reply.code(400).send({ error: m });
     const r = await db.query(
-      'INSERT INTO media_items (kind, title, subtitle, url, sort, country, contact_url) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id',
-      [m.kind, m.title, m.subtitle, m.url, m.sort, m.country, m.contact_url],
+      'INSERT INTO media_items (kind, title, subtitle, url, sort, country, contact_url, staff_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id',
+      [m.kind, m.title, m.subtitle, m.url, m.sort, m.country, m.contact_url, m.staff_id],
     );
     return { id: r.rows[0].id };
   });
@@ -775,8 +776,8 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     const m = cleanMedia((req.body ?? {}) as Record<string, unknown>);
     if (typeof m === 'string') return reply.code(400).send({ error: m });
     const r = await db.query(
-      'UPDATE media_items SET kind=$2, title=$3, subtitle=$4, url=$5, sort=$6, country=$7, contact_url=$8 WHERE id=$1',
-      [Number(req.params.id), m.kind, m.title, m.subtitle, m.url, m.sort, m.country, m.contact_url],
+      'UPDATE media_items SET kind=$2, title=$3, subtitle=$4, url=$5, sort=$6, country=$7, contact_url=$8, staff_id=$9 WHERE id=$1',
+      [Number(req.params.id), m.kind, m.title, m.subtitle, m.url, m.sort, m.country, m.contact_url, m.staff_id],
     );
     if (!r.rowCount) return reply.code(404).send({ error: 'Запись не найдена' });
     return { ok: true };
