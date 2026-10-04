@@ -132,6 +132,8 @@ CREATE TABLE IF NOT EXISTS messages (
 );
 CREATE INDEX IF NOT EXISTS messages_tg ON messages(tg_id, id);
 ALTER TABLE messages ADD COLUMN IF NOT EXISTS file_name TEXT;
+-- Начало эфира, которое стример указал в отчёте (по Киеву, хранится как момент времени)
+ALTER TABLE shift_reports ADD COLUMN IF NOT EXISTS declared_start TIMESTAMPTZ;
 
 -- Пуши: бот может писать только тем, кто нажал /start. last_seen_at нужен для «давно не заходил»
 ALTER TABLE leads ADD COLUMN IF NOT EXISTS bot_started BOOLEAN DEFAULT FALSE;

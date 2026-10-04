@@ -1288,6 +1288,42 @@ const EYE='<path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="1
 const EYEOFF='<path d="M17.9 17.9A10.9 10.9 0 0112 19C5 19 1 12 1 12a18 18 0 015.1-5.9M9.9 5.2A10.9 10.9 0 0112 5c7 0 11 7 11 7a18 18 0 01-2.2 3.2"/><path d="M1 1l22 22"/>';
 const COPYI='<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 01-1-1V4a1 1 0 011-1h10a1 1 0 011 1v1"/>';
 const KEYI='<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/>';
+const DW_H=40;
+function dwCol(items,idx,onPick){const H=DW_H;
+    const c=el('div',{class:'dw-col',role:'listbox'});
+    let timer=null,cur=idx;
+    const draw=()=>c.replaceChildren(...items.map((t,i)=>el('div',{class:'dw-it'+(i===cur?' on':''),role:'option',onclick:()=>{c.scrollTo({top:i*H,behavior:'smooth'})}},t)));
+    const settle=()=>{const i=Math.max(0,Math.min(items.length-1,Math.round(c.scrollTop/H)));if(i!==cur){cur=i;[...c.children].forEach((n,k)=>n.classList.toggle('on',k===i));onPick(i)}};
+    c.addEventListener('scroll',()=>{clearTimeout(timer);timer=setTimeout(()=>{settle();c.scrollTo({top:cur*H,behavior:'smooth'})},90);[...c.children].forEach((n,k)=>n.classList.toggle('on',k===Math.max(0,Math.min(items.length-1,Math.round(c.scrollTop/H)))))},{passive:true});
+    draw();
+    return{el:c,set(items2,i2){items=items2;cur=i2;draw();c.scrollTop=i2*H},jump(i2){cur=i2;[...c.children].forEach((n,k)=>n.classList.toggle('on',k===i2));c.scrollTop=i2*H},get idx(){return cur}};
+  }
+
+/** Выбор времени как на iPhone: две колонки (часы и минуты). .value вида ЧЧ:ММ */
+function timeWheel({value='',placeholder='Выбрать время'}={}){
+  const p2=n=>String(n).padStart(2,'0');
+  let val=value||'';
+  const btn=el('button',{type:'button',class:'dw-btn'},val||placeholder);
+  Object.defineProperty(btn,'value',{get:()=>val,set:v=>{val=v||'';btn.textContent=val||placeholder}});
+  function open(){
+    document.querySelectorAll('.dw-ov').forEach(x=>x.remove());
+    const now=new Date();let h=val?+val.slice(0,2):now.getHours(),m=val?+val.slice(3,5):now.getMinutes();
+    const hs=Array.from({length:24},(_,i)=>p2(i)),ms=Array.from({length:60},(_,i)=>p2(i));
+    const ch=dwCol(hs,h,i=>{h=i}),cm=dwCol(ms,m,i=>{m=i});
+    const ov=el('div',{class:'lc-overlay dw-ov',role:'dialog','aria-modal':'true'});
+    const close=()=>{ov.remove();document.removeEventListener('keydown',onKey)};
+    const onKey=e=>{if(e.key==='Escape')close()};document.addEventListener('keydown',onKey);
+    ov.addEventListener('mousedown',e=>{if(e.target===ov)close()});
+    ov.append(el('div',{class:'dw-sheet'},
+      el('div',{class:'dw-top'},el('button',{type:'button',class:'btn o s',onclick:close},'Отмена'),el('b',{},'Выберите время'),el('button',{type:'button',class:'btn s',onclick:()=>{val=p2(h)+':'+p2(m);btn.textContent=val;btn.dispatchEvent(new Event('change'));close()}},'Готово')),
+      el('div',{class:'dw-wheels',style:'grid-template-columns:1fr 1fr'},ch.el,cm.el,el('div',{class:'dw-bar'}))));
+    document.body.append(ov);
+    requestAnimationFrame(()=>{ch.jump(h);cm.jump(m)});
+  }
+  btn.addEventListener('click',open);
+  return btn;
+}
+
 /** Выбор даты как на iPhone: три колонки с прокруткой (день, месяц, год). Элемент-кнопка, у неё есть .value вида ГГГГ-ММ-ДД ('' если не выбрано) */
 const MONTHS_RU=['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
 function dateWheel({value='',min='1990-01-01',max='2100-12-31',optional=false,placeholder='Выбрать дату'}={}){
@@ -1298,16 +1334,7 @@ function dateWheel({value='',min='1990-01-01',max='2100-12-31',optional=false,pl
   const fmt=v=>v?new Date(v+'T12:00:00').toLocaleDateString('ru-RU',{day:'numeric',month:'long',year:'numeric'}):placeholder;
   const btn=el('button',{type:'button',class:'dw-btn'},fmt(val));
   Object.defineProperty(btn,'value',{get:()=>val,set:v=>{val=v||'';btn.textContent=fmt(val)}});
-  const H=40;
-  function col(items,idx,onPick){
-    const c=el('div',{class:'dw-col',role:'listbox'});
-    let timer=null,cur=idx;
-    const draw=()=>c.replaceChildren(...items.map((t,i)=>el('div',{class:'dw-it'+(i===cur?' on':''),role:'option',onclick:()=>{c.scrollTo({top:i*H,behavior:'smooth'})}},t)));
-    const settle=()=>{const i=Math.max(0,Math.min(items.length-1,Math.round(c.scrollTop/H)));if(i!==cur){cur=i;[...c.children].forEach((n,k)=>n.classList.toggle('on',k===i));onPick(i)}};
-    c.addEventListener('scroll',()=>{clearTimeout(timer);timer=setTimeout(()=>{settle();c.scrollTo({top:cur*H,behavior:'smooth'})},90);[...c.children].forEach((n,k)=>n.classList.toggle('on',k===Math.max(0,Math.min(items.length-1,Math.round(c.scrollTop/H)))))},{passive:true});
-    draw();
-    return{el:c,set(items2,i2){items=items2;cur=i2;draw();c.scrollTop=i2*H},jump(i2){cur=i2;[...c.children].forEach((n,k)=>n.classList.toggle('on',k===i2));c.scrollTop=i2*H},get idx(){return cur}};
-  }
+  const col=dwCol;
   function open(){
     document.querySelectorAll('.dw-ov').forEach(x=>x.remove());
     const now=new Date(),minY=+min.slice(0,4),maxY=+max.slice(0,4);
@@ -1549,6 +1576,10 @@ async function openFinishModal(live,skew){
   ov.append(box);document.body.append(ov);
   let defs;try{defs=await api('/report-fields')}catch(x){box.replaceChildren(el('div',{class:'err'},x.message));return}
   const elapsed=Math.max(1,Math.floor((Date.now()+skew-Date.parse(live.started_at))/60000));
+  const kDate=d=>d.toLocaleDateString('sv-SE',{timeZone:'Europe/Kyiv'});
+  const kTime=d=>d.toLocaleTimeString('en-GB',{timeZone:'Europe/Kyiv',hour:'2-digit',minute:'2-digit'});
+  const st0=new Date(Date.parse(live.started_at));
+  const startDay=dateWheel({value:kDate(st0),min:kDate(new Date(Date.now()-2*864e5)),max:kDate(new Date())}),startTime=timeWheel({value:kTime(st0)});
   const hrs=el('input',{type:'number',min:'0',max:'12',inputmode:'numeric',value:String(Math.min(12,Math.floor(elapsed/60))),'aria-label':'Часы',style:'text-align:center'});
   const mins=el('input',{type:'number',min:'0',max:'59',inputmode:'numeric',value:String(elapsed>=720?0:elapsed%60),'aria-label':'Минуты',style:'text-align:center'});
   const totalMin=()=>(Number(hrs.value)||0)*60+(Number(mins.value)||0);
@@ -1571,13 +1602,14 @@ async function openFinishModal(live,skew){
     send.disabled=true;
     try{
       const fields={};inputs.forEach(x=>{fields[x.d.id]=x.i.value});
-      await api('/shifts/'+live.id+'/finish',{method:'POST',body:{declared_min:totalMin(),fields,comment:comment.value,screenshot:await fileDataUrl(shot)}});
+      await api('/shifts/'+live.id+'/finish',{method:'POST',body:{declared_min:totalMin(),start:startDay.value+'T'+startTime.value,fields,comment:comment.value,screenshot:await fileDataUrl(shot)}});
       close();toast('Отчёт отправлен на проверку');render({soft:true});
     }catch(x){err.textContent=x.message;send.disabled=false}
   }},'Отправить на проверку');
   box.replaceChildren(
     el('div',{class:'lc-head'},el('h3',{style:'font-size:18px'},'Отчёт о смене'),el('button',{class:'btn o s',type:'button','aria-label':'Закрыть',onclick:close},'✕')),
-    el('div',{class:'lc-two'},el('div',{class:'lc-field'},el('label',{},'Время эфира (подставилось с таймера)'),time),
+    el('div',{class:'lc-two'},el('div',{class:'lc-field'},el('label',{},'Дата начала эфира'),startDay),el('div',{class:'lc-field'},el('label',{},'Время начала эфира'),startTime),
+      el('div',{class:'lc-field'},el('label',{},'Длительность эфира (подставилась с таймера)'),time),
       ...inputs.map(x=>el('div',{class:'lc-field'},el('label',{},x.d.name+(x.d.required?' *':'')),x.i))),
     el('div',{class:'lc-field'},el('label',{},'Комментарий'),comment),
     file,drop,prev,err,el('div',{class:'lc-actions'},send));
@@ -1692,7 +1724,7 @@ async function accReview(){
     const act=async(action,extra)=>{try{await api('/shifts/'+r.id+'/review',{method:'POST',body:{action,...extra}});toast(action==='approve'?'Отчёт зачтён':'Отчёт отклонён');accRefresh()}catch(x){toast(x.message)}};
     return el('div',{class:'rev'},
       shotThumb('/api/office/shifts/'+r.id+'/screenshot',{class:'shotc',title:'Нажмите, чтобы увеличить'}).appendChild(el('img',{src:'/api/office/shifts/'+r.id+'/screenshot',alt:'Скриншот',loading:'lazy'})).parentNode,
-      el('div',{class:'meta2'},el('div',{},el('b',{},r.staff_name),' ',el('span',{class:'mut sm'},new Date(r.day+'T12:00:00').toLocaleDateString('ru-RU',{day:'numeric',month:'short'})),' ',el('span',{class:'pill p-pur'},'заявлено '+hmin(r.declared_min))),
+      el('div',{class:'meta2'},el('div',{},el('b',{},r.staff_name),' ',el('span',{class:'mut sm'},new Date(r.day+'T12:00:00').toLocaleDateString('ru-RU',{day:'numeric',month:'short'})),' ',el('span',{class:'pill p-pur'},'заявлено '+hmin(r.declared_min)),r.declared_start?el('span',{class:'mut sm',title:'Начало эфира, указанное в отчёте'},' · начало '+new Date(r.declared_start).toLocaleString('ru-RU',{timeZone:'Europe/Kyiv',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})):null),
         el('div',{class:'kv2'},...r.fields.filter(f=>f.value!==null&&f.value!=='').map(f=>el('span',{},f.name+': ',el('b',{},typeof f.value==='number'?f.value.toLocaleString('ru-RU'):f.value)))),
         el('div',{class:'mut sm'},r.stream_url),r.comment?el('div',{class:'sm'},r.comment):null),
       el('div',{class:'acts2'},el('div',{class:'inl'},min,el('span',{class:'mut sm'},'мин'),el('button',{class:'btn s',type:'button',onclick:()=>act('approve',{minutes:Number(min.value)})},'Зачесть')),

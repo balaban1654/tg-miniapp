@@ -369,6 +369,16 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     if (!row) return reply.code(404).send({ error: 'Смена не найдена или уже отправлена' });
     const declared = Math.trunc(Number(b.declared_min));
     if (!Number.isFinite(declared) || declared < 1 || declared > 720) return reply.code(400).send({ error: 'Укажите время эфира в минутах, от 1 до 720' });
+    // Начало эфира по Киеву, «ГГГГ-ММ-ДДTЧЧ:ММ»: не в будущем и не старше двух суток
+    let declaredStart: Date | null = null;
+    if (b.start !== undefined && b.start !== null && String(b.start) !== '') {
+      if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(String(b.start))) return reply.code(400).send({ error: 'Укажите дату и время начала эфира' });
+      const t = (await db.query(`SELECT ($1::timestamp AT TIME ZONE '${TZ}') AS t`, [String(b.start)]).catch(() => null))?.rows[0]?.t as Date | undefined;
+      if (!t || Number.isNaN(+t)) return reply.code(400).send({ error: 'Укажите дату и время начала эфира' });
+      if (+t > Date.now() + 10 * 60_000) return reply.code(400).send({ error: 'Начало эфира не может быть в будущем' });
+      if (+t < Date.now() - 48 * 3600_000) return reply.code(400).send({ error: 'Начало эфира не раньше двух суток назад' });
+      declaredStart = t;
+    }
     // Скриншот обязателен: только настоящие jpg/png/webp до 6 МБ
     const rawPhoto = b.screenshot;
     if (typeof rawPhoto !== 'string' || !rawPhoto) return reply.code(400).send({ error: 'Загрузите скриншот статистики эфира' });
@@ -398,8 +408,8 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
       } else fields.push({ name: d.name, kind: d.kind, value: str(raw, 500) });
     }
     await db.query(
-      `UPDATE shift_reports SET status = 'pending', ended_at = now(), declared_min = $2, fields = $3::jsonb, comment = $4, screenshot = $5, screenshot_type = $6 WHERE id = $1`,
-      [row.id, declared, JSON.stringify(fields), str(b.comment, 1000) || null, photo, imgType(photo)],
+      `UPDATE shift_reports SET status = 'pending', ended_at = now(), declared_min = $2, fields = $3::jsonb, comment = $4, screenshot = $5, screenshot_type = $6, declared_start = $7 WHERE id = $1`,
+      [row.id, declared, JSON.stringify(fields), str(b.comment, 1000) || null, photo, imgType(photo), declaredStart],
     );
     return { ok: true };
   });
@@ -411,6 +421,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     status: r.status,
     stream_url: r.stream_url,
     started_at: r.started_at,
+    declared_start: r.declared_start,
     ended_at: r.ended_at,
     day: r.day,
     declared_min: r.declared_min,
@@ -420,7 +431,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     reject_reason: r.reject_reason,
     has_screenshot: r.has_screenshot,
   });
-  const REPORT_COLS = `s.id, s.staff_id, st.name AS staff_name, s.status, s.stream_url, s.started_at, s.ended_at, to_char(s.day, 'YYYY-MM-DD') AS day, s.declared_min, s.approved_min,
+  const REPORT_COLS = `s.id, s.staff_id, st.name AS staff_name, s.status, s.stream_url, s.started_at, s.declared_start, s.ended_at, to_char(s.day, 'YYYY-MM-DD') AS day, s.declared_min, s.approved_min,
          s.fields, s.comment, s.reject_reason, (s.screenshot IS NOT NULL) AS has_screenshot`;
 
   // История отчётов стримера
