@@ -550,7 +550,7 @@ function dxModal(btn,s,d,skew,mode){
   document.body.append(ov);btn.classList.add('on');
   if(mode!=='hover')x.focus();
 }
-function dxGo(t,sub){tab=t;if(sub&&t==='acc')accState.tab=sub;if(sub&&t==='plans')plansState.tab=sub;showApp()}
+function dxGo(t,sub,period){tab=t;if(period&&t==='acc')accState.period=period;if(sub&&t==='acc')accState.tab=sub;if(sub&&t==='plans')plansState.tab=sub;showApp()}
 
 function dxColorOf(d){const ids=d.streamers.map(s=>s.id).sort((a,b)=>a-b);return id=>DXC[ids.indexOf(id)%DXC.length]}
 function dxFunnel(d){
@@ -619,9 +619,10 @@ function dxTasks(d){
   if(T.advances.length)rows.push([T.advances.length,'w','Заявка на аванс',names(T.advances,x=>x.staff_name+' · '+usd0(x.amount)),'acc','pay']);
   if(T.lagging.length)rows.push([T.lagging.length,T.lagging.some(x=>x.level==='bad')?'r':'w','Стримеры отстают от плана',hlag,'acc','sum']);
   if(T.shortfalls.length)rows.push([T.shortfalls.reduce((a,x)=>a+x.n,0),'w','Недобор часов без причины',names(T.shortfalls,x=>x.name+' '+x.n),'acc','why']);
+  if(T.monthWaiting)rows.push([T.monthWaiting.pending||'!',T.monthWaiting.pending?'w':'r','Месяц '+perLabel(T.monthWaiting.period)+' ждёт закрытия',T.monthWaiting.hold?'Открыт заново: закройте его после правок':T.monthWaiting.pending+' отчётов не проверено. После проверки закроется сам','acc','review',T.monthWaiting.period]);
   if((T.tasksDone||[]).length)rows.push([T.tasksDone.length,'w','Задачи ждут принятия',names(T.tasksDone,x=>x.staff_name+': '+x.title),'plans','tasks']);
   if((T.tasksOverdue||[]).length)rows.push([T.tasksOverdue.length,'r','Просрочены задачи',names(T.tasksOverdue,x=>x.staff_name+': '+x.title),'plans','tasks']);
-  const list=el('div',{class:'dx-tl'},...(rows.length?rows.map(([n,c,t,s,tb,sub])=>el('button',{type:'button',class:'dx-tk',onclick:()=>dxGo(tb,sub)},el('b',{class:'dx-bd '+c},String(n)),el('span',{class:'dx-tx'},el('span',{class:'tt'},t),el('span',{class:'ts'},s)),svgIcon(IC_CHEV,16))):[el('div',{class:'dx-ok'},'Всё в порядке: задач нет')]));
+  const list=el('div',{class:'dx-tl'},...(rows.length?rows.map(([n,c,t,s,tb,sub,per])=>el('button',{type:'button',class:'dx-tk',onclick:()=>dxGo(tb,sub,per)},el('b',{class:'dx-bd '+c},String(n)),el('span',{class:'dx-tx'},el('span',{class:'tt'},t),el('span',{class:'ts'},s)),svgIcon(IC_CHEV,16))):[el('div',{class:'dx-ok'},'Всё в порядке: задач нет')]));
   return el('div',{class:'card dx-tasks'},el('div',{class:'dx-lbl'},'Требует внимания'),list);
 }
 async function adminDash(){
@@ -1253,12 +1254,30 @@ async function viewAcc(){
   const monthBar=el('div',{class:'mon2'}),tabBar=el('div',{class:'lc-tabs',role:'tablist'});
   const TABS=[['sum','Сводка'],['review','Отчёты на проверке'],['bonus','Бонусы и штрафы'],['pay','Выплаты и авансы'],['exp','Расходы'],['why','Причины по сменам'],['plan','KPI-план'],['form','Форма отчёта']];
   const drawBar=()=>{
-    monthBar.replaceChildren(el('button',{type:'button','aria-label':'Предыдущий месяц',onclick:()=>{accState.period=perShift(accState.period,-1);accState.sel=null;drawBar();drawBody()}},'‹'),el('b',{},perLabel(accState.period)),el('button',{type:'button','aria-label':'Следующий месяц',onclick:()=>{accState.period=perShift(accState.period,1);accState.sel=null;drawBar();drawBody()}},'›'));
+    monthBar.replaceChildren(el('button',{type:'button','aria-label':'Предыдущий месяц',onclick:()=>{accState.period=perShift(accState.period,-1);accState.sel=null;drawBar();drawBody();drawStatus()}},'‹'),el('b',{},perLabel(accState.period)),el('button',{type:'button','aria-label':'Следующий месяц',onclick:()=>{accState.period=perShift(accState.period,1);accState.sel=null;drawBar();drawBody();drawStatus()}},'›'));
     tabBar.replaceChildren(...TABS.map(([k,t])=>el('button',{type:'button',role:'tab','aria-selected':k===accState.tab?'true':'false',class:'lc-tab'+(k===accState.tab?' on':''),onclick:()=>{accState.tab=k;drawBar();drawBody();pushHash()}},t)));
+  };
+  const stat=el('div',{class:'card',style:'display:flex;gap:12px;align-items:center;flex-wrap:wrap;justify-content:space-between;padding:12px 16px'});
+  const fmtClose=v=>new Date(v).toLocaleString('ru-RU',{timeZone:'Europe/Kyiv',day:'numeric',month:'long',hour:'2-digit',minute:'2-digit'});
+  const drawStatus=async()=>{
+    let m;try{m=await api('/month/status?period='+accState.period)}catch{return}
+    accState.closed=m.closed;
+    const act=(label,path,body,cls,confirmText)=>{
+      const b=el('button',{class:'btn s '+cls,type:'button'},label);let armed=false;
+      b.onclick=async()=>{
+        if(confirmText&&!armed){armed=true;b.textContent=confirmText;setTimeout(()=>{armed=false;b.textContent=label},5000);return}
+        b.disabled=true;
+        try{const r=await api(path,{method:'POST',body});toast(path.endsWith('close')?'Месяц закрыт: начислено '+usd2(r.total):'Месяц открыт заново');await drawStatus();drawBody()}catch(x){toast(x.message);b.disabled=false}
+      };
+      return b;
+    };
+    if(m.closed)stat.replaceChildren(el('div',{class:'inl'},el('span',{class:'pill p-ok'},'🔒 Месяц закрыт'),el('span',{class:'mut sm'},fmtClose(m.closed_at)+(m.auto?' · автоматически':' · '+(m.by||''))+'. Начисления зафиксированы, смена ставок их не меняет.')),act('Открыть заново','/month/reopen',{period:accState.period},'o','Точно открыть?'));
+    else if(m.canClose)stat.replaceChildren(el('div',{class:'inl'},el('span',{class:'pill p-warn'},'Месяц открыт'),m.pending?el('span',{class:'pill p-bad'},'не проверено отчётов: '+m.pending):null,el('span',{class:'mut sm'},m.hold?'Открыт заново: автоматически не закроется, закройте его сами.':m.pending?'Сам закроется в 03:00 после проверки всех отчётов.':'Закроется автоматически в 03:00.')),act(m.pending?'Закрыть всё равно':'Закрыть месяц','/month/close',{period:accState.period,force:true},'',m.pending?'Закрыть без '+m.pending+' отчётов?':'Закрыть сейчас?'));
+    else stat.replaceChildren(el('span',{class:'mut sm'},'Идёт текущий месяц. Он закроется сам в 03:00 первого числа, начисления тогда зафиксируются.'));
   };
   const drawBody=async()=>{body.replaceChildren(el('div',{class:'mut'},'Загрузка…'));try{body.replaceChildren(...(await ({sum:accSum,review:accReview,bonus:accBonus,pay:accPay,exp:accExp,why:accWhy,plan:accPlan,form:accForm})[accState.tab]()).filter(Boolean))}catch(x){if(x.message!=='auth')body.replaceChildren(el('div',{class:'err'},x.message))}};
   if(!accState.period)accState.period=(await api('/kpi/summary')).period;
-  drawBar();root.append(tabBar,body);await drawBody();
+  drawBar();root.append(stat,tabBar,body);drawStatus();await drawBody();
   accRefresh=drawBody;
   return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Бухгалтерия'),monthBar),root];
 }
@@ -1337,7 +1356,7 @@ async function accReview(){
 async function streamersList(){return(await api('/staff')).filter(s=>s.role==='streamer'&&s.active)}
 
 async function accBonus(){
-  const [list,st]=await Promise.all([api('/adjustments?period='+accState.period),streamersList()]);
+  const [list,st,ms]=await Promise.all([api('/adjustments?period='+accState.period),streamersList(),api('/month/status?period='+accState.period)]);
   const who=el('select',{},...st.map(s=>el('option',{value:s.id},s.name)));
   const kind=el('select',{},el('option',{value:'bonus'},'Бонус'),el('option',{value:'penalty'},'Штраф'));
   const amount=el('input',{type:'number',min:'0',step:'0.01',placeholder:'Сумма, $'});
@@ -1346,8 +1365,9 @@ async function accBonus(){
   const form=el('div',{class:'card',style:'display:grid;gap:10px'},el('h3',{style:'font-size:14px'},'Добавить'),
     el('div',{class:'lc-two'},el('label',{},'Стример',who),el('label',{},'Тип',kind),el('label',{},'Сумма',amount),el('label',{},'Комментарий',comment)),err,
     el('div',{},el('button',{class:'btn s',type:'button',onclick:async()=>{err.textContent='';try{await api('/adjustments',{method:'POST',body:{staff_id:Number(who.value),kind:kind.value,amount:Number(amount.value),comment:comment.value,period:accState.period}});toast('Добавлено');accRefresh()}catch(x){err.textContent=x.message}}},'Добавить')));
-  const rows=list.map(a=>[td(a.d),td(a.staff_name),el('td',{},el('span',{class:'pill '+(a.kind==='bonus'?'p-ok':'p-bad')},a.kind==='bonus'?'бонус':'штраф')),td(usd2(a.kind==='bonus'?a.amount:-a.amount),'n'),el('td',{style:'white-space:normal;text-align:left'},a.comment||'—'),el('td',{},el('button',{class:'btn o s',type:'button',onclick:async()=>{await api('/adjustments/'+a.id,{method:'DELETE'});accRefresh()}},'Удалить'))]);
-  return[form,ctrT(table(['Дата','Стример','Тип','Сумма','Комментарий (видите только вы)',''],rows,'За этот месяц бонусов и штрафов нет.')),
+  const rows=list.map(a=>[td(a.d),td(a.staff_name),el('td',{},el('span',{class:'pill '+(a.kind==='bonus'?'p-ok':'p-bad')},a.kind==='bonus'?'бонус':'штраф')),td(usd2(a.kind==='bonus'?a.amount:-a.amount),'n'),el('td',{style:'white-space:normal;text-align:left'},a.comment||'—'),el('td',{},ms.closed?'':el('button',{class:'btn o s',type:'button',onclick:async()=>{try{await api('/adjustments/'+a.id,{method:'DELETE'});accRefresh()}catch(x){toast(x.message)}}},'Удалить'))]);
+  const lockNote=el('div',{class:'card warn-card'},el('b',{},'🔒 Месяц закрыт'),el('div',{class:'mut sm'},'Бонусы и штрафы за закрытый месяц менять нельзя. Откройте месяц заново (кнопка вверху), внесите изменения и закройте снова.'));
+  return[ms.closed?lockNote:form,ctrT(table(['Дата','Стример','Тип','Сумма','Комментарий (видите только вы)',''],rows,'За этот месяц бонусов и штрафов нет.')),
     el('div',{class:'mut sm'},'Стример видит бонусы и штрафы суммами, без вашего комментария. Переработку тоже можно оплатить здесь.')];
 }
 
@@ -1416,7 +1436,7 @@ async function accPlan(){
       el('h4',{},'Дневной бонус'),el('div',{class:'lc-two'},lab('FTD в день',f.dc),lab('Минимальный депозит, $',f.dm),lab('Бонус, $',f.db),lab('День закрывается в (Киев), час',f.dh)),
       el('h4',{},'Прочее'),el('div',{class:'lc-two'},lab('Запас на курс брокера, %',f.tol),lab('Максимальный аванс, $',f.adv)),
       err,el('div',{},el('button',{class:'btn',type:'button',onclick:save},'Сохранить'))),
-    el('div',{class:'mut sm'},'Изменения применяются сразу ко всем месяцам, которые ещё считаются на лету. Выплаты за закрытые месяцы лучше фиксировать заметкой.')];
+    el('div',{class:'mut sm'},'Изменения действуют на текущий и открытые месяцы. Закрытые месяцы не пересчитываются: начисления в них зафиксированы.')];
 }
 
 async function accForm(){

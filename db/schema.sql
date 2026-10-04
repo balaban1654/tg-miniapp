@@ -439,3 +439,19 @@ CREATE TABLE IF NOT EXISTS staff_tasks (
   accepted_at TIMESTAMPTZ
 );
 CREATE INDEX IF NOT EXISTS staff_tasks_staff ON staff_tasks(staff_id, status);
+
+-- Закрытие месяца: фиксируем начисления стримерам, чтобы смена ставок и планов не меняла прошлое
+CREATE TABLE IF NOT EXISTS month_closes (
+  period    TEXT PRIMARY KEY,                    -- 'YYYY-MM'
+  closed_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  closed_by INT REFERENCES staff(id),            -- NULL: закрыт автоматически
+  plan      JSONB NOT NULL                       -- KPI-план на момент закрытия
+);
+CREATE TABLE IF NOT EXISTS kpi_closed (
+  period   TEXT NOT NULL REFERENCES month_closes(period) ON DELETE CASCADE,
+  staff_id INT NOT NULL REFERENCES staff(id) ON DELETE CASCADE,
+  data     JSONB NOT NULL,                       -- расчёт KPI на момент закрытия
+  PRIMARY KEY (period, staff_id)
+);
+-- Месяц, который админ открыл заново: автоматически его больше не закрываем, только вручную
+CREATE TABLE IF NOT EXISTS month_holds (period TEXT PRIMARY KEY);

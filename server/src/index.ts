@@ -8,6 +8,7 @@ import { resolve } from 'node:path';
 import { migrate } from './migrate.js';
 import { ensureAdmin } from './auth.js';
 import { officeRoutes } from './office.js';
+import { autoCloseMonth } from './accounting.js';
 import { postbackRoutes } from './postback.js';
 import { appRoutes } from './app.js';
 import { seedDefaultRules, startScheduler } from './push.js';
@@ -73,6 +74,10 @@ app.get<{ Params: { kind: string; slug: string } }>('/:kind(s|b)/:slug', async (
 });
 
 await app.listen({ port: config.port, host: '0.0.0.0' });
+// Автозакрытие прошлого месяца: проверяем каждые 10 минут, закрывает после 03:00 первого числа
+const closeTick = () => void autoCloseMonth().then((p) => p && app.log.info(`Месяц ${p} закрыт автоматически`)).catch((e) => app.log.error(e, 'Ошибка автозакрытия месяца'));
+setInterval(closeTick, 10 * 60_000);
+setTimeout(closeTick, 30_000);
 if (process.env.DISABLE_BOT !== '1') {
   startScheduler();
   void setupBotProfile();

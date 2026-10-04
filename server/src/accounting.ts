@@ -96,7 +96,7 @@ export interface KpiResult {
 }
 
 /** Расчёт за месяц по правилам KPI. Часы берутся только из зачтённых отчётов, лиды это FTD по ссылкам стримера. */
-export async function kpiFor(staffId: number, period: string, plan: KpiPlan): Promise<KpiResult> {
+async function kpiCompute(staffId: number, period: string, plan: KpiPlan): Promise<KpiResult> {
   const hoursMin = Number(
     (await db.query(`SELECT coalesce(sum(approved_min), 0)::int AS m FROM shift_reports WHERE staff_id = $1 AND status = 'approved' AND to_char(day, 'YYYY-MM') = $2`, [staffId, period])).rows[0].m,
   );
@@ -178,6 +178,86 @@ export async function kpiFor(staffId: number, period: string, plan: KpiPlan): Pr
     belowTier,
     dayRows: dayRows.filter((x) => x.hit || x.n >= 3),
   };
+}
+
+/** KPI за месяц. Если месяц закрыт, берём зафиксированный расчёт (выплаты считаются по факту, они идут и после закрытия). */
+export async function kpiFor(staffId: number, period: string, plan: KpiPlan): Promise<KpiResult> {
+  const snap = (await db.query('SELECT data FROM kpi_closed WHERE period = $1 AND staff_id = $2', [period, staffId])).rows[0];
+  if (!snap) return kpiCompute(staffId, period, plan);
+  const k = snap.data as KpiResult;
+  const paid = Number((await db.query(`SELECT coalesce(sum(amount), 0)::float AS s FROM staff_payouts WHERE staff_id = $1 AND period = $2`, [staffId, period])).rows[0].s);
+  return { ...k, paid, due: r2(k.total - paid) };
+}
+
+/** План, по которому месяц был закрыт (для закрытого месяца), иначе текущий */
+export async function planFor(period: string): Promise<KpiPlan> {
+  const row = (await db.query('SELECT plan FROM month_closes WHERE period = $1', [period])).rows[0];
+  if (!row) return getPlan();
+  const d = row.plan as Partial<KpiPlan>;
+  return { ...DEFAULT_PLAN, ...d, day: { ...DEFAULT_PLAN.day, ...(d.day ?? {}) }, goals: { ...DEFAULT_PLAN.goals, ...(d.goals ?? {}) } };
+}
+
+export const prevPeriod = (p: string): string => {
+  const y = Number(p.slice(0, 4));
+  const m = Number(p.slice(5, 7));
+  return m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, '0')}`;
+};
+
+export async function isClosed(period: string): Promise<boolean> {
+  return (await db.query('SELECT 1 FROM month_closes WHERE period = $1', [period])).rowCount! > 0;
+}
+
+/** Закрывает месяц: расчёт каждого стримера записывается и дальше не пересчитывается. Бросает ошибку, если месяц уже закрыт. */
+export async function closeMonth(period: string, byStaffId: number | null): Promise<{ streamers: number; total: number }> {
+  const plan = await getPlan();
+  const ids = (await db.query(`SELECT id FROM staff WHERE role = 'streamer' ORDER BY id`)).rows.map((r: any) => r.id as number);
+  const calc: [number, KpiResult][] = [];
+  for (const id of ids) calc.push([id, await kpiCompute(id, period, plan)]);
+  const c = await db.connect();
+  try {
+    await c.query('BEGIN');
+    const ins = await c.query('INSERT INTO month_closes (period, closed_by, plan) VALUES ($1,$2,$3::jsonb) ON CONFLICT DO NOTHING', [period, byStaffId, JSON.stringify(plan)]);
+    if (!ins.rowCount) throw new Error('Месяц уже закрыт');
+    for (const [id, k] of calc) await c.query('INSERT INTO kpi_closed (period, staff_id, data) VALUES ($1,$2,$3::jsonb)', [period, id, JSON.stringify(k)]);
+    await c.query('DELETE FROM month_holds WHERE period = $1', [period]);
+    await c.query('COMMIT');
+  } catch (e) {
+    await c.query('ROLLBACK');
+    throw e;
+  } finally {
+    c.release();
+  }
+  return { streamers: calc.length, total: r2(calc.reduce((a, [, k]) => a + k.total, 0)) };
+}
+
+/** Количество отчётов за месяц, которые ещё не проверены или не закончены */
+export async function unreviewed(period: string): Promise<number> {
+  return Number((await db.query(`SELECT count(*)::int AS n FROM shift_reports WHERE status IN ('pending','live') AND to_char(day, 'YYYY-MM') = $1`, [period])).rows[0].n);
+}
+
+/**
+ * Автозакрытие прошлого месяца в 03:00 первого числа (по Киеву). Ждёт, пока проверены все отчёты месяца,
+ * и не трогает месяц, который админ открыл заново.
+ */
+export async function autoCloseMonth(): Promise<string | null> {
+  const t = (await db.query(`SELECT extract(day FROM now() AT TIME ZONE '${TZ}')::int AS d, extract(hour FROM now() AT TIME ZONE '${TZ}')::int AS h`)).rows[0];
+  if (t.d === 1 && t.h < 3) return null;
+  const prev = prevPeriod(await currentPeriod());
+  if (await isClosed(prev)) return null;
+  if ((await db.query('SELECT 1 FROM month_holds WHERE period = $1', [prev])).rowCount) return null;
+  if (!(await db.query(`SELECT 1 FROM staff WHERE role = 'streamer' LIMIT 1`)).rowCount) return null;
+  if ((await unreviewed(prev)) > 0) return null;
+  try {
+    const r = await closeMonth(prev, null);
+    const chat = process.env.ALERT_TG_CHAT_ID || process.env.BACKUP_TG_CHAT_ID;
+    if (chat && process.env.BOT_TOKEN) {
+      const text = `🔒 Hunter: месяц ${prev} закрыт автоматически. Начислено стримерам $${r.total.toLocaleString('ru-RU')} (${r.streamers} чел.). Выплаты: Бухгалтерия → Выплаты и авансы.`;
+      await fetch(`https://api.telegram.org/bot${process.env.BOT_TOKEN}/sendMessage`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ chat_id: chat, text }) }).catch(() => {});
+    }
+    return prev;
+  } catch {
+    return null;
+  }
 }
 
 type Pre = (req: FastifyRequest, reply: FastifyReply) => Promise<unknown>;
@@ -380,8 +460,9 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
   app.post<{ Params: { id: string } }>('/shifts/:id/review', { preHandler: admin }, async (req, reply) => {
     const me = req.staff!;
     const b = (req.body ?? {}) as Record<string, any>;
-    const cur = (await db.query(`SELECT id, declared_min FROM shift_reports WHERE id = $1 AND status = 'pending'`, [Number(req.params.id)])).rows[0];
+    const cur = (await db.query(`SELECT id, declared_min, to_char(day, 'YYYY-MM') AS pm FROM shift_reports WHERE id = $1 AND status = 'pending'`, [Number(req.params.id)])).rows[0];
     if (!cur) return reply.code(404).send({ error: 'Отчёт не найден или уже проверен' });
+    if (await isClosed(cur.pm)) return reply.code(409).send({ error: 'Месяц отчёта закрыт. Откройте месяц заново в Бухгалтерии, проверьте отчёт и закройте месяц снова.' });
     if (b.action === 'approve') {
       const min = b.minutes === undefined ? cur.declared_min : Math.trunc(Number(b.minutes));
       if (!Number.isFinite(min) || min < 1 || min > 720) return reply.code(400).send({ error: 'Время от 1 до 720 минут' });
@@ -448,8 +529,8 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
   });
 
   app.get<{ Querystring: { period?: string } }>('/kpi/summary', { preHandler: admin }, async (req) => {
-    const plan = await getPlan();
     const period = PERIOD.test(String(req.query.period)) ? String(req.query.period) : await currentPeriod();
+    const plan = await planFor(period);
     const staff = (await db.query(`SELECT id, name, login, active FROM staff WHERE role = 'streamer' ORDER BY active DESC, name`)).rows;
     const rows = [];
     for (const s of staff) rows.push({ staff: s, kpi: await kpiFor(s.id, period, plan) });
@@ -457,14 +538,51 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
   });
 
   app.get<{ Params: { id: string }; Querystring: { period?: string } }>('/kpi/:id', { preHandler: admin }, async (req, reply) => {
-    const plan = await getPlan();
     const period = PERIOD.test(String(req.query.period)) ? String(req.query.period) : await currentPeriod();
+    const plan = await planFor(period);
     const id = Number(req.params.id);
     const s = (await db.query(`SELECT id, name, login FROM staff WHERE id = $1 AND role = 'streamer'`, [id])).rows[0];
     if (!s) return reply.code(404).send({ error: 'Стример не найден' });
     const adj = (await db.query(`SELECT a.id, a.kind, a.amount::float AS amount, a.comment, a.created_at, c.name AS by FROM staff_adjustments a LEFT JOIN staff c ON c.id = a.created_by WHERE a.staff_id = $1 AND a.period = $2 ORDER BY a.id`, [id, period])).rows;
     const pay = (await db.query(`SELECT id, kind, amount::float AS amount, note, created_at FROM staff_payouts WHERE staff_id = $1 AND period = $2 ORDER BY id`, [id, period])).rows;
     return { plan, period, staff: s, kpi: await kpiFor(id, period, plan), adjustments: adj, payouts: pay };
+  });
+
+  // ----- Закрытие месяца -----
+  const monthInfo = async (period: string) => {
+    const c = (await db.query(`SELECT m.closed_at, m.closed_by, s.name AS by FROM month_closes m LEFT JOIN staff s ON s.id = m.closed_by WHERE m.period = $1`, [period])).rows[0] ?? null;
+    const cur = await currentPeriod();
+    const hold = ((await db.query('SELECT 1 FROM month_holds WHERE period = $1', [period])).rowCount ?? 0) > 0;
+    return { period, closed: !!c, closed_at: c?.closed_at ?? null, auto: c ? c.closed_by === null : false, by: c?.by ?? null, canClose: period < cur, current: period === cur, hold, pending: await unreviewed(period) };
+  };
+  app.get<{ Querystring: { period?: string } }>('/month/status', { preHandler: admin }, async (req) => {
+    const period = PERIOD.test(String(req.query.period)) ? String(req.query.period) : await currentPeriod();
+    return monthInfo(period);
+  });
+  app.post('/month/close', { preHandler: admin }, async (req, reply) => {
+    const b = (req.body ?? {}) as Record<string, any>;
+    const period = PERIOD.test(String(b.period)) ? String(b.period) : '';
+    if (!period) return reply.code(400).send({ error: 'Укажите месяц' });
+    const info = await monthInfo(period);
+    if (!info.canClose) return reply.code(400).send({ error: 'Текущий месяц закрыть нельзя: он ещё идёт. Закроется автоматически в 03:00 первого числа.' });
+    if (info.closed) return reply.code(409).send({ error: 'Месяц уже закрыт' });
+    if (info.pending > 0 && !b.force) return reply.code(409).send({ error: `За месяц есть непроверенные отчёты: ${info.pending}. Проверьте их или закройте всё равно.`, pending: info.pending });
+    try {
+      const r = await closeMonth(period, req.staff!.id);
+      return { ok: true, ...r };
+    } catch (e: any) {
+      return reply.code(409).send({ error: e?.message ?? 'Не удалось закрыть месяц' });
+    }
+  });
+  app.post('/month/reopen', { preHandler: admin }, async (req, reply) => {
+    const b = (req.body ?? {}) as Record<string, any>;
+    const period = PERIOD.test(String(b.period)) ? String(b.period) : '';
+    if (!period) return reply.code(400).send({ error: 'Укажите месяц' });
+    const r = await db.query('DELETE FROM month_closes WHERE period = $1 RETURNING period', [period]);
+    if (!r.rowCount) return reply.code(404).send({ error: 'Месяц не закрыт' });
+    // Чтобы автозакрытие не закрыло его снова, пока админ правит
+    await db.query('INSERT INTO month_holds (period) VALUES ($1) ON CONFLICT DO NOTHING', [period]);
+    return { ok: true };
   });
 
   // ----- Бонусы и штрафы (админ). Стример видит только суммы -----
@@ -486,10 +604,13 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     const sid = Number(b.staff_id);
     if (!(await db.query(`SELECT 1 FROM staff WHERE id = $1 AND role = 'streamer'`, [sid])).rowCount) return reply.code(404).send({ error: 'Стример не найден' });
     const period = PERIOD.test(String(b.period)) ? String(b.period) : await currentPeriod();
+    if (await isClosed(period)) return reply.code(409).send({ error: 'Месяц закрыт, бонусы и штрафы менять нельзя. Откройте месяц заново в Бухгалтерии.' });
     await db.query('INSERT INTO staff_adjustments (staff_id, period, kind, amount, comment, created_by) VALUES ($1,$2,$3,$4,$5,$6)', [sid, period, kind, amount, str(b.comment, 500) || null, req.staff!.id]);
     return { ok: true };
   });
-  app.delete<{ Params: { id: string } }>('/adjustments/:id', { preHandler: admin }, async (req) => {
+  app.delete<{ Params: { id: string } }>('/adjustments/:id', { preHandler: admin }, async (req, reply) => {
+    const row = (await db.query('SELECT period FROM staff_adjustments WHERE id = $1', [Number(req.params.id)])).rows[0];
+    if (row && (await isClosed(row.period))) return reply.code(409).send({ error: 'Месяц закрыт, бонусы и штрафы менять нельзя. Откройте месяц заново в Бухгалтерии.' });
     await db.query('DELETE FROM staff_adjustments WHERE id = $1', [Number(req.params.id)]);
     return { ok: true };
   });
@@ -830,6 +951,13 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
         advances,
         lagging,
         shortfalls: out.filter((x) => shortBy.get(x.id)).map((x) => ({ id: x.id, name: x.name, n: shortBy.get(x.id) as number })),
+        monthWaiting: await (async () => {
+          const prev = prevPeriod(await currentPeriod());
+          if (await isClosed(prev)) return null;
+          const hold = ((await db.query('SELECT 1 FROM month_holds WHERE period = $1', [prev])).rowCount ?? 0) > 0;
+          const pending = await unreviewed(prev);
+          return pending > 0 || hold ? { period: prev, pending, hold } : null;
+        })(),
         tasksDone: (await db.query(`SELECT t.id, s.name AS staff_name, t.title FROM staff_tasks t JOIN staff s ON s.id = t.staff_id WHERE t.status = 'done' ORDER BY t.done_at`)).rows,
         tasksOverdue: (await db.query(`SELECT t.id, s.name AS staff_name, t.title FROM staff_tasks t JOIN staff s ON s.id = t.staff_id WHERE t.status = 'open' AND t.due < $1::date ORDER BY t.due`, [today])).rows,
       },
