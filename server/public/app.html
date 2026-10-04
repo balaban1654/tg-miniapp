@@ -844,7 +844,7 @@ function fsShell(pill,body){
   const bottom=!needReg()?null:el('div',{class:'fs-bottom'},el('button',{class:'btn o',type:'button',onclick:()=>go('home')},'Всё понятно — регистрация'));
   root.replaceChildren(
     el('div',{class:'hd fs-hd'},el('div',{class:'brand'},el('button',{class:'xbtn',type:'button','aria-label':'Закрыть урок',onclick:()=>{tab='trainer';render()}},'✕'),el('b',{},'Тренажёр')),
-      el('div',{class:'hr'},el('button',{class:'pillb',type:'button',onclick:support},svgEl(CHAT_ICON),'Поддержка'),el('span',{class:'steppill'},pill))),
+      el('div',{class:'hr'},el('span',{class:'steppill'},pill))),
     el('main',{class:'fs-main'},body),...(bottom?[bottom]:[]));
 }
 const TIMES=[5,10,15,30,60,120,300];
@@ -1063,7 +1063,7 @@ function lesson1(n=1){
       el('button',{class:'btn o',type:'button',onclick:async()=>{try{await api('/trainer/'+n+'/done',{method:'POST'})}catch{}if(n<3)viewTrainer(n+1);else{tab='trainer';render()}}},nextLabel)];
     root.replaceChildren(
       el('div',{class:'hd fs-hd'},el('div',{class:'brand'},el('button',{class:'xbtn',type:'button','aria-label':'Закрыть урок',onclick:async()=>{try{await api('/trainer/'+n+'/done',{method:'POST'})}catch{}tab='trainer';render()}},'✕'),el('b',{},'Тренажёр')),
-        el('div',{class:'hr'},el('button',{class:'pillb',type:'button',onclick:support},svgEl(CHAT_ICON),'Поддержка'),el('span',{class:'steppill'},'Урок '+n+' · итог'))),
+        el('div',{class:'hr'},el('span',{class:'steppill'},'Урок '+n+' · итог'))),
       el('main',{class:'fs-main'},body));
   };
 
