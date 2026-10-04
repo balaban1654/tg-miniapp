@@ -515,7 +515,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
          FROM leads d
          JOIN LATERAL (SELECT direction, kind, text, created_at FROM messages WHERE tg_id = d.tg_id ORDER BY id DESC LIMIT 1) m ON TRUE
          LEFT JOIN staff o ON o.id = d.owner_id
-        WHERE ${chatScope(me, 'd.owner_id')}
+        WHERE ${chatScope(me, 'd.owner_id')} AND (d.chat_closed_at IS NULL OR m.created_at > d.chat_closed_at)
         ORDER BY (m.direction = 'in') DESC, m.created_at DESC LIMIT 200`,
     );
     return r.rows.map((x) => ({ ...x, waiting: x.last_dir === 'in' }));
@@ -536,6 +536,20 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
       [tgId],
     );
     return { lead: lead.rows[0], messages: msgs.rows.reverse() };
+  });
+
+  // Админ закрывает чат (скрывается, пока клиент не напишет) или очищает переписку совсем
+  app.post<{ Params: { tgId: string } }>('/chats/:tgId/close', { preHandler: need('admin') }, async (req, reply) => {
+    const r = await db.query('UPDATE leads SET chat_closed_at = now() WHERE tg_id = $1', [Number(req.params.tgId)]);
+    if (!r.rowCount) return reply.code(404).send({ error: 'Чат не найден' });
+    return { ok: true };
+  });
+  app.delete<{ Params: { tgId: string } }>('/chats/:tgId', { preHandler: need('admin') }, async (req, reply) => {
+    const tgId = Number(req.params.tgId);
+    if (!Number.isSafeInteger(tgId)) return reply.code(400).send({ error: 'Неверный ID' });
+    const r = await db.query('DELETE FROM messages WHERE tg_id = $1', [tgId]);
+    await db.query('UPDATE leads SET chat_closed_at = NULL WHERE tg_id = $1', [tgId]);
+    return { ok: true, deleted: r.rowCount };
   });
 
   app.get<{ Params: { tgId: string; msgId: string } }>('/chats/:tgId/file/:msgId', { preHandler: auth }, async (req, reply) => {
