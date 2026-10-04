@@ -906,10 +906,10 @@ function smMetrics(d){
   const hp=m.hoursMin/pl.planMin*100,sp=m.shifts/m.planShifts*100,lp=m.ftd/pl.leads*100;
   const toGo=pl.leads-m.ftd;
   return el('div',{class:'card dx-pf'},el('div',{class:'dx-hd'},el('div',{class:'l'},el('span',{class:'dx-lbl'},'Мои показатели за '+(d.range.whole?'месяц':perLabel(m.period).toLowerCase())),dxPopBtn('Кольца выполнения плана',IC_RINGS,smRings(d),'pl'),dxPopBtn('Воронка',IC_FUNNEL,smFunnel(d),'pl wide')),mark!==null?el('span',{class:'mut',style:'font-size:12px'},'метка: план на сегодня'):null),
+    smTile('Сегодня в эфире',hm(t.minutes),'/ '+fmtH(t.shiftMin)+' ч',t.minutes/t.shiftMin*100,null,t.minLeft>0?'до закрытия смены '+hm(t.minLeft):'смена закрыта',t.live?'идёт эфир':'',t.minLeft>0?'warn':'ok'),
     smTile('Часы в эфире',hm(m.hoursMin),'/ '+pl.hours+' ч',hp,mark,Math.round(hp)+'% плана','по графику '+hm(pl.paceMin),lv(hp)),
     smTile('Закрытых смен',String(m.shifts),'/ '+n0(m.planShifts),sp,mark,Math.round(sp)+'% плана','смена = '+fmtH(pl.shiftH*60)+' ч',lv(sp)),
-    smTile('Лиды (FTD)',String(m.ftd),'/ '+pl.leads,lp,mark,Math.round(lp)+'% плана',toGo>0?'ещё '+toGo+' до плана':'план выполнен',lv(lp)),
-    smTile('Сегодня в эфире',hm(t.minutes),'/ '+fmtH(t.shiftMin)+' ч',t.minutes/t.shiftMin*100,null,t.minLeft>0?'до закрытия смены '+hm(t.minLeft):'смена закрыта',t.live?'идёт эфир':'',t.minLeft>0?'warn':'ok'));
+    smTile('Лиды (FTD)',String(m.ftd),'/ '+pl.leads,lp,mark,Math.round(lp)+'% плана',toGo>0?'ещё '+toGo+' до плана':'план выполнен',lv(lp)));
 }
 function smLeads(d){
   const b=d.byStatus,total=Object.values(b).reduce((a,x)=>a+x,0),f=d.funnel;
