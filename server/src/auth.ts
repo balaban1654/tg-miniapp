@@ -15,6 +15,7 @@ export interface Staff {
   role: Role;
   parent_id: number | null;
   totp: boolean;
+  streams: boolean;
 }
 
 /** Роли, которым 2FA обязательна: без неё доступны только настройка 2FA и выход */
@@ -66,7 +67,7 @@ export async function staffFromRequest(req: FastifyRequest): Promise<Staff | nul
   const token = req.cookies[COOKIE];
   if (!token) return null;
   const r = await db.query(
-    `SELECT s.id, s.login, s.name, s.role, s.parent_id, (s.totp_secret IS NOT NULL) AS totp
+    `SELECT s.id, s.login, s.name, s.role, s.parent_id, (s.totp_secret IS NOT NULL) AS totp, s.streams
        FROM sessions x JOIN staff s ON s.id = x.staff_id
       WHERE x.token_hash = $1 AND x.expires_at > now() AND s.active`,
     [sha(token)],

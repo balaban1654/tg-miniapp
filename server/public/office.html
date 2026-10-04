@@ -394,6 +394,7 @@ function showApp(){
   if(me.role==='analyst'){items.length=0;items.push(['signals','Сигналы']);if(tab!=='signals')tab='signals'}
   if(me.role==='admin')items.push(['push','Пуши'],['media','Медиа'],['pb','Постбеки']);
   if(me.role==='streamer')items.splice(items.length,0,['shifts','Смены и отчёты'],['mytasks','Мои задачи']);
+  if(me.role==='admin'&&me.streams)items.splice(items.findIndex(x=>x[0]==='chats')+1,0,['shifts','Смены и отчёты']);
   if(me.role==='admin'){items.splice(items.findIndex(x=>x[0]==='push'),0,['acc','Бухгалтерия']);items.splice(1,0,['plans','Планы и задачи'])}
   if(tab==='links'&&me.role==='admin'){tab='staff';staffState.tab='links'}
   if(!items.some(x=>x[0]===tab)){tab=items[0][0];history.replaceState(null,'','#'+hashPath())}
@@ -1186,7 +1187,7 @@ async function staffTeam(){
     el('label',{style:'grid-column:1/-1'},'Ссылка регистрации (WW)',po.l),el('label',{style:'grid-column:1/-1'},'Ссылка регистрации (RU)',po.r),
     el('button',{class:'btn',type:'submit'},'Сохранить'),perr):el('span');
   return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},isAdmin?'Сотрудники':'Моя команда')),form,poForm,
-    ctrT(table(['Имя','Логин',...(isAdmin?['Пароль','2FA']:[]),'Роль','Тимлидер','Кампания PO','Промокод','Статус',''],rows.map(r=>[el('td',{},el('span',{class:'cp'},r.name,isAdmin?el('button',{type:'button',title:'Карточка сотрудника','aria-label':'Карточка сотрудника',onclick:()=>openStaffCard(r.id)},svgIcon(PERSON)):null)),td(r.login),...(isAdmin?[pwCell(r),tfaCell(r)]:[]),el('td',{},el('span',{class:'pill p-pur'},ROLE[r.role])),parentCell(r),td(r.po_campaign||'—'),td(r.po_promo||'—'),el('td',{},el('span',{class:'pill '+(r.active?'p-ok':'p-bad')},r.active?'активен':'отключён')),el('td',{},toggle(r))]),'Пока никого нет.'))];
+    ctrT(table(['Имя','Логин',...(isAdmin?['Пароль','2FA']:[]),'Роль','Тимлидер','Кампания PO','Промокод','Статус',''],rows.map(r=>[el('td',{},el('span',{class:'cp'},r.name,isAdmin?el('button',{type:'button',title:'Карточка сотрудника','aria-label':'Карточка сотрудника',onclick:()=>openStaffCard(r.id)},svgIcon(PERSON)):null)),td(r.login),...(isAdmin?[pwCell(r),tfaCell(r)]:[]),el('td',{},el('span',{class:'pill p-pur'},ROLE[r.role]),r.streams?el('span',{class:'pill p-pur',style:'margin-left:4px'},'Стример'):null),parentCell(r),td(r.po_campaign||'—'),td(r.po_promo||'—'),el('td',{},el('span',{class:'pill '+(r.active?'p-ok':'p-bad')},r.active?'активен':'отключён')),el('td',{},toggle(r))]),'Пока никого нет.'))];
 }
 
 const ctrT=t=>{t.classList.add('ctr');return t};
@@ -1445,14 +1446,15 @@ async function openStaffCard(id){
   let d;try{d=await api(self?'/profile':'/staff/'+id+'/card')}catch(x){box.replaceChildren(el('div',{class:'err'},x.message),el('button',{class:'btn o s',type:'button',onclick:close},'Закрыть'));return}
   const inp=(type,v,ph)=>el('input',{type,value:v||'',placeholder:ph||'',autocomplete:'off'});
   const f={full:inp('text',d.full_name,'Фамилия Имя Отчество'),birth:dateWheel({value:d.birth_date||'',optional:true,min:'1940-01-01',max:new Date().toISOString().slice(0,10),placeholder:'Не указана'}),city:inp('text',d.city,'Город проживания'),
+    streams:el('input',{type:'checkbox',style:'width:auto'}),
     method:el('select',{},el('option',{value:''},'Не выбран'),...d.payout_methods.map(m=>el('option',{value:m},m))),wallet:inp('text',d.payout_wallet,'Адрес кошелька или реквизиты')};
-  f.method.value=d.payout_method||'';
+  f.method.value=d.payout_method||'';f.streams.checked=!!d.streams;
   const fld=(l,i)=>el('div',{class:'lc-field'},el('label',{},l),i);
   const msg=el('div',{class:'err',role:'alert'});
   const say=(t,ok)=>{msg.className=ok?'ok-msg':'err';msg.textContent=t};
   const save=async()=>{try{
-    const body={full_name:f.full.value,birth_date:f.birth.value,city:f.city.value,payout_method:f.method.value,payout_wallet:f.wallet.value};
-    await api(self?'/profile':'/staff/'+id,{method:'PATCH',body});say('',true);toast('Сохранено');if(!self)render({soft:true})}catch(x){say(x.message)}};
+    const body={full_name:f.full.value,birth_date:f.birth.value,city:f.city.value,payout_method:f.method.value,payout_wallet:f.wallet.value,...(d.role==='admin'&&me.role==='admin'?{streams:f.streams.checked}:{})};
+    await api(self?'/profile':'/staff/'+id,{method:'PATCH',body});say('',true);toast('Сохранено');if(self){const nm=await api('/me');if(nm.streams!==me.streams){me=nm;showApp()}}else render({soft:true})}catch(x){say(x.message)}};
   // Пароль: свой меняем по текущему, чужой админ сбрасывает сам
   const pw={cur:inp('password','','Текущий пароль'),n1:inp('password','','Новый пароль, от 8 символов'),n2:inp('password','','Повторите новый пароль')};
   [pw.cur,pw.n1,pw.n2].forEach(i=>i.autocomplete='new-password');
@@ -1482,7 +1484,8 @@ async function openStaffCard(id){
   };
   tfDraw();
   const panes={
-    personal:()=>[el('div',{class:'lc-two'},fld('ФИО',f.full),fld('Дата рождения',f.birth),fld('Город',f.city)),saveRow()],
+    personal:()=>[el('div',{class:'lc-two'},fld('ФИО',f.full),fld('Дата рождения',f.birth),fld('Город',f.city)),
+      d.role==='admin'&&me.role==='admin'?el('label',{style:'display:flex;gap:8px;align-items:center;font-size:13px;color:var(--fg)'},f.streams,'Тоже стримит: смены, отчёты, часы и зарплата считаются как у стримера'):null,saveRow()],
     payout:()=>[el('div',{class:'lc-two'},fld('Куда выплачивать',f.method),fld('Адрес кошелька / реквизиты',f.wallet)),saveRow()],
     security:()=>[el('div',{class:'lc-two'},...(self?[fld('Текущий пароль',pw.cur)]:[]),fld('Новый пароль',pw.n1),fld('Повторите',pw.n2)),
       el('div',{class:'lc-actions'},el('button',{class:'btn o',type:'button',onclick:changePw},self?'Сменить пароль':'Сбросить пароль'),pmsg),
@@ -1494,7 +1497,7 @@ async function openStaffCard(id){
   const bar=el('div',{class:'lc-tabs',role:'tablist'});
   const draw=()=>{
     bar.replaceChildren(...TABS.map(([k,t])=>el('button',{type:'button',role:'tab','aria-selected':k===cur?'true':'false',class:'lc-tab'+(k===cur?' on':''),onclick:()=>{cur=k;say('',true);psay('',true);draw()}},t)));
-    body.replaceChildren(...panes[cur]());
+    body.replaceChildren(...panes[cur]().filter(Boolean));
   };
   box.replaceChildren(
     el('div',{class:'lc-head'},el('div',{},el('h3',{style:'font-size:18px'},d.name),el('div',{class:'mut sm'},'Логин '+d.login+' · '+ROLE[d.role])),
@@ -1769,7 +1772,7 @@ async function openAddReportModal(){
   const onKey=e=>{if(e.key==='Escape')close()};document.addEventListener('keydown',onKey);
   const box=el('div',{class:'lc'},el('div',{class:'mut'},'Загрузка…'));ov.append(box);document.body.append(ov);
   let defs,staff;try{[defs,staff]=await Promise.all([api('/report-fields'),api('/staff')])}catch(x){box.replaceChildren(el('div',{class:'err'},x.message));return}
-  defs=defs.filter(d=>d.active);staff=staff.filter(x=>x.role==='streamer'&&x.active);
+  defs=defs.filter(d=>d.active);staff=staff.filter(x=>(x.role==='streamer'||x.streams)&&x.active);
   const kToday=new Date().toLocaleDateString('sv-SE',{timeZone:'Europe/Kyiv'});
   const who=el('select',{},el('option',{value:''},'Выберите стримера'),...staff.map(x=>el('option',{value:x.id},x.name)));
   const startDay=dateWheel({value:kToday,min:(+kToday.slice(0,4)-1)+'-01-01',max:kToday}),startTime=timeWheel({value:'12:00'});
@@ -1850,7 +1853,7 @@ async function accReview(){
     el('div',{class:'head',style:'margin-top:6px'},el('h3',{style:'font-size:15px'},'Проверенные за '+perLabel(accState.period)),el('button',{class:'btn s',type:'button',onclick:openAddReportModal},'Добавить отчёт')),histBar,histHold];
 }
 
-async function streamersList(){return(await api('/staff')).filter(s=>s.role==='streamer'&&s.active)}
+async function streamersList(){return(await api('/staff')).filter(s=>(s.role==='streamer'||s.streams)&&s.active)}
 
 async function accBonus(){
   const [list,st,ms]=await Promise.all([api('/adjustments?period='+accState.period),streamersList(),api('/month/status?period='+accState.period)]);
@@ -2196,7 +2199,7 @@ async function viewPush(){
   // --- рассылка
   const SEGL={all:'Все',new:'Не зарегистрировались',registered:'Зарегистрировались, без депозита',ftd:'С депозитом',access:'С открытым доступом',churned:'Отвалились'};
   const sel=el('select',{},Object.entries(SEGL).map(([k,v])=>el('option',{value:k},v+' ('+seg[k]+')')));
-  const owner=el('select',{},el('option',{value:''},'Все стримеры'),...staff.filter(x=>['streamer','teamlead','buyer'].includes(x.role)).map(x=>el('option',{value:x.id},x.name)));
+  const owner=el('select',{},el('option',{value:''},'Все стримеры'),...staff.filter(x=>(x.streams||['streamer','teamlead','buyer'].includes(x.role))).map(x=>el('option',{value:x.id},x.name)));
   owner.addEventListener('change',async()=>{const c=await api('/push/segments'+(owner.value?'?owner_id='+owner.value:''));[...sel.options].forEach(o=>o.textContent=SEGL[o.value]+' ('+c[o.value]+')')});
   const bt=el('textarea',{class:'big',placeholder:'{имя}, у нас новости…',maxlength:'4000'});
   const bbe=buttonsEditor([]);const bpv=el('div',{});
@@ -2328,7 +2331,7 @@ const COUNTRIES=[['UA','Украина'],['RU','Россия'],['KZ','Казах
 const countrySel=()=>el('select',{'aria-label':'Страна'},el('option',{value:''},'Без флага'),COUNTRIES.map(([c,n])=>el('option',{value:c},c+' · '+n)));
 async function viewMedia(){
   const [rows,staffAll]=await Promise.all([api('/media'),api('/staff').catch(()=>[])]);
-  const streamers=staffAll.filter(x=>x.role==='streamer'&&x.active!==false);
+  const streamers=staffAll.filter(x=>(x.role==='streamer'||x.streams)&&x.active!==false);
   const staffSel=()=>el('select',{},el('option',{value:''},'Не привязан'),...streamers.map(x=>el('option',{value:x.id},x.name)));
   if(!rows.some(r=>r.id===mediaEdit))mediaEdit=null;
   const f={kind:el('select',{},el('option',{value:'trader'},'Трейдер'),el('option',{value:'channel'},'Канал')),title:el('input',{required:'',placeholder:'Лера'}),country:countrySel(),contact:el('input',{placeholder:'https://t.me/username'}),sub:el('input',{placeholder:'Трейдер команды'}),url:el('input',{required:'',placeholder:'https://t.me/...'}),sort:el('input',{type:'number',placeholder:'1'}),staff:staffSel()};

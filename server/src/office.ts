@@ -40,11 +40,12 @@ declare module 'fastify' {
 
 /** Способы выплат: позже список переедет в раздел «Бухгалтерия» */
 const PAYOUT_METHODS = ['Tippo ID', 'USDT BEP20'];
-const STAFF_CARD_COLS = 'id, login, name, role, tg_username, full_name, to_char(birth_date, \'YYYY-MM-DD\') AS birth_date, city, payout_method, payout_wallet';
+const STAFF_CARD_COLS = 'id, login, name, role, streams, tg_username, full_name, to_char(birth_date, \'YYYY-MM-DD\') AS birth_date, city, payout_method, payout_wallet';
 
 /** Разбор полей карточки сотрудника: вернёт колонки для UPDATE или текст ошибки */
 function cardFields(b: Record<string, unknown>): { cols: Record<string, unknown> } | { error: string } {
   const cols: Record<string, unknown> = {};
+  if (b.streams !== undefined) cols.streams = Boolean(b.streams);
   if (b.full_name !== undefined) cols.full_name = str(b.full_name, 120) || null;
   if (b.city !== undefined) cols.city = str(b.city, 80) || null;
   if (b.birth_date !== undefined) {
@@ -184,8 +185,10 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     const f = cardFields((req.body ?? {}) as Record<string, unknown>);
     if ('error' in f) return reply.code(400).send({ error: f.error });
     const keys = Object.keys(f.cols);
-    if (!keys.length) return { ok: true };
-    await db.query(`UPDATE staff SET ${keys.map((k, i) => `${k} = $${i + 2}`).join(', ')} WHERE id = $1`, [req.staff!.id, ...keys.map((k) => f.cols[k])]);
+    if (req.staff!.role !== 'admin') delete f.cols.streams;   // «тоже стример» выставляет только админ
+    const keys2 = Object.keys(f.cols);
+    if (!keys2.length) return { ok: true };
+    await db.query(`UPDATE staff SET ${keys2.map((k, i) => `${k} = $${i + 2}`).join(', ')} WHERE id = $1`, [req.staff!.id, ...keys2.map((k) => f.cols[k])]);
     return { ok: true };
   });
   // Смена своего пароля: нужен текущий
@@ -314,7 +317,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
       me.role === 'admin' ? 'TRUE' : me.role === 'teamlead' ? `(id = ${me.id} OR parent_id = ${me.id})` : `id = ${me.id}`;
     const r = await db.query(
       `SELECT id, login, name, role, parent_id, rate_ftd, rate_percent, active, created_at,
-              po_campaign, po_promo, po_link, po_link_ru, tg_username, (totp_secret IS NOT NULL) AS totp
+              po_campaign, po_promo, po_link, po_link_ru, tg_username, streams, (totp_secret IS NOT NULL) AS totp
          FROM staff WHERE ${scope} ORDER BY id`,
     );
     return r.rows;

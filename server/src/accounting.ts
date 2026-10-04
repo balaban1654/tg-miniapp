@@ -212,7 +212,7 @@ export async function isClosed(period: string): Promise<boolean> {
 /** Закрывает месяц: расчёт каждого стримера записывается и дальше не пересчитывается. Бросает ошибку, если месяц уже закрыт. */
 export async function closeMonth(period: string, byStaffId: number | null): Promise<{ streamers: number; total: number }> {
   const plan = await getPlan();
-  const ids = (await db.query(`SELECT id FROM staff WHERE role = 'streamer' ORDER BY id`)).rows.map((r: any) => r.id as number);
+  const ids = (await db.query(`SELECT id FROM staff WHERE (role = 'streamer' OR streams) ORDER BY id`)).rows.map((r: any) => r.id as number);
   const calc: [number, KpiResult][] = [];
   for (const id of ids) calc.push([id, await kpiCompute(id, period, plan)]);
   const c = await db.connect();
@@ -247,7 +247,7 @@ export async function autoCloseMonth(): Promise<string | null> {
   const prev = prevPeriod(await currentPeriod());
   if (await isClosed(prev)) return null;
   if ((await db.query('SELECT 1 FROM month_holds WHERE period = $1', [prev])).rowCount) return null;
-  if (!(await db.query(`SELECT 1 FROM staff WHERE role = 'streamer' LIMIT 1`)).rowCount) return null;
+  if (!(await db.query(`SELECT 1 FROM staff WHERE (role = 'streamer' OR streams) LIMIT 1`)).rowCount) return null;
   if ((await unreviewed(prev)) > 0) return null;
   try {
     const r = await closeMonth(prev, null);
@@ -274,7 +274,13 @@ const imgType = (b: Buffer) => (b[0] === 0xff ? 'image/jpeg' : b.subarray(1, 4).
 
 export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promise<void> {
   const { need, str } = h;
-  const stream = need('streamer');
+  // Смены, отчёты и свои цифры: стример или админ, который тоже стримит
+  const streamBase = need('streamer', 'admin');
+  const stream = async (req: FastifyRequest, reply: FastifyReply) => {
+    await streamBase(req, reply);
+    if (reply.sent) return;
+    if (req.staff!.role === 'admin' && !req.staff!.streams) return reply.code(403).send({ error: 'Нет доступа' });
+  };
   const admin = need('admin');
   const anyStaff = need();
 
@@ -362,7 +368,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     const sid = Number(b.staff_id);
     const url = str(b.stream_url, 500).match(/https?:\/\/[^\s]+/i)?.[0] ?? '';
     if (!/^https?:\/\/[^\s]+\.[^\s]+$/i.test(url)) return reply.code(400).send({ error: 'Вставьте ссылку на эфир, например https://tiktok.com/@name/live' });
-    const st = (await db.query(`SELECT id FROM staff WHERE id = $1 AND role = 'streamer' AND active`, [sid])).rows[0];
+    const st = (await db.query(`SELECT id FROM staff WHERE id = $1 AND (role = 'streamer' OR streams) AND active`, [sid])).rows[0];
     if (!st) return reply.code(404).send({ error: 'Стример не найден' });
     if ((await db.query(`SELECT 1 FROM shift_reports WHERE staff_id = $1 AND status = 'live'`, [sid])).rowCount) return reply.code(409).send({ error: 'У этого стримера смена уже идёт' });
     const r = await db.query(`INSERT INTO shift_reports (staff_id, stream_url, day) VALUES ($1,$2,(now() AT TIME ZONE '${TZ}')::date) RETURNING id`, [sid, url]);
@@ -409,7 +415,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     const me = req.staff!;
     const b = (req.body ?? {}) as Record<string, any>;
     const sid = Number(b.staff_id);
-    if (!(await db.query(`SELECT 1 FROM staff WHERE id = $1 AND role = 'streamer'`, [sid])).rowCount) return reply.code(404).send({ error: 'Выберите стримера' });
+    if (!(await db.query(`SELECT 1 FROM staff WHERE id = $1 AND (role = 'streamer' OR streams)`, [sid])).rowCount) return reply.code(404).send({ error: 'Выберите стримера' });
     if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(String(b.start))) return reply.code(400).send({ error: 'Укажите дату и время начала эфира' });
     const mins = Math.trunc(Number(b.declared_min));
     if (!Number.isFinite(mins) || mins < 1 || mins > 720) return reply.code(400).send({ error: 'Время эфира от 1 минуты до 12 часов' });
@@ -613,7 +619,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
   app.get<{ Querystring: { period?: string } }>('/kpi/summary', { preHandler: admin }, async (req) => {
     const period = PERIOD.test(String(req.query.period)) ? String(req.query.period) : await currentPeriod();
     const plan = await planFor(period);
-    const staff = (await db.query(`SELECT id, name, login, active FROM staff WHERE role = 'streamer' ORDER BY active DESC, name`)).rows;
+    const staff = (await db.query(`SELECT id, name, login, active FROM staff WHERE (role = 'streamer' OR streams) ORDER BY active DESC, name`)).rows;
     const rows = [];
     for (const s of staff) rows.push({ staff: s, kpi: await kpiFor(s.id, period, plan) });
     return { plan, period, rows };
@@ -623,7 +629,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     const period = PERIOD.test(String(req.query.period)) ? String(req.query.period) : await currentPeriod();
     const plan = await planFor(period);
     const id = Number(req.params.id);
-    const s = (await db.query(`SELECT id, name, login FROM staff WHERE id = $1 AND role = 'streamer'`, [id])).rows[0];
+    const s = (await db.query(`SELECT id, name, login FROM staff WHERE id = $1 AND (role = 'streamer' OR streams)`, [id])).rows[0];
     if (!s) return reply.code(404).send({ error: 'Стример не найден' });
     const adj = (await db.query(`SELECT a.id, a.kind, a.amount::float AS amount, a.comment, a.created_at, c.name AS by FROM staff_adjustments a LEFT JOIN staff c ON c.id = a.created_by WHERE a.staff_id = $1 AND a.period = $2 ORDER BY a.id`, [id, period])).rows;
     const pay = (await db.query(`SELECT id, kind, amount::float AS amount, note, created_at FROM staff_payouts WHERE staff_id = $1 AND period = $2 ORDER BY id`, [id, period])).rows;
@@ -684,7 +690,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     const amount = Math.abs(Number(b.amount));
     if (!kind || !Number.isFinite(amount) || amount <= 0 || amount > 100000) return reply.code(400).send({ error: 'Укажите тип и сумму' });
     const sid = Number(b.staff_id);
-    if (!(await db.query(`SELECT 1 FROM staff WHERE id = $1 AND role = 'streamer'`, [sid])).rowCount) return reply.code(404).send({ error: 'Стример не найден' });
+    if (!(await db.query(`SELECT 1 FROM staff WHERE id = $1 AND (role = 'streamer' OR streams)`, [sid])).rowCount) return reply.code(404).send({ error: 'Стример не найден' });
     const period = PERIOD.test(String(b.period)) ? String(b.period) : await currentPeriod();
     if (await isClosed(period)) return reply.code(409).send({ error: 'Месяц закрыт, бонусы и штрафы менять нельзя. Откройте месяц заново в Бухгалтерии.' });
     await db.query('INSERT INTO staff_adjustments (staff_id, period, kind, amount, comment, created_by) VALUES ($1,$2,$3,$4,$5,$6)', [sid, period, kind, amount, str(b.comment, 500) || null, req.staff!.id]);
@@ -717,7 +723,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     const amount = Number(b.amount);
     const sid = Number(b.staff_id);
     if (!Number.isFinite(amount) || amount <= 0 || amount > 1e6) return reply.code(400).send({ error: 'Укажите сумму выплаты' });
-    if (!(await db.query(`SELECT 1 FROM staff WHERE id = $1 AND role = 'streamer'`, [sid])).rowCount) return reply.code(404).send({ error: 'Стример не найден' });
+    if (!(await db.query(`SELECT 1 FROM staff WHERE id = $1 AND (role = 'streamer' OR streams)`, [sid])).rowCount) return reply.code(404).send({ error: 'Стример не найден' });
     const period = PERIOD.test(String(b.period)) ? String(b.period) : await currentPeriod();
     await db.query('INSERT INTO staff_payouts (staff_id, period, kind, amount, note, created_by) VALUES ($1,$2,$3,$4,$5,$6)', [sid, period, kind, amount, str(b.note, 300) || null, req.staff!.id]);
     return { ok: true };
@@ -888,7 +894,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     // Где должны быть сегодня: доля прошедших дней периода
     const pace = ref >= to ? 1 : Math.max(0, Math.min(1, (daysBetween(from, ref) + 1) / rangeDays));
 
-    const staffRows = (await db.query(`SELECT id, name, login, tg_username, active FROM staff WHERE role = 'streamer' ORDER BY id`)).rows as { id: number; name: string; login: string; tg_username: string | null; active: boolean }[];
+    const staffRows = (await db.query(`SELECT id, name, login, tg_username, active FROM staff WHERE (role = 'streamer' OR streams) ORDER BY id`)).rows as { id: number; name: string; login: string; tg_username: string | null; active: boolean }[];
     const ids = staffRows.map((s) => s.id);
 
     const evRange = await aggEvents(from, to);
@@ -1075,7 +1081,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     const details = str(b.details, 2000) || null;
     const due = DATE.test(String(b.due)) ? String(b.due) : null;
     let ids: number[] = [];
-    if (b.all_streamers) ids = (await db.query(`SELECT id FROM staff WHERE role = 'streamer' AND active`)).rows.map((r: any) => r.id);
+    if (b.all_streamers) ids = (await db.query(`SELECT id FROM staff WHERE (role = 'streamer' OR streams) AND active`)).rows.map((r: any) => r.id);
     else if (Array.isArray(b.staff_ids)) ids = b.staff_ids.map(Number).filter((n: number) => Number.isInteger(n) && n > 0);
     if (!ids.length) return reply.code(400).send({ error: 'Выберите, кому поставить задачу' });
     const ok = (await db.query(`SELECT id FROM staff WHERE id = ANY($1::int[]) AND active AND role <> 'admin'`, [ids])).rows.map((r: any) => r.id);
@@ -1161,7 +1167,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     const shiftMin = plan.shiftH * 60;
 
     // Коллеги: имена, часы за месяц и эфир, без денег и без карточек
-    const colRows = (await db.query(`SELECT id, name FROM staff WHERE role = 'streamer' AND active AND id <> $1 ORDER BY id`, [me.id])).rows as { id: number; name: string }[];
+    const colRows = (await db.query(`SELECT id, name FROM staff WHERE (role = 'streamer' OR streams) AND active AND id <> $1 ORDER BY id`, [me.id])).rows as { id: number; name: string }[];
     const liveBy = new Map(((await db.query(`SELECT DISTINCT ON (staff_id) staff_id, started_at, stream_url FROM shift_reports WHERE status = 'live' ORDER BY staff_id, id DESC`)).rows as any[]).map((r) => [r.staff_id, r]));
     const lastBy = new Map(((await db.query(`SELECT DISTINCT ON (staff_id) staff_id, ended_at, coalesce(approved_min, declared_min) AS m FROM shift_reports WHERE status <> 'live' AND ended_at IS NOT NULL ORDER BY staff_id, ended_at DESC`)).rows as any[]).map((r) => [r.staff_id, r]));
     const hoursBy = new Map(((await db.query(`SELECT staff_id, coalesce(sum(approved_min), 0)::int AS m FROM shift_reports WHERE status = 'approved' AND to_char(day, 'YYYY-MM') = $1 GROUP BY staff_id`, [refMonth])).rows as any[]).map((r) => [r.staff_id, r.m]));

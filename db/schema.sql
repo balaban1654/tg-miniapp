@@ -135,6 +135,8 @@ ALTER TABLE messages ADD COLUMN IF NOT EXISTS file_name TEXT;
 -- Начало эфира, которое стример указал в отчёте (по Киеву, хранится как момент времени)
 -- Админ закрыл чат: он скрыт из списка, пока клиент не напишет снова
 ALTER TABLE leads ADD COLUMN IF NOT EXISTS chat_closed_at TIMESTAMPTZ;
+-- Сотрудник (админ) тоже стримит: смены, отчёты, часы и зарплата считаются как у стримера
+ALTER TABLE staff ADD COLUMN IF NOT EXISTS streams BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE shift_reports ADD COLUMN IF NOT EXISTS declared_start TIMESTAMPTZ;
 -- 'await': смену закрыл админ без отчёта, данные должен внести сам стример
 ALTER TABLE shift_reports DROP CONSTRAINT IF EXISTS shift_reports_status_check;
