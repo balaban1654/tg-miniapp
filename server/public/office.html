@@ -1155,6 +1155,12 @@ async function staffTeam(){
       el('option',{value:''},'Без тимлидера'),...leads.map(s=>el('option',{value:s.id},s.name)));
     sel.value=r.parent_id||'';return el('td',{},sel);
   };
+  // 2FA: у кого подключена, там кнопка «Сбросить» (сотрудник войдёт и настроит заново), у кого нет, прочерк
+  const tfaCell=r=>{
+    if(!r.totp)return el('td',{},el('span',{class:'mut'},'—'));
+    if(r.id===me.id)return el('td',{},el('span',{class:'pill p-ok',title:'Свою 2FA админ сбрасывает через сервер'},'включена'));
+    return el('td',{},el('button',{class:'btn o s',type:'button',title:'Сбросить 2FA: сотрудник выйдет из кабинета и настроит её заново',onclick:async()=>{if(!confirm('Сбросить 2FA у '+r.name+'? Он выйдет из кабинета и при входе настроит её заново.'))return;try{await api('/staff/'+r.id+'/2fa/reset',{method:'POST'});toast('2FA сброшена: '+r.name);render()}catch(x){toast(x.message)}}},'Сбросить'));
+  };
   const toggle=r=>isAdmin&&r.id!==me.id?el('button',{class:'btn o s',type:'button',onclick:async()=>{await api('/staff/'+r.id,{method:'PATCH',body:{active:!r.active}});render()}},r.active?'Отключить':'Включить'):'';
   const pickP=el('select',{},...rows.filter(s=>['admin','streamer','teamlead','buyer'].includes(s.role)).map(s=>el('option',{value:s.id},s.name+' · '+ROLE[s.role])));
   const po={t:el('input',{placeholder:'daria_manager',maxlength:'40'}),c:el('input',{placeholder:'daria'}),p:el('input',{placeholder:'LIO669'}),l:el('input',{placeholder:'https://…/register?…&ac=daria&cid=…'}),r:el('input',{placeholder:'https://… (необязательно)'})};
@@ -1168,7 +1174,7 @@ async function staffTeam(){
     el('label',{style:'grid-column:1/-1'},'Ссылка регистрации (WW)',po.l),el('label',{style:'grid-column:1/-1'},'Ссылка регистрации (RU)',po.r),
     el('button',{class:'btn',type:'submit'},'Сохранить'),perr):el('span');
   return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},isAdmin?'Сотрудники':'Моя команда')),form,poForm,
-    ctrT(table(['Имя','Логин',...(isAdmin?['Пароль']:[]),'Роль','Тимлидер','Кампания PO','Промокод','Статус',''],rows.map(r=>[el('td',{},el('span',{class:'cp'},r.name,isAdmin?el('button',{type:'button',title:'Карточка сотрудника','aria-label':'Карточка сотрудника',onclick:()=>openStaffCard(r.id)},svgIcon(PERSON)):null)),td(r.login),...(isAdmin?[pwCell(r)]:[]),el('td',{},el('span',{class:'pill p-pur'},ROLE[r.role])),parentCell(r),td(r.po_campaign||'—'),td(r.po_promo||'—'),el('td',{},el('span',{class:'pill '+(r.active?'p-ok':'p-bad')},r.active?'активен':'отключён')),el('td',{},toggle(r))]),'Пока никого нет.'))];
+    ctrT(table(['Имя','Логин',...(isAdmin?['Пароль','2FA']:[]),'Роль','Тимлидер','Кампания PO','Промокод','Статус',''],rows.map(r=>[el('td',{},el('span',{class:'cp'},r.name,isAdmin?el('button',{type:'button',title:'Карточка сотрудника','aria-label':'Карточка сотрудника',onclick:()=>openStaffCard(r.id)},svgIcon(PERSON)):null)),td(r.login),...(isAdmin?[pwCell(r),tfaCell(r)]:[]),el('td',{},el('span',{class:'pill p-pur'},ROLE[r.role])),parentCell(r),td(r.po_campaign||'—'),td(r.po_promo||'—'),el('td',{},el('span',{class:'pill '+(r.active?'p-ok':'p-bad')},r.active?'активен':'отключён')),el('td',{},toggle(r))]),'Пока никого нет.'))];
 }
 
 const ctrT=t=>{t.classList.add('ctr');return t};
