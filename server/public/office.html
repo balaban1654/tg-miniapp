@@ -897,6 +897,41 @@ function dxModal(btn,s,d,skew,mode){
 }
 function dxGo(t,sub,period){tab=t;if(period&&t==='acc')accState.period=period;if(sub&&t==='acc')accState.tab=sub;if(sub&&t==='plans')plansState.tab=sub;showApp()}
 
+
+/* Копирование воронки картинкой: model={ctr,rtd,stages:[{name,total,segs:[{t,w,c}]}],note} */
+function dxFunnelCopy(model){
+  const b=el('button',{type:'button',class:'dx-ib sm2 dx-rcopy',title:'Скопировать картинкой','aria-label':'Скопировать воронку картинкой'});b.append(svgIcon(IC_COPY,18));
+  const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const draw=()=>{
+    const W=1000,P=50,ff='Montserrat, system-ui, sans-serif',BH=64;
+    const lines=model.note?Math.ceil(model.note.length/62):0;
+    const H=P*2+70+model.stages.length*(46+BH+34)+(lines?lines*36+10:0);
+    const c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d');
+    x.fillStyle=css('--card2')||'#251847';x.fillRect(0,0,W,H);
+    x.textBaseline='middle';x.textAlign='left';let y=P+20;
+    x.font='700 44px '+ff;x.fillStyle=css('--acc2')||'#c9a6ff';
+    x.fillText('CTR: '+model.ctr,P,y);const w1=x.measureText('CTR: '+model.ctr+'     ').width;x.fillText('RTD: '+model.rtd,P+w1,y);
+    y+=70;
+    for(const st of model.stages){
+      x.font='700 28px '+ff;x.fillStyle=css('--mut')||'#a89cc8';x.fillText(st.name.toUpperCase(),P,y);
+      x.textAlign='right';x.font='700 36px '+ff;x.fillStyle=css('--fg')||'#fff';x.fillText(st.total,W-P,y);x.textAlign='left';
+      y+=46;
+      const tot=st.segs.reduce((a,g)=>a+g.w,0),avail=W-P*2-(st.segs.length-1)*4;let px=P;
+      if(!st.segs.length){x.fillStyle='#ffffff1a';x.beginPath();x.roundRect(P,y,W-P*2,BH,12);x.fill();x.fillStyle=css('--mut')||'#a89cc8';x.font='700 26px '+ff;x.fillText('нет данных',P+20,y+BH/2+2)}
+      st.segs.forEach((g,i)=>{const w=avail*g.w/tot;x.fillStyle=g.c;x.beginPath();x.roundRect(px,y,w,BH,[i===0?12:6,i===st.segs.length-1?12:6,i===st.segs.length-1?12:6,i===0?12:6]);x.fill();
+        x.save();x.beginPath();x.rect(px,y,w,BH);x.clip();x.fillStyle='#0d0817';let fs=26;x.font='700 '+fs+'px '+ff;while(fs>16&&x.measureText(g.t).width>w-20){fs-=2;x.font='700 '+fs+'px '+ff}x.fillText(g.t,px+10,y+BH/2+2);x.restore();px+=w+4});
+      y+=BH+34;
+    }
+    if(model.note){x.fillStyle=css('--mut')||'#a89cc8';x.font='500 26px '+ff;const words=model.note.split(' ');let ln='';
+      for(const w of words){if((ln+' '+w).length>62){x.fillText(ln,P,y);y+=36;ln=w}else ln=ln?ln+' '+w:w}x.fillText(ln,P,y)}
+    return c;
+  };
+  b.onclick=async e=>{e.stopPropagation();
+    try{const c=draw();const blob=await new Promise(r=>c.toBlob(r,'image/png'));
+      await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]);toast('Картинка скопирована, можно вставлять в чат')}
+    catch(err){toast('Не удалось скопировать картинку: браузер не разрешил доступ к буферу')}};
+  return b;
+}
 function dxColorOf(d){const ids=d.streamers.map(s=>s.id).sort((a,b)=>a-b);return id=>DXC[ids.indexOf(id)%DXC.length]}
 function dxFunnel(d){
   const C=dxColorOf(d),t=d.totals;
@@ -904,7 +939,8 @@ function dxFunnel(d){
   const ctr=t.clicks?t.regs/t.clicks*100:null,rtd=t.regs?t.ftd/t.regs*100:null;
   const pc=v=>v===null?'—':v.toFixed(1).replace('.',',')+'%';
   const note=!d.range.all&&d.clicksSince&&d.range.from<d.clicksSince?el('div',{class:'mut sm'},'Клики считаются с '+dmy(d.clicksSince)+': раньше их время не записывалось.'):null;
-  return[el('div',{class:'dx-fk'},el('b',{title:'Из клика в регистрацию'},'CTR: '+pc(ctr)),el('b',{title:'Из регистрации в депозит'},'RTD: '+pc(rtd))),
+  const model={ctr:pc(ctr),rtd:pc(rtd),note:note?note.textContent:'',stages:stages.map(([n,k])=>({name:n,total:n0(t[k]),segs:d.streamers.filter(s=>s.range[k]>0).map(s=>({t:s.name+' '+n0(s.range[k]),w:s.range[k],c:C(s.id)}))}))};
+  return[dxFunnelCopy(model),el('div',{class:'dx-fk'},el('b',{title:'Из клика в регистрацию'},'CTR: '+pc(ctr)),el('b',{title:'Из регистрации в депозит'},'RTD: '+pc(rtd))),
     ...stages.map(([n,k])=>{
       const rows=d.streamers.filter(s=>s.range[k]>0);
       return el('div',{class:'dx-fs'},el('div',{class:'dx-fsh'},el('span',{class:'dx-lbl'},n),el('b',{},n0(t[k]))),
@@ -1120,7 +1156,8 @@ function smFunnel(d){
   const f=d.funnel,ctr=f.clicks?f.regs/f.clicks*100:null,rtd=f.regs?f.ftd/f.regs*100:null,pc=v=>v===null?'—':v.toFixed(1).replace('.',',')+'%';
   const stages=[['Клики',f.clicks],['Регистрации',f.regs],['FTD',f.ftd]];
   const note=d.clicksSince&&d.range.from<d.clicksSince?el('div',{class:'mut sm'},'Клики считаются с '+dmy(d.clicksSince)+': раньше их время не записывалось.'):null;
-  return[el('div',{class:'dx-fk'},el('b',{title:'Из клика в регистрацию'},'CTR: '+pc(ctr)),el('b',{title:'Из регистрации в депозит'},'RTD: '+pc(rtd))),
+  const model={ctr:pc(ctr),rtd:pc(rtd),note:note?note.textContent:'',stages:stages.map(([n,v])=>({name:n,total:n0(v),segs:v>0?[{t:n+' '+n0(v),w:v,c:getComputedStyle(document.documentElement).getPropertyValue('--acc').trim()||'#9b5cff'}]:[]}))};
+  return[dxFunnelCopy(model),el('div',{class:'dx-fk'},el('b',{title:'Из клика в регистрацию'},'CTR: '+pc(ctr)),el('b',{title:'Из регистрации в депозит'},'RTD: '+pc(rtd))),
     ...stages.map(([n,v])=>el('div',{class:'dx-fs'},el('div',{class:'dx-fsh'},el('span',{class:'dx-lbl'},n),el('b',{},n0(v))),el('div',{class:'dx-seg2'},el('span',{style:'flex:1;background:var(--acc)'},n0(v))))),note].filter(Boolean);
 }
 /** Кольца стримера: как у админа, общий план команды (депозиты и FTD всей команды за месяц) */
