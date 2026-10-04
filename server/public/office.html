@@ -938,7 +938,7 @@ function smTasks(d){
     items.push(el('button',{type:'button',class:'dx-tk',title:done?'Вернуть в работу':'Отметить выполненной',onclick:async()=>{try{await api('/tasks/'+t.id+(done?'/undo':'/done'),{method:'POST'});toast(done?'Задача снова в работе':'Задача отправлена на проверку');render({soft:true});setTasksBadge()}catch(x){toast(x.message)}}},
       el('span',{class:'dx-ic '+(done?'ok':'a')},svgIcon(IC_CHECK,18)),el('span',{class:'dx-tx'},el('span',{class:'tt',style:done?'text-decoration:line-through;color:var(--mut)':''},t.title),el('span',{class:'ts',style:over?'color:var(--bad)':''},sub))));
   });
-  return el('div',{class:'card dx-tasks'},el('div',{class:'dx-lbl'},'Мои задачи'),el('div',{class:'dx-tl'},...(items.length?items:[el('div',{class:'dx-ok'},'Задач нет. Отличная работа')])));
+  return el('div',{class:'card dx-tasks'},el('div',{class:'dx-lbl'},'Требует внимания'),el('div',{class:'dx-tl'},...(items.length?items:[el('div',{class:'dx-ok'},'Всё в порядке. Отличная работа')])));
 }
 function smLast(d){
   const cols=['Дата','Время','Статус',...d.fields];
