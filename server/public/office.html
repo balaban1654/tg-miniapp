@@ -1301,6 +1301,12 @@ function pwCell(r){
 }
 const EYE='<path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/>';
 const EYEOFF='<path d="M17.9 17.9A10.9 10.9 0 0112 19C5 19 1 12 1 12a18 18 0 015.1-5.9M9.9 5.2A10.9 10.9 0 0112 5c7 0 11 7 11 7a18 18 0 01-2.2 3.2"/><path d="M1 1l22 22"/>';
+/** Значок «скопировать» после текста: копирует строку, на секунду становится галочкой */
+function copyIconBtn(text,msg='Скопировано'){
+  const b=el('button',{type:'button',class:'cp-btn',title:'Скопировать','aria-label':'Скопировать',style:'background:none;border:0;color:var(--mut);cursor:pointer;padding:2px 4px;margin-left:6px;vertical-align:middle'},svgIcon(COPYI,15));
+  b.addEventListener('click',async()=>{try{await navigator.clipboard.writeText(String(text));b.replaceChildren(svgIcon('<path d="M5 12.5l4.5 4.5L19 7.5"/>',15));b.style.color='var(--ok)';toast(msg)}catch{toast('Выделите и скопируйте вручную')}setTimeout(()=>{b.replaceChildren(svgIcon(COPYI,15));b.style.color=''},1500)});
+  return b;
+}
 const COPYI='<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 01-1-1V4a1 1 0 011-1h10a1 1 0 011 1v1"/>';
 const KEYI='<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/>';
 const DW_H=40;
@@ -1782,7 +1788,7 @@ async function accPay(){
   const advBox=advs.length?el('div',{class:'card',style:'display:grid;gap:8px;border-color:var(--acc)'},el('h4',{},'Запросы аванса'),...advs.map(a=>el('div',{class:'inl',style:'justify-content:space-between'},
     el('div',{},el('b',{},a.staff_name+' запросил '+usd2(a.amount)),el('div',{class:'mut sm'},perLabel(a.period))),
     el('div',{class:'inl'},el('button',{class:'btn s',type:'button',onclick:async()=>{try{await api('/advances/'+a.id+'/decide',{method:'POST',body:{action:'pay'}});toast('Аванс записан как выплаченный');accRefresh()}catch(x){toast(x.message)}}},'Выплатил'),el('button',{class:'btn o s',type:'button',onclick:async()=>{try{await api('/advances/'+a.id+'/decide',{method:'POST',body:{action:'reject'}});accRefresh()}catch(x){toast(x.message)}}},'Отклонить'))))):null;
-  const rows=sum.rows.map((r,i)=>{const c=cards[i]||{};return[td(r.staff.name),td(usd2(r.kpi.total),'n'),td(r.kpi.paid?usd2(r.kpi.paid):'—','n'),el('td',{class:'n'},el('b',{},usd2(r.kpi.due))),td(c.payout_method||'не указано'),el('td',{class:'mono sm'},c.payout_wallet||el('span',{class:'mut'},'нет реквизитов'))]});
+  const rows=sum.rows.map((r,i)=>{const c=cards[i]||{};return[td(r.staff.name),td(usd2(r.kpi.total),'n'),td(r.kpi.paid?usd2(r.kpi.paid):'—','n'),el('td',{class:'n'},el('b',{},usd2(r.kpi.due))),td(c.payout_method||'не указано'),el('td',{class:'mono sm'},c.payout_wallet?[c.payout_wallet,copyIconBtn(c.payout_wallet,'Реквизиты скопированы')]:el('span',{class:'mut'},'нет реквизитов'))]});
   const who=el('select',{},...st.map(s=>el('option',{value:s.id},s.name)));
   const kind=el('select',{},el('option',{value:'final'},'Итоговая выплата'),el('option',{value:'advance'},'Аванс (вручную)'),el('option',{value:'extra'},'Доплата'));
   const amount=el('input',{type:'number',min:'0',step:'0.01',placeholder:'Сумма, $'});
