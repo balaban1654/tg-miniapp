@@ -956,6 +956,70 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     return { ok: true };
   });
 
+  // Импорт выгрузки постбеков из партнёрки (CSV «postbacks_logs»). Берём только строки, отправленные на наш /postback/*:
+  // остальные адреса в выгрузке (старый бот, make.com) дублируют те же события. Уже принятые не задваиваются
+  app.post('/postbacks/import', { preHandler: need('admin') }, async (req, reply) => {
+    const text = String(((req.body ?? {}) as any).csv ?? '').replace(/^\uFEFF/, '');
+    if (!text.trim()) return reply.code(400).send({ error: 'Файл пустой' });
+    if (!config.postbackSecret || config.postbackSecret.length < 16) return reply.code(500).send({ error: 'На сервере не задан POSTBACK_SECRET (от 16 символов)' });
+    const table: string[][] = [];
+    {
+      let row: string[] = [], cur = '', q = false;
+      for (let i = 0; i < text.length; i++) {
+        const ch = text[i];
+        if (q) {
+          if (ch === '"') { if (text[i + 1] === '"') { cur += '"'; i++; } else q = false; } else cur += ch;
+        } else if (ch === '"') q = true;
+        else if (ch === ',') { row.push(cur); cur = ''; }
+        else if (ch === '\n' || ch === '\r') { if (ch === '\r' && text[i + 1] === '\n') i++; row.push(cur); cur = ''; if (row.some((x) => x.trim())) table.push(row); row = []; }
+        else cur += ch;
+      }
+      row.push(cur); if (row.some((x) => x.trim())) table.push(row);
+    }
+    const head = (table.shift() ?? []).map((x) => x.trim().toLowerCase());
+    const iUrl = head.indexOf('url');
+    if (iUrl < 0) return reply.code(400).send({ error: 'Это не выгрузка постбеков: нет колонки URL' });
+    if (table.length > 5000) return reply.code(400).send({ error: 'Слишком много строк (больше 5000)' });
+    const out = { total: 0, added: 0, exists: 0, unknown: 0, errors: 0, unknownIds: [] as string[] };
+    for (const r of table) {
+      let u: URL;
+      try { u = new URL(r[iUrl]); } catch { continue; }
+      const m = /^\/postback\/(reg|ftd|dep|wd|comm)$/.exec(u.pathname);
+      if (!m) continue;
+      out.total++;
+      const event = m[1];
+      const qp = u.searchParams;
+      const dt = (qp.get('date_time') ?? '').trim();
+      const trader = (qp.get('trader_id') ?? '').trim();
+      // уже принятый нашим сервером тот же постбек
+      if (dt && trader && (await db.query(`SELECT 1 FROM postback_log WHERE event = $1 AND query->>'trader_id' = $2 AND query->>'date_time' = $3 AND (result = 'ok' OR result LIKE 'дубль%') LIMIT 1`, [event, trader, dt])).rowCount) { out.exists++; continue; }
+      const amount = qp.get('sumdep') ?? qp.get('commission') ?? qp.get('wdr_sum') ?? '';
+      // то же событие уже есть в базе (журнал могли очистить): первое по типу, либо та же сумма в пределах нескольких минут
+      const known = (await db.query('SELECT tg_id FROM leads WHERE trader_id = $1 LIMIT 1', [trader])).rows[0];
+      if (known && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(dt)) {
+        const dup = event === 'reg' || event === 'ftd'
+          ? await db.query('SELECT 1 FROM events WHERE tg_id = $1 AND type = $2 LIMIT 1', [known.tg_id, event])
+          : await db.query(`SELECT 1 FROM events WHERE tg_id = $1 AND type = $2 AND amount = $3::numeric AND abs(extract(epoch FROM created_at - ($4::timestamp AT TIME ZONE 'Etc/GMT-2'))) < 600 LIMIT 1`, [known.tg_id, event, Number(amount) || 0, dt]);
+        if (dup.rowCount) { out.exists++; continue; }
+      }
+      const tx = 'imp-' + createHash('sha1').update([event, trader, dt, amount].join('|')).digest('hex').slice(0, 16);
+      const q = new URLSearchParams({ secret: config.postbackSecret, txid: tx, imported: '1' });
+      for (const [k, v] of qp) if (k !== 'secret' && k !== 'txid' && v !== '') q.set(k, v);
+      const res = await app.inject({ method: 'GET', url: `/postback/${event}?${q.toString()}` });
+      const o = res.json() as { ok?: boolean; ignored?: boolean; duplicate?: boolean };
+      if (!o.ok) { out.errors++; continue; }
+      if (o.ignored) { out.unknown++; if (trader && !out.unknownIds.includes(trader)) out.unknownIds.push(trader); continue; }
+      if (o.duplicate) { out.exists++; continue; }
+      out.added++;
+      if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(dt)) {
+        // время в выгрузке партнёрки: UTC+2
+        const ev = await db.query(`UPDATE events SET created_at = ($2::timestamp AT TIME ZONE 'Etc/GMT-2') WHERE external_id = $1 RETURNING id`, [`${event}:${tx}`, dt]);
+        if (ev.rowCount) await db.query(`UPDATE postback_log SET created_at = ($2::timestamp AT TIME ZONE 'Etc/GMT-2') WHERE event_id = $1`, [ev.rows[0].id, dt]);
+      }
+    }
+    return { ok: true, ...out, unknownIds: out.unknownIds.slice(0, 200) };
+  });
+
   // Удаление одного постбека: запись журнала, а с флагом with_event ещё и событие (депозит/комиссия) из базы
   app.delete<{ Params: { id: string }; Querystring: { with_event?: string } }>('/postbacks/:id', { preHandler: need('admin') }, async (req, reply) => {
     const id = Number(req.params.id);

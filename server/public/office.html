@@ -89,6 +89,7 @@ html{background:#0a0613}
 .shot-w{position:relative;display:inline-block}.shot-w img{display:block;max-height:140px;max-width:100%;border-radius:10px}.shot-del{position:absolute;top:6px;right:6px;width:30px;height:30px;border-radius:8px;border:0;background:#000a;color:#fff;display:grid;place-items:center;cursor:pointer}.shot-del:hover{background:var(--bad,#e5484d)}
 .auto-acc{cursor:default;pointer-events:none}
 .sum-row td{border-top:2px solid var(--acc);background:#9b5cff14;font-weight:700}
+.pb-drop{flex:1;display:flex;align-items:center;justify-content:center;min-width:0;padding:10px 12px;font-size:12px}.pb-drop.busy{opacity:.6}.pb-clip{padding:0 12px;display:grid;place-items:center}
 .drop-row{display:flex;gap:8px;align-items:stretch}.drop-row .drop2{flex:1;width:auto}.drop-paste{padding:0 14px;display:grid;place-items:center}.drop2.over{background:#9b5cff33;border-style:solid}
 .drop2{border:1.5px dashed var(--acc);border-radius:12px;padding:14px;text-align:center;color:var(--acc2);background:#9b5cff10;font-weight:600;font-size:13px;cursor:pointer;width:100%}
 .mon2{display:flex;gap:6px;align-items:center}.mon2 button{background:var(--card);border:1px solid var(--line);color:var(--fg);border-radius:9px;width:32px;height:32px;cursor:pointer}.mon2 b{min-width:140px;text-align:center}
@@ -2705,13 +2706,40 @@ function pbManualDialog(done){
       close();toast('Постбек добавлен');done()}
     catch(x){err.textContent=x.message;send.disabled=false}}},'Добавить');
   ev.onchange=()=>{amount.parentElement.style.display=ev.value==='reg'?'none':''};
+  // Загрузка выгрузки постбеков из партнёрки (CSV): перетащить в окно или выбрать файл скрепкой
+  const res=el('div',{class:'sm',style:'display:grid;gap:4px'});
+  const file=el('input',{type:'file',accept:'.csv,text/csv',style:'display:none'});
+  const drop=el('div',{class:'drop2 pb-drop',role:'button',tabindex:'0',title:'Перетащите CSV-выгрузку постбеков'},'Перетащите сюда файл выгрузки (CSV)');
+  const clip=el('button',{class:'btn o pb-clip',type:'button',title:'Выбрать файл','aria-label':'Выбрать файл выгрузки'},svgIcon('<path d="M21 11.5l-8.6 8.6a5 5 0 0 1-7.1-7.1l9-9a3.3 3.3 0 0 1 4.7 4.7l-9 9a1.7 1.7 0 0 1-2.4-2.4l8.3-8.3"/>',18));
+  const dropWrap=el('div',{style:'display:flex;gap:8px;align-items:stretch;flex:1;min-width:0'},drop,clip,file);
+  const load=async f=>{
+    if(!f)return;err.textContent='';res.replaceChildren();
+    if(!/\.csv$/i.test(f.name)){err.textContent='Нужен файл CSV. Если у вас Excel, сохраните таблицу как CSV';return}
+    if(f.size>8*1024*1024){err.textContent='Файл больше 8 МБ';return}
+    drop.textContent='Загружаю: '+f.name+'…';drop.classList.add('busy');
+    try{
+      const r=await api('/postbacks/import',{method:'POST',body:{csv:await f.text()}});
+      drop.textContent='Готово: '+f.name;
+      res.replaceChildren(...[el('div',{},'Постбеков на наш адрес в файле: ',el('b',{},String(r.total))),
+        el('div',{style:'color:var(--ok)'},'Добавлено: '+r.added),
+        el('div',{class:'mut'},'Уже были в базе: '+r.exists),
+        r.unknown?el('div',{style:'color:var(--warn)'},'Клиент не из бота (Pocket ID не привязан ни к одному лиду): '+r.unknown+(r.unknownIds.length?' · '+r.unknownIds.slice(0,12).join(', ')+(r.unknownIds.length>12?'…':''):'')):null,
+        r.errors?el('div',{style:'color:var(--bad)'},'Ошибок: '+r.errors):null].filter(Boolean));
+      if(r.added)done();
+    }catch(x){drop.textContent='Перетащите сюда файл выгрузки (CSV)';err.textContent=x.message}
+    drop.classList.remove('busy');file.value='';
+  };
+  file.onchange=()=>load(file.files[0]);clip.onclick=()=>file.click();drop.onclick=()=>file.click();
+  ['dragenter','dragover'].forEach(n=>ov.addEventListener(n,e=>{e.preventDefault();drop.classList.add('over')}));
+  ov.addEventListener('dragleave',e=>{if(e.target===ov)drop.classList.remove('over')});
+  ov.addEventListener('drop',e=>{e.preventDefault();drop.classList.remove('over');load([...(e.dataTransfer?.files||[])][0])});
   ov.append(el('div',{class:'lc',style:'width:min(560px,100%)'},
     el('div',{class:'lc-head'},el('h3',{style:'font-size:18px'},'Добавить постбек вручную'),el('button',{class:'btn o s',type:'button','aria-label':'Закрыть',onclick:close},'✕')),
     el('div',{class:'mut sm'},'Для событий, которые уже пришли в партнёрке, но не дошли до нас. Обрабатывается так же, как настоящий постбек: лид получит статус и доступ, деньги попадут в статистику.'),
     el('div',{class:'lc-two'},el('div',{class:'lc-field'},el('label',{},'Событие'),ev),el('div',{class:'lc-field'},el('label',{},'Сумма, $'),amount),
       el('div',{class:'lc-field'},el('label',{},'Pocket ID'),pocket),el('div',{class:'lc-field'},el('label',{},'Telegram ID'),tg),
       el('div',{class:'lc-field'},el('label',{},'Дата'),day),el('div',{class:'lc-field'},el('label',{},'Время'),tm)),
-    err,el('div',{class:'lc-actions'},send)));
+    err,res,el('div',{style:'display:flex;gap:12px;align-items:stretch;justify-content:space-between'},dropWrap,send)));
   document.body.append(ov);
 }
 function pbDeleteDialog(r,done){
