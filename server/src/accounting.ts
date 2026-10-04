@@ -107,7 +107,7 @@ async function kpiCompute(staffId: number, period: string, plan: KpiPlan): Promi
       `SELECT coalesce(e.amount, 0)::float AS amount,
               to_char((e.created_at AT TIME ZONE '${TZ}') - ($3 || ' hours')::interval, 'YYYY-MM-DD') AS dkey
          FROM events e JOIN leads d ON d.tg_id = e.tg_id
-        WHERE d.owner_id = $1 AND e.type = 'ftd' AND to_char(e.created_at AT TIME ZONE '${TZ}', 'YYYY-MM') = $2`,
+        WHERE d.owner_id = $1 AND d.lead_role = 'lead' AND e.type = 'ftd' AND to_char(e.created_at AT TIME ZONE '${TZ}', 'YYYY-MM') = $2`,
       [staffId, period, String(plan.day.cutoffH)],
     )
   ).rows as { amount: number; dkey: string }[];
@@ -786,7 +786,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
       await db.query(
         `SELECT d.owner_id, e.type, count(*)::int AS n, coalesce(sum(e.amount), 0)::float AS s
            FROM events e JOIN leads d ON d.tg_id = e.tg_id
-          WHERE d.owner_id IS NOT NULL AND e.type IN ('reg','ftd','dep','comm')
+          WHERE d.owner_id IS NOT NULL AND d.lead_role = 'lead' AND e.type IN ('reg','ftd','dep','comm')
             AND (e.created_at AT TIME ZONE '${TZ}')::date BETWEEN $1::date AND $2::date
           GROUP BY d.owner_id, e.type`,
         [from, to],

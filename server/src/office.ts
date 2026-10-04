@@ -273,7 +273,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     }
     const TZ = 'Europe/Kyiv';
     const leads = await db.query(
-      `SELECT status, count(*)::int AS n FROM leads WHERE ${ownerScope(me, 'owner_id')}
+      `SELECT status, count(*)::int AS n FROM leads WHERE lead_role = 'lead' AND ${ownerScope(me, 'owner_id')}
          ${range ? `AND (created_at AT TIME ZONE '${TZ}')::date BETWEEN $1::date AND $2::date` : ''} GROUP BY status`,
       (range ?? []) as string[],
     );
@@ -287,7 +287,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     const money = await db.query(
       `SELECT e.type, coalesce(sum(e.amount),0)::float AS s
          FROM events e JOIN leads d ON d.tg_id = e.tg_id
-        WHERE e.type IN ('ftd','dep','wd','comm') AND ${ownerScope(me, 'd.owner_id')}
+        WHERE e.type IN ('ftd','dep','wd','comm') AND d.lead_role = 'lead' AND ${ownerScope(me, 'd.owner_id')}
           ${range ? `AND (e.created_at AT TIME ZONE '${TZ}')::date BETWEEN $1::date AND $2::date` : ''} GROUP BY e.type`,
       (range ?? []) as string[],
     );
@@ -430,14 +430,14 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     const DT = depTypes(me);
     const r = await db.query(
       `SELECT l.id, l.slug, l.source, l.campaign, l.clicks, l.created_at, s.name AS owner_name, l.owner_id,
-              (SELECT count(*)::int FROM leads d WHERE d.link_id = l.id) AS starts,
-              (SELECT count(*)::int FROM leads d WHERE d.link_id = l.id
+              (SELECT count(*)::int FROM leads d WHERE d.link_id = l.id AND d.lead_role = 'lead') AS starts,
+              (SELECT count(*)::int FROM leads d WHERE d.link_id = l.id AND d.lead_role = 'lead'
                  AND EXISTS (SELECT 1 FROM events e WHERE e.tg_id = d.tg_id AND e.type = 'reg')) AS regs,
-              (SELECT count(*)::int FROM leads d WHERE d.link_id = l.id AND d.status IN ('ftd','active')) AS ftds,
+              (SELECT count(*)::int FROM leads d WHERE d.link_id = l.id AND d.lead_role = 'lead' AND d.status IN ('ftd','active')) AS ftds,
               coalesce((SELECT sum(e.amount) FROM events e JOIN leads d ON d.tg_id = e.tg_id
-                 WHERE d.link_id = l.id AND e.type IN ${DT}),0)::float AS deposits,
+                 WHERE d.link_id = l.id AND d.lead_role = 'lead' AND e.type IN ${DT}),0)::float AS deposits,
               coalesce((SELECT sum(e.amount) FROM events e JOIN leads d ON d.tg_id = e.tg_id
-                 WHERE d.link_id = l.id AND e.type = 'comm' AND ${me.role === 'streamer' ? 'false' : 'true'}),0)::float AS commission
+                 WHERE d.link_id = l.id AND d.lead_role = 'lead' AND e.type = 'comm' AND ${me.role === 'streamer' ? 'false' : 'true'}),0)::float AS commission
          FROM links l JOIN staff s ON s.id = l.owner_id
         WHERE ${ownerScope(me, 'l.owner_id')} ORDER BY l.id DESC`,
     );
@@ -464,7 +464,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
               coalesce(sum((SELECT sum(e.amount) FROM events e WHERE e.tg_id = d.tg_id AND e.type IN ${DT})),0)::float AS deposits,
               coalesce(sum((SELECT sum(e.amount) FROM events e WHERE e.tg_id = d.tg_id AND e.type = 'comm' AND ${me.role === 'streamer' ? 'false' : 'true'})),0)::float AS commission
          FROM links l JOIN leads d ON d.link_id = l.id
-        WHERE ${ownerScope(me, 'l.owner_id')} GROUP BY 1`,
+        WHERE d.lead_role = 'lead' AND ${ownerScope(me, 'l.owner_id')} GROUP BY 1`,
     );
     const byS = new Map(res.rows.map((x) => [x.source, x]));
     const out = r.rows.map((x) => ({
@@ -1211,7 +1211,17 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
         ORDER BY d.created_at DESC LIMIT 300`,
       vals,
     );
-    return r.rows;
+    // Сотрудники в списке лидов: владелец и ссылка у них общие (создатель компании), деньги и результаты нулевые
+    const main = (
+      await db.query(
+        `SELECT s.id, s.name, (SELECT slug FROM links WHERE owner_id = s.id ORDER BY id LIMIT 1) AS slug
+           FROM staff s WHERE s.role = 'admin' ORDER BY (lower(s.login) = lower($1)) DESC, s.id LIMIT 1`,
+        [config.adminLogin ?? ''],
+      )
+    ).rows[0];
+    return r.rows.map((x) =>
+      x.lead_role && x.lead_role !== 'lead' ? { ...x, deposits: 0, commission: 0, owner_id: main?.id ?? x.owner_id, owner_name: main?.name ?? x.owner_name, link_slug: main?.slug ?? x.link_slug } : x,
+    );
   });
 
   await accountingRoutes(app, { need, str, num });
