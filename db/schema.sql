@@ -493,3 +493,6 @@ DO $$ BEGIN
     INSERT INTO app_flags (key) VALUES ('ftd_access_backfill');
   END IF;
 END $$;
+
+-- Связь записи журнала с событием: чтобы можно было удалить постбек вместе с деньгами
+ALTER TABLE postback_log ADD COLUMN IF NOT EXISTS event_id BIGINT;

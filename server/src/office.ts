@@ -920,10 +920,59 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     return r.rows;
   });
 
+  // Ручное добавление постбека (то, что уже пришло в партнёрке, но до нас не дошло). Идёт через тот же обработчик,
+  // что и настоящий постбек: доступ, статус лида и пуши отработают как обычно
+  app.post('/postbacks/manual', { preHandler: need('admin') }, async (req, reply) => {
+    const b = (req.body ?? {}) as Record<string, unknown>;
+    const event = str(b.event, 10);
+    if (!['reg', 'ftd', 'dep', 'wd', 'comm'].includes(event)) return reply.code(400).send({ error: 'Выберите событие' });
+    const pocket = str(b.pocket_id, 40);
+    const tg = str(b.tg_id, 20);
+    if (!pocket && !tg) return reply.code(400).send({ error: 'Укажите Pocket ID или Telegram ID' });
+    if (pocket && !/^[A-Za-z0-9_-]+$/.test(pocket)) return reply.code(400).send({ error: 'Pocket ID: только буквы, цифры, - и _' });
+    if (tg && !/^\d+$/.test(tg)) return reply.code(400).send({ error: 'Telegram ID: только цифры' });
+    const amount = Number(b.amount);
+    if (event !== 'reg' && !(amount > 0 && amount < 1e7)) return reply.code(400).send({ error: 'Укажите сумму' });
+    const when = str(b.when, 20);
+    if (when && !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(when)) return reply.code(400).send({ error: 'Неверная дата' });
+    if (!config.postbackSecret || config.postbackSecret.length < 16) return reply.code(500).send({ error: 'На сервере не задан POSTBACK_SECRET (от 16 символов)' });
+    const tx = 'manual-' + randomBytes(6).toString('hex');
+    const qs = new URLSearchParams({ secret: config.postbackSecret, txid: tx, manual: '1' });
+    if (pocket) qs.set('trader_id', pocket);
+    if (tg) qs.set('click_id', tg);
+    if (event !== 'reg') qs.set('amount', String(amount));
+    const res = await app.inject({ method: 'GET', url: `/postback/${event}?${qs.toString()}` });
+    const out = res.json() as { ok?: boolean; ignored?: boolean; duplicate?: boolean; reason?: string; error?: string };
+    if (!out.ok) return reply.code(400).send({ error: out.error || 'Не удалось добавить' });
+    if (out.ignored) return reply.code(404).send({ error: 'Клиент не найден: ' + (out.reason || '') });
+    if (out.duplicate) return reply.code(409).send({ error: 'Такое событие уже есть' });
+    if (when) {
+      const ev = await db.query(
+        `UPDATE events SET created_at = ($2::timestamp AT TIME ZONE 'Europe/Kyiv') WHERE external_id = $1 RETURNING id`,
+        [`${event}:${tx}`, when.replace('T', ' ')],
+      );
+      if (ev.rowCount) await db.query(`UPDATE postback_log SET created_at = ($2::timestamp AT TIME ZONE 'Europe/Kyiv') WHERE event_id = $1`, [ev.rows[0].id, when.replace('T', ' ')]);
+    }
+    return { ok: true };
+  });
+
+  // Удаление одного постбека: запись журнала, а с флагом with_event ещё и событие (депозит/комиссия) из базы
+  app.delete<{ Params: { id: string }; Querystring: { with_event?: string } }>('/postbacks/:id', { preHandler: need('admin') }, async (req, reply) => {
+    const id = Number(req.params.id);
+    const row = (await db.query('SELECT event_id FROM postback_log WHERE id = $1', [id])).rows[0];
+    if (!row) return reply.code(404).send({ error: 'Запись не найдена' });
+    let removedEvent = false;
+    if (req.query.with_event && row.event_id) {
+      removedEvent = ((await db.query('DELETE FROM events WHERE id = $1', [row.event_id])).rowCount ?? 0) > 0;
+    }
+    await db.query('DELETE FROM postback_log WHERE id = $1', [id]);
+    return { ok: true, removedEvent };
+  });
+
   // Журнал постбеков для админа
   app.get('/postbacks', { preHandler: need('admin') }, async () => {
     const r = await db.query(
-      `SELECT id, event, query, tg_id, result, created_at FROM postback_log ORDER BY id DESC LIMIT 100`,
+      `SELECT id, event, query, tg_id, result, created_at, event_id FROM postback_log ORDER BY created_at DESC, id DESC LIMIT 100`,
     );
     return r.rows;
   });

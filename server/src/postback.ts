@@ -23,13 +23,14 @@ function secretOk(given: string): boolean {
   return config.postbackSecret.length >= 16 && a.length === b.length && timingSafeEqual(a, b);
 }
 
-async function log(event: string, q: Record<string, string>, tgId: number | null, result: string) {
+async function log(event: string, q: Record<string, string>, tgId: number | null, result: string, eventId: number | null = null) {
   const { secret: _s, ...safe } = q;
-  await db.query('INSERT INTO postback_log (event, query, tg_id, result) VALUES ($1,$2,$3,$4)', [
+  await db.query('INSERT INTO postback_log (event, query, tg_id, result, event_id) VALUES ($1,$2,$3,$4,$5)', [
     event,
     JSON.stringify(safe),
     tgId,
     result,
+    eventId,
   ]);
 }
 
@@ -118,7 +119,7 @@ export async function postbackRoutes(app: FastifyInstance): Promise<void> {
 
     // Пуши по событию (например «Депозит получен») уходят сразу. Сбой пуша не должен ломать постбек
     await processLead(tgId).catch(() => {});
-    await log(event, q, tgId, 'ok');
+    await log(event, q, tgId, 'ok', Number(ins.rows[0].id));
     return { ok: true };
   };
 

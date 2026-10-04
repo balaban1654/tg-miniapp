@@ -2649,6 +2649,51 @@ const copyCell=v=>{
   const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');['viewBox:0 0 24 24','width:15','height:15','fill:none','stroke:currentColor','stroke-width:2','stroke-linecap:round','stroke-linejoin:round'].forEach(a=>{const[k,...r]=a.split(':');svg.setAttribute(k,r.join(':'))});svg.innerHTML=COPY_SVG;b.append(svg);
   return el('td',{},el('span',{class:'cp'},String(v),b));
 };
+function pbManualDialog(done){
+  document.querySelectorAll('.lc-overlay').forEach(x=>x.remove());
+  const ov=el('div',{class:'lc-overlay',role:'dialog','aria-modal':'true'});
+  const close=()=>{ov.remove();document.removeEventListener('keydown',onKey)};
+  const onKey=e=>{if(e.key==='Escape')close()};document.addEventListener('keydown',onKey);
+  ov.addEventListener('mousedown',e=>{if(e.target===ov)close()});
+  const ev=el('select',{},...[['dep','Депозит (додеп)'],['ftd','Первый депозит (FTD)'],['reg','Регистрация'],['comm','Комиссия'],['wd','Вывод']].map(([v,t])=>el('option',{value:v},t)));
+  const pocket=el('input',{placeholder:'Pocket ID',inputmode:'numeric',autocomplete:'off'});
+  const tg=el('input',{placeholder:'Telegram ID (если нет Pocket ID)',inputmode:'numeric',autocomplete:'off'});
+  const amount=el('input',{type:'number',min:'0',step:'0.01',placeholder:'Сумма, $'});
+  const t0=new Date(),kDate=d=>d.toLocaleDateString('sv-SE',{timeZone:'Europe/Kyiv'}),kTime=d=>d.toLocaleTimeString('en-GB',{timeZone:'Europe/Kyiv',hour:'2-digit',minute:'2-digit'});
+  const day=dateWheel({value:kDate(t0),min:kDate(new Date(Date.now()-60*864e5)),max:kDate(t0)}),tm=timeWheel({value:kTime(t0)});
+  const err=el('div',{class:'err',role:'alert'});
+  const send=el('button',{class:'btn',type:'button',onclick:async()=>{
+    err.textContent='';send.disabled=true;
+    try{await api('/postbacks/manual',{method:'POST',body:{event:ev.value,pocket_id:pocket.value.trim(),tg_id:tg.value.trim(),amount:ev.value==='reg'?undefined:Number(amount.value),when:day.value+'T'+tm.value}});
+      close();toast('Постбек добавлен');done()}
+    catch(x){err.textContent=x.message;send.disabled=false}}},'Добавить');
+  ev.onchange=()=>{amount.parentElement.style.display=ev.value==='reg'?'none':''};
+  ov.append(el('div',{class:'lc',style:'width:min(560px,100%)'},
+    el('div',{class:'lc-head'},el('h3',{style:'font-size:18px'},'Добавить постбек вручную'),el('button',{class:'btn o s',type:'button','aria-label':'Закрыть',onclick:close},'✕')),
+    el('div',{class:'mut sm'},'Для событий, которые уже пришли в партнёрке, но не дошли до нас. Обрабатывается так же, как настоящий постбек: лид получит статус и доступ, деньги попадут в статистику.'),
+    el('div',{class:'lc-two'},el('div',{class:'lc-field'},el('label',{},'Событие'),ev),el('div',{class:'lc-field'},el('label',{},'Сумма, $'),amount),
+      el('div',{class:'lc-field'},el('label',{},'Pocket ID'),pocket),el('div',{class:'lc-field'},el('label',{},'Telegram ID'),tg),
+      el('div',{class:'lc-field'},el('label',{},'Дата'),day),el('div',{class:'lc-field'},el('label',{},'Время'),tm)),
+    err,el('div',{class:'lc-actions'},send)));
+  document.body.append(ov);
+}
+function pbDeleteDialog(r,done){
+  const run=async(withEv,btn)=>{btn.disabled=true;try{await api('/postbacks/'+r.id+(withEv?'?with_event=1':''),{method:'DELETE'});close();toast(withEv?'Постбек и событие удалены':'Запись журнала удалена');done()}catch(x){err.textContent=x.message;btn.disabled=false}};
+  document.querySelectorAll('.lc-overlay').forEach(x=>x.remove());
+  const ov=el('div',{class:'lc-overlay',role:'dialog','aria-modal':'true'});
+  const close=()=>{ov.remove();document.removeEventListener('keydown',onKey)};
+  const onKey=e=>{if(e.key==='Escape')close()};document.addEventListener('keydown',onKey);
+  ov.addEventListener('mousedown',e=>{if(e.target===ov)close()});
+  const err=el('div',{class:'err',role:'alert'});
+  const opt=(title,text,withEv,cls)=>{const b=el('button',{class:'btn '+cls,type:'button'},title);b.onclick=()=>run(withEv,b);return el('div',{class:'card',style:'display:grid;gap:8px'},el('div',{class:'mut sm'},text),b)};
+  ov.append(el('div',{class:'lc',style:'width:min(520px,100%)'},
+    el('div',{class:'lc-head'},el('h3',{style:'font-size:18px'},'Удалить постбек «'+r.event+'»'),el('button',{class:'btn o s',type:'button','aria-label':'Закрыть',onclick:close},'✕')),
+    r.event_id
+      ?[opt('Удалить полностью','Запись пропадёт из журнала, а депозит или комиссия исчезнут из базы: статистика и зарплаты пересчитаются. Статус и доступ лида не меняются.',true,''),opt('Только из журнала','Событие и деньги останутся в базе, уберётся только строка в этом списке.',false,'o')]
+      :opt('Удалить запись','Это строка журнала. Событие по ней (если оно было) связать нельзя: оно остаётся в базе.',false,''),
+    err));
+  document.body.append(ov);
+}
 async function viewPostbacks(){
   const rows=await api('/postbacks');
   const clearBox=el('span',{});
@@ -2658,8 +2703,8 @@ async function viewPostbacks(){
     el('button',{class:'btn o s',type:'button',onclick:()=>{sure.hidden=true;askBtn.hidden=false}},'Отмена'));
   clearBox.append(askBtn,sure);
   const time=v=>new Date(v).toLocaleString('ru-RU',{timeZone:'Europe/Kyiv',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit',second:'2-digit'});
-  return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Постбеки'),el('div',{style:'display:flex;gap:8px;align-items:center'},clearBox,el('button',{class:'btn o s',type:'button',onclick:render},'Обновить'))),
-    table(['Время','Событие','Telegram ID','Pocket ID',['Сумма','n'],'Результат'],rows.map(r=>{const qq=r.query||{};return[td(time(r.created_at)),el('td',{},el('span',{class:'pill p-pur'},r.event)),copyCell(r.tg_id||qq.click_id),copyCell(qq.trader_id),td(qq.commission||qq.sumdep||qq.wdr_sum||qq.amount||qq.sum||'—','n'),el('td',{},el('span',{class:'pill '+(r.result==='ok'?'p-ok':(r.result.startsWith('дубль')||r.result.startsWith('пропущен'))?'p-warn':'p-bad')},r.result))]}),
+  return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Постбеки'),el('div',{style:'display:flex;gap:8px;align-items:center'},el('button',{class:'btn s',type:'button',onclick:()=>pbManualDialog(render)},'+ Добавить постбек'),clearBox,el('button',{class:'btn o s',type:'button',onclick:render},'Обновить'))),
+    table(['Время','Событие','Telegram ID','Pocket ID',['Сумма','n'],'Результат',''],rows.map(r=>{const qq=r.query||{};return[td(time(r.created_at)),el('td',{},el('span',{class:'pill p-pur'},r.event)),copyCell(r.tg_id||qq.click_id),copyCell(qq.trader_id),td(qq.commission||qq.sumdep||qq.wdr_sum||qq.amount||qq.sum||'—','n'),el('td',{},el('span',{class:'pill '+(r.result==='ok'?'p-ok':(r.result.startsWith('дубль')||r.result.startsWith('пропущен'))?'p-warn':'p-bad')},r.result)),el('td',{},el('button',{class:'btn o s',type:'button',title:'Удалить постбек','aria-label':'Удалить постбек',onclick:()=>pbDeleteDialog(r,render)},svgIcon(TRASH,15)))]}),
       'Постбеков пока нет. Когда партнёрка отправит первый, он появится здесь.')];
 }
 
