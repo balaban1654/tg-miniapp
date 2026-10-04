@@ -16,6 +16,7 @@ export interface KpiPlan {
   ftd: { over: number; bonus: number }[]; // бонус за FTD по сумме первого депозита
   day: { count: number; min: number; bonus: number; cutoffH: number }; // дневной бонус
   tol: number; // запас на курс брокера
+  shiftTol: number; // допуск по дневной смене: недобор в пределах этой доли нормы не считается невыполненным днём
   advance: number; // максимальный аванс
   goals: Goals; // цели месяца для дашборда админа
 }
@@ -49,6 +50,7 @@ export const DEFAULT_PLAN: KpiPlan = {
   ],
   day: { count: 4, min: 50, bonus: 50, cutoffH: 3 },
   tol: 0.1,
+  shiftTol: 0.15,
   advance: 200,
   goals: { ftd: 50, ftdSum: 4500, deposits: 9500, commission: 6000, net: 3900 },
 };
@@ -297,6 +299,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
       ftd: Array.isArray(b.ftd) ? b.ftd.map((t: any) => ({ over: n(t.over, 0), bonus: n(t.bonus, 0) })).filter((t: any) => t.over > 0) : cur.ftd,
       day: { count: n(b.day?.count, cur.day.count, 1, 100), min: n(b.day?.min, cur.day.min), bonus: n(b.day?.bonus, cur.day.bonus), cutoffH: n(b.day?.cutoffH, cur.day.cutoffH, 0, 12) },
       tol: n(b.tol, cur.tol, 0, 0.5),
+      shiftTol: n(b.shiftTol, cur.shiftTol, 0, 0.5),
       advance: n(b.advance, cur.advance),
       goals: {
         ftd: n(b.goals?.ftd, cur.goals.ftd, 0, 1e6),
@@ -685,7 +688,14 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
   app.post('/shortfalls/sync', { preHandler: stream }, async (req) => {
     const me = req.staff!;
     const plan = await getPlan();
-    const need = plan.shiftH * 60;
+    // Норма смены с допуском: например, 3 ч и допуск 15% значит, что 2 ч 33 мин и больше считается выполненным днём
+    const need = Math.round(plan.shiftH * 60 * (1 - plan.shiftTol));
+    // Прежние дни без причины, которые теперь укладываются в допуск, убираем
+    await db.query(
+      `DELETE FROM shift_shortfalls f WHERE f.staff_id = $1 AND f.reason IS NULL
+         AND coalesce((SELECT sum(coalesce(approved_min, declared_min)) FROM shift_reports r WHERE r.staff_id = f.staff_id AND r.day = f.day AND r.status IN ('approved','pending')), 0) >= $2`,
+      [me.id, need],
+    );
     await db.query(
       `INSERT INTO shift_shortfalls (staff_id, day, minutes)
        SELECT $1, d::date, coalesce((SELECT sum(coalesce(approved_min, declared_min)) FROM shift_reports r WHERE r.staff_id = $1 AND r.day = d::date AND r.status IN ('approved','pending')), 0)
