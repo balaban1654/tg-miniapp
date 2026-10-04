@@ -2070,12 +2070,12 @@ async function accBonus(){
 }
 
 async function accPay(){
-  const [sum,advs,st]=await Promise.all([api('/kpi/summary?period='+accState.period),api('/advances'),allStaffList()]);
+  const [sum,advs,st]=await Promise.all([api('/kpi/summary?all=1&period='+accState.period),api('/advances'),allStaffList()]);
   const cards=await Promise.all(sum.rows.map(r=>api('/staff/'+r.staff.id+'/card').catch(()=>({}))));
   const advBox=advs.length?el('div',{class:'card',style:'display:grid;gap:8px;border-color:var(--acc)'},el('h4',{},'Запросы аванса'),...advs.map(a=>el('div',{class:'inl',style:'justify-content:space-between'},
     el('div',{},el('b',{},a.staff_name+' запросил '+usd2(a.amount)),el('div',{class:'mut sm'},perLabel(a.period))),
     el('div',{class:'inl'},el('button',{class:'btn s',type:'button',onclick:async()=>{try{await api('/advances/'+a.id+'/decide',{method:'POST',body:{action:'pay'}});toast('Аванс записан как выплаченный');accRefresh()}catch(x){toast(x.message)}}},'Выплатил'),el('button',{class:'btn o s',type:'button',onclick:async()=>{try{await api('/advances/'+a.id+'/decide',{method:'POST',body:{action:'reject'}});accRefresh()}catch(x){toast(x.message)}}},'Отклонить'))))):null;
-  const rows=sum.rows.map((r,i)=>{const c=cards[i]||{};return[td(r.staff.name),td(usd2(r.kpi.total),'n'),td(r.kpi.paid?usd2(r.kpi.paid):'—','n'),el('td',{class:'n'},el('b',{},usd2(r.kpi.due))),td(c.payout_method||'не указано'),el('td',{class:'mono sm'},c.payout_wallet?[c.payout_wallet,copyIconBtn(c.payout_wallet,'Реквизиты скопированы')]:el('span',{class:'mut'},'нет реквизитов'))]});
+  const rows=sum.rows.map((r,i)=>{const c=cards[i]||{};return[td(r.staff.name),td((ROLE[r.staff.role]||r.staff.role)+(r.staff.role!=='streamer'&&r.staff.streams?', Стример':'')),td(usd2(r.kpi.total),'n'),td(r.kpi.paid?usd2(r.kpi.paid):'—','n'),el('td',{class:'n'},el('b',{},usd2(r.kpi.due))),td(c.payout_method||'не указано'),el('td',{class:'mono sm'},c.payout_wallet?[c.payout_wallet,copyIconBtn(c.payout_wallet,'Реквизиты скопированы')]:el('span',{class:'mut'},'нет реквизитов'))]});
   const who=el('select',{},...st.map(s=>el('option',{value:s.id},s.name)));
   const kind=el('select',{},el('option',{value:'final'},'Итоговая выплата'),el('option',{value:'advance'},'Аванс (вручную)'),el('option',{value:'extra'},'Доплата'));
   const amount=el('input',{type:'number',min:'0',step:'0.01',placeholder:'Сумма, $'});
@@ -2085,7 +2085,7 @@ async function accPay(){
     el('div',{class:'lc-two'},el('label',{},'Сотрудник',who),el('label',{},'Тип',kind),el('label',{},'Сумма',amount),el('label',{},'Заметка',note)),err,
     el('div',{},el('button',{class:'btn s',type:'button',onclick:async()=>{err.textContent='';try{await api('/payouts',{method:'POST',body:{staff_id:Number(who.value),kind:kind.value,amount:Number(amount.value),note:note.value,period:accState.period}});toast('Выплата записана');accRefresh()}catch(x){err.textContent=x.message}}},'Записать')));
   return[el('div',{class:'head'},el('h3',{style:'font-size:15px'},'Выплаты за '+perLabel(accState.period)),el('span',{class:'pill p-pur'},'выплаты с 5 по 10 число следующего месяца')),
-    advBox,ctrT(table(['Стример','Итого','Выплачено','К выплате','Куда','Реквизиты'],rows,'Стримеров пока нет.')),form,
+    advBox,ctrT(table(['Сотрудник','Должность','Итого','Выплачено','К выплате','Куда','Реквизиты'],rows,'Сотрудников пока нет.')),form,
     el('div',{class:'mut sm'},'Реквизиты берутся из карточки сотрудника (раздел «Сотрудники»). Запрошенный аванс не больше $'+sum.plan.advance+', вручную можно выплатить больше. Аванс вычитается из итога.')];
 }
 

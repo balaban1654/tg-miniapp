@@ -616,10 +616,10 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     return { ok: true };
   });
 
-  app.get<{ Querystring: { period?: string } }>('/kpi/summary', { preHandler: admin }, async (req) => {
+  app.get<{ Querystring: { period?: string; all?: string } }>('/kpi/summary', { preHandler: admin }, async (req) => {
     const period = PERIOD.test(String(req.query.period)) ? String(req.query.period) : await currentPeriod();
     const plan = await planFor(period);
-    const staff = (await db.query(`SELECT id, name, login, active FROM staff WHERE (role = 'streamer' OR streams) ORDER BY active DESC, name`)).rows;
+    const staff = (await db.query(`SELECT id, name, login, active, role, streams FROM staff WHERE ${req.query.all ? 'active' : `(role = 'streamer' OR streams)`} ORDER BY active DESC, (role = 'streamer') DESC, name`)).rows;
     const rows = [];
     for (const s of staff) rows.push({ staff: s, kpi: await kpiFor(s.id, period, plan) });
     return { plan, period, rows };
