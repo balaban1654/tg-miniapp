@@ -1169,7 +1169,7 @@ async function twofaDialog(forced,done){
     el('div',{class:'mut sm',style:'white-space:pre-line'},'1. Установите на телефон Google Authenticator.\n2. Отсканируйте QR-код (или введите ключ вручную).\n3. Введите 6-значный код из приложения.'),
     qr,el('div',{class:'mut sm',style:'text-align:center;word-break:break-all'},'Ключ: ',el('code',{},s.secret)),
     boxes,msg,
-    el('div',{class:'lc-actions'},el('button',{class:'btn',type:'button',onclick:go},'Включить'),outBtn)].filter(Boolean));
+    el('div',{class:'lc-actions',style:'justify-content:center'},el('button',{class:'btn',type:'button',onclick:go},'Включить'),outBtn)].filter(Boolean));
   ins[0].focus();
 }
 /** Колонка «Пароль»: в базе только хэш, поэтому показать старый пароль нельзя. Кнопка выдаёт новый, он виден с глазиком, пока не обновили страницу */
