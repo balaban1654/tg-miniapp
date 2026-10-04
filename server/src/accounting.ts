@@ -349,7 +349,8 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
   app.get('/shifts/current', { preHandler: stream }, async (req) => {
     const me = req.staff!;
     const live = (await db.query(`SELECT id, stream_url, started_at FROM shift_reports WHERE staff_id = $1 AND status = 'live' ORDER BY id DESC LIMIT 1`, [me.id])).rows[0] ?? null;
-    return { live, now: new Date().toISOString(), ...(await todayInfo(me.id)), fields: await fieldsDef(true) };
+    const awaiting = (await db.query(`SELECT id, started_at, ended_at, to_char(day, 'YYYY-MM-DD') AS day FROM shift_reports WHERE staff_id = $1 AND status = 'await' ORDER BY id`, [me.id])).rows;
+    return { live, awaiting, now: new Date().toISOString(), ...(await todayInfo(me.id)), fields: await fieldsDef(true) };
   });
 
   // Админ открывает смену за стримера (например, когда тот забыл): та же ссылка на эфир, дальше стример заканчивает смену сам
@@ -375,10 +376,18 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     return { ok: true, id: r.rows[0].id };
   });
 
-  app.post<{ Params: { id: string } }>('/shifts/:id/finish', { preHandler: stream, bodyLimit: 9 * 1024 * 1024 }, async (req, reply) => {
+  // Админ закрывает смену стримера без отчёта: данные потом внесёт сам стример (у него это задача)
+  app.post<{ Params: { id: string } }>('/shifts/:id/close', { preHandler: admin }, async (req, reply) => {
+    const r = await db.query(`UPDATE shift_reports SET status = 'await', ended_at = now() WHERE id = $1 AND status = 'live'`, [Number(req.params.id)]);
+    if (!r.rowCount) return reply.code(404).send({ error: 'Идущая смена не найдена' });
+    return { ok: true };
+  });
+
+  // Отчёт отправляет стример; админ может заполнить его за стримера (смена идёт или ждёт отчёта)
+  app.post<{ Params: { id: string } }>('/shifts/:id/finish', { preHandler: need('streamer', 'admin'), bodyLimit: 9 * 1024 * 1024 }, async (req, reply) => {
     const me = req.staff!;
     const b = (req.body ?? {}) as Record<string, any>;
-    const row = (await db.query(`SELECT id, started_at FROM shift_reports WHERE id = $1 AND staff_id = $2 AND status = 'live'`, [Number(req.params.id), me.id])).rows[0];
+    const row = (await db.query(`SELECT id, started_at FROM shift_reports WHERE id = $1 AND ($2 OR staff_id = $3) AND status IN ('live','await')`, [Number(req.params.id), me.role === 'admin', me.id])).rows[0];
     if (!row) return reply.code(404).send({ error: 'Смена не найдена или уже отправлена' });
     const declared = Math.trunc(Number(b.declared_min));
     if (!Number.isFinite(declared) || declared < 1 || declared > 720) return reply.code(400).send({ error: 'Укажите время эфира в минутах, от 1 до 720' });
@@ -421,7 +430,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
       } else fields.push({ name: d.name, kind: d.kind, value: str(raw, 500) });
     }
     await db.query(
-      `UPDATE shift_reports SET status = 'pending', ended_at = now(), declared_min = $2, fields = $3::jsonb, comment = $4, screenshot = $5, screenshot_type = $6, declared_start = $7 WHERE id = $1`,
+      `UPDATE shift_reports SET status = 'pending', ended_at = coalesce(ended_at, now()), declared_min = $2, fields = $3::jsonb, comment = $4, screenshot = $5, screenshot_type = $6, declared_start = $7 WHERE id = $1`,
       [row.id, declared, JSON.stringify(fields), str(b.comment, 1000) || null, photo, imgType(photo), declaredStart],
     );
     return { ok: true };
@@ -538,7 +547,8 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     const live = (await db.query(`SELECT id, stream_url, started_at FROM shift_reports WHERE staff_id = $1 AND status = 'live' LIMIT 1`, [me.id])).rows[0] ?? null;
     const unpaidShort = (await db.query(`SELECT to_char(day, 'YYYY-MM-DD') AS day, minutes FROM shift_shortfalls WHERE staff_id = $1 AND reason IS NULL ORDER BY day`, [me.id])).rows;
     // Стримеру показываем суммы бонусов и штрафов без комментариев
-    return { plan, kpi: k, ...t, live, now: new Date().toISOString(), advance: await advState(me.id, period, k.minTotal, plan), shortfalls: unpaidShort };
+    const awaiting = (await db.query(`SELECT id, started_at, ended_at, to_char(day, 'YYYY-MM-DD') AS day FROM shift_reports WHERE staff_id = $1 AND status = 'await' ORDER BY id`, [me.id])).rows;
+    return { plan, kpi: k, ...t, live, awaiting, now: new Date().toISOString(), advance: await advState(me.id, period, k.minTotal, plan), shortfalls: unpaidShort };
   });
 
   app.post('/advance/request', { preHandler: stream }, async (req, reply) => {
@@ -845,7 +855,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
 
     const nowIso = new Date().toISOString();
     const live = new Map(
-      ((await db.query(`SELECT DISTINCT ON (staff_id) staff_id, started_at, stream_url FROM shift_reports WHERE status = 'live' ORDER BY staff_id, id DESC`)).rows as { staff_id: number; started_at: string; stream_url: string }[]).map((r) => [r.staff_id, r]),
+      ((await db.query(`SELECT DISTINCT ON (staff_id) staff_id, id, started_at, stream_url FROM shift_reports WHERE status = 'live' ORDER BY staff_id, id DESC`)).rows as { staff_id: number; id: number; started_at: string; stream_url: string }[]).map((r) => [r.staff_id, r]),
     );
     const lastEnd = new Map(
       ((await db.query(`SELECT staff_id, max(ended_at) AS t FROM shift_reports WHERE status <> 'live' AND ended_at IS NOT NULL GROUP BY staff_id`)).rows as { staff_id: number; t: string }[]).map((r) => [r.staff_id, r.t]),
@@ -902,7 +912,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
         login: s.login,
         tg: s.tg_username,
         active: s.active,
-        live: lv ? { started_at: lv.started_at, stream_url: lv.stream_url, elapsed } : null,
+        live: lv ? { id: lv.id, started_at: lv.started_at, stream_url: lv.stream_url, elapsed } : null,
         lastEnd: lastEnd.get(s.id) ?? null,
         lastMin: lastLen.get(s.id) ?? null,
         minLeft: lv ? Math.max(0, plan.shiftH * 60 - doneToday) : null,
@@ -1154,7 +1164,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
         minForAdvance: plan.advance,
       },
       tasks,
-      alerts: { rejected, shortfalls: short },
+      alerts: { rejected, shortfalls: short, awaiting: (await db.query(`SELECT id, started_at, ended_at, to_char(day, 'YYYY-MM-DD') AS day FROM shift_reports WHERE staff_id = $1 AND status = 'await' ORDER BY id`, [me.id])).rows },
       fields: defs.map((d) => d.name),
       last: last.map((r: any) => ({ id: r.id, day: r.day, status: r.status, minutes: r.minutes, reject_reason: r.reject_reason, values: Object.fromEntries((r.fields as any[]).filter((f) => f.kind === 'number').map((f) => [f.name, f.value])) })),
     };

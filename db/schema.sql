@@ -134,6 +134,9 @@ CREATE INDEX IF NOT EXISTS messages_tg ON messages(tg_id, id);
 ALTER TABLE messages ADD COLUMN IF NOT EXISTS file_name TEXT;
 -- Начало эфира, которое стример указал в отчёте (по Киеву, хранится как момент времени)
 ALTER TABLE shift_reports ADD COLUMN IF NOT EXISTS declared_start TIMESTAMPTZ;
+-- 'await': смену закрыл админ без отчёта, данные должен внести сам стример
+ALTER TABLE shift_reports DROP CONSTRAINT IF EXISTS shift_reports_status_check;
+ALTER TABLE shift_reports ADD CONSTRAINT shift_reports_status_check CHECK (status IN ('live','await','pending','approved','rejected'));
 
 -- Пуши: бот может писать только тем, кто нажал /start. last_seen_at нужен для «давно не заходил»
 ALTER TABLE leads ADD COLUMN IF NOT EXISTS bot_started BOOLEAN DEFAULT FALSE;

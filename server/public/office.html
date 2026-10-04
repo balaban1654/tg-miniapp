@@ -237,7 +237,7 @@ textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10
 .dx-ovl.hv{background:none;pointer-events:none;padding:0;overflow:visible}
 .dx-md{width:min(560px,100%);background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px;display:flex;flex-direction:column;gap:16px;margin-block:auto;box-shadow:0 24px 60px rgba(0,0,0,.6)}
 .dx-ovl.hv .dx-md{pointer-events:auto;position:fixed;margin:0;max-height:calc(100vh - 24px);overflow:auto}
-.dx-mh{display:flex;align-items:flex-start;gap:12px}.dx-hr{display:grid;gap:6px;justify-items:end}.dx-hr1{display:flex;align-items:center;gap:8px}.dx-open{background:none;border:0;color:var(--acc2);font:700 12px var(--fb,inherit);cursor:pointer;padding:0;text-decoration:underline dotted;text-underline-offset:3px}.dx-of{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--bg2)}.dx-of input{flex:1 1 220px;min-width:0}.dx-of[hidden]{display:none}.dx-of .er{flex:1 1 100%;color:var(--bad);font-size:12px;min-height:0}.dx-mh h2{font-size:20px}.dx-mh .tg{font-size:12px;color:var(--mut)}.dx-sp{flex:1}
+.dx-mh{display:flex;align-items:flex-start;gap:12px}.dx-hr{display:grid;gap:6px;justify-items:end}.dx-hr1{display:flex;align-items:center;gap:8px}.dx-open{background:none;border:0;color:var(--acc2);font:700 12px var(--fb,inherit);cursor:pointer;padding:0;text-decoration:underline dotted;text-underline-offset:3px}.dx-of{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--bg2)}.dx-of input{flex:0 1 250px;min-width:0;padding:7px 10px;font-size:13px}.dx-of input:focus,.dx-of input:focus-visible{outline:none;box-shadow:none;border-color:var(--line)}.dx-of .btn{padding:7px 14px}.dx-of .tx{flex:1 1 100%;font-size:12px;color:var(--mut)}.dx-of[hidden]{display:none}.dx-of .er{flex:1 1 100%;color:var(--bad);font-size:12px;min-height:0}.dx-mh h2{font-size:20px}.dx-mh .tg{font-size:12px;color:var(--mut)}.dx-sp{flex:1}
 .dx-av{width:44px;height:44px;border-radius:50%;background:#9b5cff33;color:var(--acc2);display:grid;place-items:center;flex:none}
 .dx-st{display:inline-flex;font-size:12px;font-weight:700;padding:4px 10px;border-radius:99px;background:#3ddc9722;color:var(--ok)}.dx-st.off{background:#ffffff14;color:var(--mut)}
 .dx-x{width:32px;height:32px;border:1px solid var(--line);border-radius:8px;background:none;color:var(--mut);cursor:pointer;font-size:18px;line-height:1}.dx-x:hover{color:var(--acc2);border-color:var(--acc)}
@@ -684,11 +684,17 @@ function dxModal(btn,s,d,skew,mode){
   const ofGo=el('button',{class:'btn s',type:'button',onclick:async()=>{ofErr.textContent='';ofGo.disabled=true;try{await api('/shifts/start-for',{method:'POST',body:{staff_id:s.id,stream_url:ofUrl.value}});toast('Смена открыта: '+s.name);dxCloseModal();render({soft:true})}catch(e){ofErr.textContent=e.message;ofGo.disabled=false}}},'Начать смену');
   ofUrl.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();ofGo.click()}});
   const openForm=el('div',{class:'dx-of',hidden:''},ofUrl,ofGo,ofErr);
+  // Закрыть смену за стримера: внести данные самому или пропустить, тогда отчёт появится у стримера в задачах
+  const clSkip=el('button',{class:'btn o s',type:'button',onclick:async()=>{clSkip.disabled=true;try{await api('/shifts/'+(s.live&&s.live.id)+'/close',{method:'POST'});toast('Смена закрыта: отчёт заполнит '+s.name);dxCloseModal();render({soft:true})}catch(e){clErr.textContent=e.message;clSkip.disabled=false}}},'Пропустить');
+  const clFill=el('button',{class:'btn s',type:'button',onclick:()=>{const lv=s.live;dxCloseModal();openFinishModal({id:lv.id,started_at:lv.started_at},skew)}},'Указать данные');
+  const clErr=el('div',{class:'er',role:'alert'});
+  const closeForm=el('div',{class:'dx-of',hidden:''},el('div',{class:'tx'},'Закрыть смену сейчас? Внесите данные эфира сами или пропустите: тогда стример заполнит отчёт сам, у него это появится в задачах.'),clFill,clSkip,clErr);
+  const closeLink=s.live?el('button',{type:'button',class:'dx-open',onclick:()=>{closeForm.hidden=!closeForm.hidden;md.dataset.pin=closeForm.hidden?'':'1'}},'Закрыть смену'):null;
   const openLink=s.live?null:el('button',{type:'button',class:'dx-open',onclick:()=>{openForm.hidden=!openForm.hidden;md.dataset.pin=openForm.hidden?'':'1';if(!openForm.hidden)ofUrl.focus()}},'Открыть смену');
   const md=el('div',{class:'dx-md',role:'dialog','aria-modal':'true','aria-label':s.name},
     el('div',{class:'dx-mh'},el('div',{class:'dx-av'},svgIcon('<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',24)),el('div',{},el('h2',{},s.name),el('div',{class:'tg'},s.tg?'@'+String(s.tg).replace(/^@/,''):s.login)),el('div',{class:'dx-sp'}),
-      el('div',{class:'dx-hr'},el('div',{class:'dx-hr1'},el('span',{class:'dx-st'+(s.live?'':' off')},s.live?'в эфире '+hm(Math.max(0,Math.floor((Date.now()+skew-Date.parse(s.live.started_at))/60000))):'не в эфире · '+dxOffText(s,d.today)),x),openLink)),
-    openForm,
+      el('div',{class:'dx-hr'},el('div',{class:'dx-hr1'},el('span',{class:'dx-st'+(s.live?'':' off')},s.live?'в эфире '+hm(Math.max(0,Math.floor((Date.now()+skew-Date.parse(s.live.started_at))/60000))):'не в эфире · '+dxOffText(s,d.today)),x),openLink||closeLink)),
+    openForm,closeForm,
     el('div',{},el('div',{class:'dx-hd'},el('div',{class:'dx-sec'},'Часы за месяц'),el('div',{class:'dx-hv'},left!==null?el('span',{class:'dx-cl'},'До закрытия: '+left+' мин'):null,el('b',{style:'color:'+col},fmtH(hrs)+' / '+plan.hours+' ч'))),
       el('div',{class:'dx-bar',style:'margin:13px 0 0'},el('i',{style:'width:'+Math.min(100,pct)+'%;background:'+col}),el('u',{style:'left:'+Math.min(100,pp)+'%'})),
       el('div',{class:'dx-meta',style:'margin-top:13px'},el('span',{},pct+'% плана'),el('span',{},'по графику на сегодня '+fmtH(pace)+' ч'))),
@@ -923,6 +929,7 @@ function smSalary(d){
 function smTasks(d){
   const items=[];
   const alertRow=(c,t,s)=>el('button',{type:'button',class:'dx-tk',onclick:()=>dxGo('shifts')},el('span',{class:'dx-ic '+c},svgIcon(IC_ALERT,18)),el('span',{class:'dx-tx'},el('span',{class:'tt'},t),el('span',{class:'ts'},s)),svgIcon(IC_CHEV,16));
+  (d.alerts.awaiting||[]).forEach(x=>items.push(el('button',{type:'button',class:'dx-tk',title:'Заполнить отчёт',onclick:()=>openFinishModal({id:x.id,started_at:x.started_at},Date.parse(d.now)-Date.now(),{endedAt:x.ended_at})},el('span',{class:'dx-ic w'},svgIcon(IC_ALERT,18)),el('span',{class:'dx-tx'},el('span',{class:'tt'},'Заполните отчёт за смену '+dxDay(x.day)),el('span',{class:'ts'},'Смену закрыл руководитель. Укажите время, цифры и скриншот')),svgIcon(IC_CHEV,16))));
   d.alerts.rejected.forEach(x=>items.push(alertRow('r','Отчёт за '+dxDay(x.day)+' отклонён',x.reject_reason||'Исправьте и отправьте снова')));
   d.alerts.shortfalls.forEach(x=>items.push(alertRow('w','Недобор часов '+dxDay(x.day),'Напишите причину, её прочтёт руководитель')));
   d.tasks.forEach(t=>{
@@ -1479,7 +1486,7 @@ const planPill=ok=>el('span',{class:'pill '+(ok?'p-ok':'p-bad')},ok?'выпол�
 const bar=(pct,done)=>el('div',{class:'pbar2'},el('i',{class:done?'done':'',style:'width:'+Math.max(0,Math.min(100,pct))+'%'}));
 const pbRow=(label,val,pct,done,note)=>el('div',{class:'pl2'},el('div',{class:'lab2'},el('span',{},label),el('b',{class:'mono'},val)),bar(pct,done),note?el('span',{class:'sm warnt'},note):null);
 const fileDataUrl=f=>new Promise((ok,no)=>{const r=new FileReader();r.onload=()=>ok(r.result);r.onerror=()=>no(new Error('Не удалось прочитать файл'));r.readAsDataURL(f)});
-const REPSTATUS={pending:['на проверке','p-warn'],approved:['зачтён','p-ok'],rejected:['отклонён','p-bad']};
+const REPSTATUS={await:['ждёт отчёта','p-warn'],pending:['на проверке','p-warn'],approved:['зачтён','p-ok'],rejected:['отклонён','p-bad']};
 
 /** Карточка «Мой KPI» на дашборде стримера */
 async function kpiCardBlock(){
@@ -1538,6 +1545,10 @@ async function shiftTab(){
   const d=await api('/kpi/me');
   const {plan}=d,skew=Date.parse(d.now)-Date.now(),shiftMin=plan.shiftH*60;
   const out=[];
+  // Смены, которые закрыл руководитель без отчёта: данные вносит сам стример
+  for(const x of (d.awaiting||[]))out.push(el('div',{class:'card warn-card'},el('b',{},'Заполните отчёт за смену '+new Date(x.day+'T12:00:00').toLocaleDateString('ru-RU',{day:'numeric',month:'long'})),
+    el('div',{class:'mut sm'},'Смену закрыл руководитель. Укажите время эфира, цифры и приложите скриншот статистики.'),
+    el('div',{},el('button',{class:'btn s',type:'button',onclick:()=>openFinishModal({id:x.id,started_at:x.started_at},skew,{endedAt:x.ended_at})},'Заполнить отчёт'))));
   // Невыполненные дни: нужна причина
   for(const s of d.shortfalls){
     const ta=el('textarea',{class:'big',rows:'2',placeholder:'Почему не получилось выйти в эфир или не хватило времени',maxlength:'1000',style:'min-height:64px'});
@@ -1574,7 +1585,7 @@ async function shiftTab(){
   return out;
 }
 
-async function openFinishModal(live,skew){
+async function openFinishModal(live,skew,opts={}){
   document.querySelectorAll('.lc-overlay').forEach(x=>x.remove());
   const ov=el('div',{class:'lc-overlay',role:'dialog','aria-modal':'true'});
   const close=()=>{ov.remove();document.removeEventListener('keydown',onKey)};
@@ -1583,7 +1594,7 @@ async function openFinishModal(live,skew){
   const box=el('div',{class:'lc'},el('div',{class:'mut'},'Загрузка…'));
   ov.append(box);document.body.append(ov);
   let defs;try{defs=await api('/report-fields')}catch(x){box.replaceChildren(el('div',{class:'err'},x.message));return}
-  const elapsed=Math.max(1,Math.floor((Date.now()+skew-Date.parse(live.started_at))/60000));
+  const elapsed=Math.max(1,Math.floor(((opts.endedAt?Date.parse(opts.endedAt):Date.now()+skew)-Date.parse(live.started_at))/60000));
   const kDate=d=>d.toLocaleDateString('sv-SE',{timeZone:'Europe/Kyiv'});
   const kTime=d=>d.toLocaleTimeString('en-GB',{timeZone:'Europe/Kyiv',hour:'2-digit',minute:'2-digit'});
   const st0=new Date(Date.parse(live.started_at));
