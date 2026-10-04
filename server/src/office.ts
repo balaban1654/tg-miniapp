@@ -367,7 +367,15 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     if (b.active !== undefined) add('active', Boolean(b.active));
     if (b.rate_ftd !== undefined) add('rate_ftd', num(b.rate_ftd));
     if (b.rate_percent !== undefined) add('rate_percent', num(b.rate_percent));
-    if (b.parent_id !== undefined) add('parent_id', b.parent_id ? Number(b.parent_id) : null);
+    if (b.parent_id !== undefined) {
+      const pid = b.parent_id ? Number(b.parent_id) : null;
+      if (pid !== null) {
+        if (pid === id) return reply.code(400).send({ error: 'Нельзя назначить сотрудника самому себе' });
+        const t = await db.query(`SELECT 1 FROM staff WHERE id = $1 AND role IN ('teamlead','admin')`, [pid]);
+        if (!t.rowCount) return reply.code(400).send({ error: 'Тимлидер не найден' });
+      }
+      add('parent_id', pid);
+    }
     const link = (v: unknown): string | null | undefined => {
       if (v === undefined) return undefined;
       const t = str(v, 600);

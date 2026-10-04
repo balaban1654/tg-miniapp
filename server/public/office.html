@@ -310,10 +310,11 @@ const ROLE={admin:'Админ',teamlead:'Тимлидер',streamer:'Стрим�
 const STATUS={new:['Новый','p-pur'],registered:['Регистрация','p-warn'],ftd:['FTD','p-ok'],active:['Активный','p-ok'],churned:['Отвал','p-bad']};
 let me=null,tab='home';
 /* Адрес страницы: у каждого раздела своя ссылка (#/leads, #/acc/review), при обновлении остаёмся на месте */
+const STAFF_TABS=['team','links'];
 const ACC_TABS=['sum','review','bonus','pay','exp','why','plan','form'];
-function hashPath(){return '/'+tab+(tab==='acc'?'/'+accState.tab:tab==='plans'?'/'+plansState.tab:'')}
+function hashPath(){return '/'+tab+(tab==='acc'?'/'+accState.tab:tab==='plans'?'/'+plansState.tab:tab==='staff'?'/'+staffState.tab:'')}
 function pushHash(){const h='#'+hashPath();if(location.hash!==h)history.pushState(null,'',h)}
-function readHash(){const[,t,sub]=(location.hash||'').split('/');if(!t)return;tab=t;if(t==='acc'&&ACC_TABS.includes(sub))accState.tab=sub;if(t==='plans'&&PLANS_TABS.includes(sub))plansState.tab=sub}
+function readHash(){const[,t,sub]=(location.hash||'').split('/');if(!t)return;tab=t;if(t==='acc'&&ACC_TABS.includes(sub))accState.tab=sub;if(t==='plans'&&PLANS_TABS.includes(sub))plansState.tab=sub;if(t==='staff'&&STAFF_TABS.includes(sub))staffState.tab=sub}
 window.addEventListener('popstate',()=>{if(!me)return;readHash();showApp()});
 
 async function api(path,opts={}){
@@ -364,7 +365,7 @@ function showApp(){
   $('#login').hidden=true;$('#app').hidden=false;
   $('#meName').textContent=me.name+' · '+ROLE[me.role];
   const gb=$('#meGear');if(gb&&!gb.firstChild){gb.append(svgIcon(GEAR,16));gb.onclick=()=>openStaffCard(null)}
-  const items=[['home','Дашборд'],['leads','Лиды'],...(me.role==='streamer'?[]:[['links','Ссылки']])];
+  const items=[['home','Дашборд'],['leads','Лиды'],...(['streamer','admin','teamlead'].includes(me.role)?[]:[['links','Ссылки']])];
   if(me.role==='admin'||me.role==='teamlead')items.push(['staff',me.role==='admin'?'Сотрудники':'Моя команда']);
   if(['admin','teamlead','streamer'].includes(me.role))items.splice(1,0,['chats','Чаты']);
   if(me.role==='admin')items.splice(1,0,['signals','Сигналы']);
@@ -372,6 +373,7 @@ function showApp(){
   if(me.role==='admin')items.push(['push','Пуши'],['media','Медиа'],['pb','Постбеки']);
   if(me.role==='streamer')items.splice(items.length,0,['shifts','Смены и отчёты'],['mytasks','Мои задачи']);
   if(me.role==='admin')items.splice(items.findIndex(x=>x[0]==='push'),0,['acc','Бухгалтерия'],['plans','Планы и задачи']);
+  if(tab==='links'&&['admin','teamlead'].includes(me.role)){tab='staff';staffState.tab='links'}
   if(!items.some(x=>x[0]===tab)){tab=items[0][0];history.replaceState(null,'','#'+hashPath())}
   const nav=$('#nav');nav.replaceChildren(...items.map(([k,t])=>el('button',{type:'button','data-t':k,class:k===tab?'on':'',onclick:()=>{tab=k;showApp();render()}},icon(k),el('span',{class:'lbl'},k==='chats'?chatsLabel:t),k==='mytasks'?el('span',{class:'nbadge',id:'tasksBadge',hidden:''}):null)));
   render();updateBadge();
@@ -1058,7 +1060,17 @@ async function viewLinks(){
       'Ссылок пока нет. Создайте первую выше.')];
 }
 
+let staffState={tab:'team'};
 async function viewStaff(){
+  const isAdmin=me.role==='admin';
+  const root=el('div',{style:'display:grid;gap:14px'}),body=el('div',{style:'display:grid;gap:14px'}),bar=el('div',{class:'lc-tabs',role:'tablist'});
+  const TABS=[['team',isAdmin?'Сотрудники':'Моя команда'],['links','Ссылки']];
+  const drawBar=()=>bar.replaceChildren(...TABS.map(([k,t])=>el('button',{type:'button',role:'tab','aria-selected':String(k===staffState.tab),class:'lc-tab'+(k===staffState.tab?' on':''),onclick:()=>{staffState.tab=k;drawBar();drawBody();pushHash()}},t)));
+  const drawBody=async()=>{body.replaceChildren(el('div',{class:'mut'},'Загрузка…'));try{body.replaceChildren(...(staffState.tab==='links'?(await viewLinks()).slice(1):(await staffTeam()).slice(1)).filter(Boolean))}catch(x){if(x.message!=='auth')body.replaceChildren(el('div',{class:'err'},x.message))}};
+  drawBar();root.append(bar,body);await drawBody();
+  return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},isAdmin?'Сотрудники':'Моя команда')),root];
+}
+async function staffTeam(){
   const rows=(await api('/staff')).sort((a,b)=>(b.role==='admin')-(a.role==='admin')||a.id-b.id);
   const isAdmin=me.role==='admin';
   const f={login:el('input',{required:'',autocomplete:'off'}),name:el('input',{required:''}),password:el('input',{type:'password',minlength:'8',required:'',autocomplete:'new-password'}),
@@ -1071,6 +1083,14 @@ async function viewStaff(){
     isAdmin?el('label',{},'Тимлидер',f.parent):el('span'),
     el('button',{class:'btn',type:'submit'},'Добавить'),err);
   const parentName=id=>(rows.find(s=>s.id===id)||{}).name||'—';
+  // Тимлидера стримеру и медиабайеру админ меняет прямо в таблице
+  const leads=rows.filter(s=>['admin','teamlead'].includes(s.role));
+  const parentCell=r=>{
+    if(!isAdmin||!['streamer','buyer'].includes(r.role))return td(parentName(r.parent_id));
+    const sel=el('select',{'aria-label':'Тимлидер',style:'width:auto;min-width:130px;padding:6px 8px',onchange:async()=>{try{await api('/staff/'+r.id,{method:'PATCH',body:{parent_id:sel.value||null}});r.parent_id=sel.value?Number(sel.value):null;toast('Тимлидер изменён')}catch(x){toast(x.message);sel.value=r.parent_id||''}}},
+      el('option',{value:''},'Без тимлидера'),...leads.map(s=>el('option',{value:s.id},s.name)));
+    sel.value=r.parent_id||'';return el('td',{},sel);
+  };
   const toggle=r=>isAdmin&&r.id!==me.id?el('button',{class:'btn o s',type:'button',onclick:async()=>{await api('/staff/'+r.id,{method:'PATCH',body:{active:!r.active}});render()}},r.active?'Отключить':'Включить'):'';
   const pickP=el('select',{},...rows.filter(s=>['admin','streamer','teamlead','buyer'].includes(s.role)).map(s=>el('option',{value:s.id},s.name+' · '+ROLE[s.role])));
   const po={t:el('input',{placeholder:'daria_manager',maxlength:'40'}),c:el('input',{placeholder:'daria'}),p:el('input',{placeholder:'LIO669'}),l:el('input',{placeholder:'https://…/register?…&ac=daria&cid=…'}),r:el('input',{placeholder:'https://… (необязательно)'})};
@@ -1084,7 +1104,7 @@ async function viewStaff(){
     el('label',{style:'grid-column:1/-1'},'Ссылка регистрации (WW)',po.l),el('label',{style:'grid-column:1/-1'},'Ссылка регистрации (RU)',po.r),
     el('button',{class:'btn',type:'submit'},'Сохранить'),perr):el('span');
   return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},isAdmin?'Сотрудники':'Моя команда')),form,poForm,
-    ctrT(table(['Имя','Логин',...(isAdmin?['Пароль']:[]),'Роль','Тимлидер','Кампания PO','Промокод','Статус',''],rows.map(r=>[el('td',{},el('span',{class:'cp'},r.name,isAdmin?el('button',{type:'button',title:'Карточка сотрудника','aria-label':'Карточка сотрудника',onclick:()=>openStaffCard(r.id)},svgIcon(PERSON)):null)),td(r.login),...(isAdmin?[pwCell(r)]:[]),el('td',{},el('span',{class:'pill p-pur'},ROLE[r.role])),td(parentName(r.parent_id)),td(r.po_campaign||'—'),td(r.po_promo||'—'),el('td',{},el('span',{class:'pill '+(r.active?'p-ok':'p-bad')},r.active?'активен':'отключён')),el('td',{},toggle(r))]),'Пока никого нет.'))];
+    ctrT(table(['Имя','Логин',...(isAdmin?['Пароль']:[]),'Роль','Тимлидер','Кампания PO','Промокод','Статус',''],rows.map(r=>[el('td',{},el('span',{class:'cp'},r.name,isAdmin?el('button',{type:'button',title:'Карточка сотрудника','aria-label':'Карточка сотрудника',onclick:()=>openStaffCard(r.id)},svgIcon(PERSON)):null)),td(r.login),...(isAdmin?[pwCell(r)]:[]),el('td',{},el('span',{class:'pill p-pur'},ROLE[r.role])),parentCell(r),td(r.po_campaign||'—'),td(r.po_promo||'—'),el('td',{},el('span',{class:'pill '+(r.active?'p-ok':'p-bad')},r.active?'активен':'отключён')),el('td',{},toggle(r))]),'Пока никого нет.'))];
 }
 
 const ctrT=t=>{t.classList.add('ctr');return t};
