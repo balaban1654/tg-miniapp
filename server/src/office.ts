@@ -1007,17 +1007,18 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
       const tx = 'imp-' + createHash('sha1').update([event, trader, dt, amount].join('|')).digest('hex').slice(0, 16);
       const q = new URLSearchParams({ secret: config.postbackSecret, txid: tx, imported: '1' });
       for (const [k, v] of qp) if (k !== 'secret' && k !== 'txid' && v !== '') q.set(k, v);
+      await db.query(`DELETE FROM postback_log WHERE query->>'txid' = $1 AND result LIKE 'пропущен%'`, [tx]); // повторная загрузка не плодит строки
       const res = await app.inject({ method: 'GET', url: `/postback/${event}?${q.toString()}` });
       const o = res.json() as { ok?: boolean; ignored?: boolean; duplicate?: boolean };
       if (!o.ok) { out.errors++; continue; }
+      // время из выгрузки партнёрки (UTC+2) получает и событие, и строка журнала, в том числе пропущенная
+      if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(dt)) {
+        await db.query(`UPDATE postback_log SET created_at = ($2::timestamp AT TIME ZONE 'Etc/GMT-2') WHERE query->>'txid' = $1`, [tx, dt]);
+        if (!o.ignored && !o.duplicate) await db.query(`UPDATE events SET created_at = ($2::timestamp AT TIME ZONE 'Etc/GMT-2') WHERE external_id = $1`, [`${event}:${tx}`, dt]);
+      }
       if (o.ignored) { out.unknown++; if (trader && !out.unknownIds.includes(trader)) out.unknownIds.push(trader); continue; }
       if (o.duplicate) { out.exists++; continue; }
       out.added++;
-      if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(dt)) {
-        // время в выгрузке партнёрки: UTC+2
-        const ev = await db.query(`UPDATE events SET created_at = ($2::timestamp AT TIME ZONE 'Etc/GMT-2') WHERE external_id = $1 RETURNING id`, [`${event}:${tx}`, dt]);
-        if (ev.rowCount) await db.query(`UPDATE postback_log SET created_at = ($2::timestamp AT TIME ZONE 'Etc/GMT-2') WHERE event_id = $1`, [ev.rows[0].id, dt]);
-      }
     }
     return { ok: true, ...out, unknownIds: out.unknownIds.slice(0, 200) };
   });
