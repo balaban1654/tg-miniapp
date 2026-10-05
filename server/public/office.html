@@ -118,6 +118,8 @@ tr.rowc{cursor:pointer}tr.rowc:hover{background:#ffffff08}tr.rowc.on{background:
 .fhead2 span{text-align:left;white-space:nowrap}.fhead2 span:nth-child(n+3):nth-child(-n+5){text-align:center}
 .chk{display:flex;justify-content:center}.chk input{width:auto}
 @media(max-width:800px){.rev{grid-template-columns:1fr}.frow2{grid-template-columns:1fr}.fhead2{display:none}}
+.rep2 .lc-field{min-width:0}
+@media(max-width:560px){.rep2{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:10px}.rep2.first-full>.lc-field:nth-child(-n+2),.rep2 .full{grid-column:1/-1}.rep2 .lc-field label{font-size:12px}}
 .lc-two{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
 .iic{display:none}.me{margin-top:auto;padding:10px;color:var(--mut);font-size:12px;display:grid;gap:8px}
 main{padding:22px clamp(14px,3vw,32px);display:grid;grid-template-columns:minmax(0,1fr);gap:18px;align-content:start;min-width:0}
@@ -2127,9 +2129,9 @@ async function openFinishModal(live,skew,opts={}){
   }},'Отправить на проверку');
   box.replaceChildren(
     el('div',{class:'lc-head'},el('h3',{style:'font-size:18px'},'Отчёт о смене'),el('button',{class:'btn o s',type:'button','aria-label':'Закрыть',onclick:close},'✕')),
-    el('div',{class:'lc-two'},el('div',{class:'lc-field'},el('label',{},'Дата начала эфира'),startDay),el('div',{class:'lc-field'},el('label',{},'Время начала эфира'),startTime),
-      el('div',{class:'lc-field'},el('label',{},'Длительность эфира (подставилась с таймера)'),time),
-      ...inputs.map(x=>el('div',{class:'lc-field'},el('label',{},x.d.name+(x.d.required?' *':'')),x.i))),
+    el('div',{class:'lc-two rep2'},el('div',{class:'lc-field'},el('label',{},'Дата начала'),startDay),el('div',{class:'lc-field'},el('label',{},'Время начала'),startTime),
+      el('div',{class:'lc-field full'},el('label',{},'Длительность эфира (подставилась с таймера)'),time),
+      ...inputs.map(x=>el('div',{class:'lc-field'+(x.d.kind==='link'?' full':'')},el('label',{},x.d.name+(x.d.required?' *':'')),x.i))),
     el('div',{class:'lc-field'},el('label',{},'Комментарий'),comment),
     file,el('div',{class:'drop-row'},drop,pasteBtn),prev,err,el('div',{class:'lc-actions'},send));
 }
@@ -2290,9 +2292,9 @@ async function openAddReportModal(){
   box.replaceChildren(
     el('div',{class:'lc-head'},el('h3',{style:'font-size:18px'},'Добавить отчёт'),el('button',{class:'btn o s',type:'button','aria-label':'Закрыть',onclick:close},'✕')),
     el('div',{class:'mut sm'},'Отчёт сразу станет проверенным и зачтённым, время пойдёт в расчёт часов и зарплаты.'),
-    el('div',{class:'lc-two'},el('div',{class:'lc-field'},el('label',{},'Стример'),who),el('div',{class:'lc-field'},el('label',{},'Длительность эфира'),time),
-      el('div',{class:'lc-field'},el('label',{},'Дата начала эфира'),startDay),el('div',{class:'lc-field'},el('label',{},'Время начала эфира'),startTime),
-      ...inputs.map(x=>el('div',{class:'lc-field'},el('label',{},x.d.name),x.i))),
+    el('div',{class:'lc-two rep2 first-full'},el('div',{class:'lc-field'},el('label',{},'Стример'),who),el('div',{class:'lc-field'},el('label',{},'Длительность эфира'),time),
+      el('div',{class:'lc-field'},el('label',{},'Дата начала'),startDay),el('div',{class:'lc-field'},el('label',{},'Время начала'),startTime),
+      ...inputs.map(x=>el('div',{class:'lc-field'+(x.d.kind==='link'?' full':'')},el('label',{},x.d.name),x.i))),
     el('div',{class:'lc-field'},el('label',{},'Комментарий'),comment),
     file,el('div',{class:'drop-row'},drop,pasteBtn),prev,err,el('div',{class:'lc-actions'},send));
 }
