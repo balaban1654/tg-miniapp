@@ -252,6 +252,21 @@ textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10
  .accv .tbl.sumt tr.on{border-color:var(--acc)}
  .accv .rev,.accv .frow2{grid-template-columns:minmax(0,1fr)}
 }
+.sumcards{display:none}
+@media(max-width:700px){
+ .accv .tbl.sumt{display:none!important}
+ .accv .sumcards{display:grid;gap:12px}
+ .sc{padding:14px 14px 10px;cursor:pointer;display:flex;flex-direction:column;gap:7px}
+ .sc-n{font:700 18px var(--fd)}
+ .sc-p{display:flex;gap:16px;font-size:13px;color:var(--mut);padding-bottom:4px}.sc-p b.ok{color:var(--ok)}.sc-p b.warn{color:var(--warn)}.sc-p b.bad{color:var(--bad)}
+ .sc-r{display:flex;align-items:baseline;gap:8px;font-size:13px;color:var(--mut);line-height:1.35}
+ .sc-r .a{flex:none;max-width:68%}
+ .sc-r .ld{flex:1;min-width:10px;border-bottom:1px dotted #ffffff30;transform:translateY(-3px)}
+ .sc-r .v{flex:none;color:var(--fg);font-weight:600;text-align:right;font-variant-numeric:tabular-nums}
+ .sc-r.strong{font-size:15px;color:var(--fg)}.sc-r.strong .v{font-weight:800}
+ .sc-r.due{margin-top:2px;padding:8px 10px;border-radius:10px;background:#9b5cff1a;border:1px solid var(--acc)}.sc-r.due .v{color:var(--ok);font-size:17px}.sc-r.due .ld{border-color:#ffffff22}
+ .sc-sep{height:1px;background:var(--line);margin:3px 0}
+}
 /* дашборд админа */
 .dx{display:grid;gap:16px;min-width:0}
 .dx-top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
@@ -2224,7 +2239,35 @@ async function accSum(){
   const SUMH=['Стример','Часы','Смены','План смен','Лиды (FTD)','План лидов','За смены','За лидов','Бонусы FTD','Дневные','Доп.','Итого','Выплачено','К выплате'];
   rows.forEach(tr=>[...tr.children].forEach((c,i)=>c.setAttribute('data-l',SUMH[i]||'')));
   const tbl=el('div',{class:'tbl ctr sumt'},el('table',{},el('thead',{},el('tr',{},SUMH.map(c=>el('th',{},c)))),el('tbody',{},rows)));
-  return[tiles,R.length?tbl:el('div',{class:'card empty'},'Стримеров пока нет. Добавьте их в разделе «Сотрудники».'),el('div',{class:'mut sm'},'Нажмите на строку, чтобы увидеть разбор начисления.'),detail];
+  // Телефон: у каждого стримера своя карточка, строки «название ······ сумма» выровнены по обоим краям
+  const trs=[...tbl.querySelectorAll('tbody tr')];
+  const dim=(()=>{const m=d.period||accState.period||kyivToday().slice(0,7);const[y,mo]=m.split('-').map(Number);return new Date(Date.UTC(y,mo,0)).getUTCDate()})();
+  const paceP=(d.period||accState.period)===kyivToday().slice(0,7)?Number(kyivToday().slice(8))/dim*100:100;
+  const lvc=p=>p>=paceP?'ok':p>=paceP*.85?'warn':'bad';
+  const planShifts=d.plan.hours/d.plan.shiftH,planLeads=d.plan.leads||0;
+  const row=(a,v,cls)=>el('div',{class:'sc-r'+(cls?' '+cls:'')},el('span',{class:'a'},a),el('span',{class:'ld'}),el('span',{class:'v'},v));
+  const cards=R.map((r,i)=>{const k=r.kpi;
+    const sp=planShifts?k.shifts/planShifts*100:0,lp=planLeads?k.ftdCount/planLeads*100:0;
+    const c=el('div',{class:'card sc',tabindex:'0',onclick:()=>{trs[i]&&trs[i].click();setTimeout(()=>detail.scrollIntoView({behavior:'smooth',block:'start'}),50)}},
+      el('div',{class:'sc-n'},r.staff.name),
+      el('div',{class:'sc-p'},el('span',{},'Смены: ',el('b',{class:lvc(sp)},Math.round(sp)+'%')),el('span',{},'Лиды: ',el('b',{class:lvc(lp)},Math.round(lp)+'%'))),
+      row('Часы в эфире',hmin(k.hoursMin)+(k.overtimeMin?' (+'+hmin(k.overtimeMin)+')':'')),
+      row('Смен',k.shifts+' из '+n0(planShifts)),
+      row('Лидов (FTD)',k.ftdCount+(planLeads?' из '+planLeads:'')),
+      el('div',{class:'sc-sep'}),
+      row('За смены (ставка $'+k.act.baseRate+')',usd2(k.act.base)),
+      row('За лидов ('+k.ftdCount+' × $'+k.act.price+')',usd2(k.act.leadsPay)),
+      row('Бонусы за FTD',usd2(k.ftdBonus)),
+      row('Дневные бонусы',usd2(k.dayBonus)),
+      row('Премии',usd2(k.adjBonus)),
+      row('Штрафы',k.adjPenalty?'−'+usd2(k.adjPenalty):usd2(0)),
+      el('div',{class:'sc-sep'}),
+      row('Итого',usd2(k.total),'strong'),
+      row('Выплачено',k.paid?usd2(-k.paid):'—'),
+      row('К выплате',usd2(k.due),'strong due'));
+    return c});
+  const list=el('div',{class:'sumcards'},...cards);
+  return[tiles,R.length?tbl:el('div',{class:'card empty'},'Стримеров пока нет. Добавьте их в разделе «Сотрудники».'),R.length?list:null,el('div',{class:'mut sm'},'Нажмите на строку, чтобы увидеть разбор начисления.'),detail];
 }
 
 async function accDetail(box,id){
