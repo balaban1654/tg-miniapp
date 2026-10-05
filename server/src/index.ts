@@ -70,7 +70,7 @@ app.get('/favicon.ico', async (_req, reply) => reply.type('image/png').header('C
 
 // Заглушка для корня домена, пока основного сайта нет
 const siteHtml = readFileSync(resolve(process.cwd(), 'public/site.html'), 'utf8').replaceAll('{{BOT}}', config.botUsername);
-app.get('/site', async (_req, reply) => reply.type('text/html; charset=utf-8').header('Cache-Control', 'public, max-age=300').send(siteHtml));
+app.get('/site', async (_req, reply) => reply.type('text/html; charset=utf-8').header('Cache-Control', 'public, max-age=60').send(siteHtml));
 const termsHtml = readFileSync(resolve(process.cwd(), 'public/terms.html'), 'utf8');
 app.get('/terms', async (_req, reply) => reply.type('text/html; charset=utf-8').header('Cache-Control', 'public, max-age=300').send(termsHtml));
 
