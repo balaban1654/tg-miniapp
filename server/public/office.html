@@ -239,6 +239,17 @@ textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10
  .accv .tbl tr.sum-row{border-color:var(--acc)}
  .accv .tbl img{max-width:100%}
  .accv input[placeholder^='Причина']{width:100%!important}.accv .btn{min-height:40px}
+ .accv .tbl.sumt tbody tr{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;padding:10px}
+ .accv .tbl.sumt td{display:flex!important;flex-direction:column;align-items:flex-start;justify-content:flex-start;gap:3px;padding:7px 8px;border:1px solid var(--line)!important;border-radius:10px;background:var(--bg2);text-align:left!important;font-size:13px;width:auto;min-width:0}
+ .accv .tbl.sumt td+td{border-top:1px solid var(--line)!important}
+ .accv .tbl.sumt td::before{max-width:none;font-size:9.5px;line-height:1.2;letter-spacing:.04em;color:var(--mut)}
+ .accv .tbl.sumt td:first-child{grid-column:1/-1;background:none;border:0!important;padding:0 0 2px;font-size:16px}
+ .accv .tbl.sumt td:first-child::before{display:none}
+ .accv .tbl.sumt td .pill{font-size:10px;padding:2px 7px;white-space:nowrap}
+ .accv .tbl.sumt td .sm{font-size:10px}
+ .accv .tbl.sumt td:nth-child(12),.accv .tbl.sumt td:nth-child(14){border-color:var(--acc)!important}
+ .accv .tbl.sumt td:nth-child(14){background:#9b5cff1a;grid-column:1/-1;flex-direction:row;justify-content:space-between;align-items:center;font-size:16px}.accv .tbl.sumt td:nth-child(14)::before{font-size:11px}
+ .accv .tbl.sumt tr.on{border-color:var(--acc)}
  .accv .rev,.accv .frow2{grid-template-columns:minmax(0,1fr)}
 }
 /* дашборд админа */
@@ -2210,7 +2221,9 @@ async function accSum(){
     tr.addEventListener('click',open);tr.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open()}});
     if(accState.sel===r.staff.id)setTimeout(()=>{tr.classList.add('on');accDetail(detail,r.staff.id)},0);
     return tr});
-  const tbl=el('div',{class:'tbl ctr'},el('table',{},el('thead',{},el('tr',{},['Стример','Часы','Смены','План смен','Лиды (FTD)','План лидов','За смены','За лидов','Бонусы FTD','Дневные','Доп.','Итого','Выплачено','К выплате'].map(c=>el('th',{},c)))),el('tbody',{},rows)));
+  const SUMH=['Стример','Часы','Смены','План смен','Лиды (FTD)','План лидов','За смены','За лидов','Бонусы FTD','Дневные','Доп.','Итого','Выплачено','К выплате'];
+  rows.forEach(tr=>[...tr.children].forEach((c,i)=>c.setAttribute('data-l',SUMH[i]||'')));
+  const tbl=el('div',{class:'tbl ctr sumt'},el('table',{},el('thead',{},el('tr',{},SUMH.map(c=>el('th',{},c)))),el('tbody',{},rows)));
   return[tiles,R.length?tbl:el('div',{class:'card empty'},'Стримеров пока нет. Добавьте их в разделе «Сотрудники».'),el('div',{class:'mut sm'},'Нажмите на строку, чтобы увидеть разбор начисления.'),detail];
 }
 
