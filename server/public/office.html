@@ -380,10 +380,17 @@ textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10
 .rb-d.start,.rb-d.end{background:var(--acc);color:#fff;border-radius:50%}.rb-d.start.in-r{border-radius:50% 0 0 50%}
 .rb-d.today{box-shadow:inset 0 0 0 1.5px #ff5cc8}
 .rb-hint{grid-column:1/-1;color:var(--mut);font-size:12px}
+
+.rb-apply{display:none}
 @media(max-width:820px){
  .rb{width:100%;flex-wrap:wrap;margin-left:0}.rb-pill{flex:1;min-width:0}
- .rb-pop{position:fixed;left:12px;right:12px;top:auto;margin-top:8px;grid-template-columns:1fr;max-height:80vh;overflow:auto}
- .rb-ps{flex-direction:row;flex-wrap:wrap;padding-top:0}.rb-cal{grid-template-columns:1fr}.rb-cal .rb-m:first-child{display:none}.rb-nav.mob{display:grid}
+ .rb-pop{position:fixed;left:0;right:0;bottom:0;top:auto;margin:0;z-index:80;grid-template-columns:minmax(0,1fr);gap:12px;max-height:88vh;max-height:88dvh;overflow:auto;border-radius:20px 20px 0 0;padding:14px 14px calc(16px + env(safe-area-inset-bottom,0px));box-shadow:0 0 0 100vmax rgba(5,2,12,.62)}
+ .rb-ps{flex-direction:row;flex-wrap:nowrap;overflow-x:auto;padding:0 0 4px;gap:6px;scrollbar-width:none}.rb-ps::-webkit-scrollbar{display:none}
+ .rb-ps button{flex:none;border:1px solid var(--line);padding:8px 14px;font-size:13px}
+ .rb-cal{grid-template-columns:minmax(0,1fr);gap:0}.rb-cal .rb-m:first-child{display:none}.rb-nav.mob{display:grid}
+ .rb-nav{width:34px;height:34px;top:-2px}.rb-mh{height:34px;font-size:17px}
+ .rb-d{height:38px;font-size:15px}.rb-w{font-size:11px;padding:4px 0}
+ .rb-apply{display:block;width:100%;padding:13px;font-size:15px;position:sticky;bottom:0;box-shadow:0 -10px 14px #120b22}
 }
 /* дашборд стримера и задачи */
 .dx-ic{display:grid;place-items:center;width:34px;height:34px;border-radius:99px;flex:none}.dx-ic.a{background:#9b5cff26;color:var(--acc2)}.dx-ic.w{background:#ffb84d26;color:var(--warn)}.dx-ic.r{background:#ff6b8a26;color:var(--bad)}.dx-ic.ok{background:#3ddc9726;color:var(--ok)}
@@ -882,7 +889,7 @@ function rangeBar(onApply){
     days.length=0;
     const presets=dxPresets();
     const ps=el('div',{class:'rb-ps'},...presets.map(([t,r])=>el('button',{type:'button',class:dxSame(r,sel)&&!anchor?'on':'',onclick:()=>{sel={...r};anchor=null;view=perShift(r.to.slice(0,7),-1);draw()}},t)),el('button',{type:'button',class:!anchor&&!presets.some(([,r])=>dxSame(r,sel))||anchor?'on':'',onclick:()=>{anchor=null}},'Свободный период'));
-    pop.replaceChildren(ps,el('div',{class:'rb-cal'},monthEl(view,'l'),monthEl(perShift(view,1),'r')));
+    pop.replaceChildren(ps,el('div',{class:'rb-cal'},monthEl(view,'l'),monthEl(perShift(view,1),'r')),el('button',{type:'button',class:'btn rb-apply',onclick:()=>go.click()},'Применить'));
     paint(sel);
   }
   pill.addEventListener('click',e=>{e.stopPropagation();const open=pop.hidden;dxCloseAll();if(open){sel={...dxCur()};anchor=null;view=perShift(sel.to.slice(0,7),-1);draw();pop.hidden=false;pill.classList.add('on');pill.setAttribute('aria-expanded','true')}});
