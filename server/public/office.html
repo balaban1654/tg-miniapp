@@ -512,6 +512,12 @@ function table(cols,rows,empty){
 }
 const td=(v,cls)=>el('td',{class:cls||''},v);
 
+function askC(text){return new Promise(res=>{const prev=document.activeElement;const done=v=>{ov.remove();document.removeEventListener('keydown',kd,true);try{prev&&prev.focus&&prev.focus()}catch{}res(v)};
+  const kd=e=>{if(e.key==='Escape'){e.preventDefault();e.stopPropagation();done(false)}};
+  const ok=el('button',{type:'button',class:'btn',onclick:()=>done(true)},'Да'),no=el('button',{type:'button',class:'btn o',onclick:()=>done(false)},'Отмена');
+  const ov=el('div',{class:'lc-overlay ask-ov',role:'alertdialog','aria-modal':'true',style:'z-index:120',onclick:e=>{if(e.target===ov)done(false)}},
+    el('div',{class:'card',style:'max-width:420px;width:100%;display:grid;gap:16px;text-align:center'},el('div',{style:'white-space:pre-line;line-height:1.45'},text),el('div',{style:'display:flex;gap:10px;justify-content:center'},ok,no)));
+  document.body.append(ov);document.addEventListener('keydown',kd,true);ok.focus()})}
 function toast(t){document.querySelectorAll('.toast').forEach(x=>x.remove());const n=el('div',{class:'toast',role:'status'},t);document.body.append(n);setTimeout(()=>n.remove(),2050)}
 (function(){const r=document.getElementById('rain');if(!r||matchMedia('(prefers-reduced-motion:reduce)').matches)return;
   for(let i=0;i<26;i++){const c=document.createElement('i');c.style.cssText='left:'+Math.random()*100+'%;height:'+(14+Math.random()*34)+'px;background:'+(Math.random()<.5?'#43b82f':'#ff3b1d')+';opacity:'+(.15+Math.random()*.3)+';animation-duration:'+(14+Math.random()*18)+'s;animation-delay:-'+Math.random()*30+'s';r.appendChild(c)}})();
@@ -707,7 +713,7 @@ async function openNavEditor(){
     }catch(x){err.textContent=x.message}
   };
   const reset=async()=>{
-    if(!confirm(target==='me'?'Вернуть стандартное меню?':'Вернуть стримерам стандартное меню?'))return;
+    if(!await askC(target==='me'?'Вернуть стандартное меню?':'Вернуть стримерам стандартное меню?'))return;
     try{
       if(target==='me'){await api('/profile/nav',{method:'PUT',body:{layout:null}});me.nav_layout=null;drawNav();updateBadge();close();toast('Меню сброшено')}
       else{await api('/nav/streamer',{method:'PUT',body:{layout:null}});streamerLay=null;load();draw();toast('Меню стримеров сброшено')}
@@ -1713,11 +1719,11 @@ async function viewLinks(){
       try{const x=await api('/links/random',{method:'POST',body:{source:src.value,owner_id:owner.value||undefined}});const nu=goUrl(x.slug);try{await navigator.clipboard.writeText(nu);toast('Создана и скопирована: '+nu)}catch{toast('Создана: '+nu)}render({soft:true})}catch(x){err.textContent=x.message}}},'Создать случайную'):null,err);
   const copyBtn=u=>{const b=el('button',{type:'button',class:'cp-btn',title:'Скопировать ссылку','aria-label':'Скопировать ссылку',style:'background:none;border:0;color:var(--mut);cursor:pointer;padding:2px 4px;margin-left:6px;vertical-align:middle;display:inline-grid'},svgIcon(COPYI,15));
     b.addEventListener('click',async()=>{try{await navigator.clipboard.writeText(u);b.replaceChildren(svgIcon('<path d="M5 12.5l4.5 4.5L19 7.5"/>',15));b.style.color='var(--ok)';toast('Ссылка скопирована')}catch{toast('Выделите ссылку и скопируйте вручную')}setTimeout(()=>{b.replaceChildren(svgIcon(COPYI,15));b.style.color=''},1500)});return b};
-  const srcTable=ctrT(table(['Источник','Ссылок','Клики','Старты','Регистрации','FTD','Депозиты',...(adm?['Комиссия']:[])],sources.map(x=>[el('td',{},x.source,adm?el('button',{type:'button',title:'Обнулить статистику источника','aria-label':'Обнулить статистику источника',style:'background:none;border:0;color:var(--mut);cursor:pointer;padding:2px 4px;margin-left:6px;vertical-align:middle;display:inline-grid',onclick:async()=>{if(!confirm('Обнулить статистику источника «'+x.source+'»?\nКлики и счётчики по его ссылкам начнутся с нуля. Лиды и деньги не удаляются.'))return;try{await api('/links/reset',{method:'POST',body:{source:x.source}});toast('Статистика источника обнулена');render({soft:true})}catch(e){toast(e.message)}}},svgIcon('<path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5"/>',14)):null),td(x.links,'n'),td(x.clicks,'n'),td(x.starts,'n'),td(x.regs,'n'),td(x.ftds,'n'),td(money(x.deposits),'n'),...(adm?[td(money(x.commission),'n')]:[])]),'Данные по источникам появятся, когда придут первые лиды.'));
+  const srcTable=ctrT(table(['Источник','Ссылок','Клики','Старты','Регистрации','FTD','Депозиты',...(adm?['Комиссия']:[])],sources.map(x=>[el('td',{},x.source,adm?el('button',{type:'button',title:'Обнулить статистику источника','aria-label':'Обнулить статистику источника',style:'background:none;border:0;color:var(--mut);cursor:pointer;padding:2px 4px;margin-left:6px;vertical-align:middle;display:inline-grid',onclick:async()=>{if(!await askC('Обнулить статистику источника «'+x.source+'»?\nКлики и счётчики по его ссылкам начнутся с нуля. Лиды и деньги не удаляются.'))return;try{await api('/links/reset',{method:'POST',body:{source:x.source}});toast('Статистика источника обнулена');render({soft:true})}catch(e){toast(e.message)}}},svgIcon('<path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5"/>',14)):null),td(x.links,'n'),td(x.clicks,'n'),td(x.starts,'n'),td(x.regs,'n'),td(x.ftds,'n'),td(money(x.deposits),'n'),...(adm?[td(money(x.commission),'n')]:[])]),'Данные по источникам появятся, когда придут первые лиды.'));
   return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Ссылки')),form,
-    el('div',{style:'display:flex;align-items:center;gap:12px;justify-content:space-between'},el('h3',{style:'font-size:15px'},'По источникам'),adm?el('button',{type:'button',class:'btn o',onclick:async()=>{if(!confirm('Обнулить статистику ВСЕХ ссылок?\nКлики и счётчики начнутся с нуля. Лиды и деньги не удаляются.'))return;try{await api('/links/reset',{method:'POST',body:{all:true}});toast('Вся статистика ссылок обнулена');render({soft:true})}catch(e){toast(e.message)}}},'Обнулить всё'):null),srcTable,
+    el('div',{style:'display:flex;align-items:center;gap:12px;justify-content:space-between'},el('h3',{style:'font-size:15px'},'По источникам'),adm?el('button',{type:'button',class:'btn o',onclick:async()=>{if(!await askC('Обнулить статистику ВСЕХ ссылок?\nКлики и счётчики начнутся с нуля. Лиды и деньги не удаляются.'))return;try{await api('/links/reset',{method:'POST',body:{all:true}});toast('Вся статистика ссылок обнулена');render({soft:true})}catch(e){toast(e.message)}}},'Обнулить всё'):null),srcTable,
     el('h3',{style:'font-size:15px'},'По ссылкам'),
-    ctrT(table(['Ссылка','Источник','Владелец','Клики','Старты','Рег','FTD','Депозиты',...(adm?['Комиссия']:[])],rows.map(r=>{const u=goUrl(r.slug);return[el('td',{style:'white-space:nowrap'},r.parent_id?el('span',{class:'mut',style:'margin-right:4px'},'↳'):null,el('code',{style:'display:inline'},u),copyBtn(u),el('button',{type:'button',title:'Аналитика ссылки','aria-label':'Аналитика ссылки',style:'background:none;border:0;color:var(--mut);cursor:pointer;padding:2px 4px;vertical-align:middle;display:inline-grid',onclick:()=>openLinkAnalytics(r)},svgIcon('<path d="M4 20V11M10 20V4M16 20v-7M22 20H2"/>',15)),adm?el('button',{type:'button',title:'Удалить ссылку','aria-label':'Удалить ссылку',style:'background:none;border:0;color:var(--mut);cursor:pointer;padding:2px 4px;vertical-align:middle;display:inline-grid',onclick:async()=>{if(!confirm('Удалить ссылку '+u+(r.parent_id?'':' и все случайные под ней')+'?\nСсылка перестанет работать. Лиды останутся у владельца.'))return;try{await api('/links/'+r.id,{method:'DELETE'});toast('Ссылка удалена');render({soft:true})}catch(e){toast(e.message)}}},svgIcon('<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>',15)):null),td(r.source||'—'),td(r.owner_name),td(r.clicks,'n'),td(r.starts,'n'),td(r.regs,'n'),td(r.ftds,'n'),td(money(r.deposits),'n'),...(adm?[td(money(r.commission),'n')]:[])]}),
+    ctrT(table(['Ссылка','Источник','Владелец','Клики','Старты','Рег','FTD','Депозиты',...(adm?['Комиссия']:[])],rows.map(r=>{const u=goUrl(r.slug);return[el('td',{style:'white-space:nowrap'},r.parent_id?el('span',{class:'mut',style:'margin-right:4px'},'↳'):null,el('code',{style:'display:inline'},u),copyBtn(u),el('button',{type:'button',title:'Аналитика ссылки','aria-label':'Аналитика ссылки',style:'background:none;border:0;color:var(--mut);cursor:pointer;padding:2px 4px;vertical-align:middle;display:inline-grid',onclick:()=>openLinkAnalytics(r)},svgIcon('<path d="M4 20V11M10 20V4M16 20v-7M22 20H2"/>',15)),adm?el('button',{type:'button',title:'Удалить ссылку','aria-label':'Удалить ссылку',style:'background:none;border:0;color:var(--mut);cursor:pointer;padding:2px 4px;vertical-align:middle;display:inline-grid',onclick:async()=>{if(!await askC('Удалить ссылку '+u+(r.parent_id?'':' и все случайные под ней')+'?\nСсылка перестанет работать. Лиды останутся у владельца.'))return;try{await api('/links/'+r.id,{method:'DELETE'});toast('Ссылка удалена');render({soft:true})}catch(e){toast(e.message)}}},svgIcon('<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>',15)):null),td(r.source||'—'),td(r.owner_name),td(r.clicks,'n'),td(r.starts,'n'),td(r.regs,'n'),td(r.ftds,'n'),td(money(r.deposits),'n'),...(adm?[td(money(r.commission),'n')]:[])]}),
       'Ссылок пока нет. Создайте первую выше.'))];
 }
 
@@ -1757,7 +1763,7 @@ async function staffTeam(){
   const tfaCell=r=>{
     if(!r.totp)return el('td',{},el('span',{class:'mut'},'—'));
     if(r.id===me.id)return el('td',{},el('span',{class:'pill p-ok',title:'Свою 2FA админ сбрасывает через сервер'},'включена'));
-    return el('td',{},el('button',{class:'btn o s',type:'button',title:'Сбросить 2FA: сотрудник выйдет из кабинета и настроит её заново',onclick:async()=>{if(!confirm('Сбросить 2FA у '+r.name+'? Он выйдет из кабинета и при входе настроит её заново.'))return;try{await api('/staff/'+r.id+'/2fa/reset',{method:'POST'});toast('2FA сброшена: '+r.name);render()}catch(x){toast(x.message)}}},'Сбросить'));
+    return el('td',{},el('button',{class:'btn o s',type:'button',title:'Сбросить 2FA: сотрудник выйдет из кабинета и настроит её заново',onclick:async()=>{if(!await askC('Сбросить 2FA у '+r.name+'? Он выйдет из кабинета и при входе настроит её заново.'))return;try{await api('/staff/'+r.id+'/2fa/reset',{method:'POST'});toast('2FA сброшена: '+r.name);render()}catch(x){toast(x.message)}}},'Сбросить'));
   };
   const toggle=r=>isAdmin&&r.id!==me.id?el('button',{class:'btn o s',type:'button',onclick:async()=>{await api('/staff/'+r.id,{method:'PATCH',body:{active:!r.active}});render()}},r.active?'Отключить':'Включить'):'';
   const pickP=el('select',{},...rows.filter(s=>['admin','streamer','teamlead','buyer'].includes(s.role)).map(s=>el('option',{value:s.id},s.name+' · '+ROLE[s.role])));
@@ -1975,7 +1981,7 @@ function pwCell(r){
     const ico=(svg,title,fn)=>el('button',{type:'button',class:'iconb',title,'aria-label':title,onclick:fn,style:'background:none;border:0;color:var(--mut);cursor:pointer;padding:2px 4px'},svgIcon(svg));
     const gen=ico(KEYI,'Выдать новый пароль',async()=>{
       if(r.id===me.id){toast('Свой пароль меняйте в карточке (шестерёнка)');return}
-      if(!confirm('Выдать '+r.name+' новый пароль? Старый перестанет работать, сотрудник выйдет из кабинета.'))return;
+      if(!await askC('Выдать '+r.name+' новый пароль? Старый перестанет работать, сотрудник выйдет из кабинета.'))return;
       try{const d=await api('/staff/'+r.id+'/password/generate',{method:'POST'});freshPw.set(r.id,d.password);draw(true)}catch(x){toast(x.message)}});
     if(!pw){td.replaceChildren(el('span',{class:'mut',title:'Пароль хранится только в зашифрованном виде'},'••••••••'),gen);return}
     td.replaceChildren(el('code',{style:'user-select:all'},show?pw:'•'.repeat(pw.length)),
@@ -2137,7 +2143,7 @@ async function openStaffCard(id){
   const tf=el('div',{class:'lc-field',style:'border-top:1px solid var(--line);padding-top:12px'});
   const tfDraw=async()=>{
     const m=el('div',{class:'err',role:'alert'});
-    if(!self){tf.replaceChildren(el('label',{},'Двухфакторная защита'),el('div',{class:'lc-actions'},el('button',{class:'btn o s',type:'button',onclick:async()=>{if(!confirm('Сбросить 2FA? Сотрудник выйдет из кабинета и при входе настроит её заново.'))return;try{await api('/staff/'+id+'/2fa/reset',{method:'POST'});toast('2FA сброшена')}catch(x){m.textContent=x.message}}},'Сбросить 2FA'),m));return}
+    if(!self){tf.replaceChildren(el('label',{},'Двухфакторная защита'),el('div',{class:'lc-actions'},el('button',{class:'btn o s',type:'button',onclick:async()=>{if(!await askC('Сбросить 2FA? Сотрудник выйдет из кабинета и при входе настроит её заново.'))return;try{await api('/staff/'+id+'/2fa/reset',{method:'POST'});toast('2FA сброшена')}catch(x){m.textContent=x.message}}},'Сбросить 2FA'),m));return}
     let st;try{st=await api('/profile/2fa')}catch(x){tf.replaceChildren(el('div',{class:'err'},x.message));return}
     if(!st.enabled){tf.replaceChildren(el('label',{},'Двухфакторная защита'),el('div',{class:'mut sm'},'Выключена. Вход только по паролю.'),el('div',{class:'lc-actions'},el('button',{class:'btn',type:'button',onclick:()=>twofaDialog(false,tfDraw)},'Включить')));return}
     const pass=inp('password','','Пароль'),c=inp('text','','Код из приложения');pass.autocomplete='off';
@@ -2576,7 +2582,7 @@ async function accReview(){
     list.sort(by);
     const rows=list.map(r=>[td(r.staff_name),td(new Date(r.day+'T12:00:00').toLocaleDateString('ru-RU',{day:'numeric',month:'short'})),td(r.status==='await'?'—':hmin(r.declared_min)+(r.approved_min&&r.approved_min!==r.declared_min?' → '+hmin(r.approved_min):'')),el('td',{},el('span',{class:'pill '+REPSTATUS[r.status][1]},REPSTATUS[r.status][0])),
       el('td',{},r.has_screenshot?shotThumb('/api/office/shifts/'+r.id+'/screenshot',{style:'color:var(--acc2)'}).appendChild(document.createTextNode('скриншот')).parentNode:'—'),
-      el('td',{},el('button',{class:'btn o s',type:'button',style:'color:var(--bad)',onclick:async()=>{if(!confirm('Удалить отчёт '+r.staff_name+' за '+new Date(r.day+'T12:00:00').toLocaleDateString('ru-RU',{day:'numeric',month:'long'})+' из системы?'+(r.status==='approved'?' Его время пропадёт из расчёта часов и зарплаты.':'')))return;try{await api('/shifts/'+r.id,{method:'DELETE'});toast('Отчёт удалён');accRefresh()}catch(x){toast(x.message)}}},'Удалить'))]);
+      el('td',{},el('button',{class:'btn o s',type:'button',style:'color:var(--bad)',onclick:async()=>{if(!await askC('Удалить отчёт '+r.staff_name+' за '+new Date(r.day+'T12:00:00').toLocaleDateString('ru-RU',{day:'numeric',month:'long'})+' из системы?'+(r.status==='approved'?' Его время пропадёт из расчёта часов и зарплаты.':'')))return;try{await api('/shifts/'+r.id,{method:'DELETE'});toast('Отчёт удалён');accRefresh()}catch(x){toast(x.message)}}},'Удалить'))]);
     histHold.replaceChildren(ctrT(table(['Сотрудник','Дата','Время','Статус','Скрин',''],rows,done.length?'Ничего не найдено. Измените фильтры.':'За этот месяц проверенных отчётов нет.')));
   };
   drawHist();
@@ -2729,7 +2735,7 @@ async function accForm(){
     box.replaceChildren(el('div',{class:'frow2 fhead2'},el('span',{},'Поле'),el('span',{},'Тип'),el('span',{},'Обязательно'),el('span',{},'На дашборде'),el('span',{},'Показывать'),el('span',{},'')),
       ...rows.map((r,i)=>el('div',{class:'frow2'},r.name,r.kind,el('label',{class:'chk'},r.req),el('label',{class:'chk'},r.dash),el('label',{class:'chk'},r.act),
         el('span',{class:'inl'},el('button',{class:'btn o s',type:'button','aria-label':'Выше',onclick:()=>{if(i){[rows[i-1],rows[i]]=[rows[i],rows[i-1]];draw()}}},'↑'),el('button',{class:'btn o s',type:'button','aria-label':'Ниже',onclick:()=>{if(i<rows.length-1){[rows[i+1],rows[i]]=[rows[i],rows[i+1]];draw()}}},'↓'),
-          el('button',{class:'btn o s',type:'button',title:'Удалить поле','aria-label':'Удалить поле',style:'color:var(--bad)',onclick:()=>{if(r.id&&!confirm('Удалить поле «'+(r.name.value||'без названия')+'»? В старых отчётах его значения останутся.'))return;rows.splice(i,1);draw();if(r.id)toast('Поле удалится после нажатия «Сохранить»')}},'✕')))));
+          el('button',{class:'btn o s',type:'button',title:'Удалить поле','aria-label':'Удалить поле',style:'color:var(--bad)',onclick:async()=>{if(r.id&&!await askC('Удалить поле «'+(r.name.value||'без названия')+'»? В старых отчётах его значения останутся.'))return;rows.splice(i,1);draw();if(r.id)toast('Поле удалится после нажатия «Сохранить»')}},'✕')))));
   };
   draw();
   const err=el('div',{class:'err',role:'alert'});
@@ -2861,7 +2867,7 @@ async function viewChats(){
   }
   // Админ: закрыть чат (уходит из списка до нового сообщения клиента) или очистить переписку
   async function chatDone(id,how){
-    if(how==='clear'&&!confirm('Удалить всю переписку с этим клиентом? Это нельзя отменить.'))return;
+    if(how==='clear'&&!await askC('Удалить всю переписку с этим клиентом? Это нельзя отменить.'))return;
     try{
       if(how==='clear')await api('/chats/'+id,{method:'DELETE'});else await api('/chats/'+id+'/close',{method:'POST'});
       toast(how==='clear'?'Переписка удалена':'Чат закрыт');
