@@ -1375,17 +1375,9 @@ function pocketAddRow(){
   draw();return box;
 }
 /** Статус игрока для клиента: по регистрации и сумме депозитов */
-function clientRank(){
-  const sum=Number(me.deposited||0),cnt=Number(me.depositCount||0);
-  if(sum>=1000)return 'мастер';
-  if(sum>=300)return 'профессионал';
-  if(cnt>=2)return 'опытный';
-  if(cnt>=1||me.access||['ftd','active'].includes(me.status))return 'начинающий';
-  if(me.status==='registered')return 'сделан первый шаг';
-  return 'игрок вне команды';
-}
+function clientRank(){return me.tier?me.tier.name:'Новичок'}
 function viewProfile(){
-  const rows=[['Telegram ID',me.tgId,true],['Pocket ID',me.pocketId||null,true],...(me.leadRole&&me.leadRole!=='lead'?[['Роль',ROLE_NAME[me.leadRole]||me.leadRole]]:[]),['Статус',clientRank()],['Менеджер',me.manager?(me.managerTg?el('a',{href:'https://t.me/'+me.managerTg,style:'color:var(--acc2);text-decoration:none',onclick:e=>{e.preventDefault();openLink('https://t.me/'+me.managerTg)}},'@'+me.managerTg):me.manager):'не назначен'],['Доступ',me.access?'открыт':'закрыт']];
+  const rows=[['Telegram ID',me.tgId,true],['Pocket ID',me.pocketId||null,true],...(me.leadRole&&me.leadRole!=='lead'?[['Роль',ROLE_NAME[me.leadRole]||me.leadRole]]:[['Статус',clientRank()]]),...(me.leadRole&&me.leadRole!=='lead'?[]:[['Менеджер',me.manager?(me.managerTg?el('a',{href:'https://t.me/'+me.managerTg,style:'color:var(--acc2);text-decoration:none',onclick:e=>{e.preventDefault();openLink('https://t.me/'+me.managerTg)}},'@'+me.managerTg):me.manager):'не назначен']]),['Доступ',me.access?'открыт':'закрыт']];
   const copyBtn=v=>el('button',{type:'button','aria-label':'Копировать',title:'Копировать',style:'background:none;border:0;padding:2px;color:var(--mut);cursor:pointer;display:grid;place-items:center',onclick:()=>copyText(v)},svgEl(COPY_ICON));
   shell('Профиль',[el('div',{class:'card row',style:'justify-content:flex-start;gap:12px'},withPhoto(el('div',{class:'ava'},(me.name||'?').trim().slice(0,1).toUpperCase())),el('div',{},el('b',{style:'font:700 16px var(--fd)'},me.name),el('div',{class:'sm'},me.username?'@'+me.username:''))),
     el('div',{class:'card',style:'display:grid;grid-template-columns:minmax(0,1fr);gap:10px'},rows.map(([k,v,cp])=>k==='Pocket ID'&&!v?pocketAddRow():el('div',{class:'row'},el('span',{class:'sm'},k),

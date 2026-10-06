@@ -11,6 +11,7 @@ const sha256 = (v: string) => createHash('sha256').update(v).digest('hex');
 import { accountingRoutes } from './accounting.js';
 import { toVoice, toVideoNote } from './media.js';
 import { parseReviewPhoto, cleanReviewText, cleanRating } from './reviews.js';
+import { loadDepConfig, leadTierState } from './depbonus.js';
 import { dispatchTemplate, TEMPLATE_KEYS, DEFAULTS, CHANNEL_RE, normChannel, type TemplateKey } from './templates.js';
 import {
   type Staff,
@@ -1578,7 +1579,32 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     const deposits = ev.rows.filter((e) => e.type === 'ftd' || e.type === 'dep');
     const sum = (rows: any[]) => rows.reduce((t, e) => t + Number(e.amount || 0), 0);
     const last = (k: 'country' | 'promo' | 'ac') => [...ev.rows].reverse().find((e) => e[k])?.[k] ?? null;
+    // Финансовая плитка: по типам постбеков сумма, количество и даты. Стример видит только сумму FTD, у остальных количество и даты без сумм
+    const fe = (await db.query(`SELECT type, amount::float AS amount, created_at FROM events WHERE tg_id = $1 AND type IN ('ftd','dep','wd','comm') ORDER BY created_at, id`, [tgId])).rows as { type: string; amount: number | null; created_at: string }[];
+    const hide = me.role === 'streamer';
+    const fin: Record<string, { sum: number | null; count: number; dates: { at: string; amount: number | null }[] }> = {};
+    for (const t of ['ftd', 'dep', 'wd', 'comm']) {
+      const rows = fe.filter((e) => e.type === t);
+      const showSum = !hide || t === 'ftd';
+      fin[t] = { sum: showSum ? rows.reduce((a, e) => a + Number(e.amount || 0), 0) : null, count: rows.length, dates: rows.map((e) => ({ at: e.created_at, amount: showSum ? Number(e.amount || 0) : null })) };
+    }
+    // Градации додепов (без порогов) и состояние запроса бонуса
+    let tier: unknown = null;
+    if (!r.rows[0].lead_role || r.rows[0].lead_role === 'lead') {
+      const cfg = await loadDepConfig();
+      const st = await leadTierState(tgId, cfg);
+      const reqs = (await db.query(`SELECT tier, status, reject_reason FROM dep_bonus_requests WHERE tg_id = $1 ORDER BY id`, [tgId])).rows as { tier: number; status: string; reject_reason: string | null }[];
+      tier = {
+        tiers: st.tiers,
+        reached: st.reached,
+        eligible: st.eligible ? { tier: st.eligible, name: cfg.tiers[st.eligible - 1].name } : null,
+        requests: reqs.map((q) => ({ ...q, name: cfg.tiers[q.tier - 1]?.name })),
+        canRequest: me.role === 'streamer' && r.rows[0].owner_id === me.id && Boolean(st.eligible),
+      };
+    }
     return {
+      fin,
+      tier,
       lead: r.rows[0],
       country: last('country'),
       promo: last('promo'),

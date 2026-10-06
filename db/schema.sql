@@ -576,3 +576,23 @@ DELETE FROM signals s WHERE s.requested_by IS NULL AND (s.is_test OR s.demo_resu
 
 -- Админ всегда считается в общих показателях (признак «тоже стример» больше не настраивается)
 UPDATE staff SET streams = TRUE WHERE role = 'admin' AND NOT streams;
+
+-- Бонус стримеру за додепы лида: лид достигает градации по сумме депозитов, стример запрашивает бонус (сообщение и скрин), админ принимает
+CREATE TABLE IF NOT EXISTS dep_bonus_requests (
+  id              SERIAL PRIMARY KEY,
+  tg_id           BIGINT NOT NULL REFERENCES leads(tg_id) ON DELETE CASCADE,
+  staff_id        INT NOT NULL REFERENCES staff(id),
+  tier            INT NOT NULL CHECK (tier BETWEEN 1 AND 4),
+  amount          NUMERIC(12,2) NOT NULL,
+  message         TEXT NOT NULL,
+  screenshot      BYTEA,
+  screenshot_type TEXT,
+  status          TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','approved','rejected')),
+  period          TEXT,
+  reject_reason   TEXT,
+  decided_by      INT REFERENCES staff(id),
+  decided_at      TIMESTAMPTZ,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS dep_bonus_one ON dep_bonus_requests (tg_id, tier) WHERE status <> 'rejected';
+CREATE INDEX IF NOT EXISTS dep_bonus_status ON dep_bonus_requests (status, created_at);

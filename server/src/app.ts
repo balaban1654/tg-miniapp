@@ -3,6 +3,7 @@ import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { db, attachLead } from './db.js';
 import { bot } from './bot.js';
 import { config } from './config.js';
+import { loadDepConfig, leadTierState } from './depbonus.js';
 import { parseReviewPhoto, cleanReviewText, cleanRating } from './reviews.js';
 
 export interface TgUser {
@@ -174,6 +175,12 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
       [u.id],
     );
     const s = st.rows[0];
+    // Статус клиента в профиле: градация по сумме всех его депозитов (Бронза, Серебро, Золото, Платина)
+    let tier: { name: string; idx: number } | null = null;
+    if (!l.lead_role || l.lead_role === 'lead') {
+      const ts = await leadTierState(u.id, await loadDepConfig());
+      tier = ts.reached ? { name: ts.tiers[ts.reached - 1].name, idx: ts.reached } : null;
+    }
     const guess = ['ru', 'be', 'kk', 'ky', 'uz', 'tg', 'hy', 'az', 'uk'].includes(u.language_code ?? '') ? 'ru' : 'ww';
     return {
       now: new Date().toISOString(),
@@ -185,6 +192,7 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
       access: Boolean(l.access || l.is_tester), // тестовый аккаунт: доступ как у обычного клиента
       isTester: Boolean(l.is_tester),
       leadRole: l.lead_role || 'lead',
+      tier,
       pocketId: l.trader_id,
       manager: l.manager,
       managerTg: l.manager_tg ?? null,

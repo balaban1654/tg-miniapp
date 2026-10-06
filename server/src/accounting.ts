@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { db } from './db.js';
 import { announceLive } from './templates.js';
+import { DEFAULT_DEP_TIERS, normTiers, loadDepConfig, leadTierState, type DepTier } from './depbonus.js';
 import type { Role } from './auth.js';
 
 /** Бухгалтерия стримеров: KPI, смены и отчёты, бонусы и штрафы, выплаты и авансы. Работает только для роли «стример». */
@@ -19,6 +20,8 @@ export interface KpiPlan {
   tol: number; // запас на курс брокера
   shiftTol: number; // допуск по дневной смене: недобор в пределах этой доли нормы не считается невыполненным днём
   advance: number; // максимальный аванс
+  depTiers: DepTier[]; // градации додепов лида и бонус стримеру за каждую
+  depStart: string | null; // с какой даты действуют бонусы за додепы
   goals: Goals; // цели месяца для дашборда админа
 }
 
@@ -53,6 +56,8 @@ export const DEFAULT_PLAN: KpiPlan = {
   tol: 0.1,
   shiftTol: 0.15,
   advance: 200,
+  depTiers: DEFAULT_DEP_TIERS,
+  depStart: null,
   goals: { ftd: 50, ftdSum: 4500, deposits: 9500, commission: 6000, net: 3900 },
 };
 
@@ -64,7 +69,7 @@ const DATE = /^\d{4}-\d{2}-\d{2}$/;
 export async function getPlan(): Promise<KpiPlan> {
   const row = (await db.query('SELECT data FROM kpi_settings WHERE id = 1')).rows[0];
   const d = (row?.data ?? {}) as Partial<KpiPlan>;
-  return { ...DEFAULT_PLAN, ...d, day: { ...DEFAULT_PLAN.day, ...(d.day ?? {}) }, goals: { ...DEFAULT_PLAN.goals, ...(d.goals ?? {}) } };
+  return { ...DEFAULT_PLAN, ...d, depTiers: normTiers(d.depTiers), depStart: d.depStart ?? null, day: { ...DEFAULT_PLAN.day, ...(d.day ?? {}) }, goals: { ...DEFAULT_PLAN.goals, ...(d.goals ?? {}) } };
 }
 
 export async function currentPeriod(): Promise<string> {
@@ -86,6 +91,7 @@ export interface KpiResult {
   min: { base: number; baseRate: number; price: number; leadsPay: number };
   ftdBonus: number;
   dayBonus: number;
+  depBonus: number; // принятые бонусы за додепы лидов
   adjBonus: number;
   adjPenalty: number;
   total: number; // начислено по текущему состоянию планов
@@ -115,6 +121,7 @@ async function kpiCompute(staffId: number, period: string, plan: KpiPlan): Promi
   const adj = (await db.query(`SELECT kind, coalesce(sum(amount), 0)::float AS s FROM staff_adjustments WHERE staff_id = $1 AND period = $2 GROUP BY kind`, [staffId, period])).rows;
   const adjBonus = Number(adj.find((x) => x.kind === 'bonus')?.s ?? 0);
   const adjPenalty = Number(adj.find((x) => x.kind === 'penalty')?.s ?? 0);
+  const depBonusRaw = Number((await db.query(`SELECT coalesce(sum(amount), 0)::float AS s FROM dep_bonus_requests WHERE staff_id = $1 AND period = $2 AND status = 'approved'`, [staffId, period])).rows[0].s);
   const paid = Number((await db.query(`SELECT coalesce(sum(amount), 0)::float AS s FROM staff_payouts WHERE staff_id = $1 AND period = $2`, [staffId, period])).rows[0].s);
 
   const planMin = plan.hours * 60;
@@ -153,7 +160,7 @@ async function kpiCompute(staffId: number, period: string, plan: KpiPlan): Promi
   }
   const dayRows = [...days.entries()].sort().map(([d, v]) => ({ d, n: v.n, all: v.all, hit: v.n >= plan.day.count }));
   const dayBonus = dayRows.filter((x) => x.hit).length * plan.day.bonus;
-  const extra = ftdBonus + dayBonus + adjBonus - adjPenalty;
+  const extra = ftdBonus + dayBonus + depBonusRaw + adjBonus - adjPenalty;
   // Админу, который стримит, зарплата не начисляется: его FTD, депозиты и комиссия остаются в общем пуле
   const noPay = (await db.query(`SELECT role FROM staff WHERE id = $1`, [staffId])).rows[0]?.role === 'admin';
   if (noPay) {
@@ -178,6 +185,7 @@ async function kpiCompute(staffId: number, period: string, plan: KpiPlan): Promi
     min,
     ftdBonus,
     dayBonus: dayBonusPaid,
+    depBonus: noPay ? 0 : depBonusRaw,
     adjBonus: noPay ? 0 : adjBonus,
     adjPenalty: noPay ? 0 : adjPenalty,
     total,
@@ -205,7 +213,7 @@ export async function planFor(period: string): Promise<KpiPlan> {
   const row = (await db.query('SELECT plan FROM month_closes WHERE period = $1', [period])).rows[0];
   if (!row) return getPlan();
   const d = row.plan as Partial<KpiPlan>;
-  return { ...DEFAULT_PLAN, ...d, day: { ...DEFAULT_PLAN.day, ...(d.day ?? {}) }, goals: { ...DEFAULT_PLAN.goals, ...(d.goals ?? {}) } };
+  return { ...DEFAULT_PLAN, ...d, depTiers: normTiers(d.depTiers), depStart: d.depStart ?? null, day: { ...DEFAULT_PLAN.day, ...(d.day ?? {}) }, goals: { ...DEFAULT_PLAN.goals, ...(d.goals ?? {}) } };
 }
 
 export const prevPeriod = (p: string): string => {
@@ -316,6 +324,8 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
       tol: n(b.tol, cur.tol, 0, 0.5),
       shiftTol: n(b.shiftTol, cur.shiftTol, 0, 0.5),
       advance: n(b.advance, cur.advance),
+      depTiers: cur.depTiers,
+      depStart: cur.depStart,
       goals: {
         ftd: n(b.goals?.ftd, cur.goals.ftd, 0, 1e6),
         ftdSum: n(b.goals?.ftdSum, cur.goals.ftdSum, 0, 1e9),
@@ -324,6 +334,13 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
         net: n(b.goals?.net, cur.goals.net, 0, 1e9),
       },
     };
+    if (Array.isArray(b.depTiers)) {
+      const tiers = normTiers(b.depTiers.map((t: any) => ({ from: n(t?.from, 0, 0, 1e9), bonus: n(t?.bonus, 0, 0, 1e6) })));
+      for (let i = 1; i < tiers.length; i++) if (tiers[i].from <= tiers[i - 1].from) return reply.code(400).send({ error: 'Пороги градаций должны расти: каждая следующая сумма больше предыдущей' });
+      next.depTiers = tiers;
+      // Бонусы за додепы начинают действовать с момента, когда их впервые включили: старых лидов задним числом не поднимаем
+      if (!next.depStart && tiers.some((t) => t.bonus > 0)) next.depStart = new Date().toISOString();
+    }
     await db.query('UPDATE kpi_settings SET data = $1::jsonb WHERE id = 1', [JSON.stringify(next)]);
     return { ok: true, plan: next };
   });
@@ -721,13 +738,111 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
   });
 
   // ----- Выплаты и авансы (админ) -----
+  // ----- Бонусы за додепы лидов -----
+  // Стример запрашивает бонус за достигнутую градацию лида: сообщение и скрин, что с лидом шла работа
+  app.post('/dep-bonus/request', { preHandler: stream, bodyLimit: 9 * 1024 * 1024 }, async (req, reply) => {
+    const me = req.staff!;
+    const b = (req.body ?? {}) as Record<string, unknown>;
+    if (me.role !== 'streamer') return reply.code(403).send({ error: 'Бонусы за додепы у админа не начисляются' });
+    const tgId = Number(b.tg_id);
+    const message = str(b.message, 1000);
+    if (!Number.isSafeInteger(tgId)) return reply.code(400).send({ error: 'Неверный лид' });
+    if (message.length < 5) return reply.code(400).send({ error: 'Напишите сообщение: что вы делали с этим лидом' });
+    if (typeof b.screenshot !== 'string' || !b.screenshot) return reply.code(400).send({ error: 'Прикрепите скриншот' });
+    const photo = Buffer.from(b.screenshot.replace(/^data:[^,]*,/, ''), 'base64');
+    if (!IMG_OK(photo)) return reply.code(400).send({ error: 'Скриншот должен быть картинкой JPG, PNG или WebP' });
+    if (photo.length > 6 * 1024 * 1024) return reply.code(400).send({ error: 'Скриншот больше 6 МБ' });
+    const lead = (await db.query(`SELECT tg_id FROM leads WHERE tg_id = $1 AND owner_id = $2 AND lead_role = 'lead' AND removed_at IS NULL`, [tgId, me.id])).rows[0];
+    if (!lead) return reply.code(404).send({ error: 'Лид не найден' });
+    const cfg = await loadDepConfig();
+    const st = await leadTierState(tgId, cfg);
+    if (!st.eligible) return reply.code(409).send({ error: 'Сейчас запросить бонус по этому лиду нельзя' });
+    try {
+      await db.query(
+        `INSERT INTO dep_bonus_requests (tg_id, staff_id, tier, amount, message, screenshot, screenshot_type) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+        [tgId, me.id, st.eligible, cfg.tiers[st.eligible - 1].bonus, message, photo, imgType(photo)],
+      );
+    } catch (e: any) {
+      if (e.code === '23505') return reply.code(409).send({ error: 'Запрос по этой градации уже отправлен' });
+      throw e;
+    }
+    return { ok: true };
+  });
+  // Свои лиды, по которым можно запросить бонус (для блока «Требует внимания»), и недавние решения
+  // Свои лиды, по которым можно запросить бонус (для блока «Требует внимания»), и недавние отказы
+  const depBonusMine = async (me: { id: number; role: string }) => {
+    if (me.role !== 'streamer') return { eligible: [] as any[], recent: [] as any[] };
+    const cfg = await loadDepConfig();
+    const min = Math.min(...cfg.tiers.map((t) => t.from));
+    const leads = (
+      await db.query(
+        `SELECT d.tg_id, d.username, d.first_name FROM leads d
+          WHERE d.owner_id = $1 AND d.lead_role = 'lead' AND d.removed_at IS NULL
+            AND coalesce((SELECT sum(amount) FROM events e WHERE e.tg_id = d.tg_id AND e.type IN ('ftd','dep')), 0) >= $2
+          ORDER BY d.created_at DESC LIMIT 200`,
+        [me.id, min],
+      )
+    ).rows as { tg_id: string; username: string | null; first_name: string | null }[];
+    const eligible: { tg_id: string; name: string; tier: number; tier_name: string }[] = [];
+    for (const l of leads) {
+      const st = await leadTierState(Number(l.tg_id), cfg);
+      if (st.eligible) eligible.push({ tg_id: l.tg_id, name: l.username ? '@' + l.username : l.first_name || l.tg_id, tier: st.eligible, tier_name: cfg.tiers[st.eligible - 1].name });
+    }
+    const recent = (
+      await db.query(
+        `SELECT r.id, r.tg_id, r.tier, r.status, r.reject_reason, r.decided_at, coalesce('@' || d.username, d.first_name, r.tg_id::text) AS name
+           FROM dep_bonus_requests r JOIN leads d ON d.tg_id = r.tg_id
+          WHERE r.staff_id = $1 AND r.status = 'rejected' AND r.decided_at > now() - interval '14 days' ORDER BY r.decided_at DESC LIMIT 10`,
+        [me.id],
+      )
+    ).rows as any[];
+    return { eligible, recent: recent.map((r) => ({ ...r, tier_name: cfg.tiers[r.tier - 1]?.name })) };
+  };
+  app.get('/dep-bonus/mine', { preHandler: stream }, async (req) => depBonusMine(req.staff!));
+  app.get('/dep-bonus', { preHandler: admin }, async () => {
+    const cfg = await loadDepConfig();
+    const rows = (
+      await db.query(
+        `SELECT r.id, r.tg_id, r.tier, r.amount::float AS amount, r.message, r.status, r.period, r.reject_reason, r.created_at, r.decided_at,
+                (r.screenshot IS NOT NULL) AS has_shot, s.name AS staff_name, coalesce('@' || d.username, d.first_name, r.tg_id::text) AS lead_name
+           FROM dep_bonus_requests r JOIN staff s ON s.id = r.staff_id JOIN leads d ON d.tg_id = r.tg_id
+          ORDER BY (r.status = 'pending') DESC, coalesce(r.decided_at, r.created_at) DESC LIMIT 100`,
+      )
+    ).rows as any[];
+    return rows.map((r) => ({ ...r, tier_name: cfg.tiers[r.tier - 1]?.name ?? '' }));
+  });
+  app.get<{ Params: { id: string } }>('/dep-bonus/:id/screenshot', { preHandler: anyStaff }, async (req, reply) => {
+    const me = req.staff!;
+    const r = (await db.query('SELECT screenshot, screenshot_type, staff_id FROM dep_bonus_requests WHERE id = $1', [Number(req.params.id)])).rows[0];
+    if (!r || !r.screenshot || (me.role !== 'admin' && r.staff_id !== me.id)) return reply.code(404).send({ error: 'Не найдено' });
+    return reply.type(r.screenshot_type).header('Cache-Control', 'private, max-age=3600').send(r.screenshot);
+  });
+  app.post<{ Params: { id: string } }>('/dep-bonus/:id/decide', { preHandler: admin }, async (req, reply) => {
+    const me = req.staff!;
+    const b = (req.body ?? {}) as Record<string, unknown>;
+    const r = (await db.query(`SELECT id, staff_id, status FROM dep_bonus_requests WHERE id = $1`, [Number(req.params.id)])).rows[0];
+    if (!r) return reply.code(404).send({ error: 'Запрос не найден' });
+    if (r.status !== 'pending') return reply.code(409).send({ error: 'Запрос уже обработан' });
+    if (b.approve === true) {
+      const period = await currentPeriod();
+      if (await isClosed(period)) return reply.code(409).send({ error: 'Месяц закрыт. Откройте его заново в Бухгалтерии и примите бонус' });
+      await db.query(`UPDATE dep_bonus_requests SET status = 'approved', period = $2, decided_by = $3, decided_at = now() WHERE id = $1`, [r.id, period, me.id]);
+    } else {
+      const reason = str(b.reason, 300);
+      if (!reason) return reply.code(400).send({ error: 'Укажите причину отказа' });
+      await db.query(`UPDATE dep_bonus_requests SET status = 'rejected', reject_reason = $2, decided_by = $3, decided_at = now() WHERE id = $1`, [r.id, reason, me.id]);
+    }
+    return { ok: true };
+  });
+
   // Сколько всего ждёт решения админа: отчёты на проверке, причины по сменам без решения, запросы авансов
   app.get('/accounting/pending', { preHandler: admin }, async () => {
     const n = async (sql: string) => (await db.query(sql)).rows[0].n as number;
     const review = await n(`SELECT count(*)::int AS n FROM shift_reports WHERE status = 'pending'`);
     const why = await n(`SELECT count(*)::int AS n FROM shift_shortfalls f JOIN staff s ON s.id = f.staff_id WHERE s.role <> 'admin' AND f.reason IS NOT NULL AND f.accepted_at IS NULL AND f.penalty_id IS NULL`);
     const pay = await n(`SELECT count(*)::int AS n FROM advance_requests WHERE status = 'pending'`);
-    return { review, why, pay, total: review + why + pay };
+    const depb = await n(`SELECT count(*)::int AS n FROM dep_bonus_requests WHERE status = 'pending'`);
+    return { review, why, pay, depb, total: review + why + pay + depb };
   });
   app.get('/advances', { preHandler: admin }, async () =>
     (await db.query(`SELECT r.id, r.staff_id, s.name AS staff_name, r.period, r.amount::float AS amount, r.status, r.created_at FROM advance_requests r JOIN staff s ON s.id = r.staff_id WHERE r.status = 'pending' ORDER BY r.id`)).rows,
@@ -1056,6 +1171,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
           leadsFull: k.full.leadsPay,
           ftdBonus: k.ftdBonus,
           dayBonus: k.dayBonus,
+          depBonus: k.depBonus ?? 0,
           bonus: k.adjBonus,
           penalty: k.adjPenalty,
           paid: k.paid,
@@ -1291,6 +1407,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
         shifts: k.shifts,
         ftdBonus: k.ftdBonus,
         dayBonus: k.dayBonus,
+        depBonus: k.depBonus ?? 0,
         bonus: k.adjBonus,
         penalty: k.adjPenalty,
         paid: k.paid,
@@ -1300,7 +1417,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
         minForAdvance: plan.advance,
       },
       tasks,
-      alerts: { rejected, shortfalls: short, awaiting: (await db.query(`SELECT id, started_at, ended_at, to_char(day, 'YYYY-MM-DD') AS day FROM shift_reports WHERE staff_id = $1 AND status = 'await' ORDER BY id`, [me.id])).rows },
+      alerts: { depBonus: await depBonusMine(me), rejected, shortfalls: short, awaiting: (await db.query(`SELECT id, started_at, ended_at, to_char(day, 'YYYY-MM-DD') AS day FROM shift_reports WHERE staff_id = $1 AND status = 'await' ORDER BY id`, [me.id])).rows },
       fields: defs.map((d) => d.name),
       last: last.map((r: any) => ({ id: r.id, day: r.day, status: r.status, minutes: r.minutes, reject_reason: r.reject_reason, values: Object.fromEntries((r.fields as any[]).filter((f) => f.kind === 'number').map((f) => [f.name, f.value])) })),
     };
