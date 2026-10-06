@@ -241,6 +241,8 @@ const $=s=>document.querySelector(s);
 const root=$('#root');
 let me=null,tab='home',region=null,timers=[];
 
+/** Пустые значения (null, false) не должны превращаться в текст «null» ни в одном append/replaceChildren */
+for(const fn of ['replaceChildren','append','prepend']){const orig=Element.prototype[fn];Element.prototype[fn]=function(...a){return orig.apply(this,a.flat(Infinity).filter(x=>x!=null&&x!==false))}}
 function el(tag,props={},...kids){
   const e=document.createElement(tag);
   for(const[k,v]of Object.entries(props)){if(k==='class')e.className=v;else if(k.startsWith('on'))e.addEventListener(k.slice(2),v);else if(v!==undefined&&v!==null&&v!==false)e.setAttribute(k,v===true?'':v)}
