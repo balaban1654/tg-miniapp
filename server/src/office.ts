@@ -1435,7 +1435,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
   app.post('/signal-pairs/direction', { preHandler: need('admin', 'analyst') }, async (req, reply) => {
     const d = str((req.body as any)?.direction, 4);
     const pair = str((req.body as any)?.pair, 20);
-    if (d && !['up', 'down'].includes(d)) return reply.code(400).send({ error: 'Неверное направление' });
+    if (d && !['up', 'down', 'auto'].includes(d)) return reply.code(400).send({ error: 'Неверное направление' });
     const r = await db.query('UPDATE signal_pairs SET auto = coalesce($2::text = \'auto\', false), direction=CASE WHEN $2::text IN (\'up\',\'down\') THEN $2 END, direction_at=CASE WHEN $2::text IN (\'up\',\'down\') THEN now() END, direction_by=CASE WHEN $2::text IN (\'up\',\'down\') THEN $3::int END WHERE ($1 = \'*\' OR pair = $1)', [pair, d || null, req.staff!.id]); // pair = * — сразу все пары
     if (!r.rowCount) return reply.code(404).send({ error: 'Пара не найдена' });
     return { ok: true };

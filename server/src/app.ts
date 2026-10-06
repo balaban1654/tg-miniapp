@@ -372,7 +372,8 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
     if (!allowed) return { enabled: false, pairs: [], cooldownLeft: 0, enterInSec: set.enter_in_sec, expiryMin: set.expiry_min, cfg: cfgOf(set) };
     const pairs = (
       await db.query(
-        `SELECT pair, (direction IS NOT NULL AND direction_at > now() - ($1 || ' minutes')::interval) AS available
+        // «Авто» доступно всем, у кого открыта выдача, но такой сигнал всегда тестовый
+        `SELECT pair, (CASE WHEN auto THEN TRUE ELSE (direction IS NOT NULL AND direction_at > now() - ($1 || ' minutes')::interval) END) AS available
            FROM signal_pairs WHERE enabled
           ORDER BY (SELECT count(*) FROM signals q WHERE q.pair = signal_pairs.pair AND q.requested_by IS NOT NULL AND q.created_at > now() - interval '30 days') DESC, sort, pair`,
         [String(set.direction_ttl_min)],
@@ -389,11 +390,15 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
     if (cooldownLeft > 0) return reply.code(429).send({ error: `Следующий сигнал можно получить через ${cooldownLeft} сек.`, cooldownLeft });
     const p = (
       await db.query(
-        `SELECT pair, direction, direction_by FROM signal_pairs
-          WHERE pair = $1 AND enabled AND direction IS NOT NULL AND direction_at > now() - ($2 || ' minutes')::interval`,
+        `SELECT pair, direction, direction_by, auto FROM signal_pairs
+          WHERE pair = $1 AND enabled AND (auto OR (direction IS NOT NULL AND direction_at > now() - ($2 || ' minutes')::interval))`,
         [String(req.body?.pair ?? ''), String(set.direction_ttl_min)],
       )
     ).rows[0];
+    // Авто: направление случайное от текущей минуты, у всех в одну минуту одинаковое. Сигнал всегда тестовый и в статистику не идёт
+    if (p?.auto) {
+      p.direction = createHash('sha256').update(`${p.pair}:${Math.floor(Date.now() / 60_000)}`).digest()[0] % 2 ? 'up' : 'down';
+    }
     if (!p) return reply.code(409).send({ error: 'По этой паре сейчас нет подходящего входа. Попробуйте другую пару или чуть позже.' });
     const expirySec = Math.trunc(Number(req.body?.expiry_sec));
     const okExp = await db.query('SELECT 1 FROM signal_expiries WHERE sec = $1', [expirySec]);
@@ -403,8 +408,8 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
     const entryMs = Math.ceil((Date.now() + set.enter_in_sec * 1000 - es) / 60_000) * 60_000 + es;
     const ins = await db.query(
       `INSERT INTO signals (pair, direction, expiry_min, expiry_sec, entry_at, note, source, is_test, created_by, requested_by)
-       VALUES ($1,$2,$3,$4,$5,NULL,'analyst',FALSE,$6,$7) RETURNING id, pair, direction, expiry_min, expiry_sec, entry_at, is_test, source, requested_by`,
-      [p.pair, p.direction, Math.max(1, Math.ceil(expirySec / 60)), expirySec, new Date(entryMs), p.direction_by, req.tg!.id],
+       VALUES ($1,$2,$3,$4,$5,NULL,CASE WHEN $6 THEN 'test' ELSE 'analyst' END,$6,$7,$8) RETURNING id, pair, direction, expiry_min, expiry_sec, entry_at, is_test, source, requested_by`,
+      [p.pair, p.direction, Math.max(1, Math.ceil(expirySec / 60)), expirySec, new Date(entryMs), Boolean(p.auto), p.direction_by, req.tg!.id],
     );
     return { signal: { ...ins.rows[0], taken: false }, steps: [], cfg: cfgOf(set), now: new Date().toISOString() };
   });

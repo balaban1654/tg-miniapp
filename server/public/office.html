@@ -2901,7 +2901,8 @@ async function signalConfigBlock(){
       onclick:async()=>{try{await api('/signal-pairs',{method:'PUT',body:{pair:p.pair,enabled:!p.enabled,sort:p.sort}});render({soft:true})}catch(x){toast(x.message)}}},p.enabled?'Показана':'Скрыта');
     return[td(p.pair),el('td',{},en),
       el('td',{style:'white-space:nowrap'},dirBtn(p,'up','Вверх'),dirBtn(p,'down','Вниз'),
-        el('button',{class:'btn s '+(!(p.direction&&p.fresh)?'':'o'),type:'button',onclick:()=>setDir(p.pair,'')},'Сброс')),
+        el('button',{class:'btn s '+(p.auto?'':'o'),type:'button',title:'Тест: направление случайное, каждую минуту своё. Выдаётся всем, но карточка помечена как тестовая',style:'margin-right:6px',onclick:()=>setDir(p.pair,'auto')},'Авто'),
+        el('button',{class:'btn s '+(!p.auto&&!(p.direction&&p.fresh)?'':'o'),type:'button',onclick:()=>setDir(p.pair,'')},'Сброс')),
       el('td',{},isAdmin?el('button',{class:'btn o s',type:'button',onclick:async()=>{try{await api('/signal-pairs?pair='+encodeURIComponent(p.pair),{method:'DELETE'});render({soft:true})}catch(x){fail(x)}}},'Удалить'):null)];
   });
   return el('div',{style:'display:grid;gap:12px'},

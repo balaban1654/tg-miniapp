@@ -562,5 +562,4 @@ ALTER TABLE shift_shortfalls ADD COLUMN IF NOT EXISTS accepted_at TIMESTAMPTZ;
 ALTER TABLE shift_shortfalls ADD COLUMN IF NOT EXISTS penalty_id INT REFERENCES staff_adjustments(id) ON DELETE SET NULL;
 
 -- Тестовые сигналы и демо-история больше не используются: убираем те, по которым нет сделок клиентов
-DELETE FROM signals s WHERE (s.is_test OR s.demo_result IS NOT NULL OR s.source = 'test') AND NOT EXISTS (SELECT 1 FROM deals x WHERE x.signal_id = s.id);
-UPDATE signal_pairs SET auto = FALSE WHERE auto;
+DELETE FROM signals s WHERE s.requested_by IS NULL AND (s.is_test OR s.demo_result IS NOT NULL OR s.source = 'test') AND NOT EXISTS (SELECT 1 FROM deals x WHERE x.signal_id = s.id);
