@@ -11,7 +11,7 @@ const sha256 = (v: string) => createHash('sha256').update(v).digest('hex');
 import { accountingRoutes } from './accounting.js';
 import { toVoice, toVideoNote } from './media.js';
 import { parseReviewPhoto, cleanReviewText, cleanRating } from './reviews.js';
-import { dispatchTemplate, TEMPLATE_KEYS, DEFAULTS, CHANNEL_RE, type TemplateKey } from './templates.js';
+import { dispatchTemplate, TEMPLATE_KEYS, DEFAULTS, CHANNEL_RE, normChannel, type TemplateKey } from './templates.js';
 import {
   type Staff,
   type Role,
@@ -395,7 +395,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
       me.role === 'admin' ? 'TRUE' : me.role === 'teamlead' ? `(id = ${me.id} OR parent_id = ${me.id})` : `id = ${me.id}`;
     const r = await db.query(
       `SELECT id, login, name, role, parent_id, rate_ftd, rate_percent, active, created_at,
-              po_campaign, po_promo, po_link, po_link_ru, tg_username, streams, (totp_secret IS NOT NULL) AS totp
+              po_campaign, po_promo, po_link, po_link_ru, tg_username, live_channel, streams, (totp_secret IS NOT NULL) AS totp
          FROM staff WHERE ${scope} ORDER BY id`,
     );
     return r.rows;
@@ -471,6 +471,12 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
       const u = str(b.tg_username, 40).replace(/^@/, '');
       if (u && !/^[A-Za-z][A-Za-z0-9_]{3,31}$/.test(u)) return reply.code(400).send({ error: 'Telegram: юзернейм без ссылки, например daria_manager' });
       add('tg_username', u || null);
+    }
+    if (b.live_channel !== undefined) {
+      const raw = str(b.live_channel, 80);
+      const ch = raw ? normChannel(raw) : '';
+      if (raw && !ch) return reply.code(400).send({ error: 'Канал: @имя_канала, ссылка t.me/имя или числовой id вида -1001234567890' });
+      add('live_channel', ch || null);
     }
     if (b.po_campaign !== undefined) {
       const c = str(b.po_campaign, 40);
@@ -1218,7 +1224,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
   // Шаблоны сообщений бота: новый сигнал и «стример в эфире»
   const tplKey = (k: string): TemplateKey | null => ((TEMPLATE_KEYS as readonly string[]).includes(k) ? (k as TemplateKey) : null);
   app.get('/push/templates', { preHandler: need('admin') }, async () => {
-    return (await db.query(`SELECT key, enabled, text, buttons, segment, channels, (photo IS NOT NULL) AS has_photo, updated_at FROM push_templates ORDER BY key DESC`)).rows;
+    return (await db.query(`SELECT key, enabled, text, buttons, segment, channels, to_staff_channel, (photo IS NOT NULL) AS has_photo, updated_at FROM push_templates ORDER BY key DESC`)).rows;
   });
   app.get<{ Params: { key: string } }>('/push/templates/:key/photo', { preHandler: need('admin') }, async (req, reply) => {
     const r = (await db.query('SELECT photo, photo_type FROM push_templates WHERE key = $1', [req.params.key])).rows[0];
@@ -1237,7 +1243,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     const okSeg = segment === 'none' || (segment === 'own' && key === 'live') || segment in SEGMENTS;
     if (!okSeg) return reply.code(400).send({ error: 'Неизвестный список получателей' });
     const rawCh = Array.isArray(b.channels) ? b.channels : String(b.channels ?? '').split(/[\s,;]+/);
-    const channels = [...new Set(rawCh.map((x) => String(x).trim()).filter(Boolean))];
+    const channels = [...new Set(rawCh.map((x) => String(x).trim()).filter(Boolean).map((x) => normChannel(x) || x))];
     if (channels.length > 10) return reply.code(400).send({ error: 'Каналов не больше десяти' });
     const badCh = channels.find((c) => !CHANNEL_RE.test(c));
     if (badCh) return reply.code(400).send({ error: `Канал «${badCh}»: укажите @имя_канала или числовой id вида -1001234567890` });
@@ -1246,10 +1252,10 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     const hasPhoto = ph ? true : b.remove_photo ? false : Boolean(cur?.has_photo);
     const enabled = Boolean(b.enabled);
     if (enabled && !text && !hasPhoto) return reply.code(400).send({ error: 'Нужен текст или картинка' });
-    if (enabled && segment === 'none' && !channels.length) return reply.code(400).send({ error: 'Выберите получателей или добавьте канал' });
+    if (enabled && segment === 'none' && !channels.length && !(key === 'live' && b.to_staff_channel !== false)) return reply.code(400).send({ error: 'Выберите получателей или добавьте канал' });
     await db.query(
-      'UPDATE push_templates SET enabled = $2, text = $3, buttons = $4, segment = $5, channels = $6, updated_at = now() WHERE key = $1',
-      [key, enabled, text, JSON.stringify(buttons), segment, JSON.stringify(channels)],
+      'UPDATE push_templates SET enabled = $2, text = $3, buttons = $4, segment = $5, channels = $6, to_staff_channel = $7, updated_at = now() WHERE key = $1',
+      [key, enabled, text, JSON.stringify(buttons), segment, JSON.stringify(channels), b.to_staff_channel !== false],
     );
     if (b.remove_photo) await db.query('UPDATE push_templates SET photo = NULL, photo_type = NULL WHERE key = $1', [key]);
     if (ph) await db.query('UPDATE push_templates SET photo = $2, photo_type = $3 WHERE key = $1', [key, ph.data, ph.type]);

@@ -31,6 +31,13 @@ export async function seedTemplates(): Promise<void> {
   }
 }
 
+/** @имя, ссылка t.me/имя или числовой id канала → единый вид; пусто, если не похоже на канал */
+export function normChannel(v: string): string {
+  const x = v.trim().replace(/^https?:\/\/(www\.)?t\.me\//i, '@').replace(/\/+$/, '');
+  const y = /^[A-Za-z][A-Za-z0-9_]{3,31}$/.test(x) ? '@' + x : x;
+  return CHANNEL_RE.test(y) ? y : '';
+}
+
 export const CHANNEL_RE = /^(@[A-Za-z][A-Za-z0-9_]{3,31}|-100\d{5,})$/;
 
 interface Tpl {
@@ -39,13 +46,14 @@ interface Tpl {
   buttons: Button[];
   segment: string;
   channels: string[];
+  toStaffChannel: boolean;
   photo: Photo | null;
 }
 
 async function load(key: TemplateKey): Promise<Tpl | null> {
-  const r = (await db.query('SELECT enabled, text, buttons, segment, channels, photo, photo_type FROM push_templates WHERE key = $1', [key])).rows[0];
+  const r = (await db.query('SELECT enabled, text, buttons, segment, channels, to_staff_channel, photo, photo_type FROM push_templates WHERE key = $1', [key])).rows[0];
   if (!r) return null;
-  return { enabled: r.enabled, text: r.text, buttons: r.buttons, segment: r.segment, channels: r.channels, photo: r.photo ? { data: r.photo, type: r.photo_type } : null };
+  return { enabled: r.enabled, text: r.text, buttons: r.buttons, segment: r.segment, channels: r.channels, toStaffChannel: r.to_staff_channel, photo: r.photo ? { data: r.photo, type: r.photo_type } : null };
 }
 
 /** В канал нельзя кнопку Mini App и обратные вызовы: оставляем ссылки, а вход в кабинет превращаем в ссылку на бота */
@@ -64,6 +72,8 @@ export interface Dispatch {
   vars: Record<string, string>;
   /** Ссылка на эфир для кнопки «Смотреть эфир» */
   streamUrl?: string;
+  /** Канал самого стримера (из карточки сотрудника) */
+  staffChannel?: string | null;
   /** Чьим лидам слать, если в шаблоне выбрано «Лиды этого стримера» */
   ownerId?: number | null;
   createdBy: number;
@@ -93,7 +103,9 @@ export async function dispatchTemplate(key: TemplateKey, d: Dispatch): Promise<{
   }
   let channels = 0;
   const cb = channelButtons(buttons);
-  for (const ch of t.channels) {
+  const targets = [...t.channels];
+  if (t.toStaffChannel && d.staffChannel && !targets.includes(d.staffChannel)) targets.push(d.staffChannel);
+  for (const ch of targets) {
     if (!CHANNEL_RE.test(ch)) continue;
     const kb = buildKeyboard(cb, { tg_id: '0', first_name: null, username: null, region: null, owner_name: null, po_promo: null, po_link: null, po_link_ru: null, tz: null });
     const res = await deliver(ch, renderText(text, { first_name: null, username: null, owner_name: null, po_promo: null, tz: null }), kb, t.photo);
@@ -110,9 +122,9 @@ export async function announceLive(staffId: number, streamUrl: string): Promise<
   try {
     const prev = lastLive.get(staffId) ?? 0;
     if (Date.now() - prev < 30 * 60_000) return;
-    const st = (await db.query('SELECT name FROM staff WHERE id = $1', [staffId])).rows[0];
+    const st = (await db.query('SELECT name, live_channel FROM staff WHERE id = $1', [staffId])).rows[0];
     if (!st) return;
-    const r = await dispatchTemplate('live', { vars: { 'стример': st.name }, streamUrl, ownerId: staffId, createdBy: staffId });
+    const r = await dispatchTemplate('live', { vars: { 'стример': st.name }, streamUrl, ownerId: staffId, staffChannel: st.live_channel, createdBy: staffId });
     if (!r.skipped) lastLive.set(staffId, Date.now());
   } catch (e) {
     console.error('Не удалось отправить «Стример в эфире»:', e);

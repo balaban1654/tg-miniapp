@@ -146,6 +146,9 @@ CREATE TABLE IF NOT EXISTS push_templates (
   photo_type TEXT,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+-- Канал самого стримера: пуш «стример в эфире» может уходить и в него. Основной канал команды задаётся в самом шаблоне
+ALTER TABLE staff ADD COLUMN IF NOT EXISTS live_channel TEXT;
+ALTER TABLE push_templates ADD COLUMN IF NOT EXISTS to_staff_channel BOOLEAN NOT NULL DEFAULT TRUE;
 ALTER TABLE broadcasts ADD COLUMN IF NOT EXISTS photo BYTEA;
 ALTER TABLE broadcasts ADD COLUMN IF NOT EXISTS photo_type TEXT;
 

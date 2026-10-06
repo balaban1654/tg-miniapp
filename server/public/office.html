@@ -1648,15 +1648,15 @@ async function staffTeam(){
   };
   const toggle=r=>isAdmin&&r.id!==me.id?el('button',{class:'btn o s',type:'button',onclick:async()=>{await api('/staff/'+r.id,{method:'PATCH',body:{active:!r.active}});render()}},r.active?'Отключить':'Включить'):'';
   const pickP=el('select',{},...rows.filter(s=>['admin','streamer','teamlead','buyer'].includes(s.role)).map(s=>el('option',{value:s.id},s.name+' · '+ROLE[s.role])));
-  const po={t:el('input',{placeholder:'daria_manager',maxlength:'40'}),c:el('input',{placeholder:'daria'}),p:el('input',{placeholder:'LIO669'}),l:el('input',{placeholder:'https://…/register?…&ac=daria&cid=…'}),r:el('input',{placeholder:'https://… (необязательно)'})};
-  const fill=()=>{const r=rows.find(x=>String(x.id)===pickP.value)||{};po.t.value=r.tg_username||'';po.c.value=r.po_campaign||'';po.p.value=r.po_promo||'';po.l.value=r.po_link||'';po.r.value=r.po_link_ru||''};
+  const po={t:el('input',{placeholder:'daria_manager',maxlength:'40'}),c:el('input',{placeholder:'daria'}),p:el('input',{placeholder:'LIO669'}),l:el('input',{placeholder:'https://…/register?…&ac=daria&cid=…'}),r:el('input',{placeholder:'https://… (необязательно)'}),ch:el('input',{placeholder:'@daria_channel',maxlength:'80'})};
+  const fill=()=>{const r=rows.find(x=>String(x.id)===pickP.value)||{};po.t.value=r.tg_username||'';po.c.value=r.po_campaign||'';po.p.value=r.po_promo||'';po.l.value=r.po_link||'';po.r.value=r.po_link_ru||'';po.ch.value=r.live_channel||''};
   pickP.addEventListener('change',fill);fill();
   const perr=el('div',{class:'err',role:'alert'});
   const poForm=isAdmin?el('form',{class:'card form',onsubmit:async e=>{e.preventDefault();perr.textContent='';
-    try{await api('/staff/'+pickP.value,{method:'PATCH',body:{tg_username:po.t.value,po_campaign:po.c.value,po_promo:po.p.value,po_link:po.l.value,po_link_ru:po.r.value}});perr.textContent='Сохранено';perr.className='err ok';setTimeout(render,600)}catch(x){perr.className='err';perr.textContent=x.message}}},
+    try{await api('/staff/'+pickP.value,{method:'PATCH',body:{tg_username:po.t.value,po_campaign:po.c.value,po_promo:po.p.value,po_link:po.l.value,po_link_ru:po.r.value,live_channel:po.ch.value}});perr.textContent='Сохранено';perr.className='err ok';setTimeout(render,600)}catch(x){perr.className='err';perr.textContent=x.message}}},
     el('h3',{style:'grid-column:1/-1;font-size:14px'},'Кампания в Pocket Option'),
     el('label',{},'Сотрудник',pickP),el('label',{},'Telegram менеджера (для клиента)',po.t),el('label',{},'Код кампании (ac)',po.c),el('label',{},'Промокод',po.p),
-    el('label',{style:'grid-column:1/-1'},'Ссылка регистрации (WW)',po.l),el('label',{style:'grid-column:1/-1'},'Ссылка регистрации (RU)',po.r),
+    el('label',{style:'grid-column:1/-1'},'Ссылка регистрации (WW)',po.l),el('label',{style:'grid-column:1/-1'},'Ссылка регистрации (RU)',po.r),el('label',{style:'grid-column:1/-1'},'Личный Telegram-канал (куда уходит пуш «в эфире», бот должен быть админом)',po.ch),
     el('button',{class:'btn',type:'submit'},'Сохранить'),perr):el('span');
   return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},isAdmin?'Сотрудники':'Моя команда')),form,poForm,
     ctrT(table(['Имя','Логин',...(isAdmin?['Пароль','2FA']:[]),'Роль','Тимлидер','Кампания PO','Промокод','Статус',''],rows.map(r=>[el('td',{},el('span',{class:'cp'},r.name,isAdmin?el('button',{type:'button',title:'Карточка сотрудника','aria-label':'Карточка сотрудника',onclick:()=>openStaffCard(r.id)},svgIcon(PERSON)):null)),td(r.login),...(isAdmin?[pwCell(r),tfaCell(r)]:[]),el('td',{},el('span',{class:'pill p-pur'},ROLE[r.role]),r.streams?el('span',{class:'pill p-pur',style:'margin-left:4px'},'Стример'):null),parentCell(r),td(r.po_campaign||'—'),td(r.po_promo||'—'),el('td',{},el('span',{class:'pill '+(r.active?'p-ok':'p-bad')},r.active?'активен':'отключён')),el('td',{},toggle(r))]),'Пока никого нет.'))];
@@ -2756,6 +2756,7 @@ function templateCard(t){
   const segOpts=[['none','Никому в боте (только каналы)'],...(t.key==='live'?[['own','Лиды этого стримера']]:[]),...Object.entries(SEG_LABELS)];
   const seg=el('select',{'aria-label':'Кому'},segOpts.map(([v,n])=>el('option',{value:v},n)));seg.value=t.segment;
   const ch=el('textarea',{class:'big',rows:'2',placeholder:'@channel_name\n-1001234567890',maxlength:'600','aria-label':'Каналы',style:'min-height:56px;resize:vertical'});ch.value=(t.channels||[]).join('\n');
+  const own=el('input',{type:'checkbox',style:'width:auto'});own.checked=t.to_staff_channel!==false;
   let photo=null,removePhoto=false,hasPhoto=t.has_photo;
   const file=el('input',{type:'file',accept:'image/jpeg,image/png,image/webp',style:'display:none'});
   const pv=el('div',{style:'display:flex;align-items:center;gap:10px;flex-wrap:wrap'});
@@ -2774,7 +2775,7 @@ function templateCard(t){
   drawPv();upd();
   const save=el('button',{class:'btn',type:'button'},'Сохранить');
   save.addEventListener('click',async()=>{err.className='err';err.textContent='';
-    try{await api('/push/templates/'+t.key,{method:'PUT',body:{enabled:on.checked,text:txt.value,buttons:be.get(),segment:seg.value,channels:ch.value,photo,remove_photo:removePhoto}});
+    try{await api('/push/templates/'+t.key,{method:'PUT',body:{enabled:on.checked,text:txt.value,buttons:be.get(),segment:seg.value,channels:ch.value,to_staff_channel:own.checked,photo,remove_photo:removePhoto}});
       err.className='ok-msg';err.textContent='Сохранено';setTimeout(render,700)}catch(x){err.textContent=x.message}});
   const reset=el('button',{class:'btn o',type:'button',onclick:async()=>{if(!reset.dataset.s){reset.dataset.s='1';reset.textContent='Точно вернуть стандартный текст?';return}
     try{await api('/push/templates/'+t.key+'/reset',{method:'POST'});render()}catch(x){err.textContent=x.message}}},'Вернуть стандартный текст');
@@ -2784,7 +2785,8 @@ function templateCard(t){
     el('label',{},'Текст. Подстановки: '+info.vars,txt),
     el('div',{style:'display:grid;gap:6px'},el('span',{class:'mut sm'},'Картинка (необязательно, можно отправить только её)'),pv,file),
     be.node,
-    el('div',{class:'form'},el('label',{},'Кому в боте',seg),el('label',{style:'grid-column:span 2'},'Telegram-каналы, по одному на строку (бот должен быть админом)',ch)),
+    el('div',{class:'form'},el('label',{},'Кому в боте',seg),el('label',{style:'grid-column:span 2'},t.key==='live'?'Основной канал команды: сюда попадает эфир любого стримера (по одному на строку, бот должен быть админом)':'Telegram-каналы, по одному на строку (бот должен быть админом)',ch)),
+    t.key==='live'?el('label',{style:'display:flex;gap:8px;align-items:center;cursor:pointer'},own,'Слать ещё и в личный канал этого стримера (задаётся в Сотрудниках, в карточке «Кампания в Pocket Option»). Эфир Даши не попадёт в канал Лизы.'):null,
     el('div',{},el('div',{class:'mut',style:'font-size:12px;margin-bottom:6px'},'Так увидит клиент'),bpv),
     el('div',{style:'display:flex;gap:10px;align-items:center;flex-wrap:wrap'},save,reset,err));
 }
