@@ -133,6 +133,8 @@ main{padding:22px clamp(14px,3vw,32px);display:grid;grid-template-columns:minmax
 .tbl{overflow-x:auto;border:1px solid var(--line);border-radius:14px}
 table{border-collapse:collapse;width:100%;min-width:560px}
 th,td{padding:10px 14px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}
+th.c,td.c,td.c.n{text-align:center}
+td{vertical-align:middle}
 th{font:600 11px var(--fm);letter-spacing:.06em;text-transform:uppercase;color:var(--mut);background:var(--bg2)}
 tr:last-child td{border-bottom:0}
 td.n{font-family:var(--fm);text-align:right}
@@ -2772,10 +2774,10 @@ async function viewPush(){
     el('div',{},el('div',{class:'mut sm',style:'margin-bottom:6px'},'Так увидит клиент'),pv),
     el('div',{style:'display:flex;gap:8px'},el('button',{class:'btn',type:'submit'},'Сохранить'),el('button',{class:'btn o',type:'button',onclick:()=>fill(null)},'Новое правило')),err);
   const tog=r=>el('button',{class:'btn s'+(r.enabled?'':' o'),type:'button',onclick:async()=>{await api('/push/rules/'+r.id,{method:'PATCH',body:{enabled:!r.enabled}});render()}},r.enabled?'Включено':'Выключено');
-  const rulesT=table(['Правило','Когда','Отправлено','Ошибок','Действия'],rules.map(r=>[el('td',{style:'white-space:normal;min-width:220px;max-width:300px'},el('b',{},r.name),el('div',{class:'mut sm'},r.text.slice(0,70)+(r.text.length>70?'…':''))),
-    el('td',{style:'white-space:normal;min-width:150px'},TRIG[r.trigger]+', '+fmtDelay(r.delay_min)+(r.daytime_only?', днём':'')),td(r.sent,'n'),td(r.failed,'n'),
-    el('td',{style:'display:flex;gap:6px;align-items:center'},tog(r),el('button',{class:'btn o s',type:'button',onclick:()=>{fill(r);form.scrollIntoView({behavior:'smooth'})}},'Изменить'),
-      el('button',{class:'btn o s',type:'button',onclick:async e=>{const b=e.currentTarget;if(b.dataset.s){await api('/push/rules/'+r.id,{method:'DELETE'});render()}else{b.dataset.s='1';b.textContent='Точно удалить?'}}},'Удалить'))]),'Правил пока нет.');
+  const rulesT=table(['Правило',['Когда','c'],['Отправлено','c'],['Ошибок','c'],['Действия','c']],rules.map(r=>[el('td',{style:'white-space:normal;min-width:220px;max-width:300px'},el('b',{},r.name),el('div',{class:'mut sm'},r.text.slice(0,70)+(r.text.length>70?'…':''))),
+    el('td',{class:'c',style:'white-space:normal;min-width:150px'},(TRIG[r.trigger]||r.trigger)+', '+fmtDelay(r.delay_min)+(r.daytime_only?', днём':'')),td(r.sent,'c n'),td(r.failed,'c n'),
+    el('td',{class:'c'},el('div',{style:'display:flex;gap:6px;align-items:center;justify-content:center;flex-wrap:nowrap;white-space:nowrap'},tog(r),el('button',{class:'btn o s',type:'button',onclick:()=>{fill(r);form.scrollIntoView({behavior:'smooth'})}},'Изменить'),
+      el('button',{class:'btn o s',type:'button',onclick:async e=>{const b=e.currentTarget;if(b.dataset.s){await api('/push/rules/'+r.id,{method:'DELETE'});render()}else{b.dataset.s='1';b.textContent='Точно удалить?'}}},'Удалить')))]),'Правил пока нет.');
 
   // --- рассылка
   const SEGL={all:'Все',new:'Не зарегистрировались',registered:'Зарегистрировались, без депозита',ftd:'С депозитом',access:'С открытым доступом',churned:'Отвалились',withdrew:'Выводили средства'};
