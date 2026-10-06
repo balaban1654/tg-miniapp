@@ -603,3 +603,11 @@ CREATE TABLE IF NOT EXISTS dep_bonus_requests (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS dep_bonus_one ON dep_bonus_requests (tg_id, tier) WHERE status <> 'rejected';
 CREATE INDEX IF NOT EXISTS dep_bonus_status ON dep_bonus_requests (status, created_at);
+
+-- Второй (и следующие) Pocket ID одного человека: у лида в leads.trader_id основной, остальные здесь
+CREATE TABLE IF NOT EXISTS lead_pockets (
+  trader_id  TEXT PRIMARY KEY,
+  tg_id      BIGINT NOT NULL REFERENCES leads(tg_id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS lead_pockets_tg ON lead_pockets(tg_id);

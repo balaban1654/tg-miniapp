@@ -1196,7 +1196,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
       // уже принятый нашим сервером тот же постбек
       if (dt && (await db.query(`SELECT 1 FROM postback_log WHERE event = $1 AND query->>'trader_id' = $2 AND query->>'date_time' = $3 AND (result = 'ok' OR result LIKE 'дубль%') LIMIT 1`, [event, trader, dt])).rowCount) { out.exists++; continue; }
       const click = Number(qp.get('click_id'));
-      const known = (await db.query('SELECT tg_id FROM leads WHERE trader_id = $1 OR ($2::bigint IS NOT NULL AND tg_id = $2) LIMIT 1', [trader, Number.isSafeInteger(click) && click > 0 ? click : null])).rows[0];
+      const known = (await db.query('SELECT tg_id FROM leads WHERE trader_id = $1 OR tg_id = (SELECT tg_id FROM lead_pockets WHERE trader_id = $1) OR ($2::bigint IS NOT NULL AND tg_id = $2) LIMIT 1', [trader, Number.isSafeInteger(click) && click > 0 ? click : null])).rows[0];
       if (known && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(dt)) {
         const dup = event === 'reg' || event === 'ftd'
           ? await db.query('SELECT 1 FROM events WHERE tg_id = $1 AND type = $2 LIMIT 1', [known.tg_id, event])
@@ -1241,11 +1241,15 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     if (!/^\d{5,15}$/.test(tgRaw)) return reply.code(400).send({ error: 'Telegram ID: только цифры' });
     if (!config.postbackSecret || config.postbackSecret.length < 16) return reply.code(500).send({ error: 'На сервере не задан POSTBACK_SECRET (от 16 символов)' });
     const tgId = Number(tgRaw);
-    const other = (await db.query('SELECT tg_id FROM leads WHERE trader_id = $1 AND tg_id <> $2 LIMIT 1', [trader, tgId])).rows[0];
+    const other = (await db.query('SELECT tg_id FROM leads WHERE trader_id = $1 AND tg_id <> $2 UNION ALL SELECT tg_id FROM lead_pockets WHERE trader_id = $1 AND tg_id <> $2 LIMIT 1', [trader, tgId])).rows[0];
     if (other) return reply.code(409).send({ error: 'Этот Pocket ID уже привязан к Telegram ID ' + other.tg_id });
     const lead = (await db.query('SELECT trader_id FROM leads WHERE tg_id = $1', [tgId])).rows[0];
-    if (lead && lead.trader_id && lead.trader_id !== trader) return reply.code(409).send({ error: 'У этого Telegram ID уже другой Pocket ID: ' + lead.trader_id });
-    if (lead) await db.query('UPDATE leads SET trader_id = $2 WHERE tg_id = $1', [tgId, trader]);
+    let second = false;
+    // У человека уже есть другой Pocket ID: этот пишем в карточку вторым, события пойдут тому же лиду
+    if (lead && lead.trader_id && lead.trader_id !== trader) {
+      await db.query('INSERT INTO lead_pockets (trader_id, tg_id) VALUES ($1,$2) ON CONFLICT DO NOTHING', [trader, tgId]);
+      second = true;
+    } else if (lead) await db.query('UPDATE leads SET trader_id = $2 WHERE tg_id = $1', [tgId, trader]);
     else await db.query(`INSERT INTO leads (tg_id, trader_id, status) VALUES ($1,$2,'new')`, [tgId, trader]);
     const rows = (await db.query(
       `SELECT id, event, query, created_at FROM postback_log WHERE query->>'trader_id' = $1 AND result LIKE 'пропущен%' ORDER BY created_at, id`, [trader],
@@ -1268,7 +1272,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
       `UPDATE leads SET created_at = LEAST(created_at, (SELECT min(created_at) FROM events WHERE tg_id = $1 AND created_at IS NOT NULL)) WHERE tg_id = $1 AND bot_started IS NOT TRUE AND EXISTS (SELECT 1 FROM events WHERE tg_id = $1)`,
       [tgId],
     );
-    return { ok: true, applied, left };
+    return { ok: true, applied, left, second };
   });
 
   // Закрепление лида за стримером (или снятие)
@@ -1695,6 +1699,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
       [tgId],
     );
     if (!r.rowCount || (me.role !== 'admin' && r.rows[0].lead_role && r.rows[0].lead_role !== 'lead')) return reply.code(404).send({ error: 'Лид не найден' });
+    (r.rows[0] as any).pockets = (await db.query('SELECT trader_id FROM lead_pockets WHERE tg_id = $1 ORDER BY created_at', [tgId])).rows.map((x: any) => x.trader_id);
     const ev = await db.query(
       `SELECT type, amount, created_at, raw->>'country' AS country, raw->>'promo' AS promo, raw->>'ac' AS ac
          FROM events WHERE tg_id = $1 AND type IN ('start','reg','ftd','dep','wd') ORDER BY created_at, id`,

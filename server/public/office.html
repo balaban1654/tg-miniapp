@@ -1908,7 +1908,7 @@ async function openLeadCard(tgId){
       el('div',{class:'lc-hr'},el('div',{class:'lc-pills'},pill(L.status),L.access?el('span',{class:'pill p-ok'},'доступ открыт'):el('span',{class:'pill p-pur'},'доступ закрыт')),
         el('button',{class:'btn o s',type:'button','aria-label':'Закрыть',onclick:close},'✕'))),
     el('div',{class:'lc-grid'},
-      kvc('Telegram ID',L.tg_id),kvc('Pocket ID',L.trader_id),kv('Откуда пришёл',origin),
+      kvc('Telegram ID',L.tg_id),kvc('Pocket ID',L.trader_id),...(L.pockets||[]).map((x,i)=>kvc('Pocket ID '+(i+2),x)),kv('Откуда пришёл',origin),
       kv('Страна',countryName(d.country)),kv('Владелец',L.owner_name||'не закреплён'),kv('Часовой пояс',L.tz),
       kvc('Промокод',d.promo),kv('Последний визит',fmtDT(L.last_seen_at))),
     el('div',{class:'lc-two2'},
@@ -3392,7 +3392,7 @@ async function viewPostbacks(){
       const save=async()=>{
         if(!/^\d{5,15}$/.test(inp.value.trim())){toast('Telegram ID: только цифры');return}
         ok.disabled=true;
-        try{const res=await api('/postbacks/bind',{method:'POST',body:{trader_id:trader,tg_id:inp.value.trim()}});toast('Привязано. Обработано записей: '+res.applied+(res.left?', не удалось: '+res.left:'')+'. Лид теперь в «Лидах»');render({soft:true})}
+        try{const res=await api('/postbacks/bind',{method:'POST',body:{trader_id:trader,tg_id:inp.value.trim()}});toast((res.second?'Записан вторым Pocket ID. ':'')+'Привязано. Обработано записей: '+res.applied+(res.left?', не удалось: '+res.left:'')+'. Лид теперь в «Лидах»');render({soft:true})}
         catch(x){toast(x.message);ok.disabled=false}
       };
       c.replaceChildren(el('span',{style:'display:inline-flex;gap:6px;align-items:center'},inp,ok,el('button',{class:'btn o s',type:'button','aria-label':'Отмена',onclick:show},'✕')));inp.focus();

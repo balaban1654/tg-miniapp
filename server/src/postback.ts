@@ -55,7 +55,7 @@ export async function postbackRoutes(app: FastifyInstance): Promise<void> {
       lead = await db.query('SELECT tg_id, status, access, trader_id, owner_id FROM leads WHERE tg_id = $1', [tgId]);
     }
     if (!lead.rowCount && traderId) {
-      lead = await db.query('SELECT tg_id, status, access, trader_id, owner_id FROM leads WHERE trader_id = $1 LIMIT 1', [traderId]);
+      lead = await db.query('SELECT tg_id, status, access, trader_id, owner_id FROM leads WHERE trader_id = $1 OR tg_id = (SELECT tg_id FROM lead_pockets WHERE trader_id = $1) LIMIT 1', [traderId]);
       if (lead.rowCount) tgId = Number(lead.rows[0].tg_id);
     }
     if (!lead.rowCount) {
