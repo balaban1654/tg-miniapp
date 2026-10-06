@@ -777,7 +777,7 @@ $('#lRec').onclick=()=>otpMode(!$('#otp').hidden);
   });
 })();
 $('#lBack').onclick=()=>{loginChallenge=null;loginStep(false);$('#lErr').textContent=''};
-{const hb=$('#homeBrand'),goHome=()=>{const h=me&&me.role==='analyst'?'signals':'home';if(tab===h){render();return}tab=h;showApp();render()};hb.addEventListener('click',goHome);hb.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();goHome()}})}
+{const hb=$('#homeBrand'),goHome=()=>{const h=me&&me.role==='analyst'?'signals':'home';if(tab===h){const r=render({soft:true});if(r&&r.then)r.then(()=>window.scrollTo({top:0,behavior:'smooth'}));else window.scrollTo({top:0,behavior:'smooth'});return}window.scrollTo(0,0);tab=h;showApp();render()};hb.addEventListener('click',goHome);hb.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();goHome()}})}
 $('#logout').addEventListener('click',async()=>{try{await api('/logout',{method:'POST'})}catch{}showLogin()});
 
 /** render({soft:true}) обновляет страницу на месте: без «Загрузка…» и с сохранением прокрутки, чтобы экран не дёргался */
