@@ -276,7 +276,7 @@ function shell(title,body){
   const isSig=title==='Сигнал';
   root.replaceChildren(
     el('div',{class:'hd'+(isSig?' hd-sig':'')},
-      el('div',{class:'brand'},el('div',{class:'logo'},(()=>{const i=new Image();i.alt='H';i.src='/img/logo-128.webp';i.draggable=false;return i})()),el('div',{class:'bname'},el('b',{},title||'Hunter AI'),el('span',{class:'onl2'},el('i'),'онлайн'))),
+      el('div',{class:'brand'},el('div',{class:'logo'},(()=>{const i=new Image();i.alt='H';i.src='/img/logo-256.webp';i.draggable=false;return i})()),el('div',{class:'bname'},el('b',{},title||'Hunter AI'),el('span',{class:'onl2'},el('i'),'онлайн'))),
       isSig?el('span',{class:'clk hd-clk'},clockNow()):null,
       el('div',{class:'hr'},el('button',{class:'pillb',type:'button','aria-label':'Поддержка',title:'Поддержка',onclick:support},svgEl(CHAT_ICON),isSig?null:'Поддержка'),
         withPhoto(el('button',{class:'avb',type:'button','aria-label':'Профиль',onclick:()=>go('profile')},init)))),

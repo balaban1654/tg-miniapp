@@ -56,6 +56,7 @@ html{background:#0a0613}
 #login .brand{margin-bottom:6px;gap:12px}#login .brand .logo{width:46px;height:46px;font-size:20px}#login .rem{display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;margin-top:-4px}#login .rem input{width:16px;height:16px;padding:0;accent-color:var(--acc);cursor:pointer}#login .err:empty{display:none}#login .err{min-height:0;margin-top:-4px}#login .btn{margin-top:6px;padding:12px}#login p.hint{margin-top:8px;line-height:1.5}#login .brand .hint{margin-top:3px}
 .brand{display:flex;gap:10px;align-items:center}
 .logo{width:34px;height:34px;border-radius:50%;background:var(--acc);display:grid;place-items:center;font:700 15px var(--fd)}
+.logo{overflow:hidden;background:#000;flex:none}.logo img{width:100%;height:100%;object-fit:cover;display:block}
 .hint{color:var(--mut);font-size:12px}
 /* приложение */
 #app{display:grid;grid-template-columns:200px 1fr;min-height:100vh}
@@ -410,7 +411,7 @@ textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10
 <div id="login" hidden>
   <div class="rain" id="rain" aria-hidden="true"></div>
   <form class="card" id="loginForm" autocomplete="on">
-    <div class="brand"><div class="logo">H</div><div><h1 style="font-size:18px">Hunter Office</h1><div class="hint">Кабинет команды Hunter AI</div></div></div>
+    <div class="brand"><div class="logo"><img src="/img/logo-256.webp" alt="H" draggable="false"></div><div><h1 style="font-size:18px">Hunter Office</h1><div class="hint">Кабинет команды Hunter AI</div></div></div>
     <label>Логин<input id="lLogin" name="username" autocomplete="username" required></label>
     <label>Пароль<input id="lPass" name="password" type="password" autocomplete="current-password" required></label>
     <div id="lCodeW" class="lc-field" hidden><label id="lCodeL">Код из приложения-аутентификатора</label>
@@ -427,7 +428,7 @@ textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10
 
 <div id="app" hidden>
   <aside class="side">
-    <div class="brand"><div class="logo">H</div><b style="font:700 14px var(--fd)">Hunter Office</b></div>
+    <div class="brand"><div class="logo"><img src="/img/logo-256.webp" alt="H" draggable="false"></div><b style="font:700 14px var(--fd)">Hunter Office</b></div>
     <button class="burger" id="burger" type="button" aria-label="Меню" aria-expanded="false" aria-controls="sideMenu"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
     <div class="side-menu" id="sideMenu">
     <nav class="nav" id="nav"></nav>
