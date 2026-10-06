@@ -2934,7 +2934,56 @@ async function viewMedia(){
   }
   const viewRow=r=>[td(r.kind==='trader'?'Трейдер':'Канал'),td(r.title+(r.country?', '+r.country:'')+(r.contact_url?' · '+r.contact_url.replace('https://t.me/','@'):'')+(r.staff_id?' · эфир: '+((streamers.find(x=>x.id===r.staff_id)||{}).name||'стример'):'')),td(r.subtitle||'—'),el('td',{},el('code',{},r.url)),el('td',{style:'white-space:nowrap'},iconBtn('pen','Изменить',()=>{mediaEdit=r.id;render()}),txtBtn('Удалить',async()=>{await api('/media/'+r.id,{method:'DELETE'});render()}))];
   return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Медиа в Mini App')),form,
-    table(['Тип','Имя, страна','Подпись','Ссылка',''],rows.map(r=>r.id===mediaEdit?editRow(r):viewRow(r)),'Пока пусто. Добавьте трейдеров и каналы, они появятся во вкладке «Медиа» в Mini App.'),rowErr];
+    table(['Тип','Имя, страна','Подпись','Ссылка',''],rows.map(r=>r.id===mediaEdit?editRow(r):viewRow(r)),'Пока пусто. Добавьте трейдеров и каналы, они появятся во вкладке «Медиа» в Mini App.'),rowErr,...await reviewsAdmin()];
+}
+
+let reviewEdit=null;
+const RV_STATUS={pending:'На проверке',published:'Опубликован',hidden:'Скрыт'};
+const starsTxt=n=>el('span',{style:'color:var(--warn);letter-spacing:1px;white-space:nowrap',title:n+' из 5'},'★'.repeat(n),el('span',{style:'color:#ffffff30'},'★'.repeat(5-n)));
+const ratingSel=(v)=>{const s=el('select',{'aria-label':'Оценка'},...[5,4,3,2,1].map(n=>el('option',{value:n},'★'.repeat(n)+' '+n)));s.value=String(v||5);return s};
+async function reviewsAdmin(){
+  const rows=await api('/reviews');
+  if(!rows.some(r=>r.id===reviewEdit))reviewEdit=null;
+  const err=el('div',{class:'err',role:'alert'});
+  const fa={author:el('input',{required:'',maxlength:'60',placeholder:'Имя автора'}),rating:ratingSel(5),body:el('textarea',{class:'big',required:'',rows:'3',maxlength:'1500',placeholder:'Текст отзыва',style:'min-height:80px;resize:vertical'})};
+  let photo=null;
+  const file=el('input',{type:'file',accept:'image/jpeg,image/png,image/webp',style:'display:none'});
+  const pv=el('div',{style:'display:flex;align-items:center;gap:10px;min-height:34px'});
+  const drawPv=()=>pv.replaceChildren(el('button',{class:'btn o s',type:'button',onclick:()=>file.click()},photo?'Заменить фото':'Прикрепить фото'),photo?el('div',{class:'shot-w'},el('img',{src:photo,alt:'',style:'max-height:64px'}),el('button',{class:'shot-del',type:'button',title:'Убрать фото','aria-label':'Убрать фото',onclick:()=>{photo=null;drawPv()}},'×')):null);
+  drawPv();
+  file.addEventListener('change',async()=>{const f=file.files[0];file.value='';if(!f)return;
+    if(!/^image\/(jpeg|png|webp)$/.test(f.type)){err.textContent='Нужна картинка JPG, PNG или WebP';return}
+    if(f.size>5*1024*1024){err.textContent='Фото больше 5 МБ';return}
+    err.textContent='';photo=await fileToDataUrl(f);drawPv()});
+  const form=el('form',{class:'card form',onsubmit:async e=>{e.preventDefault();err.textContent='';
+    try{await api('/reviews',{method:'POST',body:{author:fa.author.value,rating:fa.rating.value,body:fa.body.value,photo}});render()}catch(x){err.textContent=x.message}}},
+    el('label',{},'Автор',fa.author),el('label',{},'Оценка',fa.rating),el('label',{style:'grid-column:1/-1'},'Текст',fa.body),el('div',{style:'grid-column:1/-1;display:grid;gap:6px'},el('span',{class:'mut',style:'font-size:12px'},'Фото (необязательно)'),pv,file),
+    el('div',{style:'grid-column:1/-1;display:flex;gap:10px;align-items:center;flex-wrap:wrap'},el('button',{class:'btn',type:'submit'},'Добавить отзыв'),err));
+  const rowErr=el('div',{class:'err',role:'alert'});
+  const BS='display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;height:30px;vertical-align:middle;margin-left:6px';
+  const tb=(t,fn,extra)=>el('button',{class:'btn o s',type:'button',style:BS+';padding:0 12px'+(extra||''),onclick:fn},t);
+  const act=fn=>async()=>{rowErr.textContent='';try{await fn();render()}catch(x){rowErr.textContent=x.message}};
+  const delBtn=r=>{const b=tb('Удалить',()=>{});let armed=false;b.onclick=()=>{if(!armed){armed=true;b.textContent='Точно?';setTimeout(()=>{armed=false;b.textContent='Удалить'},3000);return}act(()=>api('/reviews/'+r.id,{method:'DELETE'}))()};return b};
+  const photoCell=r=>r.has_photo?el('a',{href:'/api/office/reviews/'+r.id+'/photo',target:'_blank',rel:'noopener',class:'shotc',style:'width:64px;height:64px',title:'Открыть фото'},el('img',{src:'/api/office/reviews/'+r.id+'/photo',alt:''})):'—';
+  const statusPill=r=>el('span',{class:'pill '+(r.status==='published'?'p-ok':r.status==='pending'?'p-warn':'p-bad')},RV_STATUS[r.status]||r.status);
+  function editRow(r){
+    const e={author:el('input',{value:r.author,maxlength:'60','aria-label':'Автор'}),rating:ratingSel(r.rating),body:el('textarea',{class:'big',rows:'3',maxlength:'1500','aria-label':'Текст',style:'min-width:240px;resize:vertical'}),status:el('select',{'aria-label':'Статус'},...Object.entries(RV_STATUS).map(([v,t])=>el('option',{value:v},t)))};
+    e.body.value=r.body;e.status.value=r.status;
+    let rm=false;
+    const save=act(async()=>{await api('/reviews/'+r.id,{method:'PUT',body:{author:e.author.value,rating:e.rating.value,body:e.body.value,status:e.status.value,remove_photo:rm}});reviewEdit=null});
+    return[el('td',{},el('div',{style:'display:grid;gap:6px;min-width:150px'},e.author,e.rating)),el('td',{},e.body),el('td',{},r.has_photo?el('label',{style:'display:flex;gap:6px;align-items:center;font-size:12px'},el('input',{type:'checkbox',onchange:ev=>{rm=ev.target.checked}}),'Убрать фото'):'—'),el('td',{},e.status),el('td',{style:'white-space:nowrap'},tb('Сохранить',save),tb('Отмена',()=>{reviewEdit=null;render()}))];
+  }
+  const viewRow=r=>[
+    td(el('div',{style:'display:grid;gap:3px'},el('b',{},r.author),r.username?el('span',{class:'mut',style:'font-size:12px'},'@'+r.username):el('span',{class:'mut',style:'font-size:12px'},r.by_admin?'добавил админ':''),el('span',{class:'mut',style:'font-size:12px'},new Date(r.created_at).toLocaleDateString('ru-RU')),starsTxt(r.rating))),
+    td(el('div',{style:'white-space:pre-wrap;max-width:520px;line-height:1.45'},r.body)),
+    td(photoCell(r)),td(statusPill(r)),
+    el('td',{style:'white-space:nowrap'},
+      r.status!=='published'?tb(r.status==='pending'?'Опубликовать':'Показать',act(()=>api('/reviews/'+r.id,{method:'PUT',body:{author:r.author,rating:r.rating,body:r.body,status:'published'}}))):tb('Скрыть',act(()=>api('/reviews/'+r.id,{method:'PUT',body:{author:r.author,rating:r.rating,body:r.body,status:'hidden'}}))),
+      tb('Изменить',()=>{reviewEdit=r.id;render()}),delBtn(r))];
+  const pend=rows.filter(r=>r.status==='pending').length;
+  return[el('div',{class:'head',style:'margin-top:26px'},el('h2',{style:'font-size:20px'},'Отзывы в Mini App',pend?el('span',{class:'nbadge',style:'margin-left:10px;display:inline-block',title:'Ждут проверки'},String(pend)):null)),
+    el('div',{class:'hint',style:'margin:-4px 0 10px'},'Отзывы клиентов из Mini App сначала попадают сюда. Пока вы не нажмёте «Опубликовать», их видит только автор.'),
+    form,table(['Автор','Отзыв','Фото','Статус',''],rows.map(r=>r.id===reviewEdit?editRow(r):viewRow(r)),'Отзывов пока нет.'),rowErr];
 }
 
 const COPY_SVG='<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 012-2h9"/>';

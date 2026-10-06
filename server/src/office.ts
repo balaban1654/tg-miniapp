@@ -10,6 +10,7 @@ import { randomInt, randomBytes, createHash } from 'node:crypto';
 const sha256 = (v: string) => createHash('sha256').update(v).digest('hex');
 import { accountingRoutes } from './accounting.js';
 import { toVoice, toVideoNote } from './media.js';
+import { parseReviewPhoto, cleanReviewText, cleanRating } from './reviews.js';
 import {
   type Staff,
   type Role,
@@ -1159,6 +1160,57 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
   });
   app.delete<{ Params: { id: string } }>('/media/:id', { preHandler: need('admin') }, async (req) => {
     await db.query('DELETE FROM media_items WHERE id = $1', [Number(req.params.id)]);
+    return { ok: true };
+  });
+
+  // Отзывы: админ пишет сам, отзывы клиентов из Mini App проходят проверку и выходят после «Опубликовать»
+  const REVIEW_COLS = `id, tg_id, author, rating, body, status, by_admin, created_at, (photo IS NOT NULL) AS has_photo, photo_key,
+    (SELECT username FROM leads l WHERE l.tg_id = reviews.tg_id) AS username`;
+  app.get('/reviews', { preHandler: need('admin') }, async () => {
+    return (await db.query(`SELECT ${REVIEW_COLS} FROM reviews ORDER BY (status = 'pending') DESC, created_at DESC, id DESC`)).rows;
+  });
+  app.get<{ Params: { id: string } }>('/reviews/:id/photo', { preHandler: need('admin') }, async (req, reply) => {
+    const r = (await db.query('SELECT photo, photo_type FROM reviews WHERE id = $1', [Number(req.params.id)])).rows[0];
+    if (!r?.photo) return reply.code(404).send({ error: 'Не найдено' });
+    return reply.type(r.photo_type).header('Cache-Control', 'private, max-age=3600').send(r.photo);
+  });
+  app.post('/reviews', { preHandler: need('admin'), bodyLimit: 9 * 1024 * 1024 }, async (req, reply) => {
+    const b = (req.body ?? {}) as Record<string, unknown>;
+    const author = str(b.author, 60);
+    const rating = cleanRating(b.rating);
+    const body = cleanReviewText(b.body);
+    if (!author) return reply.code(400).send({ error: 'Укажите имя автора' });
+    if (!rating) return reply.code(400).send({ error: 'Поставьте оценку от 1 до 5' });
+    if (body.length < 2) return reply.code(400).send({ error: 'Напишите текст отзыва' });
+    const ph = parseReviewPhoto(b.photo);
+    if (typeof ph === 'string') return reply.code(400).send({ error: ph });
+    const r = await db.query(
+      `INSERT INTO reviews (author, rating, body, photo, photo_type, photo_key, status, by_admin) VALUES ($1,$2,$3,$4,$5,$6,$7,TRUE) RETURNING id`,
+      [author, rating, body, ph?.data ?? null, ph?.type ?? null, ph?.key ?? null, b.status === 'hidden' ? 'hidden' : 'published'],
+    );
+    return { id: r.rows[0].id };
+  });
+  app.put<{ Params: { id: string } }>('/reviews/:id', { preHandler: need('admin'), bodyLimit: 9 * 1024 * 1024 }, async (req, reply) => {
+    const b = (req.body ?? {}) as Record<string, unknown>;
+    const id = Number(req.params.id);
+    const cur = (await db.query('SELECT id FROM reviews WHERE id = $1', [id])).rows[0];
+    if (!cur) return reply.code(404).send({ error: 'Отзыв не найден' });
+    const author = str(b.author, 60);
+    const rating = cleanRating(b.rating);
+    const body = cleanReviewText(b.body);
+    if (!author) return reply.code(400).send({ error: 'Укажите имя автора' });
+    if (!rating) return reply.code(400).send({ error: 'Поставьте оценку от 1 до 5' });
+    if (body.length < 2) return reply.code(400).send({ error: 'Напишите текст отзыва' });
+    const status = ['pending', 'published', 'hidden'].includes(String(b.status)) ? String(b.status) : null;
+    await db.query('UPDATE reviews SET author = $2, rating = $3, body = $4, status = coalesce($5, status) WHERE id = $1', [id, author, rating, body, status]);
+    if (b.remove_photo) await db.query('UPDATE reviews SET photo = NULL, photo_type = NULL, photo_key = NULL WHERE id = $1', [id]);
+    const ph = parseReviewPhoto(b.photo);
+    if (typeof ph === 'string') return reply.code(400).send({ error: ph });
+    if (ph) await db.query('UPDATE reviews SET photo = $2, photo_type = $3, photo_key = $4 WHERE id = $1', [id, ph.data, ph.type, ph.key]);
+    return { ok: true };
+  });
+  app.delete<{ Params: { id: string } }>('/reviews/:id', { preHandler: need('admin') }, async (req) => {
+    await db.query('DELETE FROM reviews WHERE id = $1', [Number(req.params.id)]);
     return { ok: true };
   });
 

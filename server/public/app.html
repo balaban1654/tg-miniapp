@@ -203,6 +203,31 @@ svg{max-width:100%}
 .err{color:var(--bad)}
 @media(max-width:350px){.stat{padding:8px 6px}.stat b{font-size:17px}.stat span{font-size:10px}main{padding-inline:12px}.hd{padding-inline:12px}}
 @media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+.rv-head{display:flex;align-items:center;gap:10px;justify-content:space-between;flex-wrap:wrap}
+.rv-sum{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--mut)}.rv-sum b{color:var(--fg);font-size:15px}
+.stars{display:inline-flex;gap:1px;color:#ffffff30;line-height:1}.stars i{font-style:normal;font-size:15px}.stars i.on{color:var(--warn)}
+.rv-list{display:grid;gap:10px}
+.rv{display:grid;gap:8px}.rv-top{display:flex;align-items:center;gap:10px;min-width:0}.rv-top .ava{width:34px;height:34px;flex:none;font-size:14px}.rv-top>div{min-width:0;flex:1}.rv-top b{font-size:14px;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rv-body{font-size:13.5px;line-height:1.5;white-space:pre-wrap;word-break:break-word}
+.rv-photo{display:flex;align-items:center;gap:10px;background:none;border:0;padding:0;color:inherit;text-align:left;cursor:pointer;width:max-content;max-width:100%;-webkit-tap-highlight-color:transparent}
+.rv-photo .th{position:relative;width:76px;height:76px;border-radius:12px;overflow:hidden;border:1px solid var(--line);flex:none;background:var(--card2)}
+.rv-photo .th img{width:100%;height:100%;object-fit:cover;display:block}
+.rv-photo .th i{position:absolute;right:4px;bottom:4px;width:22px;height:22px;border-radius:7px;background:rgba(13,8,23,.78);display:grid;place-items:center;color:#fff}
+.rv-photo .op{display:inline-flex;align-items:center;gap:5px;font-size:13px;font-weight:600;color:var(--acc2);text-decoration:underline;text-underline-offset:3px}
+.rv-photo:active .th{transform:scale(.97)}
+.rv-pend{font-size:11px;font-weight:700;color:var(--warn);background:#ffb84d22;border-radius:8px;padding:3px 8px;flex:none}
+.rv-view{position:fixed;inset:0;z-index:90;background:rgba(5,3,10,.94);display:grid;place-items:center;padding:16px}
+.rv-view img{max-width:100%;max-height:100%;border-radius:12px;object-fit:contain}
+.rv-view button{position:absolute;top:max(14px,env(safe-area-inset-top,0px));right:14px;width:38px;height:38px;border-radius:50%;border:0;background:var(--card2);color:#fff;font-size:20px;cursor:pointer}
+.rv-sheet{position:fixed;inset:0;z-index:80;background:rgba(5,3,10,.7);display:flex;align-items:flex-end;justify-content:center}
+.rv-form{width:min(520px,100%);background:var(--bg2);border:1px solid var(--line);border-bottom:0;border-radius:20px 20px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom,0px));display:grid;gap:12px;max-height:92vh;overflow:auto}
+.rv-form h3{font-size:17px}
+.rv-pick{display:flex;gap:6px;justify-content:center}.rv-pick button{background:none;border:0;font-size:34px;line-height:1;color:#ffffff2a;cursor:pointer;padding:2px;transition:transform .1s}.rv-pick button.on{color:var(--warn)}.rv-pick button:active{transform:scale(.85)}
+.rv-form textarea{width:100%;min-height:110px;resize:vertical;background:var(--card);border:1px solid var(--line);border-radius:12px;color:var(--fg);padding:11px 12px;font:14px/1.45 var(--fb);box-sizing:border-box}
+.rv-form textarea:focus{outline:none;border-color:var(--acc)}
+.rv-att{display:flex;align-items:center;gap:10px;min-width:0}.rv-att .btn{width:auto;padding:10px 14px}.rv-att .th{position:relative;width:52px;height:52px;border-radius:10px;overflow:hidden;border:1px solid var(--line);flex:none}.rv-att .th img{width:100%;height:100%;object-fit:cover}
+.rv-att .x{background:none;border:0;color:var(--bad);font-size:13px;text-decoration:underline;cursor:pointer}
+.rv-err{color:var(--bad);font-size:13px;min-height:0}.rv-err:empty{display:none}
 </style>
 </head>
 <body>
@@ -1239,6 +1264,82 @@ function traderAva(t){
   const go=e=>{e.stopPropagation();openLink(t.live)};
   return el('div',{class:'avl',role:'link',tabindex:'0',title:'Сейчас в эфире',onclick:go,onkeydown:e=>{if(e.key==='Enter')go(e)}},a,el('i',{class:'lvb'},'LIVE'));
 }
+
+const IC_IMG='<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6M10 14L21 3M21 14v5a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h5"/></svg>';
+const starsEl=n=>el('span',{class:'stars',role:'img','aria-label':'Оценка '+n+' из 5'},[1,2,3,4,5].map(i=>el('i',{class:i<=n?'on':''},'★')));
+function openPhotoView(src){
+  const close=()=>{v.remove();document.removeEventListener('keydown',onKey)};
+  const onKey=e=>{if(e.key==='Escape')close()};
+  const v=el('div',{class:'rv-view',role:'dialog','aria-modal':'true',onclick:close},el('img',{src,alt:'Фото к отзыву'}),el('button',{type:'button','aria-label':'Закрыть',onclick:close},'×'));
+  document.addEventListener('keydown',onKey);document.body.append(v);
+}
+/** Сжимаем фото на телефоне до 1280 px, чтобы отправка не зависала на плохой связи */
+function shrinkImage(file){
+  return new Promise((ok,bad)=>{
+    const url=URL.createObjectURL(file),img=new Image();
+    img.onload=()=>{
+      const k=Math.min(1,1280/Math.max(img.width,img.height)),c=document.createElement('canvas');
+      c.width=Math.max(1,Math.round(img.width*k));c.height=Math.max(1,Math.round(img.height*k));
+      const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.drawImage(img,0,0,c.width,c.height);
+      URL.revokeObjectURL(url);ok(c.toDataURL('image/jpeg',.82));
+    };
+    img.onerror=()=>{URL.revokeObjectURL(url);bad(new Error('Не удалось открыть картинку'))};
+    img.src=url;
+  });
+}
+function reviewDialog(done){
+  let rating=0,photo=null,busy=false;
+  const close=()=>{sh.remove()};
+  const pick=el('div',{class:'rv-pick',role:'radiogroup','aria-label':'Оценка'});
+  const drawStars=()=>pick.replaceChildren(...[1,2,3,4,5].map(i=>el('button',{type:'button',class:i<=rating?'on':'',role:'radio','aria-checked':String(i===rating),'aria-label':i+' из 5',onclick:()=>{rating=i;drawStars()}},'★')));
+  drawStars();
+  const ta=el('textarea',{placeholder:'Расскажите о своём опыте с командой',maxlength:'1500',rows:'4'});
+  const err=el('div',{class:'rv-err',role:'alert'});
+  const file=el('input',{type:'file',accept:'image/*',hidden:''});
+  const att=el('div',{class:'rv-att'});
+  const drawAtt=()=>att.replaceChildren(
+    el('button',{class:'btn o',type:'button',onclick:()=>file.click()},photo?'Заменить фото':'Прикрепить фото'),
+    photo?el('div',{class:'th'},el('img',{src:photo,alt:''})):null,
+    photo?el('button',{class:'x',type:'button',onclick:()=>{photo=null;drawAtt()}},'Убрать'):null);
+  drawAtt();
+  file.addEventListener('change',async()=>{
+    const f=file.files&&file.files[0];file.value='';if(!f)return;
+    err.textContent='';
+    try{photo=await shrinkImage(f);drawAtt()}catch(x){err.textContent=x.message}
+  });
+  const send=el('button',{class:'btn',type:'button'},'Отправить');
+  send.addEventListener('click',async()=>{
+    if(busy)return;err.textContent='';
+    if(!rating){err.textContent='Поставьте оценку от 1 до 5 звёзд';return}
+    if(ta.value.trim().length<5){err.textContent='Напишите хотя бы пару слов';return}
+    busy=true;send.disabled=true;send.textContent='Отправляем…';
+    try{await api('/reviews',{method:'POST',body:{rating,body:ta.value,photo}});close();toast('Спасибо! Отзыв появится после проверки');done()}
+    catch(x){err.textContent=x.message;busy=false;send.disabled=false;send.textContent='Отправить'}
+  });
+  const sh=el('div',{class:'rv-sheet',role:'dialog','aria-modal':'true',onclick:e=>{if(e.target===sh)close()}},
+    el('div',{class:'rv-form'},el('h3',{},'Ваш отзыв'),el('div',{class:'sm',style:'text-align:center'},'Оценка'),pick,ta,att,file,err,send,el('button',{class:'btn o',type:'button',onclick:close},'Отмена')));
+  document.body.append(sh);
+}
+function reviewCard(r){
+  const photo=r.photo?el('button',{class:'rv-photo',type:'button',onclick:()=>openPhotoView(r.photo),'aria-label':'Открыть фото'},
+    el('span',{class:'th'},el('img',{src:r.photo,alt:'',loading:'lazy'}),(()=>{const i=el('i');i.innerHTML=IC_IMG;return i})()),
+    el('span',{class:'op'},'Открыть фото')):null;
+  return el('div',{class:'card rv'},
+    el('div',{class:'rv-top'},el('div',{class:'ava'},(r.author||'?').slice(0,1).toUpperCase()),el('div',{},el('b',{},r.author),el('div',{class:'sm'},dmy(r.created_at))),r.status==='pending'?el('span',{class:'rv-pend'},'На проверке'):starsEl(r.rating)),
+    r.status==='pending'?starsEl(r.rating):null,
+    el('div',{class:'rv-body'},r.body),photo);
+}
+async function reviewsBlock(){
+  let d={items:[],count:0,avg:0};
+  try{d=await api('/reviews')}catch{}
+  const box=el('div',{style:'display:grid;gap:10px'});
+  const reload=async()=>{const n=await reviewsBlock();box.replaceWith(n)};
+  box.append(
+    el('div',{class:'rv-head'},el('b',{},'Отзывы'),d.count?el('span',{class:'rv-sum'},starsEl(Math.round(d.avg)),el('b',{},String(d.avg).replace('.',',')),'· '+d.count):null),
+    el('button',{class:'btn o sm2',type:'button',onclick:()=>reviewDialog(reload)},'Добавить отзыв'),
+    d.items.length?el('div',{class:'rv-list'},d.items.map(reviewCard)):el('div',{class:'card sm',style:'text-align:center;line-height:1.5'},'Отзывов пока нет. Станьте первым, кто поделится опытом.'));
+  return box;
+}
 async function viewMedia(){
   if(!me)await refreshMe();
   const m=await api('/media');
@@ -1246,7 +1347,7 @@ async function viewMedia(){
   const tr=m.traders.length?el('div',{class:'two'},m.traders.map(t=>el('div',{class:'card tr'},el('div',{class:'tl'+(t.contact?' lk':''),...(t.contact?{role:'link',tabindex:'0',onclick:()=>openLink(t.contact.url),onkeydown:e=>{if(e.key==='Enter')openLink(t.contact.url)}}:{})},traderAva(t),el('div',{style:'min-width:0'},el('b',{},t.title,flagImg(t.country)),t.contact?el('span',{class:'un'},'@'+t.contact.handle):null)),el('div',{style:'text-align:center'},el('div',{class:'sm'},t.channelTitle||t.subtitle||'Трейдер команды'),t.members!=null?el('div',{class:'sm',style:'color:var(--accent,#b79cff)'},subsText(t.members)):null),el('button',{class:'btn o sm2',type:'button',onclick:()=>openLink(t.url)},'Канал трейдера')))):el('div',{class:'card sm'},'Трейдеры скоро появятся.');
   const liveNow=m.traders.filter(t=>t.live);
   const liveHint=liveNow.length?el('div',{class:'livehint',role:'status'},el('i',{class:'ld'}),el('div',{},el('b',{},liveNow.length>1?'Сейчас в эфире: '+liveNow.map(t=>t.title).join(', '):liveNow[0].title+' сейчас в эфире'),el('div',{class:'sm'},'Чтобы открыть прямой эфир, нажмите на аватарку трейдера с красным кольцом.'))):null;
-  shell('Медиа',[liveHint,el('b',{},'Каналы команды'),ch,el('b',{},'Наши трейдеры'),tr,el('b',{},'Новости команды'),el('div',{class:'card',style:'display:grid;gap:6px'},el('b',{style:'font-size:14px'},'Скоро здесь появятся новости'),el('div',{class:'sm',style:'line-height:1.5'},'Обновления тренажёра, итоги недели, новые трейдеры и важные объявления команды. Заглядывайте сюда почаще, чтобы ничего не пропустить.'))]);
+  shell('Медиа',[liveHint,el('b',{},'Каналы команды'),ch,el('b',{},'Наши трейдеры'),tr,el('b',{},'Новости команды'),el('div',{class:'card',style:'display:grid;gap:6px'},el('b',{style:'font-size:14px'},'Скоро здесь появятся новости'),el('div',{class:'sm',style:'line-height:1.5'},'Обновления тренажёра, итоги недели, новые трейдеры и важные объявления команды. Заглядывайте сюда почаще, чтобы ничего не пропустить.')),await reviewsBlock()]);
 }
 
 const ROLE_NAME={lead:'Лид',moder:'Модер',admin:'Админ',streamer:'Стример',analyst:'Аналитик',buyer:'Медиабайер'};

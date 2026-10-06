@@ -118,6 +118,22 @@ ALTER TABLE media_items ADD COLUMN IF NOT EXISTS contact_url TEXT;
 -- Стример, чей эфир показываем на аватарке трейдера (красное кольцо и переход на эфир, пока идёт его смена)
 ALTER TABLE media_items ADD COLUMN IF NOT EXISTS staff_id INT REFERENCES staff(id) ON DELETE SET NULL;
 
+-- Отзывы: пишет админ в Hunter Office или клиент в Mini App (клиентские выходят после проверки админом)
+CREATE TABLE IF NOT EXISTS reviews (
+  id         SERIAL PRIMARY KEY,
+  tg_id      BIGINT REFERENCES leads(tg_id) ON DELETE SET NULL,
+  author     TEXT NOT NULL,
+  rating     INT NOT NULL CHECK (rating BETWEEN 1 AND 5),
+  body       TEXT NOT NULL,
+  photo      BYTEA,
+  photo_type TEXT,
+  photo_key  TEXT,
+  status     TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','published','hidden')),
+  by_admin   BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS reviews_status_idx ON reviews (status, created_at DESC);
+
 -- Чат поддержки через бота: сообщения клиентов и ответы команды
 CREATE TABLE IF NOT EXISTS messages (
   id            BIGSERIAL PRIMARY KEY,

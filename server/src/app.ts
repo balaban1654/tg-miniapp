@@ -3,6 +3,7 @@ import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { db, attachLead } from './db.js';
 import { bot } from './bot.js';
 import { config } from './config.js';
+import { parseReviewPhoto, cleanReviewText, cleanRating } from './reviews.js';
 
 export interface TgUser {
   id: number;
@@ -540,6 +541,43 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
       }),
     );
     return { traders: rows.filter((x) => x.kind === 'trader'), channels: rows.filter((x) => x.kind === 'channel') };
+  });
+
+  // Отзывы. Видны опубликованные и свои на проверке. Фото отдаётся по случайному ключу (для <img> без заголовков)
+  app.get('/reviews', { preHandler: auth }, async (req) => {
+    const r = await db.query(
+      `SELECT id, author, rating, body, status, created_at, photo_key, (tg_id = $1) AS mine
+         FROM reviews WHERE status = 'published' OR (tg_id = $1 AND status = 'pending')
+        ORDER BY created_at DESC, id DESC LIMIT 100`,
+      [req.tg!.id],
+    );
+    const rows = r.rows.map((x) => ({ ...x, photo_key: undefined, photo: x.photo_key ? `/api/app/reviews/photo/${x.photo_key}` : null }));
+    const stats = (await db.query(`SELECT count(*)::int AS n, coalesce(round(avg(rating)::numeric, 1), 0)::float AS avg FROM reviews WHERE status = 'published'`)).rows[0];
+    return { items: rows, count: stats.n, avg: stats.avg };
+  });
+  app.get<{ Params: { key: string } }>('/reviews/photo/:key', async (req, reply) => {
+    if (!/^[0-9a-f]{24}$/.test(req.params.key)) return reply.code(404).send();
+    const r = (await db.query('SELECT photo, photo_type FROM reviews WHERE photo_key = $1', [req.params.key])).rows[0];
+    if (!r?.photo) return reply.code(404).send();
+    return reply.type(r.photo_type).header('Cache-Control', 'public, max-age=86400').send(r.photo);
+  });
+  app.post('/reviews', { preHandler: auth, bodyLimit: 8 * 1024 * 1024 }, async (req, reply) => {
+    const b = (req.body ?? {}) as Record<string, unknown>;
+    const rating = cleanRating(b.rating);
+    const body = cleanReviewText(b.body);
+    if (!rating) return reply.code(400).send({ error: 'Поставьте оценку от 1 до 5 звёзд' });
+    if (body.length < 5) return reply.code(400).send({ error: 'Напишите хотя бы пару слов' });
+    const ph = parseReviewPhoto(b.photo);
+    if (typeof ph === 'string') return reply.code(400).send({ error: ph });
+    const recent = (await db.query(`SELECT count(*)::int AS n FROM reviews WHERE tg_id = $1 AND created_at > now() - interval '1 day'`, [req.tg!.id])).rows[0].n;
+    if (recent >= 3) return reply.code(429).send({ error: 'Сегодня вы уже оставили несколько отзывов. Попробуйте завтра' });
+    const lead = (await db.query('SELECT first_name, username FROM leads WHERE tg_id = $1', [req.tg!.id])).rows[0];
+    const author = (lead?.first_name || lead?.username || 'Клиент').slice(0, 60);
+    await db.query(
+      `INSERT INTO reviews (tg_id, author, rating, body, photo, photo_type, photo_key, status) VALUES ($1,$2,$3,$4,$5,$6,$7,'pending')`,
+      [req.tg!.id, author, rating, body, ph?.data ?? null, ph?.type ?? null, ph?.key ?? null],
+    );
+    return { ok: true };
   });
 
   // Аватарки каналов и трейдеров берём из Telegram. Картинка публичная, отдаём без авторизации, чтобы работал <img>
