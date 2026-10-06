@@ -154,17 +154,17 @@ th.n{text-align:right}
 .an-leg{display:grid;gap:4px;font-size:12px}.an-leg div{display:flex;align-items:center;gap:6px}.an-leg i{width:9px;height:9px;border-radius:50%;flex:none}.an-leg b{margin-left:auto;font-family:var(--fm)}
 .an-tbl{overflow-x:auto}.an-tbl table{min-width:0;font-size:12.5px}.an-tbl th,.an-tbl td{padding:7px 10px}
 @media(max-width:560px){.an{padding:14px 12px}.an-ov{padding:8px}}
-.lc.wide{width:min(900px,100%)}
-.lc-two2{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start}
-.fc{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;display:grid;gap:8px}
-.fc-row{display:grid;grid-template-columns:64px 1fr auto;gap:10px;align-items:center;padding:8px 10px;background:var(--bg2);border:1px solid var(--line);border-radius:10px}
-.fc-row .pill{text-align:center}.fc-sum{font-size:15px}
+.lc.wide{width:min(840px,100%);padding:14px 16px;gap:9px}.lc.wide .lc-grid{gap:7px 16px}.lc.wide .lc-kv .sm{font-size:11px}.lc.wide .lc-kv b{font-size:13px}.lc.wide .lc-h{margin:2px 0 6px}.lc.wide .lc-step{padding:2px 0}.lc.wide .lc-steps{gap:6px}
+.lc-two2{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start}
+.fc{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px;display:grid;gap:5px}
+.fc-row{display:grid;grid-template-columns:58px 1fr auto;gap:8px;align-items:center;padding:5px 9px;background:var(--bg2);border:1px solid var(--line);border-radius:9px}
+.fc-row .pill{text-align:center}.fc-sum{font-size:14px}
 .fc-cnt{background:none;border:0;border-bottom:1px dotted var(--acc2);color:var(--acc2);font:600 12px var(--fb);cursor:pointer;padding:1px 2px}
 .fc-sep{height:1px;background:var(--line)}
 .fc-pop{position:fixed;z-index:90;background:var(--card2);border:1px solid var(--acc);border-radius:12px;padding:10px 12px;min-width:200px;max-height:260px;overflow:auto;box-shadow:0 14px 40px #000a;font-size:12px}
 .fc-pop div{display:flex;justify-content:space-between;gap:14px;padding:3px 0}
-.tg4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
-.tg-t{border:1px solid var(--line);background:var(--card);border-radius:12px;padding:12px 8px;text-align:center;display:grid;gap:4px}.tg-i{font-size:22px}.tg-t b{font-size:13px}
+.tg4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.tg-t{border:1px solid var(--line);background:var(--card);border-radius:10px;padding:7px 6px;text-align:center;display:grid;gap:1px}.tg-i{font-size:17px;line-height:1.2}.tg-t b{font-size:12.5px}.tg-t .sm{font-size:11px}
 .tg-t.on{border-color:var(--ok);background:#3ddc9712}.tg-t.on span.sm{color:var(--ok)}.tg-t.next{border-style:dashed}.tg-t.off{opacity:.55}
 @media(max-width:700px){.lc-two2{grid-template-columns:1fr}.tg4{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .lc-overlay{position:fixed;inset:0;background:rgba(5,2,12,.72);z-index:60;display:grid;place-items:center;padding:16px;backdrop-filter:blur(3px)}
@@ -1853,7 +1853,7 @@ async function openLeadCard(tgId){
   const pop=(anchor,rows)=>{
     document.querySelectorAll('.fc-pop').forEach(x=>x.remove());
     const r=anchor.getBoundingClientRect();
-    const p=el('div',{class:'fc-pop'},rows.length?rows.map(x=>el('div',{},el('span',{class:'mut'},fmtDT(x.at)),x.amount!==null&&x.amount!==undefined?el('b',{},money(x.amount)):null)):el('div',{class:'mut'},'Нет записей'));
+    const p=el('div',{class:'fc-pop'},rows.length?rows.slice().sort((a,b)=>Date.parse(b.at)-Date.parse(a.at)).map(x=>el('div',{},el('span',{class:'mut'},fmtDT(x.at)),x.amount!==null&&x.amount!==undefined?el('b',{},money(x.amount)):null)):el('div',{class:'mut'},'Нет записей'));
     document.body.append(p);
     const w=p.offsetWidth,h=p.offsetHeight;
     p.style.left=Math.max(8,Math.min(innerWidth-w-8,r.right-w))+'px';
@@ -1872,12 +1872,12 @@ async function openLeadCard(tgId){
   // Градации додепов (суммы не показываем)
   const T=d.tier;
   const TI=['🥉','🥈','🥇','💎'];
-  const tierBox=T?el('div',{style:'display:grid;gap:10px'},el('h4',{class:'lc-h'},'Градации додепов'),
+  const tierBox=T?el('div',{style:'display:grid;gap:7px'},el('h4',{class:'lc-h'},'Градации додепов'),
     el('div',{class:'tg4'},T.tiers.map((t,i)=>el('div',{class:'tg-t'+(t.reached?' on':i===T.reached?' next':' off')},el('span',{class:'tg-i'},TI[i]),el('b',{},t.name),el('span',{class:'mut sm'},t.reached?'достигнута':i===T.reached?'следующая':'впереди')))),
     ...(T.requests||[]).map(q=>el('div',{class:'mut sm'},'«'+q.name+'»: '+(q.status==='pending'?'запрос бонуса на проверке':q.status==='approved'?'бонус принят':'запрос отклонён'+(q.reject_reason?': '+q.reject_reason:'')))),
     T.canRequest?el('div',{},el('button',{class:'btn',type:'button',onclick:()=>depBonusDialog(L,T.eligible,()=>{close();openLeadCard(tgId)})},'Запросить бонус за «'+T.eligible.name+'»')):(me.role==='admin'&&T.eligible?el('div',{class:'mut sm'},'Стример может запросить бонус за «'+T.eligible.name+'».'):null)):null;
   box.replaceChildren(...[
-    el('div',{class:'lc-head'},el('div',{style:'min-width:0'},el('h3',{style:'font-size:24px;line-height:1.2;overflow:hidden;text-overflow:ellipsis'},fname),L.first_name&&L.username?el('div',{class:'mut',style:'font-size:13px;margin-top:2px'},'@'+L.username):null),
+    el('div',{class:'lc-head'},el('div',{style:'min-width:0'},el('h3',{style:'font-size:21px;line-height:1.2;overflow:hidden;text-overflow:ellipsis'},fname),L.first_name&&L.username?el('div',{class:'mut',style:'font-size:13px;margin-top:2px'},'@'+L.username):null),
       el('div',{style:'display:flex;gap:8px;align-items:center;flex:none'},pill(L.status),L.access?el('span',{class:'pill p-ok'},'доступ открыт'):el('span',{class:'pill p-pur'},'доступ закрыт'),
         el('button',{class:'btn o s',type:'button','aria-label':'Закрыть',onclick:close},'✕'))),
     el('div',{class:'lc-grid'},
