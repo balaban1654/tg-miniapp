@@ -1600,7 +1600,7 @@ async function viewLeads(){
   const bar=el('div',{class:'lf'},q,sel(Object.entries(STATUS).map(([k,v])=>[k,v[0]]),'status','Все статусы'),
     sel(links.map(x=>[x,x]),'link','Все ссылки'),showOwner?sel([['none','Не закреплён'],...owners],'owner','Все владельцы'):null,sel(SORTS,'sort'),
     el('button',{class:'btn o s',type:'button',onclick:()=>{Object.assign(F,{q:'',status:'',link:'',owner:'',sort:'new'});render()}},'Сбросить'));
-  const holder=el('div',{});const cnt=el('span',{class:'mut'},'');
+  const holder=el('div',{});const cnt=el('span',{class:'mut'},'');const tots=el('div',{class:'pb-tots',style:'margin:0'});
   const draw=()=>{
     const qq=F.q.trim().toLowerCase().replace(/^@/,'');
     let list=rows.filter(r=>(!F.status||(r.status===F.status&&!isStaff(r)))&&(!F.link||r.link_slug===F.link)&&(!F.owner||(F.owner==='none'?!r.owner_id:String(r.owner_id)===F.owner))
@@ -1624,6 +1624,10 @@ async function viewLeads(){
       if(leadRows.length)body.insertBefore(band('Лиды'),trs[staffRows.length]);
     }
     holder.replaceChildren(tbl);cnt.textContent=(list.length===rows.length?rows.length+' всего':list.length+' из '+rows.length);
+    // Сводка по статусам: те же фильтры, кроме самого статуса, админ состав не считаем
+    const base=rows.filter(r=>!isStaff(r)&&(!F.link||r.link_slug===F.link)&&(!F.owner||(F.owner==='none'?!r.owner_id:String(r.owner_id)===F.owner))
+      &&(!qq||[r.username,r.first_name,r.tg_id,r.trader_id].some(v=>v!=null&&String(v).toLowerCase().includes(qq))));
+    tots.replaceChildren(...Object.entries(STATUS).map(([k,v])=>[k,v,base.filter(r=>r.status===k).length]).filter(x=>x[2]).map(([k,v,n])=>el('span',{class:'pb-tot'},el('span',{class:'pill '+v[1]},v[0]),el('b',{},n+' шт'))));
   };
   leadsRows=rows;leadsRedraw=draw;draw();
   let legacyCard=null;
@@ -1634,7 +1638,7 @@ async function viewLeads(){
       legacy?el('div',{class:'sm'},'В списке: '+legacy.total+' · подключились: '+legacy.claimed):null,ta,
       el('div',{},el('button',{class:'btn o s',type:'button',onclick:async()=>{try{const r=await api('/legacy/bulk',{method:'POST',body:{text:ta.value}});ta.value='';toast('Добавлено: '+r.added+(r.skipped?', уже были: '+r.skipped:''));setTimeout(render,700)}catch(x){toast(x.message)}}},'Загрузить')));
   }
-  return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Лиды'),cnt),bar,holder,legacyCard].filter(Boolean);
+  return[el('div',{class:'head'},el('div',{style:'display:flex;align-items:center;gap:16px;flex-wrap:wrap;min-width:0'},el('h2',{style:'font-size:20px'},'Лиды'),tots),cnt),bar,holder,legacyCard].filter(Boolean);
 }
 
 function goUrl(slug){return 'https://'+location.host.replace(/^(crm|go|app)\./,'')+'/'+slug}
