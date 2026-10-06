@@ -1345,11 +1345,11 @@ async function reviewsBlock(){
   const box=el('div',{style:'display:grid;gap:10px'});
   const reload=async()=>{const n=await reviewsBlock();box.replaceWith(n)};
   const total=d.items.length;
-  box.append(
+  box.append(...[
     el('div',{class:'rv-head'},el('b',{},'Отзывы'),d.count?el('span',{class:'rv-sum'},starsEl(Math.round(d.avg)),el('b',{},String(d.avg).replace('.',',')),'· '+d.count):null),
     total?el('div',{class:'rv-list'},d.items.slice(0,3).map(reviewCard)):el('div',{class:'card sm',style:'text-align:center;line-height:1.5'},'Отзывов пока нет. Станьте первым, кто поделится опытом.'),
     total>3?el('button',{class:'rv-all',type:'button',onclick:()=>reviewsAll(d)},'Читать все отзывы ('+total+')',(()=>{const i=el('i');i.innerHTML=IC_IMG;return i})()):null,
-    el('button',{class:'btn o sm2',type:'button',onclick:()=>reviewDialog(reload)},'Добавить отзыв'));
+    el('button',{class:'btn o sm2',type:'button',onclick:()=>reviewDialog(reload)},'Добавить отзыв')].filter(Boolean));
   return box;
 }
 async function viewMedia(){
