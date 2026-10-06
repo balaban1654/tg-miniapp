@@ -2882,17 +2882,18 @@ async function signalConfigBlock(){
 async function viewSignals(){
   const rows=await api('/signals');
   const cfgBlock=await signalConfigBlock();
-  const f={pair:el('input',{required:'',placeholder:'EUR/USD OTC',list:'pairs'}),dir:el('select',{},el('option',{value:'up'},'Вверх'),el('option',{value:'down'},'Вниз')),
-    exp:el('select',{},el('option',{value:5},'5 сек')),enter:el('input',{type:'number',min:'0',max:'60',value:'2'}),
+  const otcPairs=((await api('/signal-config').catch(()=>({pairs:[]}))).pairs||[]).filter(p=>p.enabled&&/ OTC$/.test(p.pair)).map(p=>p.pair);
+  const f={pair:el('select',{required:'','aria-label':'Пара'},el('option',{value:''},'Выберите пару'),...otcPairs.map(v=>el('option',{value:v},v))),dir:el('select',{},el('option',{value:'up'},'Вверх'),el('option',{value:'down'},'Вниз')),
+    exp:el('select',{},el('option',{value:5},'5 сек')),enter:(()=>{const kv=d=>new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Kyiv',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'}).format(d).split(':');const [h,m,s]=kv(new Date(Date.now()+120000));const mk=(v,max,l)=>el('input',{type:'number',min:'0',max:String(max),value:v,inputmode:'numeric','aria-label':l,style:'text-align:center;min-width:0'});const H=mk(h,23,'Час'),M=mk(m,59,'Минута'),S=mk(s,59,'Секунда');const pad=x=>String(Math.max(0,Math.trunc(Number(x)||0))).padStart(2,'0');return{node:el('div',{style:'display:grid;grid-template-columns:1fr auto 1fr auto 1fr;gap:6px;align-items:center'},H,el('span',{class:'mut'},':'),M,el('span',{class:'mut'},':'),S),get value(){return pad(H.value)+':'+pad(M.value)+':'+pad(S.value)}}})(),
     note:el('input',{placeholder:'Почему такой сигнал (необязательно)',maxlength:'200'}),
     push:el('input',{type:'checkbox',checked:'',style:'width:auto'})};
   const dl=el('datalist',{id:'pairs'},['EUR/USD','GBP/USD','USD/JPY','AUD/CAD','EUR/GBP','EUR/USD OTC','GBP/USD OTC'].map(v=>el('option',{value:v})));
   const err=el('div',{class:'err',role:'alert'});
   const form=el('form',{class:'card',style:'display:grid;gap:12px',onsubmit:async e=>{e.preventDefault();err.className='err';err.textContent='';
-    try{const r=await api('/signals',{method:'POST',body:{pair:f.pair.value,direction:f.dir.value,expiry_sec:Number(f.exp.value),enter_in_min:f.enter.value,note:f.note.value,push:f.push.checked}});
+    try{const r=await api('/signals',{method:'POST',body:{pair:f.pair.value,direction:f.dir.value,expiry_sec:Number(f.exp.value),enter_time:f.enter.value,note:f.note.value,push:f.push.checked}});
       err.className='ok-msg';err.textContent='Сигнал опубликован'+(r.pushed?'. Пуш поставлен в очередь: '+r.pushed+' получателей':'');setTimeout(render,900)}catch(x){err.textContent=x.message}}},
     dl,el('h3',{style:'font-size:14px'},'Новый сигнал'),
-    el('div',{class:'form'},el('label',{},'Пара',f.pair),el('label',{},'Направление',f.dir),el('label',{},'Экспирация',f.exp),el('label',{},'Вход через, мин',f.enter)),
+    el('div',{class:'form'},el('label',{},'Пара (OTC)',f.pair),el('label',{},'Направление',f.dir),el('label',{},'Экспирация',f.exp),el('label',{},'Вход (Киев): ч : мин : сек',f.enter.node)),
     el('label',{},'Комментарий',f.note),
     el('label',{style:'display:flex;gap:8px;align-items:center'},f.push,'Отправить пуш клиентам с открытым доступом'),
     el('div',{style:'display:flex;gap:8px;flex-wrap:wrap'},el('button',{class:'btn',type:'submit'},'Опубликовать')),

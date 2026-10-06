@@ -1220,8 +1220,8 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
   // Пока общие сигналы публикуются только с экспирацией 5 секунд
   const EXPIRY_SEC = [5];
 
-  async function publishSignal(o: { pair: string; direction: 'up' | 'down'; expiry: number; expirySec?: number; enterIn: number; note: string | null; source: 'analyst' | 'test' | 'engine'; isTest: boolean; by: number; push: boolean }) {
-    const entryAt = new Date(Date.now() + o.enterIn * 60_000);
+  async function publishSignal(o: { pair: string; direction: 'up' | 'down'; expiry: number; expirySec?: number; enterIn: number; entryAt?: Date; note: string | null; source: 'analyst' | 'test' | 'engine'; isTest: boolean; by: number; push: boolean }) {
+    const entryAt = o.entryAt ?? new Date(Date.now() + o.enterIn * 60_000);
     const ins = await db.query(
       `INSERT INTO signals (pair, direction, expiry_min, expiry_sec, entry_at, note, source, is_test, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id`,
       [o.pair, o.direction, o.expiry, o.expirySec ?? null, entryAt, o.note, o.source, o.isTest, o.by],
@@ -1264,11 +1264,23 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     const expiry = expirySec ? 1 : Number(b.expiry_min);
     const enterIn = b.enter_in_min === undefined || b.enter_in_min === '' ? 2 : Math.trunc(Number(b.enter_in_min));
     if (!PAIR.test(pair)) return reply.code(400).send({ error: 'Пара в формате EUR/USD или EUR/USD OTC' });
+    // Общий сигнал: только OTC-пары из списка, который клиенты видят в анализе
+    if (!(await db.query(`SELECT 1 FROM signal_pairs WHERE enabled AND pair = $1 AND pair LIKE '% OTC'`, [pair])).rowCount) return reply.code(400).send({ error: 'Выберите OTC-пару из списка' });
+    let entryAt: Date | undefined;
+    if (typeof b.enter_time === 'string' && b.enter_time) {
+      const m = /^([01]?\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?$/.exec(b.enter_time.trim());
+      if (!m) return reply.code(400).send({ error: 'Время входа в формате чч:мм:сс' });
+      const hms = `${m[1].padStart(2, '0')}:${m[2]}:${m[3] ?? '00'}`;
+      // Время по Киеву, на сегодня. Если оно уже прошло, сигнал бессмысленен
+      const t = (await db.query(`SELECT (((now() AT TIME ZONE 'Europe/Kyiv')::date + $1::time) AT TIME ZONE 'Europe/Kyiv') AS t`, [hms])).rows[0].t as Date;
+      if (+t < Date.now() - 5_000) return reply.code(400).send({ error: 'Это время уже прошло. Укажите время входа позже текущего (по Киеву)' });
+      entryAt = t;
+    }
     if (!['up', 'down'].includes(direction)) return reply.code(400).send({ error: 'Выберите направление' });
     if (expirySec !== null && !EXPIRY_SEC.includes(expirySec)) return reply.code(400).send({ error: 'Пока доступна только экспирация 5 секунд' });
     if (expirySec === null && !EXPIRY.includes(expiry)) return reply.code(400).send({ error: 'Экспирация: 1, 2, 3, 5, 10 или 15 минут' });
     if (!Number.isFinite(enterIn) || enterIn < 0 || enterIn > 60) return reply.code(400).send({ error: 'Вход через 0–60 минут' });
-    return publishSignal({ pair, direction: direction as 'up' | 'down', expiry, expirySec: expirySec ?? undefined, enterIn, note: str(b.note, 200) || null, source: 'analyst', isTest: Boolean(b.is_test), by: req.staff!.id, push: b.push !== false });
+    return publishSignal({ pair, direction: direction as 'up' | 'down', expiry, expirySec: expirySec ?? undefined, enterIn, entryAt, note: str(b.note, 200) || null, source: 'analyst', isTest: Boolean(b.is_test), by: req.staff!.id, push: b.push !== false });
   });
 
   // Настройка сигналов по запросу клиента: общие параметры, пары и текущее направление по каждой паре
