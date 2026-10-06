@@ -1575,13 +1575,14 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
       [tgId],
     );
     // Стример не видит додепы и выводы
-    if (me.role === 'streamer') ev.rows = ev.rows.filter((e) => e.type !== 'dep' && e.type !== 'wd');
+    if (me.role !== 'admin') ev.rows = ev.rows.filter((e) => e.type !== 'dep' && e.type !== 'wd');
     const deposits = ev.rows.filter((e) => e.type === 'ftd' || e.type === 'dep');
     const sum = (rows: any[]) => rows.reduce((t, e) => t + Number(e.amount || 0), 0);
     const last = (k: 'country' | 'promo' | 'ac') => [...ev.rows].reverse().find((e) => e[k])?.[k] ?? null;
     // Финансовая плитка: по типам постбеков сумма, количество и даты. Стример видит только сумму FTD, у остальных количество и даты без сумм
     const fe = (await db.query(`SELECT type, amount::float AS amount, created_at FROM events WHERE tg_id = $1 AND type IN ('ftd','dep','wd','comm') ORDER BY created_at, id`, [tgId])).rows as { type: string; amount: number | null; created_at: string }[];
-    const hide = me.role === 'streamer';
+    // Суммы по постбекам видит только админ, остальные роли видят сумму FTD, у других типов только количество и даты
+    const hide = me.role !== 'admin';
     const fin: Record<string, { sum: number | null; count: number; dates: { at: string; amount: number | null }[] }> = {};
     for (const t of ['ftd', 'dep', 'wd', 'comm']) {
       const rows = fe.filter((e) => e.type === t);
