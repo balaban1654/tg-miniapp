@@ -228,6 +228,8 @@ svg{max-width:100%}
 .rv-att{display:flex;align-items:center;gap:10px;min-width:0}.rv-att .btn{width:auto;padding:10px 14px}.rv-att .th{position:relative;width:52px;height:52px;border-radius:10px;overflow:hidden;border:1px solid var(--line);flex:none}.rv-att .th img{width:100%;height:100%;object-fit:cover}
 .rv-att .x{background:none;border:0;color:var(--bad);font-size:13px;text-decoration:underline;cursor:pointer}
 .rv-err{color:var(--bad);font-size:13px;min-height:0}.rv-err:empty{display:none}
+.rv-all{display:inline-flex;align-items:center;justify-content:center;gap:6px;background:none;border:0;color:var(--acc2);font:600 13.5px var(--fb);text-decoration:underline;text-underline-offset:3px;cursor:pointer;padding:4px;justify-self:center}
+.rv-full{height:92vh;align-content:start}.rv-x{width:34px;height:34px;border-radius:50%;border:0;background:var(--card2);color:#fff;font-size:20px;cursor:pointer}
 </style>
 </head>
 <body>
@@ -1329,15 +1331,25 @@ function reviewCard(r){
     r.status==='pending'?starsEl(r.rating):null,
     el('div',{class:'rv-body'},r.body),photo);
 }
+function reviewsAll(d){
+  const close=()=>{v.remove();document.removeEventListener('keydown',onKey)};
+  const onKey=e=>{if(e.key==='Escape')close()};
+  const v=el('div',{class:'rv-sheet',role:'dialog','aria-modal':'true',onclick:e=>{if(e.target===v)close()}},
+    el('div',{class:'rv-form rv-full'},el('div',{class:'rv-head'},el('h3',{},'Все отзывы'),el('button',{class:'rv-x',type:'button','aria-label':'Закрыть',onclick:close},'×')),
+      el('div',{class:'rv-list'},d.items.map(reviewCard))));
+  document.addEventListener('keydown',onKey);document.body.append(v);
+}
 async function reviewsBlock(){
   let d={items:[],count:0,avg:0};
   try{d=await api('/reviews')}catch{}
   const box=el('div',{style:'display:grid;gap:10px'});
   const reload=async()=>{const n=await reviewsBlock();box.replaceWith(n)};
+  const total=d.items.length;
   box.append(
     el('div',{class:'rv-head'},el('b',{},'Отзывы'),d.count?el('span',{class:'rv-sum'},starsEl(Math.round(d.avg)),el('b',{},String(d.avg).replace('.',',')),'· '+d.count):null),
-    el('button',{class:'btn o sm2',type:'button',onclick:()=>reviewDialog(reload)},'Добавить отзыв'),
-    d.items.length?el('div',{class:'rv-list'},d.items.map(reviewCard)):el('div',{class:'card sm',style:'text-align:center;line-height:1.5'},'Отзывов пока нет. Станьте первым, кто поделится опытом.'));
+    total?el('div',{class:'rv-list'},d.items.slice(0,3).map(reviewCard)):el('div',{class:'card sm',style:'text-align:center;line-height:1.5'},'Отзывов пока нет. Станьте первым, кто поделится опытом.'),
+    total>3?el('button',{class:'rv-all',type:'button',onclick:()=>reviewsAll(d)},'Читать все отзывы ('+total+')',(()=>{const i=el('i');i.innerHTML=IC_IMG;return i})()):null,
+    el('button',{class:'btn o sm2',type:'button',onclick:()=>reviewDialog(reload)},'Добавить отзыв'));
   return box;
 }
 async function viewMedia(){
