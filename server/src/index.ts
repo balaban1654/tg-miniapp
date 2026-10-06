@@ -13,6 +13,7 @@ import { postbackRoutes } from './postback.js';
 import { appRoutes } from './app.js';
 import { seedDefaultRules, startScheduler } from './push.js';
 import { seedTemplates } from './templates.js';
+import { parseClick } from './clicks.js';
 
 const app = Fastify({ logger: true, trustProxy: true });
 await app.register(cookie);
@@ -92,7 +93,8 @@ app.get<{ Params: { kind: string; slug: string } }>('/:kind(s|b)/:slug', async (
   const r = await db.query('UPDATE links SET clicks = clicks + 1 WHERE slug = $1 RETURNING id', [slug]);
   if (!r.rowCount) return reply.code(404).send('Ссылка не найдена');
   // Журнал кликов для дашборда по периодам. Ошибка журнала не должна ломать переход
-  void db.query('INSERT INTO link_clicks (link_id) VALUES ($1)', [r.rows[0].id]).catch(() => {});
+  const ci = parseClick(req.headers);
+  void db.query('INSERT INTO link_clicks (link_id, country, city, device, os, browser, referrer) VALUES ($1,$2,$3,$4,$5,$6,$7)', [r.rows[0].id, ci.country, ci.city, ci.device, ci.os, ci.browser, ci.referrer]).catch(() => {});
   return reply.redirect(302, `https://t.me/${config.botUsername}?start=${kind}_${encodeURIComponent(slug)}`);
 });
 

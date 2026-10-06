@@ -473,6 +473,13 @@ CREATE TABLE IF NOT EXISTS link_clicks (
   link_id INT NOT NULL REFERENCES links(id) ON DELETE CASCADE,
   at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+-- Подробности клика для аналитики по ссылке (у старых кликов их нет)
+ALTER TABLE link_clicks ADD COLUMN IF NOT EXISTS country TEXT;
+ALTER TABLE link_clicks ADD COLUMN IF NOT EXISTS city TEXT;
+ALTER TABLE link_clicks ADD COLUMN IF NOT EXISTS device TEXT;
+ALTER TABLE link_clicks ADD COLUMN IF NOT EXISTS os TEXT;
+ALTER TABLE link_clicks ADD COLUMN IF NOT EXISTS browser TEXT;
+ALTER TABLE link_clicks ADD COLUMN IF NOT EXISTS referrer TEXT;
 CREATE INDEX IF NOT EXISTS link_clicks_at ON link_clicks(at);
 CREATE INDEX IF NOT EXISTS link_clicks_link ON link_clicks(link_id, at);
 

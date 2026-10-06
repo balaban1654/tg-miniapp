@@ -538,6 +538,54 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     return r.rows;
   });
 
+  // Аналитика одной ссылки: клики по дням, платформы, источники переходов, устройства, браузеры, страны, города и последние клики
+  app.get<{ Params: { id: string }; Querystring: { days?: string } }>('/links/:id/analytics', { preHandler: auth }, async (req, reply) => {
+    const me = req.staff!;
+    const id = Number(req.params.id);
+    const days = [7, 30, 90].includes(Number(req.query.days)) ? Number(req.query.days) : 7;
+    const l = (
+      await db.query(
+        `SELECT l.id, l.slug, l.source, l.clicks, l.created_at, s.name AS owner_name FROM links l JOIN staff s ON s.id = l.owner_id WHERE l.id = $1 AND ${ownerScope(me, 'l.owner_id')}`,
+        [id],
+      )
+    ).rows[0];
+    if (!l) return reply.code(404).send({ error: 'Ссылка не найдена' });
+    const TZ2 = 'Europe/Kyiv';
+    const win = `c.link_id = $1 AND (c.at AT TIME ZONE '${TZ2}')::date > (now() AT TIME ZONE '${TZ2}')::date - $2::int`;
+    const group = async (col: string, lim = 10) =>
+      (await db.query(`SELECT coalesce(c.${col}, 'Неизвестно') AS k, count(*)::int AS n FROM link_clicks c WHERE ${win} GROUP BY 1 ORDER BY n DESC, k LIMIT ${lim}`, [id, days])).rows;
+    const series = (
+      await db.query(
+        `SELECT to_char(d, 'YYYY-MM-DD') AS day, coalesce(x.n, 0)::int AS n
+           FROM generate_series((now() AT TIME ZONE '${TZ2}')::date - ($2::int - 1), (now() AT TIME ZONE '${TZ2}')::date, '1 day') d
+           LEFT JOIN (SELECT (c.at AT TIME ZONE '${TZ2}')::date AS dd, count(*) AS n FROM link_clicks c WHERE c.link_id = $1 GROUP BY 1) x ON x.dd = d
+          ORDER BY d`,
+        [id, days],
+      )
+    ).rows;
+    const total = (await db.query(`SELECT count(*)::int AS n FROM link_clicks c WHERE ${win}`, [id, days])).rows[0].n as number;
+    const best = (await db.query(`SELECT to_char((c.at AT TIME ZONE '${TZ2}')::date, 'YYYY-MM-DD') AS day, count(*)::int AS n FROM link_clicks c WHERE c.link_id = $1 GROUP BY 1 ORDER BY n DESC, day DESC LIMIT 1`, [id])).rows[0] ?? null;
+    const last = (await db.query('SELECT max(at) AS at FROM link_clicks WHERE link_id = $1', [id])).rows[0].at;
+    const cities = (
+      await db.query(`SELECT c.city AS k, max(c.country) AS country, count(*)::int AS n FROM link_clicks c WHERE ${win} AND c.city IS NOT NULL GROUP BY c.city ORDER BY n DESC, k LIMIT 10`, [id, days])
+    ).rows;
+    const recent = (
+      await db.query(`SELECT c.at, c.country, c.city, c.device, c.os, c.browser, c.referrer FROM link_clicks c WHERE c.link_id = $1 ORDER BY c.id DESC LIMIT 50`, [id])
+    ).rows;
+    return {
+      link: { id: l.id, slug: l.slug, source: l.source, owner_name: l.owner_name, created_at: l.created_at, clicks_total: l.clicks, last_click: last },
+      days, total, best,
+      series,
+      platforms: await group('os'),
+      referrers: await group('referrer'),
+      devices: await group('device'),
+      browsers: await group('browser'),
+      countries: await group('country', 10),
+      cities,
+      recent,
+    };
+  });
+
   // Итоги по источникам: все ссылки с одним и тем же источником складываются вместе
   app.get('/sources', { preHandler: auth }, async (req) => {
     const me = req.staff!;

@@ -141,6 +141,19 @@ tr:last-child td{border-bottom:0}
 td.n{font-family:var(--fm);text-align:right}
 th.n{text-align:right}
 .ctr th,.ctr td,.ctr td.n{text-align:center}
+.an-ov{align-items:start;overflow:auto}
+.an{width:min(1080px,100%);margin:0 auto;background:var(--bg2);border:1px solid var(--line);border-radius:18px;padding:20px;display:grid;gap:14px;position:relative}
+.an h2{font-size:18px;text-align:center}.an .sub{text-align:center;color:var(--mut);font-size:12.5px}
+.an-x{position:absolute;right:14px;top:14px;width:34px;height:34px;border-radius:50%;border:0;background:var(--card2);color:#fff;font-size:20px;cursor:pointer}
+.an-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
+.an-kpi{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;display:grid;gap:2px}.an-kpi span{font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.05em}.an-kpi b{font-size:18px}
+.an-card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;display:grid;gap:10px;min-width:0}.an-card h3{font-size:13.5px;display:flex;align-items:center;gap:8px;justify-content:space-between;flex-wrap:wrap}
+.an-two{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+.an-seg{display:inline-flex;gap:4px}.an-seg button{background:none;border:1px solid var(--line);color:var(--mut);border-radius:8px;padding:3px 10px;font:600 12px var(--fb);cursor:pointer}.an-seg button.on{background:var(--acc);border-color:var(--acc);color:#fff}
+.an svg{display:block;width:100%;height:auto;max-height:280px;margin:0 auto}.an .an-leg{width:100%;max-width:340px}.an-dn svg{max-width:190px}
+.an-leg{display:grid;gap:4px;font-size:12px}.an-leg div{display:flex;align-items:center;gap:6px}.an-leg i{width:9px;height:9px;border-radius:50%;flex:none}.an-leg b{margin-left:auto;font-family:var(--fm)}
+.an-tbl{overflow-x:auto}.an-tbl table{min-width:0;font-size:12.5px}.an-tbl th,.an-tbl td{padding:7px 10px}
+@media(max-width:560px){.an{padding:14px 12px}.an-ov{padding:8px}}
 .lc-overlay{position:fixed;inset:0;background:rgba(5,2,12,.72);z-index:60;display:grid;place-items:center;padding:16px;backdrop-filter:blur(3px)}
 .lc{width:min(720px,100%);max-height:90vh;overflow:auto;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px;display:grid;gap:14px;box-shadow:0 20px 60px rgba(0,0,0,.6)}
 .lc-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
@@ -1586,6 +1599,86 @@ async function viewLeads(){
 }
 
 function goUrl(slug){return 'https://'+location.host.replace(/^crm\./,'go.')+'/s/'+slug}
+/* ---------- Аналитика ссылки: клики по дням, платформы, источники, устройства, браузеры, страны, города, последние клики ---------- */
+const AN_COL=['#9b5cff','#3ddc97','#ffb84d','#ff6b8a','#4da3ff','#c9a6ff','#6a2fe0','#8b93a7','#43d1c5','#e89b4d'];
+const anSvg=(w,h,inner)=>{const d=document.createElement('div');d.innerHTML='<svg viewBox="0 0 '+w+' '+h+'" role="img" aria-hidden="true">'+inner+'</svg>';return d.firstElementChild};
+function anDonut(items){
+  const tot=items.reduce((a,x)=>a+x.n,0)||1,R=52,C=2*Math.PI*R;let off=0,arcs='';
+  items.forEach((x,i)=>{const len=x.n/tot*C;arcs+='<circle cx="80" cy="80" r="'+R+'" fill="none" stroke="'+AN_COL[i%AN_COL.length]+'" stroke-width="26" stroke-dasharray="'+len.toFixed(2)+' '+(C-len).toFixed(2)+'" stroke-dashoffset="'+(-off).toFixed(2)+'" transform="rotate(-90 80 80)"/>';off+=len});
+  const leg=el('div',{class:'an-leg'},items.map((x,i)=>el('div',{},el('i',{style:'background:'+AN_COL[i%AN_COL.length]}),el('span',{},x.k+' ('+(x.n/tot*100).toFixed(1).replace('.',',')+'%)'),el('b',{},String(x.n)))));
+  return el('div',{class:'an-dn',style:'display:grid;gap:10px;justify-items:center'},items.length?anSvg(160,160,arcs||''):el('div',{class:'mut'},'Нет данных'),items.length?leg:null);
+}
+function anHBars(items){
+  if(!items.length)return el('div',{class:'mut'},'Нет данных');
+  const mx=Math.max(...items.map(x=>x.n))||1;
+  return el('div',{style:'display:grid;gap:9px'},items.map((x,i)=>el('div',{style:'display:grid;gap:3px'},
+    el('div',{style:'display:flex;justify-content:space-between;font-size:12.5px'},el('span',{},x.k),el('b',{class:'mono'},String(x.n))),
+    el('div',{style:'height:14px;background:var(--bg);border-radius:6px;overflow:hidden'},el('i',{style:'display:block;height:100%;width:'+Math.max(2,x.n/mx*100)+'%;background:'+AN_COL[i%AN_COL.length]+';border-radius:6px'})))));
+}
+function anVBars(items){
+  if(!items.length)return el('div',{class:'mut'},'Нет данных');
+  const W=420,H=190,pad=26,bw=Math.min(36,(W-pad*2)/items.length-8),mx=Math.max(...items.map(x=>x.n))||1,gap=(W-pad*2)/items.length;
+  let g='';
+  for(let k=0;k<=4;k++){const y=10+k*(H-60)/4;g+='<line x1="'+pad+'" x2="'+(W-6)+'" y1="'+y+'" y2="'+y+'" stroke="#34255c" stroke-dasharray="3 3"/>'}
+  items.forEach((x,i)=>{const h=Math.max(2,x.n/mx*(H-60)),cx=pad+gap*i+gap/2,y=10+(H-60)-h;
+    g+='<rect x="'+(cx-bw/2).toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+h.toFixed(1)+'" rx="4" fill="'+AN_COL[0]+'"/><text x="'+cx.toFixed(1)+'" y="'+(y-4).toFixed(1)+'" font-size="10" fill="#f1ebff" text-anchor="middle">'+x.n+'</text><text x="'+cx.toFixed(1)+'" y="'+(H-34)+'" font-size="9.5" fill="#a89cc8" text-anchor="end" transform="rotate(-35 '+cx.toFixed(1)+' '+(H-34)+')">'+String(x.k).replace(/&/g,'&amp;').replace(/</g,'&lt;').slice(0,16)+'</text>'});
+  return anSvg(W,H,g);
+}
+function anArea(series){
+  const W=760,H=240,L=34,B=34,T=14,R=10,n=series.length,mx=Math.max(1,...series.map(x=>x.n)),step=(W-L-R)/Math.max(1,n-1);
+  const X=i=>L+i*step,Y=v=>T+(H-T-B)*(1-v/mx);
+  let g='';
+  const ticks=4;for(let k=0;k<=ticks;k++){const v=Math.round(mx*k/ticks),y=Y(v);g+='<line x1="'+L+'" x2="'+(W-R)+'" y1="'+y.toFixed(1)+'" y2="'+y.toFixed(1)+'" stroke="#34255c" stroke-dasharray="3 3"/><text x="'+(L-6)+'" y="'+(y+3).toFixed(1)+'" font-size="10" fill="#a89cc8" text-anchor="end">'+v+'</text>'}
+  const pts=series.map((x,i)=>[X(i),Y(x.n)]);
+  const line=pts.map((q,i)=>(i?'L':'M')+q[0].toFixed(1)+' '+q[1].toFixed(1)).join(' ');
+  g+='<path d="'+line+' L'+X(n-1).toFixed(1)+' '+(H-B)+' L'+X(0).toFixed(1)+' '+(H-B)+' Z" fill="#9b5cff" fill-opacity=".18"/><path d="'+line+'" fill="none" stroke="#9b5cff" stroke-width="2.4" stroke-linejoin="round"/>';
+  const every=Math.max(1,Math.ceil(n/10));
+  series.forEach((x,i)=>{g+='<circle cx="'+X(i).toFixed(1)+'" cy="'+Y(x.n).toFixed(1)+'" r="3" fill="#c9a6ff"><title>'+x.day+': '+x.n+'</title></circle>';
+    if(i%every===0||i===n-1){const d=x.day.slice(8)+'.'+x.day.slice(5,7);g+='<text x="'+X(i).toFixed(1)+'" y="'+(H-12)+'" font-size="9.5" fill="#a89cc8" text-anchor="end" transform="rotate(-35 '+X(i).toFixed(1)+' '+(H-12)+')">'+d+'</text>'}});
+  return anSvg(W,H,g);
+}
+const cName=cc=>{const f=(typeof COUNTRIES!=='undefined'?COUNTRIES:[]).find(c=>c[0]===cc);return f?f[1]:(cc||'Неизвестно')};
+const cFlag=cc=>{if(!/^[A-Z]{2}$/.test(cc||''))return null;const i=new Image();i.alt=cc;i.width=20;i.height=15;i.style.cssText='vertical-align:-2px;margin-right:6px;border-radius:2px';i.src='https://flagcdn.com/w40/'+cc.toLowerCase()+'.png';return i};
+async function openLinkAnalytics(r){
+  document.querySelectorAll('.an-ov').forEach(x=>x.remove());
+  let days=7;
+  const ov=el('div',{class:'lc-overlay an-ov',role:'dialog','aria-modal':'true'});
+  const close=()=>{ov.remove();document.removeEventListener('keydown',onKey)};
+  const onKey=e=>{if(e.key==='Escape')close()};document.addEventListener('keydown',onKey);
+  ov.addEventListener('mousedown',e=>{if(e.target===ov)close()});
+  const box=el('div',{class:'an'});ov.append(box);document.body.append(ov);
+  const load=async()=>{
+    box.replaceChildren(el('button',{class:'an-x',type:'button','aria-label':'Закрыть',onclick:close},'×'),el('div',{class:'mut'},'Загрузка…'));
+    let d;try{d=await api('/links/'+r.id+'/analytics?days='+days)}catch(x){box.replaceChildren(el('button',{class:'an-x',type:'button',onclick:close},'×'),el('div',{class:'err'},x.message));return}
+    const fdt=v=>v?new Date(v).toLocaleString('ru-RU',{timeZone:'Europe/Kyiv',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}):'—';
+    const fd=v=>v?v.slice(8)+'.'+v.slice(5,7)+'.'+v.slice(0,4):'—';
+    const seg=el('span',{class:'an-seg'},[7,30,90].map(n=>el('button',{type:'button',class:n===days?'on':'',onclick:()=>{days=n;load()}},n+' дн.')));
+    const goU=goUrl(d.link.slug);
+    const unknownC=d.countries.find(x=>x.k==='Неизвестно');
+    const tot=d.countries.reduce((a,x)=>a+x.n,0)||1;
+    const ctab=el('div',{class:'an-tbl'},table(['#','Страна','Клики','%'],d.countries.map((x,i)=>[td(String(i+1)),el('td',{},cFlag(x.k),x.k==='Неизвестно'?'Неизвестно':cName(x.k)),td(x.n,'n'),td((x.n/Math.max(1,d.total)*100).toFixed(1).replace('.',',')+'%','n')]),'Нет данных'));
+    const citab=el('div',{class:'an-tbl'},table(['#','Город','Страна','Клики','%'],d.cities.map((x,i)=>[td(String(i+1)),td(x.k),el('td',{},cFlag(x.country),cName(x.country)),td(x.n,'n'),td((x.n/Math.max(1,d.total)*100).toFixed(1).replace('.',',')+'%','n')]),'Города появятся, когда в Cloudflare включена передача геоданных'));
+    const rtab=el('div',{class:'an-tbl'},table(['Время','Страна','Город','Устройство','Платформа','Браузер','Источник'],d.recent.map(x=>[td(fdt(x.at)),el('td',{},cFlag(x.country),x.country?cName(x.country):'—'),td(x.city||'—'),td(x.device||'—'),td(x.os||'—'),td(x.browser||'—'),td(x.referrer||'—')]),'Подробности есть только у кликов после включения аналитики'));
+    box.replaceChildren(el('button',{class:'an-x',type:'button','aria-label':'Закрыть',onclick:close},'×'),
+      el('h2',{},'Аналитика ссылки'),el('div',{class:'sub'},goU+' · владелец '+d.link.owner_name+(d.link.source?' · источник '+d.link.source:'')),
+      el('div',{class:'an-kpis'},
+        el('div',{class:'an-kpi'},el('span',{},'Создана'),el('b',{style:'font-size:14px'},fdt(d.link.created_at))),
+        el('div',{class:'an-kpi'},el('span',{},'Последний клик'),el('b',{style:'font-size:14px'},fdt(d.link.last_click))),
+        el('div',{class:'an-kpi'},el('span',{},'Кликов всего'),el('b',{},String(d.link.clicks_total))),
+        el('div',{class:'an-kpi'},el('span',{},'За '+days+' дн. (с аналитикой)'),el('b',{},String(d.total)))),
+      el('div',{class:'an-card'},el('h3',{},d.best?('Лучший день: '+fd(d.best.day)+' · '+d.best.n+' кликов'):'Лучший день появится после первых кликов')),
+      el('div',{class:'an-card'},el('h3',{},'Клики по времени',seg),anArea(d.series)),
+      el('div',{class:'an-two'},el('div',{class:'an-card'},el('h3',{},'Платформы'),anDonut(d.platforms)),el('div',{class:'an-card'},el('h3',{},'Откуда переходят'),anDonut(d.referrers))),
+      el('div',{class:'an-two'},el('div',{class:'an-card'},el('h3',{},'Устройства'),anHBars(d.devices)),el('div',{class:'an-card'},el('h3',{},'Браузеры'),anVBars(d.browsers))),
+      el('div',{class:'an-card'},el('h3',{},'Клики по странам'),anVBars(d.countries.map(x=>({k:x.k==='Неизвестно'?x.k:cName(x.k),n:x.n})))),
+      el('div',{class:'an-card'},el('h3',{},'Топ стран'),ctab),
+      el('div',{class:'an-card'},el('h3',{},'Топ городов'),citab),
+      el('div',{class:'an-card'},el('h3',{},'Недавние клики (последние 50)'),rtab),
+      unknownC?null:null);
+  };
+  load();
+}
+
 async function viewLinks(){
   const [rows,staff,sources]=await Promise.all([api('/links'),(me.role==='admin'||me.role==='teamlead')?api('/staff'):Promise.resolve([]),api('/sources')]);
   const adm=me.role==='admin';
@@ -1604,7 +1697,7 @@ async function viewLinks(){
   return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Ссылки')),form,
     el('h3',{style:'font-size:15px'},'По источникам'),srcTable,
     el('h3',{style:'font-size:15px'},'По ссылкам'),
-    ctrT(table(['Ссылка','Источник','Владелец','Клики','Старты','Рег','FTD','Депозиты',...(adm?['Комиссия']:[])],rows.map(r=>{const u=goUrl(r.slug);return[el('td',{style:'white-space:nowrap'},el('code',{style:'display:inline'},u),copyBtn(u)),td(r.source||'—'),td(r.owner_name),td(r.clicks,'n'),td(r.starts,'n'),td(r.regs,'n'),td(r.ftds,'n'),td(money(r.deposits),'n'),...(adm?[td(money(r.commission),'n')]:[])]}),
+    ctrT(table(['Ссылка','Источник','Владелец','Клики','Старты','Рег','FTD','Депозиты',...(adm?['Комиссия']:[])],rows.map(r=>{const u=goUrl(r.slug);return[el('td',{style:'white-space:nowrap'},el('code',{style:'display:inline'},u),copyBtn(u),el('button',{type:'button',title:'Аналитика ссылки','aria-label':'Аналитика ссылки',style:'background:none;border:0;color:var(--mut);cursor:pointer;padding:2px 4px;vertical-align:middle;display:inline-grid',onclick:()=>openLinkAnalytics(r)},svgIcon('<path d="M4 20V11M10 20V4M16 20v-7M22 20H2"/>',15))),td(r.source||'—'),td(r.owner_name),td(r.clicks,'n'),td(r.starts,'n'),td(r.regs,'n'),td(r.ftds,'n'),td(money(r.deposits),'n'),...(adm?[td(money(r.commission),'n')]:[])]}),
       'Ссылок пока нет. Создайте первую выше.'))];
 }
 
