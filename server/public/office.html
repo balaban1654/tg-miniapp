@@ -3173,7 +3173,7 @@ async function viewPostbacks(){
   const holder=el('div',{});const cnt=el('span',{class:'mut'},'');const totBox=el('div',{class:'pb-tots'});
   // Telegram ID: если его нет, можно вписать вручную. Привяжется ко всем записям этого Pocket ID, лид заведётся в «Лидах»
   const tgCell=r=>{
-    const qq=r.query||{},v=r.tg_id||qq.click_id,trader=qq.trader_id;
+    const qq=r.query||{},v=r.tg_id||(/^\d{5,15}$/.test(String(qq.click_id||''))?qq.click_id:''),trader=qq.trader_id;
     if(v||!trader)return copyCell(v);
     const c=el('td',{});
     const show=()=>c.replaceChildren(el('button',{class:'btn o s',type:'button',title:'Привязать Telegram ID к этому Pocket ID',onclick:edit},'Указать'));
