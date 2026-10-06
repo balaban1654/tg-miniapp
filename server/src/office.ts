@@ -524,14 +524,14 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     const DT = depTypes(me);
     const r = await db.query(
       `SELECT l.id, l.slug, l.source, l.campaign, l.clicks, l.created_at, l.parent_id, l.token, s.name AS owner_name, l.owner_id,
-              (SELECT count(*)::int FROM leads d WHERE d.link_id = l.id AND d.lead_role = 'lead') AS starts,
-              (SELECT count(*)::int FROM leads d WHERE d.link_id = l.id AND d.lead_role = 'lead'
+              (SELECT count(*)::int FROM leads d WHERE d.link_id = l.id AND d.lead_role = 'lead' AND d.created_at >= coalesce(l.reset_at, '-infinity')) AS starts,
+              (SELECT count(*)::int FROM leads d WHERE d.link_id = l.id AND d.lead_role = 'lead' AND d.created_at >= coalesce(l.reset_at, '-infinity')
                  AND EXISTS (SELECT 1 FROM events e WHERE e.tg_id = d.tg_id AND e.type = 'reg')) AS regs,
-              (SELECT count(*)::int FROM leads d WHERE d.link_id = l.id AND d.lead_role = 'lead' AND d.status IN ('ftd','active')) AS ftds,
+              (SELECT count(*)::int FROM leads d WHERE d.link_id = l.id AND d.lead_role = 'lead' AND d.created_at >= coalesce(l.reset_at, '-infinity') AND d.status IN ('ftd','active')) AS ftds,
               coalesce((SELECT sum(e.amount) FROM events e JOIN leads d ON d.tg_id = e.tg_id
-                 WHERE d.link_id = l.id AND d.lead_role = 'lead' AND e.type IN ${DT}),0)::float AS deposits,
+                 WHERE d.link_id = l.id AND d.lead_role = 'lead' AND e.created_at >= coalesce(l.reset_at, '-infinity') AND e.type IN ${DT}),0)::float AS deposits,
               coalesce((SELECT sum(e.amount) FROM events e JOIN leads d ON d.tg_id = e.tg_id
-                 WHERE d.link_id = l.id AND d.lead_role = 'lead' AND e.type = 'comm' AND ${me.role === 'streamer' ? 'false' : 'true'}),0)::float AS commission
+                 WHERE d.link_id = l.id AND d.lead_role = 'lead' AND e.created_at >= coalesce(l.reset_at, '-infinity') AND e.type = 'comm' AND ${me.role === 'streamer' ? 'false' : 'true'}),0)::float AS commission
          FROM links l JOIN staff s ON s.id = l.owner_id
         WHERE ${ownerScope(me, 'l.owner_id')} ORDER BY coalesce(l.parent_id, l.id) DESC, (l.parent_id IS NOT NULL), l.id DESC`,
     );
@@ -603,10 +603,10 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
               count(d.tg_id)::int AS starts,
               count(d.tg_id) FILTER (WHERE EXISTS (SELECT 1 FROM events e WHERE e.tg_id = d.tg_id AND e.type = 'reg'))::int AS regs,
               count(d.tg_id) FILTER (WHERE d.status IN ('ftd','active'))::int AS ftds,
-              coalesce(sum((SELECT sum(e.amount) FROM events e WHERE e.tg_id = d.tg_id AND e.type IN ${DT})),0)::float AS deposits,
-              coalesce(sum((SELECT sum(e.amount) FROM events e WHERE e.tg_id = d.tg_id AND e.type = 'comm' AND ${me.role === 'streamer' ? 'false' : 'true'})),0)::float AS commission
+              coalesce(sum((SELECT sum(e.amount) FROM events e WHERE e.tg_id = d.tg_id AND e.created_at >= coalesce(l.reset_at, '-infinity') AND e.type IN ${DT})),0)::float AS deposits,
+              coalesce(sum((SELECT sum(e.amount) FROM events e WHERE e.tg_id = d.tg_id AND e.created_at >= coalesce(l.reset_at, '-infinity') AND e.type = 'comm' AND ${me.role === 'streamer' ? 'false' : 'true'})),0)::float AS commission
          FROM links l JOIN leads d ON d.link_id = l.id
-        WHERE d.lead_role = 'lead' AND ${ownerScope(me, 'l.owner_id')} GROUP BY 1`,
+        WHERE d.lead_role = 'lead' AND d.created_at >= coalesce(l.reset_at, '-infinity') AND ${ownerScope(me, 'l.owner_id')} GROUP BY 1`,
     );
     const byS = new Map(res.rows.map((x) => [x.source, x]));
     const out = r.rows.map((x) => ({
@@ -648,6 +648,63 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
       if (e.code === '23505') return reply.code(409).send({ error: 'Такой адрес уже занят' });
       throw e;
     }
+  });
+
+  // Случайная ссылка без имени: hunterai.space/jfsu2jd4l1. Источник и владелец выбирает админ
+  app.post('/links/random', { preHandler: need('admin') }, async (req, reply) => {
+    const me = req.staff!;
+    const b = (req.body ?? {}) as Record<string, unknown>;
+    let ownerId = me.id;
+    if (b.owner_id && Number(b.owner_id) !== me.id) {
+      if (!(await db.query('SELECT 1 FROM staff WHERE id = $1', [Number(b.owner_id)])).rowCount) return reply.code(400).send({ error: 'Владелец не найден' });
+      ownerId = Number(b.owner_id);
+    }
+    const ALPHA = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    for (let i = 0; i < 8; i++) {
+      let slug = '';
+      for (let k = 0; k < 10; k++) slug += ALPHA[randomInt(ALPHA.length)];
+      if (RESERVED_SLUGS.has(slug) || (await db.query('SELECT 1 FROM links WHERE slug = $1 OR token = $1', [slug])).rowCount) continue;
+      try {
+        const r = await db.query(`INSERT INTO links (slug, owner_id, source) VALUES ($1,$2,$3) RETURNING id`, [slug, ownerId, str(b.source, 60) || null]);
+        return { id: r.rows[0].id, slug };
+      } catch (e: any) {
+        if (e.code !== '23505') throw e;
+      }
+    }
+    return reply.code(500).send({ error: 'Не получилось придумать адрес, попробуйте ещё раз' });
+  });
+
+  // Удаление ссылки (вместе со случайными под ней). Лиды остаются у своих владельцев, теряют только привязку к ссылке
+  app.delete<{ Params: { id: string } }>('/links/:id', { preHandler: need('admin') }, async (req, reply) => {
+    const id = Number(req.params.id);
+    const c = await db.connect();
+    try {
+      await c.query('BEGIN');
+      await c.query('UPDATE leads SET link_id = NULL WHERE link_id = $1 OR link_id IN (SELECT id FROM links WHERE parent_id = $1)', [id]);
+      const r = await c.query('DELETE FROM links WHERE id = $1 RETURNING id', [id]);
+      await c.query('COMMIT');
+      if (!r.rowCount) return reply.code(404).send({ error: 'Ссылка не найдена' });
+      return { ok: true };
+    } catch (e) {
+      await c.query('ROLLBACK').catch(() => {});
+      throw e;
+    } finally {
+      c.release();
+    }
+  });
+
+  // Обнуление статистики ссылок: всей или одного источника. Лиды и деньги не удаляются, просто перестают считаться в «Ссылках»
+  app.post('/links/reset', { preHandler: need('admin') }, async (req, reply) => {
+    const b = (req.body ?? {}) as Record<string, unknown>;
+    const all = b.all === true;
+    const source = typeof b.source === 'string' ? b.source.trim() : '';
+    if (!all && !source) return reply.code(400).send({ error: 'Укажите источник или обнулите всё' });
+    const none = source === 'Без источника';
+    const cond = all ? 'TRUE' : none ? "coalesce(source,'') = ''" : 'source = $1';
+    const args = all || none ? [] : [source];
+    await db.query(`DELETE FROM link_clicks WHERE link_id IN (SELECT id FROM links WHERE ${cond})`, args);
+    const r = await db.query(`UPDATE links SET clicks = 0, reset_at = now() WHERE ${cond}`, args);
+    return { ok: true, links: r.rowCount };
   });
 
   // Случайная ссылка под основной: hunterai.space/liza/jhj725hc159n. Свой счётчик и статистика, владелец и источник как у основной

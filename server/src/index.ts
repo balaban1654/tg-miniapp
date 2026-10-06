@@ -27,16 +27,16 @@ await seedTemplates();
 
 // Интерфейс Hunter Office и его API
 const officeHtml = readFileSync(resolve(process.cwd(), 'public/office.html'), 'utf8');
-app.get('/office', async (_req, reply) => reply.type('text/html; charset=utf-8').header('Cache-Control', 'no-store').send(officeHtml));
+app.get('/crm', async (_req, reply) => reply.type('text/html; charset=utf-8').header('Cache-Control', 'no-store').send(officeHtml));
 // Установка Office как приложения (PWA): манифест и сервис-воркер
 const manifest = JSON.stringify({
   name: 'Hunter Office',
   short_name: 'Office',
   description: 'Кабинет команды Hunter AI',
   lang: 'ru',
-  id: '/office',
-  start_url: '/office',
-  scope: '/',
+  id: '/crm',
+  start_url: '/crm',
+  scope: '/crm',
   display: 'standalone',
   orientation: 'any',
   background_color: '#0b0614',
@@ -89,9 +89,10 @@ app.get('/health', async () => {
   return { ok: true };
 });
 
-// Ссылки: hunterai.space/liza, hunterai.space/liza/<код>, а также прежние /s/liza и /b/liza. Считаем клик и отправляем в бота с параметром.
-// Неизвестный адрес ведёт на заглушку сайта
-async function goLink(req: FastifyRequest, reply: FastifyReply, kindHint: 's' | 'b' | null, slug: string, token?: string) {
+// Ссылки: hunterai.space/liza и hunterai.space/liza/<код>. Считаем клик и отправляем в бота с параметром.
+// Прежние формы (/s/liza, /b/liza, go.hunterai.space) больше не работают. Неизвестный адрес ведёт на заглушку сайта
+async function goLink(req: FastifyRequest, reply: FastifyReply, slug: string, token?: string) {
+  if (/^(go|api|crm|app)\./i.test(req.hostname)) return reply.redirect(302, SITE_URL + '/');
   const key = token ? `${slug}/${token}` : slug;
   const r = await db.query(
     `UPDATE links l SET clicks = clicks + 1 FROM staff o WHERE l.slug = $1 AND o.id = l.owner_id RETURNING l.id, l.token, o.role AS owner_role`,
@@ -102,23 +103,21 @@ async function goLink(req: FastifyRequest, reply: FastifyReply, kindHint: 's' | 
   // Журнал кликов для дашборда по периодам. Ошибка журнала не должна ломать переход
   const ci = parseClick(req.headers);
   void db.query('INSERT INTO link_clicks (link_id, country, city, device, os, browser, referrer) VALUES ($1,$2,$3,$4,$5,$6,$7)', [row.id, ci.country, ci.city, ci.device, ci.os, ci.browser, ci.referrer]).catch(() => {});
-  const kind = kindHint ?? (row.owner_role === 'buyer' ? 'b' : 's');
+  const kind = row.owner_role === 'buyer' ? 'b' : 's';
   // В параметре старта у случайной ссылки её код: слэш Telegram не допускает
   return reply.redirect(302, `https://t.me/${config.botUsername}?start=${kind}_${encodeURIComponent(row.token ?? slug)}`);
 }
-const SEG = '^[a-z0-9][a-z0-9_-]{0,39}$';
+const SEG = '^[a-z0-9][a-z0-9_-]{1,39}$';
 const TOK = '^[a-z0-9_-]{2,40}$';
 app.get<{ Params: { a: string } }>(`/:a(${SEG})`, async (req, reply) => {
   if (RESERVED_SLUGS.has(req.params.a)) return reply.redirect(302, SITE_URL + '/');
-  return goLink(req, reply, null, req.params.a);
+  return goLink(req, reply, req.params.a);
 });
 app.get<{ Params: { a: string; b: string } }>(`/:a(${SEG})/:b(${TOK})`, async (req, reply) => {
   const { a, b } = req.params;
-  if (a === 's' || a === 'b') return goLink(req, reply, a, b);
   if (RESERVED_SLUGS.has(a)) return reply.code(404).send({ error: 'Не найдено' });
-  return goLink(req, reply, null, a, b);
+  return goLink(req, reply, a, b);
 });
-app.get<{ Params: { k: string; a: string; b: string } }>(`/:k(s|b)/:a(${SEG})/:b(${TOK})`, async (req, reply) => goLink(req, reply, req.params.k as 's' | 'b', req.params.a, req.params.b));
 
 await app.listen({ port: config.port, host: '0.0.0.0' });
 // Автозакрытие прошлого месяца: проверяем каждые 10 минут, закрывает после 03:00 первого числа
