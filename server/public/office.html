@@ -61,6 +61,7 @@ html{background:#0a0613}
 /* приложение */
 #app{display:grid;grid-template-columns:200px 1fr;min-height:100vh}
 .side{background:#0a0613;border-right:1px solid var(--line);padding:16px 10px;display:flex;flex-direction:column;gap:4px;position:sticky;top:0;height:100vh}
+.side .brand#homeBrand{cursor:pointer;border-radius:10px;-webkit-tap-highlight-color:transparent}.side .brand#homeBrand:focus-visible{outline:2px solid var(--acc)}
 .side .brand{padding:4px 10px 16px}
 .nav{display:grid;gap:3px}
 .nav button{display:flex;align-items:center;gap:10px;text-align:left;white-space:nowrap;background:none;border:0;border-radius:9px;padding:9px 12px;color:var(--mut);font-weight:600;cursor:pointer}
@@ -428,7 +429,7 @@ textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10
 
 <div id="app" hidden>
   <aside class="side">
-    <div class="brand"><div class="logo"><img src="/img/logo-256.webp" alt="H" draggable="false"></div><b style="font:700 14px var(--fd)">Hunter Office</b></div>
+    <div class="brand" id="homeBrand" role="link" tabindex="0" title="На дашборд"><div class="logo"><img src="/img/logo-256.webp" alt="H" draggable="false"></div><b style="font:700 14px var(--fd)">Hunter Office</b></div>
     <button class="burger" id="burger" type="button" aria-label="Меню" aria-expanded="false" aria-controls="sideMenu"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
     <div class="side-menu" id="sideMenu">
     <nav class="nav" id="nav"></nav>
@@ -774,6 +775,7 @@ $('#lRec').onclick=()=>otpMode(!$('#otp').hidden);
   });
 })();
 $('#lBack').onclick=()=>{loginChallenge=null;loginStep(false);$('#lErr').textContent=''};
+{const hb=$('#homeBrand'),goHome=()=>{const h=me&&me.role==='analyst'?'signals':'home';if(tab===h){render();return}tab=h;showApp();render()};hb.addEventListener('click',goHome);hb.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();goHome()}})}
 $('#logout').addEventListener('click',async()=>{try{await api('/logout',{method:'POST'})}catch{}showLogin()});
 
 /** render({soft:true}) обновляет страницу на месте: без «Загрузка…» и с сохранением прокрутки, чтобы экран не дёргался */
