@@ -721,6 +721,14 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
   });
 
   // ----- Выплаты и авансы (админ) -----
+  // Сколько всего ждёт решения админа: отчёты на проверке, причины по сменам без решения, запросы авансов
+  app.get('/accounting/pending', { preHandler: admin }, async () => {
+    const n = async (sql: string) => (await db.query(sql)).rows[0].n as number;
+    const review = await n(`SELECT count(*)::int AS n FROM shift_reports WHERE status = 'pending'`);
+    const why = await n(`SELECT count(*)::int AS n FROM shift_shortfalls f JOIN staff s ON s.id = f.staff_id WHERE s.role <> 'admin' AND f.reason IS NOT NULL AND f.accepted_at IS NULL AND f.penalty_id IS NULL`);
+    const pay = await n(`SELECT count(*)::int AS n FROM advance_requests WHERE status = 'pending'`);
+    return { review, why, pay, total: review + why + pay };
+  });
   app.get('/advances', { preHandler: admin }, async () =>
     (await db.query(`SELECT r.id, r.staff_id, s.name AS staff_name, r.period, r.amount::float AS amount, r.status, r.created_at FROM advance_requests r JOIN staff s ON s.id = r.staff_id WHERE r.status = 'pending' ORDER BY r.id`)).rows,
   );
