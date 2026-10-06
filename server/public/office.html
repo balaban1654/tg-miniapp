@@ -2713,15 +2713,16 @@ async function viewChats(){
 const TRIG={start:'Нажал /start',no_reg:'Нет регистрации',no_deposit:'Регистрация без депозита',ftd:'Депозит получен',inactive:'Давно не заходил',withdrawal:'Успешный вывод средств'};
 const BTYPE={miniapp:'Открыть кабинет',review:'Оставить отзыв (окно отзыва в Mini App)',support:'Поддержка (чат в боте)',register:'Регистрация',url:'Своя ссылка',acc_ready:'Ответ «Всё понятно — регистрация»',acc_no:'Ответ «Нет, создать»',acc_yes:'Ответ «Да, уже есть»'};
 const fmtDelay=m=>m===0?'сразу':m%1440===0?'через '+(m/1440)+' дн.':m%60===0?'через '+(m/60)+' ч':'через '+m+' мин';
-const sample=t=>t.replace(/\{время:(\d{10,14})\}/g,(_m,ms)=>new Date(+ms).toLocaleTimeString('ru-RU',{timeZone:'Europe/Kyiv',hourCycle:'h23'})+' (Киев)').replaceAll('{имя}','Аня').replaceAll('{стример}','Иван').replaceAll('{промокод}','LIO669');
+const sample=t=>t.replaceAll('{пара}','EUR/USD OTC').replaceAll('{направление}','вверх').replaceAll('{экспирация}','5 сек').replaceAll('{время}','12:30:00 (Киев)').replace(/\{время:(\d{10,14})\}/g,(_m,ms)=>new Date(+ms).toLocaleTimeString('ru-RU',{timeZone:'Europe/Kyiv',hourCycle:'h23'})+' (Киев)').replaceAll('{имя}','Аня').replaceAll('{стример}','Иван').replaceAll('{промокод}','LIO669');
 
-function buttonsEditor(initial){
+function buttonsEditor(initial,types){
+  const TYPES=types||BTYPE;
   const box=el('div',{style:'display:grid;gap:8px'});
   const rows=[];
   const add=(b={})=>{
     const label=el('input',{placeholder:'Подпись кнопки',maxlength:'40',value:b.label||''});
     const kind=b.type==='callback'?b.data:(b.type||'miniapp');
-    const type=el('select',{},Object.entries(BTYPE).map(([k,v])=>el('option',{value:k,...(k===kind?{selected:''}:{})},v)));
+    const type=el('select',{},Object.entries(TYPES).map(([k,v])=>el('option',{value:k,...(k===kind?{selected:''}:{})},v)));
     const url=el('input',{placeholder:'https://…',value:b.url||''});
     const del=el('button',{class:'btn o s',type:'button',onclick:()=>{rows.splice(rows.indexOf(r),1);r.node.remove()}},'Убрать');
     const sync=()=>{url.hidden=type.value!=='url'};type.addEventListener('change',sync);sync();
@@ -2741,8 +2742,55 @@ function preview(text,buttons){
   return el('div',{class:'pv'},sample(text)||'Текст сообщения',buttons.length?el('div',{class:'k'},buttons.map(b=>el('span',{},b.label))):null);
 }
 
+const SEG_LABELS={all:'Все, кто запускал бота',new:'Не зарегистрировались',registered:'Зарегистрировались, без депозита',ftd:'С депозитом',access:'С открытым доступом',churned:'Отвалились',withdrew:'Выводили средства'};
+const TPL_INFO={
+  signal:{title:'Новый сигнал от аналитика',when:'Уходит при публикации сигнала в «Сигналах» (если стоит галочка «Отправить пуш»).',vars:'{пара} {направление} {экспирация} {время} {имя}',types:{miniapp:'Открыть кабинет',url:'Своя ссылка',support:'Поддержка (чат в боте)'}},
+  live:{title:'Стример в прямом эфире',when:'Уходит, когда стример открывает смену. Кнопка «Смотреть эфир» ведёт на ту ссылку, с которой он начал смену. Повтор от одного стримера не чаще раза в 30 минут.',vars:'{стример} {имя}',types:{stream:'Смотреть эфир (ссылка смены)',miniapp:'Открыть кабинет',url:'Своя ссылка'}}
+};
+function templateCard(t){
+  const info=TPL_INFO[t.key]||{title:t.key,when:'',vars:'',types:BTYPE};
+  const err=el('div',{class:'err',role:'alert'});
+  const on=el('input',{type:'checkbox',style:'width:auto'});on.checked=t.enabled;
+  const txt=el('textarea',{class:'big',rows:'4',maxlength:'4000',placeholder:'Текст сообщения. Можно оставить пустым, если есть картинка'});txt.value=t.text||'';
+  const be=buttonsEditor(t.buttons,info.types);
+  const segOpts=[['none','Никому в боте (только каналы)'],...(t.key==='live'?[['own','Лиды этого стримера']]:[]),...Object.entries(SEG_LABELS)];
+  const seg=el('select',{'aria-label':'Кому'},segOpts.map(([v,n])=>el('option',{value:v},n)));seg.value=t.segment;
+  const ch=el('textarea',{class:'big',rows:'2',placeholder:'@channel_name\n-1001234567890',maxlength:'600','aria-label':'Каналы',style:'min-height:56px;resize:vertical'});ch.value=(t.channels||[]).join('\n');
+  let photo=null,removePhoto=false,hasPhoto=t.has_photo;
+  const file=el('input',{type:'file',accept:'image/jpeg,image/png,image/webp',style:'display:none'});
+  const pv=el('div',{style:'display:flex;align-items:center;gap:10px;flex-wrap:wrap'});
+  const bpv=el('div',{});
+  const upd=()=>bpv.replaceChildren(preview(txt.value,be.get()));
+  const drawPv=()=>{
+    const src=photo||(hasPhoto&&!removePhoto?'/api/office/push/templates/'+t.key+'/photo?'+(t.updated_at||''):null);
+    pv.replaceChildren(el('button',{class:'btn o s',type:'button',onclick:()=>file.click()},src?'Заменить картинку':'Добавить картинку'),
+      src?el('div',{class:'shot-w'},el('img',{src,alt:'',style:'max-height:72px'}),el('button',{class:'shot-del',type:'button',title:'Убрать картинку','aria-label':'Убрать картинку',onclick:()=>{photo=null;if(hasPhoto)removePhoto=true;drawPv()}},'×')):null);
+  };
+  file.addEventListener('change',async()=>{const f=file.files[0];file.value='';if(!f)return;
+    if(!/^image\/(jpeg|png|webp)$/.test(f.type)){err.textContent='Нужна картинка JPG, PNG или WebP';return}
+    if(f.size>5*1024*1024){err.textContent='Картинка больше 5 МБ';return}
+    err.textContent='';photo=await fileToDataUrl(f);removePhoto=false;drawPv()});
+  txt.addEventListener('input',upd);be.node.addEventListener('input',upd);be.node.addEventListener('click',()=>setTimeout(upd,0));
+  drawPv();upd();
+  const save=el('button',{class:'btn',type:'button'},'Сохранить');
+  save.addEventListener('click',async()=>{err.className='err';err.textContent='';
+    try{await api('/push/templates/'+t.key,{method:'PUT',body:{enabled:on.checked,text:txt.value,buttons:be.get(),segment:seg.value,channels:ch.value,photo,remove_photo:removePhoto}});
+      err.className='ok-msg';err.textContent='Сохранено';setTimeout(render,700)}catch(x){err.textContent=x.message}});
+  const reset=el('button',{class:'btn o',type:'button',onclick:async()=>{if(!reset.dataset.s){reset.dataset.s='1';reset.textContent='Точно вернуть стандартный текст?';return}
+    try{await api('/push/templates/'+t.key+'/reset',{method:'POST'});render()}catch(x){err.textContent=x.message}}},'Вернуть стандартный текст');
+  return el('div',{class:'card',style:'display:grid;gap:12px'},
+    el('div',{style:'display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap'},el('h3',{style:'font-size:15px'},info.title),el('label',{style:'display:flex;gap:8px;align-items:center;cursor:pointer'},on,'Включён')),
+    el('div',{class:'mut sm'},info.when),
+    el('label',{},'Текст. Подстановки: '+info.vars,txt),
+    el('div',{style:'display:grid;gap:6px'},el('span',{class:'mut sm'},'Картинка (необязательно, можно отправить только её)'),pv,file),
+    be.node,
+    el('div',{class:'form'},el('label',{},'Кому в боте',seg),el('label',{style:'grid-column:span 2'},'Telegram-каналы, по одному на строку (бот должен быть админом)',ch)),
+    el('div',{},el('div',{class:'mut',style:'font-size:12px;margin-bottom:6px'},'Так увидит клиент'),bpv),
+    el('div',{style:'display:flex;gap:10px;align-items:center;flex-wrap:wrap'},save,reset,err));
+}
+
 async function viewPush(){
-  const[rules,seg,casts,staff]=await Promise.all([api('/push/rules'),api('/push/segments'),api('/push/broadcasts'),api('/staff')]);
+  const[rules,seg,casts,staff,tpls]=await Promise.all([api('/push/rules'),api('/push/segments'),api('/push/broadcasts'),api('/staff'),api('/push/templates')]);
   // --- правила
   let editId=null;
   const f={name:el('input',{required:'',placeholder:'Например: Нет регистрации, через 3 часа'}),
@@ -2818,6 +2866,7 @@ async function viewPush(){
     el('div',{},sendBtn),berr);
   const castT=table(['Когда','Кому','Текст','Всего','Отправлено','Ошибок','В очереди'],casts.map(c=>[td(new Date(c.created_at).toLocaleString('ru-RU',{timeZone:'Europe/Kyiv',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})),td(SEGL[c.segment]||c.segment),el('td',{style:'max-width:320px;white-space:normal'},c.text.replace(/\{время:(\d{10,14})\}/g,(_m,ms)=>new Date(+ms).toLocaleTimeString('ru-RU',{timeZone:'Europe/Kyiv',hourCycle:'h23'})+' (Киев)').slice(0,110)),td(c.total,'n'),td(c.sent,'n'),td(c.failed,'n'),td(c.pending,'n')]),'Рассылок пока не было.');
   return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Пуши и рассылки'),el('span',{class:'mut sm'},'Каждое правило уходит человеку один раз')),
+    el('h3',{style:'font-size:15px'},'Шаблоны сообщений'),...tpls.map(templateCard),
     el('h3',{style:'font-size:15px'},'Автоматические пуши'),rulesT,form,
     el('h3',{style:'font-size:15px'},'Рассылки'),bform,castT];
 }
@@ -2852,8 +2901,7 @@ async function signalConfigBlock(){
       onclick:async()=>{try{await api('/signal-pairs',{method:'PUT',body:{pair:p.pair,enabled:!p.enabled,sort:p.sort}});render({soft:true})}catch(x){toast(x.message)}}},p.enabled?'Показана':'Скрыта');
     return[td(p.pair),el('td',{},en),
       el('td',{style:'white-space:nowrap'},dirBtn(p,'up','Вверх'),dirBtn(p,'down','Вниз'),
-        el('button',{class:'btn s '+(p.auto?'':'o'),type:'button',title:'Тест: направление случайное, каждую минуту своё. Выдаётся всем, но карточка помечена как тестовая',style:'margin-right:6px',onclick:()=>setDir(p.pair,'auto')},'Авто'),
-        el('button',{class:'btn s '+(!p.auto&&!(p.direction&&p.fresh)?'':'o'),type:'button',onclick:()=>setDir(p.pair,'')},'Сброс')),
+        el('button',{class:'btn s '+(!(p.direction&&p.fresh)?'':'o'),type:'button',onclick:()=>setDir(p.pair,'')},'Сброс')),
       el('td',{},isAdmin?el('button',{class:'btn o s',type:'button',onclick:async()=>{try{await api('/signal-pairs?pair='+encodeURIComponent(p.pair),{method:'DELETE'});render({soft:true})}catch(x){fail(x)}}},'Удалить'):null)];
   });
   return el('div',{style:'display:grid;gap:12px'},
@@ -2897,7 +2945,7 @@ async function viewSignals(){
     el('label',{},'Комментарий',f.note),
     el('label',{style:'display:flex;gap:8px;align-items:center'},f.push,'Отправить пуш клиентам с открытым доступом'),
     el('div',{style:'display:flex;gap:8px;flex-wrap:wrap'},el('button',{class:'btn',type:'submit'},'Опубликовать')),
-    err,el('p',{class:'mut sm',style:'margin:0'},'Общий сигнал публикует человек. Сигналы по запросу клиента выдаются из настроек ниже (направление ставит аналитик). Режим «Авто» (случайное направление) нужен только для проверки бота.'));
+    err,el('p',{class:'mut sm',style:'margin:0'},'Общий сигнал публикует человек. Сигналы по запросу клиента выдаются из настроек ниже (направление ставит аналитик).'));
   const t=r=>new Date(r).toLocaleString('ru-RU',{timeZone:'Europe/Kyiv',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
   const list=table(['Опубликован','Пара','Направление','Экспирация','Вход','Источник','Вошли','Плюс','Минус'],rows.map(r=>[td(t(r.created_at)),td(r.pair),el('td',{},el('span',{class:'pill '+(r.direction==='up'?'p-ok':'p-bad')},r.direction==='up'?'Вверх':'Вниз')),td(r.expiry_sec?(r.expiry_sec>=3600&&r.expiry_sec%3600===0?r.expiry_sec/3600+' ч':r.expiry_sec>=60&&r.expiry_sec%60===0?r.expiry_sec/60+' мин':r.expiry_sec+' сек'):r.expiry_min+' мин'),td(new Date(r.entry_at).toLocaleTimeString('ru-RU',{timeZone:'Europe/Kyiv',hour:'2-digit',minute:'2-digit'})),el('td',{},el('span',{class:'pill p-pur'},lroleName(r.source_role))),td(r.taken,'n'),td(r.wins+(Object.keys(r.win_steps||{}).length?' ('+Object.entries(r.win_steps).map(([k,v])=>(k==1?'вход':'пер.'+(k-1))+' '+v).join(', ')+')':''),'n'),td(r.losses,'n')]),'Сигналов пока не было.');
   list.classList.add('ctr');

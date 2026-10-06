@@ -91,62 +91,6 @@ export const LESSONS = [
   },
 ];
 
-/**
- * Пока настоящих сигналов с итогами нет, показываем пример оформления. Все строки помечены is_test,
- * в приложении это подписано «ТЕСТ» и «тестовые данные».
- * Днём новая строка появляется каждые 5–7 минут, вечером (с 18:00) каждые 2–4 минуты, старая уходит.
- * Пары идут разные, минус редкий. Всё считается от времени, поэтому у всех клиентов одинаково.
- */
-function demoPast(preview = false) {
-  const pairs = ['EUR/USD', 'GBP/USD', 'AUD/CHF', 'EUR/GBP', 'AUD/USD', 'USD/JPY', 'EUR/JPY', 'GBP/JPY', 'AUD/CAD', 'EUR/CAD', 'CAD/JPY', 'CHF/JPY', 'NZD/USD', 'USD/CAD', 'USD/CHF', 'GBP/CHF', 'EUR/CHF'].map((p) => p + ' OTC');
-  const h = (n: number) => {
-    let x = Math.imul(n ^ 0x9e3779b9, 0x85ebca6b);
-    x ^= x >>> 13;
-    x = Math.imul(x, 0xc2b2ae35);
-    x ^= x >>> 16;
-    return x >>> 0;
-  };
-  const hourFmt = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', hourCycle: 'h23', timeZone: config.pushTz });
-  const evening = (t: number) => Number(hourFmt.format(new Date(t))) >= 18;
-  // Две сетки: на 6 минут (день, интервалы 5–7) и на 3 минуты (вечер, интервалы 2–4). Внутри блока сдвиг 0–1 минута
-  const streams = [
-    { block: 6 * 60_000, salt: 11, lossMod: 4, when: (t: number) => !evening(t) },
-    { block: 3 * 60_000, salt: 29, lossMod: 8, when: (t: number) => evening(t) },
-  ];
-  const now = Date.now();
-  const events: { at: number; loss: boolean }[] = [];
-  for (const st of streams) {
-    const top = Math.floor(now / st.block) + 1;
-    for (let b = top; b > top - 30; b--) {
-      const at = b * st.block + (h(b + st.salt * 1000) % 60) * 1000;
-      if (!st.when(at) || at > now - 90_000) continue; // сигнал считается завершённым через ~1,5 минуты после входа
-      const loss = h(b + st.salt * 7919) % st.lossMod === 0 && h(b - 1 + st.salt * 7919) % st.lossMod !== 0;
-      events.push({ at, loss });
-    }
-  }
-  events.sort((x, y) => y.at - x.at);
-  const used = new Set<number>(); // голоса в пяти строках не повторяются
-  return events.slice(0, 5).map((e) => {
-    const slot = Math.floor(e.at / 120_000); // у событий с интервалом от 2 минут слоты разные, пары на 5 соседних строках не повторяются
-    // Голоса показываем всем. Утром и днём 20–50, вечером и ночью 20–96 (чаще ближе к верхней границе)
-    const hr = Number(hourFmt.format(new Date(e.at)));
-    const day = hr >= 6 && hr < 18;
-    const [lo, span] = day ? [20, 31] : [20, 77];
-    let votes = day ? lo + (h(slot + 5) % span) : lo + Math.max(h(slot + 5) % span, h(slot * 7 + 90001) % span);
-    while (used.has(votes)) votes = lo + ((votes - lo + 1) % span);
-    used.add(votes);
-    return {
-      id: -Math.floor(e.at / 1000),
-      preview,
-      pair: pairs[(slot * 5) % pairs.length],
-      direction: h(slot + 1) % 2 ? 'up' : 'down',
-      entry_at: new Date(e.at).toISOString(),
-      is_test: true,
-      wins: e.loss ? 0 : votes,
-      losses: e.loss ? votes : 0,
-    };
-  });
-}
 
 /** Название канала и число подписчиков берём из Telegram по ссылке. Кэш на 30 минут, при ошибке пробуем снова через 5 */
 const tgInfoCache = new Map<string, { until: number; title: string | null; members: number | null }>();
@@ -360,7 +304,7 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
   const VIS = `(s.requested_by = d.tg_id
        OR (s.requested_by IS NULL AND s.created_at > now() - interval '2 hours'
            AND s.entry_at + make_interval(secs => (SELECT max_events * overlap_gap_sec + 300 FROM signal_settings WHERE id = 1)) > now()
-           AND (NOT s.is_test OR d.is_tester)))`;
+           AND NOT s.is_test))`;
   const ACTIVE = `${VIS} AND NOT EXISTS (SELECT 1 FROM signal_steps t WHERE t.signal_id = s.id AND t.tg_id = d.tg_id)`;
   app.get('/signals/active', { preHandler: auth }, async (req) => {
     const r = await db.query(
@@ -403,8 +347,7 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
       [],
     );
     if (r.rowCount) return r.rows;
-    const t = await db.query('SELECT is_tester FROM leads WHERE tg_id = $1', [req.tg!.id]);
-    return demoPast(Boolean(t.rows[0]?.is_tester));
+    return [];
   });
 
   // Сигнал по запросу клиента. Направление берётся из того, что поставил человек в Office, и действует ограниченное время
@@ -429,8 +372,7 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
     if (!allowed) return { enabled: false, pairs: [], cooldownLeft: 0, enterInSec: set.enter_in_sec, expiryMin: set.expiry_min, cfg: cfgOf(set) };
     const pairs = (
       await db.query(
-        // «Авто» доступно всем, у кого открыта выдача, но такой сигнал всегда тестовый
-        `SELECT pair, (CASE WHEN auto THEN TRUE ELSE (direction IS NOT NULL AND direction_at > now() - ($1 || ' minutes')::interval) END) AS available
+        `SELECT pair, (direction IS NOT NULL AND direction_at > now() - ($1 || ' minutes')::interval) AS available
            FROM signal_pairs WHERE enabled
           ORDER BY (SELECT count(*) FROM signals q WHERE q.pair = signal_pairs.pair AND q.requested_by IS NOT NULL AND q.created_at > now() - interval '30 days') DESC, sort, pair`,
         [String(set.direction_ttl_min)],
@@ -447,15 +389,11 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
     if (cooldownLeft > 0) return reply.code(429).send({ error: `Следующий сигнал можно получить через ${cooldownLeft} сек.`, cooldownLeft });
     const p = (
       await db.query(
-        `SELECT pair, direction, direction_by, auto FROM signal_pairs
-          WHERE pair = $1 AND enabled AND (auto OR (direction IS NOT NULL AND direction_at > now() - ($2 || ' minutes')::interval))`,
+        `SELECT pair, direction, direction_by FROM signal_pairs
+          WHERE pair = $1 AND enabled AND direction IS NOT NULL AND direction_at > now() - ($2 || ' minutes')::interval`,
         [String(req.body?.pair ?? ''), String(set.direction_ttl_min)],
       )
     ).rows[0];
-    // Авто (до подключения движка): направление случайное от текущей минуты, у всех в одну минуту одинаковое. Сигнал всегда тестовый
-    if (p?.auto) {
-      p.direction = createHash('sha256').update(`${p.pair}:${Math.floor(Date.now() / 60_000)}`).digest()[0] % 2 ? 'up' : 'down';
-    }
     if (!p) return reply.code(409).send({ error: 'По этой паре сейчас нет подходящего входа. Попробуйте другую пару или чуть позже.' });
     const expirySec = Math.trunc(Number(req.body?.expiry_sec));
     const okExp = await db.query('SELECT 1 FROM signal_expiries WHERE sec = $1', [expirySec]);
@@ -465,8 +403,8 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
     const entryMs = Math.ceil((Date.now() + set.enter_in_sec * 1000 - es) / 60_000) * 60_000 + es;
     const ins = await db.query(
       `INSERT INTO signals (pair, direction, expiry_min, expiry_sec, entry_at, note, source, is_test, created_by, requested_by)
-       VALUES ($1,$2,$3,$4,$5,NULL,CASE WHEN $6 THEN 'test' ELSE 'analyst' END,$6,$7,$8) RETURNING id, pair, direction, expiry_min, expiry_sec, entry_at, is_test, source, requested_by`,
-      [p.pair, p.direction, Math.max(1, Math.ceil(expirySec / 60)), expirySec, new Date(entryMs), !(lead.access || lead.is_tester) || Boolean(p.auto), p.direction_by, req.tg!.id],
+       VALUES ($1,$2,$3,$4,$5,NULL,'analyst',FALSE,$6,$7) RETURNING id, pair, direction, expiry_min, expiry_sec, entry_at, is_test, source, requested_by`,
+      [p.pair, p.direction, Math.max(1, Math.ceil(expirySec / 60)), expirySec, new Date(entryMs), p.direction_by, req.tg!.id],
     );
     return { signal: { ...ins.rows[0], taken: false }, steps: [], cfg: cfgOf(set), now: new Date().toISOString() };
   });

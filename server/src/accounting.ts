@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { db } from './db.js';
+import { announceLive } from './templates.js';
 import type { Role } from './auth.js';
 
 /** Бухгалтерия стримеров: KPI, смены и отчёты, бонусы и штрафы, выплаты и авансы. Работает только для роли «стример». */
@@ -380,6 +381,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     if (!st) return reply.code(404).send({ error: 'Стример не найден' });
     if ((await db.query(`SELECT 1 FROM shift_reports WHERE staff_id = $1 AND status = 'live'`, [sid])).rowCount) return reply.code(409).send({ error: 'У этого стримера смена уже идёт' });
     const r = await db.query(`INSERT INTO shift_reports (staff_id, stream_url, day) VALUES ($1,$2,(now() AT TIME ZONE '${TZ}')::date) RETURNING id`, [sid, url]);
+    void announceLive(sid, url);
     return { ok: true, id: r.rows[0].id };
   });
 
@@ -390,6 +392,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     if (!/^https?:\/\/[^\s]+\.[^\s]+$/i.test(url)) return reply.code(400).send({ error: 'Вставьте ссылку на эфир, например https://tiktok.com/@name/live' });
     if ((await db.query(`SELECT 1 FROM shift_reports WHERE staff_id = $1 AND status = 'live'`, [me.id])).rowCount) return reply.code(409).send({ error: 'Смена уже идёт' });
     const r = await db.query(`INSERT INTO shift_reports (staff_id, stream_url, day) VALUES ($1,$2,(now() AT TIME ZONE '${TZ}')::date) RETURNING id`, [me.id, url]);
+    void announceLive(me.id, url);
     return { ok: true, id: r.rows[0].id };
   });
 

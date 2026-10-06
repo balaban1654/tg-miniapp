@@ -134,6 +134,21 @@ CREATE TABLE IF NOT EXISTS reviews (
 );
 CREATE INDEX IF NOT EXISTS reviews_status_idx ON reviews (status, created_at DESC);
 
+-- Шаблоны сообщений, которые бот шлёт сам: новый сигнал и «стример в эфире». Куда и кому, текст, картинка и кнопки настраивает админ
+CREATE TABLE IF NOT EXISTS push_templates (
+  key        TEXT PRIMARY KEY,
+  enabled    BOOLEAN NOT NULL DEFAULT TRUE,
+  text       TEXT NOT NULL DEFAULT '',
+  buttons    JSONB NOT NULL DEFAULT '[]',
+  segment    TEXT NOT NULL DEFAULT 'all',
+  channels   JSONB NOT NULL DEFAULT '[]',
+  photo      BYTEA,
+  photo_type TEXT,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+ALTER TABLE broadcasts ADD COLUMN IF NOT EXISTS photo BYTEA;
+ALTER TABLE broadcasts ADD COLUMN IF NOT EXISTS photo_type TEXT;
+
 -- Чат поддержки через бота: сообщения клиентов и ответы команды
 CREATE TABLE IF NOT EXISTS messages (
   id            BIGSERIAL PRIMARY KEY,
@@ -545,3 +560,7 @@ END $$;
 ALTER TABLE staff_adjustments ADD COLUMN IF NOT EXISTS visible BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE shift_shortfalls ADD COLUMN IF NOT EXISTS accepted_at TIMESTAMPTZ;
 ALTER TABLE shift_shortfalls ADD COLUMN IF NOT EXISTS penalty_id INT REFERENCES staff_adjustments(id) ON DELETE SET NULL;
+
+-- Тестовые сигналы и демо-история больше не используются: убираем те, по которым нет сделок клиентов
+DELETE FROM signals s WHERE (s.is_test OR s.demo_result IS NOT NULL OR s.source = 'test') AND NOT EXISTS (SELECT 1 FROM deals x WHERE x.signal_id = s.id);
+UPDATE signal_pairs SET auto = FALSE WHERE auto;

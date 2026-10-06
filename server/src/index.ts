@@ -12,6 +12,7 @@ import { autoCloseMonth } from './accounting.js';
 import { postbackRoutes } from './postback.js';
 import { appRoutes } from './app.js';
 import { seedDefaultRules, startScheduler } from './push.js';
+import { seedTemplates } from './templates.js';
 
 const app = Fastify({ logger: true, trustProxy: true });
 await app.register(cookie);
@@ -19,6 +20,7 @@ await app.register(cookie);
 await migrate();
 await ensureAdmin();
 await seedDefaultRules();
+await seedTemplates();
 
 // Интерфейс Hunter Office и его API
 const officeHtml = readFileSync(resolve(process.cwd(), 'public/office.html'), 'utf8');

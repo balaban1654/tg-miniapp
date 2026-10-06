@@ -1,4 +1,4 @@
-import { GrammyError, InlineKeyboard } from 'grammy';
+import { GrammyError, InlineKeyboard, InputFile } from 'grammy';
 import type { InlineKeyboardButton } from 'grammy/types';
 import { db } from './db.js';
 import { config } from './config.js';
@@ -8,7 +8,7 @@ import { withClickId } from './app.js';
 export type Trigger = 'start' | 'no_reg' | 'no_deposit' | 'ftd' | 'inactive' | 'withdrawal';
 export interface Button {
   label: string;
-  type: 'miniapp' | 'url' | 'support' | 'register' | 'callback' | 'review';
+  type: 'miniapp' | 'url' | 'support' | 'register' | 'callback' | 'review' | 'stream';
   url?: string;
   data?: string;
   /** Цвет кнопки в Telegram: primary — синяя, success — зелёная */
@@ -40,7 +40,7 @@ interface Target {
 }
 
 /** В тестах (DISABLE_BOT=1) сообщения не уходят в Telegram, а складываются сюда. */
-export const outbox: { tgId: string; text: string; buttons: unknown }[] = [];
+export const outbox: { tgId: string; text: string; photo?: string; buttons: unknown }[] = [];
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -122,13 +122,32 @@ export async function loadTarget(tgId: number | string): Promise<Target> {
 
 type Delivery = { ok: true } | { ok: false; retry?: boolean; blocked?: boolean; error: string };
 
-async function deliver(tgId: string, text: string, kb?: InlineKeyboard): Promise<Delivery> {
+export interface Photo {
+  data: Buffer;
+  type: string;
+}
+/** Сообщение в личку или канал. Картинка может идти без текста: тогда это просто фото с кнопками */
+export async function deliver(tgId: string, text: string, kb?: InlineKeyboard, photo?: Photo | null): Promise<Delivery> {
+  if (!text.trim() && !photo) return { ok: false, error: 'пустое сообщение' };
   if (config.disableBot) {
-    outbox.push({ tgId, text, buttons: kb ? kb.inline_keyboard.map((r) => r.map((b) => ({ text: b.text, ...('url' in b ? { url: b.url } : {}), ...('callback_data' in b ? { cb: b.callback_data } : {}), ...('web_app' in b ? { web_app: b.web_app.url } : {}) }))) : null });
+    outbox.push({ tgId, text, ...(photo ? { photo: photo.type } : {}), buttons: kb ? kb.inline_keyboard.map((r) => r.map((b) => ({ text: b.text, ...('url' in b ? { url: b.url } : {}), ...('callback_data' in b ? { cb: b.callback_data } : {}), ...('web_app' in b ? { web_app: b.web_app.url } : {}) }))) : null } as (typeof outbox)[number]);
     return { ok: true };
   }
   try {
-    await bot.api.sendMessage(tgId, toHtml(text), { parse_mode: 'HTML', link_preview_options: { is_disabled: true }, ...(kb ? { reply_markup: kb } : {}) });
+    const opts = { parse_mode: 'HTML' as const, ...(kb ? { reply_markup: kb } : {}) };
+    if (photo) {
+      const file = new InputFile(photo.data, 'photo.' + (photo.type === 'image/png' ? 'png' : photo.type === 'image/webp' ? 'webp' : 'jpg'));
+      const html = text.trim() ? toHtml(text) : '';
+      // Подпись к фото до 1024 знаков. Длиннее: фото отдельно, текст с кнопками следом
+      if (html.length > 0 && html.length <= 1000) await bot.api.sendPhoto(tgId, file, { caption: html, ...opts });
+      else if (html.length === 0) await bot.api.sendPhoto(tgId, file, opts);
+      else {
+        await bot.api.sendPhoto(tgId, file);
+        await bot.api.sendMessage(tgId, html, { ...opts, link_preview_options: { is_disabled: true } });
+      }
+    } else {
+      await bot.api.sendMessage(tgId, toHtml(text), { parse_mode: 'HTML', link_preview_options: { is_disabled: true }, ...(kb ? { reply_markup: kb } : {}) });
+    }
     return { ok: true };
   } catch (e) {
     if (e instanceof GrammyError) {
@@ -239,7 +258,6 @@ export const SEGMENTS: Record<string, string> = {
   ftd: `d.status IN ('ftd','active')`,
   access: 'd.access',
   churned: `d.status = 'churned'`,
-  testers: 'd.is_tester',
   withdrew: `EXISTS (SELECT 1 FROM events e WHERE e.tg_id = d.tg_id AND e.type = 'wd')`,
 };
 
@@ -253,11 +271,11 @@ export function segmentWhere(segment: string, ownerId?: number | null): { sql: s
   return { sql, params };
 }
 
-export async function createBroadcast(b: { text: string; buttons: Button[]; segment: string; ownerId?: number | null; createdBy: number }) {
+export async function createBroadcast(b: { text: string; buttons: Button[]; segment: string; ownerId?: number | null; createdBy: number; photo?: Photo | null }) {
   const w = segmentWhere(b.segment, b.ownerId);
   const ins = await db.query(
-    `INSERT INTO broadcasts (text, buttons, segment, owner_id, created_by) VALUES ($1,$2,$3,$4,$5) RETURNING id`,
-    [b.text, JSON.stringify(b.buttons), b.segment, b.ownerId ?? null, b.createdBy],
+    `INSERT INTO broadcasts (text, buttons, segment, owner_id, created_by, photo, photo_type) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
+    [b.text, JSON.stringify(b.buttons), b.segment, b.ownerId ?? null, b.createdBy, b.photo?.data ?? null, b.photo?.type ?? null],
   );
   const id = ins.rows[0].id;
   const jobs = await db.query(
@@ -270,7 +288,7 @@ export async function createBroadcast(b: { text: string; buttons: Button[]; segm
 
 async function runBroadcasts(): Promise<boolean> {
   const jobs = await db.query(
-    `SELECT j.broadcast_id, j.tg_id, b.text, b.buttons, d.first_name, d.username, d.region, d.tz,
+    `SELECT j.broadcast_id, j.tg_id, b.text, b.buttons, (b.photo IS NOT NULL) AS has_photo, d.first_name, d.username, d.region, d.tz,
             o.name AS owner_name, o.po_promo, o.po_link, o.po_link_ru
        FROM broadcast_jobs j
        JOIN broadcasts b ON b.id = j.broadcast_id
@@ -278,8 +296,13 @@ async function runBroadcasts(): Promise<boolean> {
        LEFT JOIN staff o ON o.id = d.owner_id
       WHERE j.status = 'pending' ORDER BY j.broadcast_id, j.tg_id LIMIT 250`,
   );
+  const photos = new Map<number, Photo | null>();
   for (const j of jobs.rows) {
-    const res = await deliver(j.tg_id, renderText(j.text, j), buildKeyboard(j.buttons, j));
+    if (j.has_photo && !photos.has(j.broadcast_id)) {
+      const p = (await db.query('SELECT photo, photo_type FROM broadcasts WHERE id = $1', [j.broadcast_id])).rows[0];
+      photos.set(j.broadcast_id, p?.photo ? { data: p.photo, type: p.photo_type } : null);
+    }
+    const res = await deliver(j.tg_id, renderText(j.text, j), buildKeyboard(j.buttons, j), j.has_photo ? photos.get(j.broadcast_id) : null);
     if (!res.ok && res.retry) return false;
     await db.query(`UPDATE broadcast_jobs SET status = $3, error = $4 WHERE broadcast_id = $1 AND tg_id = $2`, [
       j.broadcast_id,

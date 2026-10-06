@@ -11,6 +11,7 @@ const sha256 = (v: string) => createHash('sha256').update(v).digest('hex');
 import { accountingRoutes } from './accounting.js';
 import { toVoice, toVideoNote } from './media.js';
 import { parseReviewPhoto, cleanReviewText, cleanRating } from './reviews.js';
+import { dispatchTemplate, TEMPLATE_KEYS, DEFAULTS, CHANNEL_RE, type TemplateKey } from './templates.js';
 import {
   type Staff,
   type Role,
@@ -825,7 +826,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
         const data = str(b.data, 20);
         if (!['acc_no', 'acc_yes', 'acc_ready'].includes(data)) return 'Неизвестное действие кнопки';
         out.push({ label, type, data, ...extra });
-      } else if (['miniapp', 'support', 'register', 'review'].includes(type)) out.push({ label, type: type as Button['type'], ...extra });
+      } else if (['miniapp', 'support', 'register', 'review', 'stream'].includes(type)) out.push({ label, type: type as Button['type'], ...extra });
       else return 'Неизвестный тип кнопки';
     }
     return out;
@@ -1214,6 +1215,54 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     return { ok: true };
   });
 
+  // Шаблоны сообщений бота: новый сигнал и «стример в эфире»
+  const tplKey = (k: string): TemplateKey | null => ((TEMPLATE_KEYS as readonly string[]).includes(k) ? (k as TemplateKey) : null);
+  app.get('/push/templates', { preHandler: need('admin') }, async () => {
+    return (await db.query(`SELECT key, enabled, text, buttons, segment, channels, (photo IS NOT NULL) AS has_photo, updated_at FROM push_templates ORDER BY key DESC`)).rows;
+  });
+  app.get<{ Params: { key: string } }>('/push/templates/:key/photo', { preHandler: need('admin') }, async (req, reply) => {
+    const r = (await db.query('SELECT photo, photo_type FROM push_templates WHERE key = $1', [req.params.key])).rows[0];
+    if (!r?.photo) return reply.code(404).send({ error: 'Не найдено' });
+    return reply.type(r.photo_type).header('Cache-Control', 'no-cache').send(r.photo);
+  });
+  app.put<{ Params: { key: string } }>('/push/templates/:key', { preHandler: need('admin'), bodyLimit: 9 * 1024 * 1024 }, async (req, reply) => {
+    const key = tplKey(req.params.key);
+    if (!key) return reply.code(404).send({ error: 'Шаблон не найден' });
+    const b = (req.body ?? {}) as Record<string, unknown>;
+    const cur = (await db.query('SELECT (photo IS NOT NULL) AS has_photo FROM push_templates WHERE key = $1', [key])).rows[0];
+    const text = str(b.text, 4000);
+    const buttons = cleanButtons(b.buttons);
+    if (typeof buttons === 'string') return reply.code(400).send({ error: buttons });
+    const segment = str(b.segment, 20);
+    const okSeg = segment === 'none' || (segment === 'own' && key === 'live') || segment in SEGMENTS;
+    if (!okSeg) return reply.code(400).send({ error: 'Неизвестный список получателей' });
+    const rawCh = Array.isArray(b.channels) ? b.channels : String(b.channels ?? '').split(/[\s,;]+/);
+    const channels = [...new Set(rawCh.map((x) => String(x).trim()).filter(Boolean))];
+    if (channels.length > 10) return reply.code(400).send({ error: 'Каналов не больше десяти' });
+    const badCh = channels.find((c) => !CHANNEL_RE.test(c));
+    if (badCh) return reply.code(400).send({ error: `Канал «${badCh}»: укажите @имя_канала или числовой id вида -1001234567890` });
+    const ph = parseReviewPhoto(b.photo);
+    if (typeof ph === 'string') return reply.code(400).send({ error: ph.replace('Фото', 'Картинка') });
+    const hasPhoto = ph ? true : b.remove_photo ? false : Boolean(cur?.has_photo);
+    const enabled = Boolean(b.enabled);
+    if (enabled && !text && !hasPhoto) return reply.code(400).send({ error: 'Нужен текст или картинка' });
+    if (enabled && segment === 'none' && !channels.length) return reply.code(400).send({ error: 'Выберите получателей или добавьте канал' });
+    await db.query(
+      'UPDATE push_templates SET enabled = $2, text = $3, buttons = $4, segment = $5, channels = $6, updated_at = now() WHERE key = $1',
+      [key, enabled, text, JSON.stringify(buttons), segment, JSON.stringify(channels)],
+    );
+    if (b.remove_photo) await db.query('UPDATE push_templates SET photo = NULL, photo_type = NULL WHERE key = $1', [key]);
+    if (ph) await db.query('UPDATE push_templates SET photo = $2, photo_type = $3 WHERE key = $1', [key, ph.data, ph.type]);
+    return { ok: true };
+  });
+  app.post<{ Params: { key: string } }>('/push/templates/:key/reset', { preHandler: need('admin') }, async (req, reply) => {
+    const key = tplKey(req.params.key);
+    if (!key) return reply.code(404).send({ error: 'Шаблон не найден' });
+    const d = DEFAULTS[key];
+    await db.query('UPDATE push_templates SET text = $2, buttons = $3, updated_at = now() WHERE key = $1', [key, d.text, JSON.stringify(d.buttons)]);
+    return { ok: true };
+  });
+
   // Сигналы. Публикует человек. Случайный режим есть только для тестов и виден только тестовым аккаунтам
   const PAIR = /^[A-Za-z0-9]{2,8}\/[A-Za-z0-9]{2,8}( OTC)?$/;
   const EXPIRY = [1, 2, 3, 5, 10, 15];
@@ -1228,9 +1277,17 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     );
     let pushed = 0;
     if (o.push) {
-      const text = `${o.isTest ? 'ТЕСТ. Не для торговли.\n' : ''}Новый сигнал: ${o.pair}, ${o.direction === 'up' ? 'вверх' : 'вниз'}, экспирация ${o.expirySec ? `${o.expirySec} сек` : `${o.expiry} мин`}.\nВход в {время:${entryAt.getTime()}}. Откройте кабинет.`;
-      const r = await createBroadcast({ text, buttons: [{ label: 'Открыть кабинет', type: 'miniapp' }], segment: o.isTest ? 'testers' : 'all', createdBy: o.by });
-      pushed = r.total;
+      // Текст, кнопки, получатели и каналы берутся из шаблона «Новый сигнал» (Пуши → Шаблоны)
+      const r = await dispatchTemplate('signal', {
+        vars: {
+          'пара': o.pair,
+          'направление': o.direction === 'up' ? 'вверх' : 'вниз',
+          'экспирация': o.expirySec ? `${o.expirySec} сек` : `${o.expiry} мин`,
+          'время': `{время:${entryAt.getTime()}}`,
+        },
+        createdBy: o.by,
+      });
+      pushed = r.users + r.channels;
     }
     return { id: ins.rows[0].id, pushed };
   }
@@ -1280,7 +1337,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     if (expirySec !== null && !EXPIRY_SEC.includes(expirySec)) return reply.code(400).send({ error: 'Пока доступна только экспирация 5 секунд' });
     if (expirySec === null && !EXPIRY.includes(expiry)) return reply.code(400).send({ error: 'Экспирация: 1, 2, 3, 5, 10 или 15 минут' });
     if (!Number.isFinite(enterIn) || enterIn < 0 || enterIn > 60) return reply.code(400).send({ error: 'Вход через 0–60 минут' });
-    return publishSignal({ pair, direction: direction as 'up' | 'down', expiry, expirySec: expirySec ?? undefined, enterIn, entryAt, note: str(b.note, 200) || null, source: 'analyst', isTest: Boolean(b.is_test), by: req.staff!.id, push: b.push !== false });
+    return publishSignal({ pair, direction: direction as 'up' | 'down', expiry, expirySec: expirySec ?? undefined, enterIn, entryAt, note: str(b.note, 200) || null, source: 'analyst', isTest: false, by: req.staff!.id, push: b.push !== false });
   });
 
   // Настройка сигналов по запросу клиента: общие параметры, пары и текущее направление по каждой паре
@@ -1378,54 +1435,10 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
   app.post('/signal-pairs/direction', { preHandler: need('admin', 'analyst') }, async (req, reply) => {
     const d = str((req.body as any)?.direction, 4);
     const pair = str((req.body as any)?.pair, 20);
-    if (d && !['up', 'down', 'auto'].includes(d)) return reply.code(400).send({ error: 'Неверное направление' });
+    if (d && !['up', 'down'].includes(d)) return reply.code(400).send({ error: 'Неверное направление' });
     const r = await db.query('UPDATE signal_pairs SET auto = coalesce($2::text = \'auto\', false), direction=CASE WHEN $2::text IN (\'up\',\'down\') THEN $2 END, direction_at=CASE WHEN $2::text IN (\'up\',\'down\') THEN now() END, direction_by=CASE WHEN $2::text IN (\'up\',\'down\') THEN $3::int END WHERE ($1 = \'*\' OR pair = $1)', [pair, d || null, req.staff!.id]); // pair = * — сразу все пары
     if (!r.rowCount) return reply.code(404).send({ error: 'Пара не найдена' });
     return { ok: true };
-  });
-
-  // Случайный сигнал только для проверки бота: всегда помечен ТЕСТ и уходит только тестовым аккаунтам
-  app.post('/signals/test', { preHandler: need('admin') }, async (req) => {
-    const pairs = ['EUR/USD OTC', 'GBP/USD OTC', 'USD/JPY OTC', 'AUD/CAD OTC', 'EUR/GBP OTC'];
-    return publishSignal({
-      pair: pairs[randomInt(pairs.length)],
-      direction: randomInt(2) ? 'up' : 'down',
-      expiry: 1,
-      enterIn: 1,
-      note: 'Тестовый сигнал для проверки бота. Это не торговая рекомендация.',
-      source: 'test',
-      isTest: true,
-      by: req.staff!.id,
-      push: true,
-    });
-  });
-
-  // Пометить сигнал тестовым (или вернуть обычным): тестовые сигналы видят только тестовые аккаунты
-  app.patch<{ Params: { id: string } }>('/signals/:id/test', { preHandler: need('admin') }, async (req, reply) => {
-    const on = Boolean((req.body as any)?.is_test);
-    const r = await db.query('UPDATE signals SET is_test = $2 WHERE id = $1 RETURNING id', [Number(req.params.id), on]);
-    if (!r.rowCount) return reply.code(404).send({ error: 'Сигнал не найден' });
-    return { ok: true };
-  });
-
-  // Тестовая история для просмотра оформления блока «Прошедшие сигналы». Видят только тестовые аккаунты, везде помечена ТЕСТ
-  app.post('/signals/demo-history', { preHandler: need('admin') }, async (req) => {
-    const pairs = ['EUR/USD OTC', 'GBP/USD OTC', 'AUD/CHF OTC', 'EUR/GBP OTC', 'AUD/USD OTC', 'USD/JPY OTC'];
-    const lossAt = randomInt(5);
-    let at = Date.now() - 20 * 60_000;
-    for (let i = 0; i < 5; i++) {
-      at -= (10 + randomInt(80)) * 60_000;
-      await db.query(
-        `INSERT INTO signals (pair, direction, expiry_min, entry_at, note, source, is_test, demo_result, created_by) VALUES ($1,$2,1,$3,'Тестовая история. Это не результаты торговли.','test',TRUE,$4,$5)`,
-        [pairs[randomInt(pairs.length)], randomInt(2) ? 'up' : 'down', new Date(at), i === lossAt ? 'loss' : 'win', req.staff!.id],
-      );
-    }
-    return { ok: true };
-  });
-
-  app.delete('/signals/demo-history', { preHandler: need('admin') }, async () => {
-    const r = await db.query(`DELETE FROM signals s WHERE s.demo_result IS NOT NULL AND NOT EXISTS (SELECT 1 FROM deals x WHERE x.signal_id = s.id)`);
-    return { removed: r.rowCount };
   });
 
   app.patch<{ Params: { tgId: string } }>('/leads/:tgId/tester', { preHandler: need('admin') }, async (req, reply) => {
