@@ -12,6 +12,7 @@ import { accountingRoutes } from './accounting.js';
 import { toVoice, toVideoNote } from './media.js';
 import { parseReviewPhoto, cleanReviewText, cleanRating } from './reviews.js';
 import { loadDepConfig, leadTierState } from './depbonus.js';
+import { RESERVED_SLUGS } from './reserved.js';
 import { dispatchTemplate, TEMPLATE_KEYS, DEFAULTS, CHANNEL_RE, normChannel, type TemplateKey } from './templates.js';
 import {
   type Staff,
@@ -522,7 +523,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     const me = req.staff!;
     const DT = depTypes(me);
     const r = await db.query(
-      `SELECT l.id, l.slug, l.source, l.campaign, l.clicks, l.created_at, s.name AS owner_name, l.owner_id,
+      `SELECT l.id, l.slug, l.source, l.campaign, l.clicks, l.created_at, l.parent_id, l.token, s.name AS owner_name, l.owner_id,
               (SELECT count(*)::int FROM leads d WHERE d.link_id = l.id AND d.lead_role = 'lead') AS starts,
               (SELECT count(*)::int FROM leads d WHERE d.link_id = l.id AND d.lead_role = 'lead'
                  AND EXISTS (SELECT 1 FROM events e WHERE e.tg_id = d.tg_id AND e.type = 'reg')) AS regs,
@@ -532,7 +533,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
               coalesce((SELECT sum(e.amount) FROM events e JOIN leads d ON d.tg_id = e.tg_id
                  WHERE d.link_id = l.id AND d.lead_role = 'lead' AND e.type = 'comm' AND ${me.role === 'streamer' ? 'false' : 'true'}),0)::float AS commission
          FROM links l JOIN staff s ON s.id = l.owner_id
-        WHERE ${ownerScope(me, 'l.owner_id')} ORDER BY l.id DESC`,
+        WHERE ${ownerScope(me, 'l.owner_id')} ORDER BY coalesce(l.parent_id, l.id) DESC, (l.parent_id IS NOT NULL), l.id DESC`,
     );
     // Комиссия партнёрки видна только админу
     if (me.role !== 'admin') for (const x of r.rows) x.commission = null;
@@ -625,6 +626,8 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     const b = (req.body ?? {}) as Record<string, unknown>;
     const slug = str(b.slug, 40).toLowerCase();
     if (!SLUG.test(slug)) return reply.code(400).send({ error: 'Адрес ссылки: 2–40 символов, a-z, 0-9, - и _' });
+    if (RESERVED_SLUGS.has(slug)) return reply.code(400).send({ error: 'Это слово занято под служебные адреса сайта, выберите другое' });
+    if ((await db.query('SELECT 1 FROM links WHERE token = $1', [slug])).rowCount) return reply.code(409).send({ error: 'Такой адрес уже занят' });
 
     let ownerId = me.id;
     if (b.owner_id && Number(b.owner_id) !== me.id) {
@@ -645,6 +648,29 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
       if (e.code === '23505') return reply.code(409).send({ error: 'Такой адрес уже занят' });
       throw e;
     }
+  });
+
+  // Случайная ссылка под основной: hunterai.space/liza/jhj725hc159n. Свой счётчик и статистика, владелец и источник как у основной
+  app.post<{ Params: { id: string } }>('/links/:id/random', { preHandler: need('admin') }, async (req, reply) => {
+    const parent = (await db.query('SELECT id, slug, owner_id, source, campaign, parent_id FROM links WHERE id = $1', [Number(req.params.id)])).rows[0];
+    if (!parent) return reply.code(404).send({ error: 'Ссылка не найдена' });
+    if (parent.parent_id) return reply.code(400).send({ error: 'Случайную ссылку создают под основной' });
+    const ALPHA = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    for (let i = 0; i < 6; i++) {
+      let token = '';
+      for (let k = 0; k < 12; k++) token += ALPHA[randomInt(ALPHA.length)];
+      if ((await db.query('SELECT 1 FROM links WHERE slug = $1 OR token = $1', [token])).rowCount) continue;
+      try {
+        const r = await db.query(
+          `INSERT INTO links (slug, owner_id, source, campaign, parent_id, token) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,
+          [`${parent.slug}/${token}`, parent.owner_id, parent.source, parent.campaign, parent.id, token],
+        );
+        return { id: r.rows[0].id, slug: `${parent.slug}/${token}` };
+      } catch (e: any) {
+        if (e.code !== '23505') throw e;
+      }
+    }
+    return reply.code(500).send({ error: 'Не получилось придумать код, попробуйте ещё раз' });
   });
 
   // Чаты поддержки

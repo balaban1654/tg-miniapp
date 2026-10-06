@@ -23,6 +23,11 @@ CREATE TABLE IF NOT EXISTS links (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
+-- Случайные ссылки под основной: hunterai.space/liza/jhj725hc159n. У такой ссылки свой счётчик и своя статистика, владелец и источник общие
+ALTER TABLE links ADD COLUMN IF NOT EXISTS parent_id INT REFERENCES links(id) ON DELETE CASCADE;
+ALTER TABLE links ADD COLUMN IF NOT EXISTS token TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS links_token_uq ON links (token) WHERE token IS NOT NULL;
+
 -- Лиды: первый закреплённый владелец не меняется сам
 CREATE TABLE IF NOT EXISTS leads (
   tg_id      BIGINT PRIMARY KEY,

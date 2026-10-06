@@ -23,7 +23,7 @@ export async function attachLead(
   let linkId: number | null = null;
   let ownerId: number | null = null;
   if (slug) {
-    const r = await db.query('SELECT id, owner_id FROM links WHERE slug = $1', [slug]);
+    const r = await db.query('SELECT id, owner_id FROM links WHERE slug = $1 OR token = $1', [slug]);
     if (r.rows[0]) {
       linkId = r.rows[0].id;
       ownerId = r.rows[0].owner_id;

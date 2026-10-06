@@ -1616,7 +1616,7 @@ async function viewLeads(){
   return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Лиды'),cnt),bar,holder,legacyCard].filter(Boolean);
 }
 
-function goUrl(slug){return 'https://'+location.host.replace(/^crm\./,'go.')+'/s/'+slug}
+function goUrl(slug){return 'https://'+location.host.replace(/^(crm|go|app)\./,'')+'/'+slug}
 /* ---------- Аналитика ссылки: клики по дням, платформы, источники, устройства, браузеры, страны, города, последние клики ---------- */
 const AN_COL=['#9b5cff','#3ddc97','#ffb84d','#ff6b8a','#4da3ff','#c9a6ff','#6a2fe0','#8b93a7','#43d1c5','#e89b4d'];
 const anSvg=(w,h,inner)=>{const d=document.createElement('div');d.innerHTML='<svg viewBox="0 0 '+w+' '+h+'" role="img" aria-hidden="true">'+inner+'</svg>';return d.firstElementChild};
@@ -1715,7 +1715,7 @@ async function viewLinks(){
   return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Ссылки')),form,
     el('h3',{style:'font-size:15px'},'По источникам'),srcTable,
     el('h3',{style:'font-size:15px'},'По ссылкам'),
-    ctrT(table(['Ссылка','Источник','Владелец','Клики','Старты','Рег','FTD','Депозиты',...(adm?['Комиссия']:[])],rows.map(r=>{const u=goUrl(r.slug);return[el('td',{style:'white-space:nowrap'},el('code',{style:'display:inline'},u),copyBtn(u),el('button',{type:'button',title:'Аналитика ссылки','aria-label':'Аналитика ссылки',style:'background:none;border:0;color:var(--mut);cursor:pointer;padding:2px 4px;vertical-align:middle;display:inline-grid',onclick:()=>openLinkAnalytics(r)},svgIcon('<path d="M4 20V11M10 20V4M16 20v-7M22 20H2"/>',15))),td(r.source||'—'),td(r.owner_name),td(r.clicks,'n'),td(r.starts,'n'),td(r.regs,'n'),td(r.ftds,'n'),td(money(r.deposits),'n'),...(adm?[td(money(r.commission),'n')]:[])]}),
+    ctrT(table(['Ссылка','Источник','Владелец','Клики','Старты','Рег','FTD','Депозиты',...(adm?['Комиссия']:[])],rows.map(r=>{const u=goUrl(r.slug);return[el('td',{style:'white-space:nowrap'},r.parent_id?el('span',{class:'mut',style:'margin-right:4px'},'↳'):null,el('code',{style:'display:inline'},u),copyBtn(u),adm&&!r.parent_id?el('button',{type:'button',title:'Сгенерировать случайную ссылку под этой','aria-label':'Сгенерировать случайную ссылку',style:'background:none;border:0;color:var(--mut);cursor:pointer;padding:2px 4px;vertical-align:middle;display:inline-grid',onclick:async()=>{try{const x=await api('/links/'+r.id+'/random',{method:'POST'});const nu=goUrl(x.slug);try{await navigator.clipboard.writeText(nu);toast('Создана и скопирована: '+nu)}catch{toast('Создана: '+nu)}render({soft:true})}catch(e){toast(e.message)}}},svgIcon('<path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/>',15)):null,el('button',{type:'button',title:'Аналитика ссылки','aria-label':'Аналитика ссылки',style:'background:none;border:0;color:var(--mut);cursor:pointer;padding:2px 4px;vertical-align:middle;display:inline-grid',onclick:()=>openLinkAnalytics(r)},svgIcon('<path d="M4 20V11M10 20V4M16 20v-7M22 20H2"/>',15))),td(r.source||'—'),td(r.owner_name),td(r.clicks,'n'),td(r.starts,'n'),td(r.regs,'n'),td(r.ftds,'n'),td(money(r.deposits),'n'),...(adm?[td(money(r.commission),'n')]:[])]}),
       'Ссылок пока нет. Создайте первую выше.'))];
 }
 

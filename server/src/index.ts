@@ -1,4 +1,5 @@
 import Fastify from 'fastify';
+import type { FastifyReply, FastifyRequest } from 'fastify';
 import { config } from './config.js';
 import { db } from './db.js';
 import { bot, setupBotProfile } from './bot.js';
@@ -14,6 +15,7 @@ import { appRoutes } from './app.js';
 import { seedDefaultRules, startScheduler } from './push.js';
 import { seedTemplates } from './templates.js';
 import { parseClick } from './clicks.js';
+import { RESERVED_SLUGS, SITE_URL } from './reserved.js';
 
 const app = Fastify({ logger: true, trustProxy: true });
 await app.register(cookie);
@@ -87,16 +89,36 @@ app.get('/health', async () => {
   return { ok: true };
 });
 
-// Ссылка стримера или медиабайера: считаем клик и отправляем в бота с параметром
-app.get<{ Params: { kind: string; slug: string } }>('/:kind(s|b)/:slug', async (req, reply) => {
-  const { kind, slug } = req.params;
-  const r = await db.query('UPDATE links SET clicks = clicks + 1 WHERE slug = $1 RETURNING id', [slug]);
-  if (!r.rowCount) return reply.code(404).send('Ссылка не найдена');
+// Ссылки: hunterai.space/liza, hunterai.space/liza/<код>, а также прежние /s/liza и /b/liza. Считаем клик и отправляем в бота с параметром.
+// Неизвестный адрес ведёт на заглушку сайта
+async function goLink(req: FastifyRequest, reply: FastifyReply, kindHint: 's' | 'b' | null, slug: string, token?: string) {
+  const key = token ? `${slug}/${token}` : slug;
+  const r = await db.query(
+    `UPDATE links l SET clicks = clicks + 1 FROM staff o WHERE l.slug = $1 AND o.id = l.owner_id RETURNING l.id, l.token, o.role AS owner_role`,
+    [key],
+  );
+  if (!r.rowCount) return reply.redirect(302, SITE_URL + '/');
+  const row = r.rows[0];
   // Журнал кликов для дашборда по периодам. Ошибка журнала не должна ломать переход
   const ci = parseClick(req.headers);
-  void db.query('INSERT INTO link_clicks (link_id, country, city, device, os, browser, referrer) VALUES ($1,$2,$3,$4,$5,$6,$7)', [r.rows[0].id, ci.country, ci.city, ci.device, ci.os, ci.browser, ci.referrer]).catch(() => {});
-  return reply.redirect(302, `https://t.me/${config.botUsername}?start=${kind}_${encodeURIComponent(slug)}`);
+  void db.query('INSERT INTO link_clicks (link_id, country, city, device, os, browser, referrer) VALUES ($1,$2,$3,$4,$5,$6,$7)', [row.id, ci.country, ci.city, ci.device, ci.os, ci.browser, ci.referrer]).catch(() => {});
+  const kind = kindHint ?? (row.owner_role === 'buyer' ? 'b' : 's');
+  // В параметре старта у случайной ссылки её код: слэш Telegram не допускает
+  return reply.redirect(302, `https://t.me/${config.botUsername}?start=${kind}_${encodeURIComponent(row.token ?? slug)}`);
+}
+const SEG = '^[a-z0-9][a-z0-9_-]{0,39}$';
+const TOK = '^[a-z0-9_-]{2,40}$';
+app.get<{ Params: { a: string } }>(`/:a(${SEG})`, async (req, reply) => {
+  if (RESERVED_SLUGS.has(req.params.a)) return reply.redirect(302, SITE_URL + '/');
+  return goLink(req, reply, null, req.params.a);
 });
+app.get<{ Params: { a: string; b: string } }>(`/:a(${SEG})/:b(${TOK})`, async (req, reply) => {
+  const { a, b } = req.params;
+  if (a === 's' || a === 'b') return goLink(req, reply, a, b);
+  if (RESERVED_SLUGS.has(a)) return reply.code(404).send({ error: 'Не найдено' });
+  return goLink(req, reply, null, a, b);
+});
+app.get<{ Params: { k: string; a: string; b: string } }>(`/:k(s|b)/:a(${SEG})/:b(${TOK})`, async (req, reply) => goLink(req, reply, req.params.k as 's' | 'b', req.params.a, req.params.b));
 
 await app.listen({ port: config.port, host: '0.0.0.0' });
 // Автозакрытие прошлого месяца: проверяем каждые 10 минут, закрывает после 03:00 первого числа
