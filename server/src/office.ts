@@ -47,7 +47,6 @@ const STAFF_CARD_COLS = 'id, login, name, role, streams, tg_username, full_name,
 /** Разбор полей карточки сотрудника: вернёт колонки для UPDATE или текст ошибки */
 function cardFields(b: Record<string, unknown>): { cols: Record<string, unknown> } | { error: string } {
   const cols: Record<string, unknown> = {};
-  if (b.streams !== undefined) cols.streams = Boolean(b.streams);
   if (b.full_name !== undefined) cols.full_name = str(b.full_name, 120) || null;
   if (b.city !== undefined) cols.city = str(b.city, 80) || null;
   if (b.birth_date !== undefined) {
@@ -106,6 +105,11 @@ const num = (v: unknown): number => {
 
 // Какие события считать депозитами: стримеру видны только первые (FTD), без додепов
 const depTypes = (me: Staff): string => (me.role === 'streamer' ? "('ftd')" : "('ftd','dep')");
+
+/** Админ всегда участвует в общих показателях: его лиды, регистрации, FTD, депозиты, комиссия, просмотры и воронка считаются как у стримера. Смены, часы и зарплата у админа не считаются */
+async function syncAdminStreams(): Promise<void> {
+  await db.query(`UPDATE staff SET streams = TRUE WHERE role = 'admin' AND NOT streams`);
+}
 
 export async function officeRoutes(app: FastifyInstance): Promise<void> {
   const need = (...roles: Role[]) => async (req: FastifyRequest, reply: FastifyReply) => {
@@ -212,7 +216,6 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     const f = cardFields((req.body ?? {}) as Record<string, unknown>);
     if ('error' in f) return reply.code(400).send({ error: f.error });
     const keys = Object.keys(f.cols);
-    if (req.staff!.role !== 'admin') delete f.cols.streams;   // «тоже стример» выставляет только админ
     const keys2 = Object.keys(f.cols);
     if (!keys2.length) return { ok: true };
     await db.query(`UPDATE staff SET ${keys2.map((k, i) => `${k} = $${i + 2}`).join(', ')} WHERE id = $1`, [req.staff!.id, ...keys2.map((k) => f.cols[k])]);
@@ -429,6 +432,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
          VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
         [login, await hashPassword(password), name, role, parentId, num(b.rate_ftd), num(b.rate_percent)],
       );
+      await syncAdminStreams();
       return { id: r.rows[0].id };
     } catch (e: any) {
       if (e.code === '23505') return reply.code(409).send({ error: 'Такой логин уже есть' });
@@ -507,6 +511,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
       throw e;
     }
     if (!r.rowCount) return reply.code(404).send({ error: 'Не найден' });
+    await syncAdminStreams();
     if (b.active === false || b.password) await db.query('DELETE FROM sessions WHERE staff_id = $1', [id]);
     return { ok: true };
   });

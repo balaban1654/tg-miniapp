@@ -518,7 +518,6 @@ function showApp(){
   if(me.role==='analyst'){items.length=0;items.push(['signals','Сигналы']);if(tab!=='signals')tab='signals'}
   if(me.role==='admin')items.push(['push','Пуши'],['media','Медиа'],['pb','Постбеки']);
   if(me.role==='streamer')items.splice(items.length,0,['shifts','Смены и отчёты'],['mytasks','Мои задачи']);
-  if(me.role==='admin'&&me.streams)items.splice(items.findIndex(x=>x[0]==='chats')+1,0,['shifts','Смены и отчёты']);
   if(me.role==='admin'){items.splice(items.findIndex(x=>x[0]==='push'),0,['acc','Бухгалтерия']);items.splice(1,0,['plans','Планы и задачи'])}
   if(tab==='links'&&me.role==='admin'){tab='staff';staffState.tab='links'}
   if(!items.some(x=>x[0]===tab)){tab=items[0][0];history.replaceState(null,'','#'+hashPath())}
@@ -1947,14 +1946,13 @@ async function openStaffCard(id){
   let d;try{d=await api(self?'/profile':'/staff/'+id+'/card')}catch(x){box.replaceChildren(el('div',{class:'err'},x.message),el('button',{class:'btn o s',type:'button',onclick:close},'Закрыть'));return}
   const inp=(type,v,ph)=>el('input',{type,value:v||'',placeholder:ph||'',autocomplete:'off'});
   const f={full:inp('text',d.full_name,'Фамилия Имя Отчество'),birth:dateWheel({value:d.birth_date||'',optional:true,min:'1940-01-01',max:new Date().toISOString().slice(0,10),placeholder:'Не указана'}),city:inp('text',d.city,'Город проживания'),
-    streams:el('input',{type:'checkbox',style:'width:auto'}),
     method:el('select',{},el('option',{value:''},'Не выбран'),...d.payout_methods.map(m=>el('option',{value:m},m))),wallet:inp('text',d.payout_wallet,'Адрес кошелька или реквизиты')};
-  f.method.value=d.payout_method||'';f.streams.checked=!!d.streams;
+  f.method.value=d.payout_method||'';
   const fld=(l,i)=>el('div',{class:'lc-field'},el('label',{},l),i);
   const msg=el('div',{class:'err',role:'alert'});
   const say=(t,ok)=>{msg.className=ok?'ok-msg':'err';msg.textContent=t};
   const save=async()=>{try{
-    const body={full_name:f.full.value,birth_date:f.birth.value,city:f.city.value,payout_method:f.method.value,payout_wallet:f.wallet.value,...(d.role==='admin'&&me.role==='admin'?{streams:f.streams.checked}:{})};
+    const body={full_name:f.full.value,birth_date:f.birth.value,city:f.city.value,payout_method:f.method.value,payout_wallet:f.wallet.value};
     await api(self?'/profile':'/staff/'+id,{method:'PATCH',body});say('',true);toast('Сохранено');if(self){const nm=await api('/me');if(nm.streams!==me.streams){me=nm;showApp()}}else render({soft:true})}catch(x){say(x.message)}};
   // Пароль: свой меняем по текущему, чужой админ сбрасывает сам
   const pw={cur:inp('password','','Текущий пароль'),n1:inp('password','','Новый пароль, от 8 символов'),n2:inp('password','','Повторите новый пароль')};
@@ -1986,7 +1984,7 @@ async function openStaffCard(id){
   tfDraw();
   const panes={
     personal:()=>[el('div',{class:'lc-two'},fld('ФИО',f.full),fld('Дата рождения',f.birth),fld('Город',f.city)),
-      d.role==='admin'&&me.role==='admin'?el('label',{style:'display:flex;gap:8px;align-items:center;font-size:13px;color:var(--fg)'},f.streams,'Тоже стримит: его постбеки (регистрации, FTD, депозиты, комиссия) идут в общие показатели; смены, часы и зарплата у админа не считаются'):null,saveRow()],
+      saveRow()],
     payout:()=>[el('div',{class:'lc-two'},fld('Куда выплачивать',f.method),fld('Адрес кошелька / реквизиты',f.wallet)),saveRow()],
     security:()=>[el('div',{class:'lc-two'},...(self?[fld('Текущий пароль',pw.cur)]:[]),fld('Новый пароль',pw.n1),fld('Повторите',pw.n2)),
       el('div',{class:'lc-actions'},el('button',{class:'btn o',type:'button',onclick:changePw},self?'Сменить пароль':'Сбросить пароль'),pmsg),

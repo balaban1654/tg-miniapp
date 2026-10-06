@@ -566,3 +566,6 @@ ALTER TABLE shift_shortfalls ADD COLUMN IF NOT EXISTS penalty_id INT REFERENCES 
 
 -- Тестовые сигналы и демо-история больше не используются: убираем те, по которым нет сделок клиентов
 DELETE FROM signals s WHERE s.requested_by IS NULL AND (s.is_test OR s.demo_result IS NOT NULL OR s.source = 'test') AND NOT EXISTS (SELECT 1 FROM deals x WHERE x.signal_id = s.id);
+
+-- Админ всегда считается в общих показателях (признак «тоже стример» больше не настраивается)
+UPDATE staff SET streams = TRUE WHERE role = 'admin' AND NOT streams;
