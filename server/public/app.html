@@ -1417,7 +1417,15 @@ document.addEventListener('visibilitychange',async()=>{if(!document.hidden&&me&&
 
 (async()=>{
   if(!tg||!tg.initData){root.replaceChildren(el('main',{style:'padding:40px 16px;text-align:center;display:grid;gap:12px'},el('div',{class:'logo',style:'margin:auto;width:48px;height:48px;font-size:20px'},'H'),el('h2',{style:'font-size:18px'},'Hunter AI'),el('p',{class:'mut'},'Откройте приложение из Telegram, через бота @hunters_aibot.')));return}
-  try{await refreshMe();render()}catch(e){root.replaceChildren(el('main',{style:'padding:40px 16px;text-align:center'},el('p',{class:'err'},e.message)))}
+  try{
+    await refreshMe();
+    // Кнопка из пуша «Оставить отзыв»: открываем вкладку «Медиа» и сразу окно отзыва
+    let goReview=false;
+    try{const u=new URL(location.href);if(u.searchParams.get('go')==='review'){goReview=true;u.searchParams.delete('go');history.replaceState(null,'',u.pathname+u.search+u.hash)}}catch{}
+    if(goReview)tab='media';
+    await render();
+    if(goReview)reviewDialog(()=>render());
+  }catch(e){root.replaceChildren(el('main',{style:'padding:40px 16px;text-align:center'},el('p',{class:'err'},e.message)))}
 })();
 </script>
 </body>

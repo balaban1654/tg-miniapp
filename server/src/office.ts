@@ -804,7 +804,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // Пуши и рассылки (только админ)
-  const TRIGGERS = ['start', 'no_reg', 'no_deposit', 'ftd', 'inactive'];
+  const TRIGGERS = ['start', 'no_reg', 'no_deposit', 'ftd', 'inactive', 'withdrawal'];
   function cleanButtons(v: unknown): Button[] | string {
     if (v === undefined || v === null) return [];
     if (!Array.isArray(v) || v.length > 4) return 'Кнопок не больше четырёх';
@@ -825,7 +825,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
         const data = str(b.data, 20);
         if (!['acc_no', 'acc_yes', 'acc_ready'].includes(data)) return 'Неизвестное действие кнопки';
         out.push({ label, type, data, ...extra });
-      } else if (['miniapp', 'support', 'register'].includes(type)) out.push({ label, type: type as Button['type'], ...extra });
+      } else if (['miniapp', 'support', 'register', 'review'].includes(type)) out.push({ label, type: type as Button['type'], ...extra });
       else return 'Неизвестный тип кнопки';
     }
     return out;

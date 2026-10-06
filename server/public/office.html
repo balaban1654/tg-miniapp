@@ -2033,7 +2033,7 @@ async function kpiCardBlock(){
 async function fieldStatsBlock(qs=''){
   const d=await api('/shifts/fieldstats'+qs);
   if(!d.fields.length&&!d.rows.length)return null;
-  const cols=['Стример','Отчётов','Время',...d.fields];
+  const cols=['Сотрудник','Отчётов','Время',...d.fields];
   const tot={};d.rows.forEach(r=>d.fields.forEach(f=>{tot[f]=(tot[f]||0)+(r.sums[f]||0)}));
   const rows=d.rows.map(r=>[td(r.name),td(r.reports,'n'),td(hmin(r.minutes)),...d.fields.map(f=>td((r.sums[f]||0).toLocaleString('ru-RU'),'n'))]);
   if(d.rows.length)rows.push([el('td',{},el('b',{},'Всего')),td(d.rows.reduce((a,r)=>a+r.reports,0),'n'),td(hmin(d.rows.reduce((a,r)=>a+r.minutes,0))),...d.fields.map(f=>el('td',{class:'n'},el('b',{},(tot[f]||0).toLocaleString('ru-RU'))))]);
@@ -2246,7 +2246,7 @@ async function accSum(){
     tr.addEventListener('click',open);tr.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open()}});
     if(accState.sel===r.staff.id)setTimeout(()=>{tr.classList.add('on');accDetail(detail,r.staff.id)},0);
     return tr});
-  const SUMH=['Стример','Часы','Смены','План смен','Лиды (FTD)','План лидов','За смены','За лидов','Бонусы FTD','Дневные','Доп.','Итого','Выплачено','К выплате'];
+  const SUMH=['Сотрудник','Часы','Смены','План смен','Лиды (FTD)','План лидов','За смены','За лидов','Бонусы FTD','Дневные','Доп.','Итого','Выплачено','К выплате'];
   rows.forEach(tr=>[...tr.children].forEach((c,i)=>c.setAttribute('data-l',SUMH[i]||'')));
   const tbl=el('div',{class:'tbl ctr sumt'},el('table',{},el('thead',{},el('tr',{},SUMH.map(c=>el('th',{},c)))),el('tbody',{},rows)));
   // Телефон: у каждого стримера своя карточка, строки «название ······ сумма» выровнены по обоим краям
@@ -2277,7 +2277,7 @@ async function accSum(){
       row('К выплате',usd2(k.due),'strong due'));
     return c});
   const list=el('div',{class:'sumcards'},...cards);
-  return[tiles,R.length?tbl:el('div',{class:'card empty'},'Стримеров пока нет. Добавьте их в разделе «Сотрудники».'),R.length?list:null,el('div',{class:'mut sm'},'Нажмите на строку, чтобы увидеть разбор начисления.'),detail];
+  return[tiles,R.length?tbl:el('div',{class:'card empty'},'Сотрудников пока нет. Добавьте их в разделе «Сотрудники».'),R.length?list:null,el('div',{class:'mut sm'},'Нажмите на строку, чтобы увидеть разбор начисления.'),detail];
 }
 
 async function accDetail(box,id){
@@ -2358,7 +2358,7 @@ async function openAddReportModal(){
   box.replaceChildren(
     el('div',{class:'lc-head'},el('h3',{style:'font-size:18px'},'Добавить отчёт'),el('button',{class:'btn o s',type:'button','aria-label':'Закрыть',onclick:close},'✕')),
     el('div',{class:'mut sm'},'Отчёт сразу станет проверенным и зачтённым, время пойдёт в расчёт часов и зарплаты.'),
-    el('div',{class:'lc-two rep2 first-full'},el('div',{class:'lc-field'},el('label',{},'Стример'),who),el('div',{class:'lc-field'},el('label',{},'Длительность эфира'),time),
+    el('div',{class:'lc-two rep2 first-full'},el('div',{class:'lc-field'},el('label',{},'Сотрудник'),who),el('div',{class:'lc-field'},el('label',{},'Длительность эфира'),time),
       el('div',{class:'lc-field'},el('label',{},'Дата начала'),startDay),el('div',{class:'lc-field'},el('label',{},'Время начала'),startTime),
       ...inputs.map(x=>el('div',{class:'lc-field'+(x.d.kind==='link'?' full':'')},el('label',{},x.d.name),x.i))),
     el('div',{class:'lc-field'},el('label',{},'Комментарий'),comment),
@@ -2398,7 +2398,7 @@ async function accReview(){
     const rows=list.map(r=>[td(r.staff_name),td(new Date(r.day+'T12:00:00').toLocaleDateString('ru-RU',{day:'numeric',month:'short'})),td(r.status==='await'?'—':hmin(r.declared_min)+(r.approved_min&&r.approved_min!==r.declared_min?' → '+hmin(r.approved_min):'')),el('td',{},el('span',{class:'pill '+REPSTATUS[r.status][1]},REPSTATUS[r.status][0])),
       el('td',{},r.has_screenshot?shotThumb('/api/office/shifts/'+r.id+'/screenshot',{style:'color:var(--acc2)'}).appendChild(document.createTextNode('скриншот')).parentNode:'—'),
       el('td',{},el('button',{class:'btn o s',type:'button',style:'color:var(--bad)',onclick:async()=>{if(!confirm('Удалить отчёт '+r.staff_name+' за '+new Date(r.day+'T12:00:00').toLocaleDateString('ru-RU',{day:'numeric',month:'long'})+' из системы?'+(r.status==='approved'?' Его время пропадёт из расчёта часов и зарплаты.':'')))return;try{await api('/shifts/'+r.id,{method:'DELETE'});toast('Отчёт удалён');accRefresh()}catch(x){toast(x.message)}}},'Удалить'))]);
-    histHold.replaceChildren(ctrT(table(['Стример','Дата','Время','Статус','Скрин',''],rows,done.length?'Ничего не найдено. Измените фильтры.':'За этот месяц проверенных отчётов нет.')));
+    histHold.replaceChildren(ctrT(table(['Сотрудник','Дата','Время','Статус','Скрин',''],rows,done.length?'Ничего не найдено. Измените фильтры.':'За этот месяц проверенных отчётов нет.')));
   };
   drawHist();
   return[el('div',{class:'head'},el('h3',{style:'font-size:15px'},'На проверке: '+pend.length),el('span',{class:'mut sm'},'после зачёта время идёт в расчёт и в дашборд стримера')),
@@ -2421,7 +2421,7 @@ async function accBonus(){
     el('div',{},el('button',{class:'btn s',type:'button',onclick:async()=>{err.textContent='';try{await api('/adjustments',{method:'POST',body:{staff_id:Number(who.value),kind:kind.value,amount:Number(amount.value),comment:comment.value,period:accState.period}});toast('Добавлено');accRefresh()}catch(x){err.textContent=x.message}}},'Добавить')));
   const rows=list.map(a=>[td(a.d),td(a.staff_name),el('td',{},el('span',{class:'pill '+(a.kind==='bonus'?'p-ok':'p-bad')},a.kind==='bonus'?'бонус':'штраф')),td(usd2(a.kind==='bonus'?a.amount:-a.amount),'n'),el('td',{style:'white-space:normal;text-align:left'},a.comment||'—'),el('td',{},ms.closed?'':el('button',{class:'btn o s',type:'button',onclick:async()=>{try{await api('/adjustments/'+a.id,{method:'DELETE'});accRefresh()}catch(x){toast(x.message)}}},'Удалить'))]);
   const lockNote=el('div',{class:'card warn-card'},el('b',{},'🔒 Месяц закрыт'),el('div',{class:'mut sm'},'Бонусы и штрафы за закрытый месяц менять нельзя. Откройте месяц заново (кнопка вверху), внесите изменения и закройте снова.'));
-  return[ms.closed?lockNote:form,ctrT(table(['Дата','Стример','Тип','Сумма','Комментарий (видите только вы)',''],rows,'За этот месяц бонусов и штрафов нет.')),
+  return[ms.closed?lockNote:form,ctrT(table(['Дата','Сотрудник','Тип','Сумма','Комментарий (видите только вы)',''],rows,'За этот месяц бонусов и штрафов нет.')),
     el('div',{class:'mut sm'},'Стример видит бонусы и штрафы суммами, без вашего комментария. Переработку тоже можно оплатить здесь.')];
 }
 
@@ -2493,7 +2493,7 @@ async function accWhy(){
     return el('td',{},el('span',{style:'display:inline-flex;gap:6px;align-items:center'},ok,fine));
   };
   return[el('div',{class:'head'},el('h3',{style:'font-size:15px'},'Невыполненные дни за '+perLabel(accState.period))),
-    ctrT(table(['Стример','День','Зачтено','Причина',''],rows.map(r=>[td(r.staff_name),td(new Date(r.day+'T12:00:00').toLocaleDateString('ru-RU',{day:'numeric',month:'short'})),td(hmin(r.minutes)),el('td',{style:'white-space:normal;text-align:center;min-width:240px'},r.reason?r.reason:el('span',{class:'mut'},'ещё не написал')),act(r)]),'Невыполненных дней нет.')),
+    ctrT(table(['Сотрудник','День','Зачтено','Причина',''],rows.map(r=>[td(r.staff_name),td(new Date(r.day+'T12:00:00').toLocaleDateString('ru-RU',{day:'numeric',month:'short'})),td(hmin(r.minutes)),el('td',{style:'white-space:normal;text-align:center;min-width:240px'},r.reason?r.reason:el('span',{class:'mut'},'ещё не написал')),act(r)]),'Невыполненных дней нет.')),
     el('div',{class:'mut sm'},'Если за день не набралось 3 часов, стример должен написать причину. Главное: 66 часов за месяц. Штраф можно удалить во вкладке «Бонусы и штрафы».')];
 }
 
@@ -2708,8 +2708,8 @@ async function viewChats(){
   return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Чаты поддержки'),el('span',{class:'mut sm'},me.role==='admin'?'Вы видите все чаты':'Неразобранного клиента забирает тот, кто ответил первым. Новые клиенты другого стримера открываются всем, если у него закончилась смена больше 15 минут назад и никто не ответил')),wrap];
 }
 
-const TRIG={start:'Нажал /start',no_reg:'Нет регистрации',no_deposit:'Регистрация без депозита',ftd:'Депозит получен',inactive:'Давно не заходил'};
-const BTYPE={miniapp:'Открыть кабинет',support:'Поддержка (чат в боте)',register:'Регистрация',url:'Своя ссылка',acc_ready:'Ответ «Всё понятно — регистрация»',acc_no:'Ответ «Нет, создать»',acc_yes:'Ответ «Да, уже есть»'};
+const TRIG={start:'Нажал /start',no_reg:'Нет регистрации',no_deposit:'Регистрация без депозита',ftd:'Депозит получен',inactive:'Давно не заходил',withdrawal:'Успешный вывод средств'};
+const BTYPE={miniapp:'Открыть кабинет',review:'Оставить отзыв (окно отзыва в Mini App)',support:'Поддержка (чат в боте)',register:'Регистрация',url:'Своя ссылка',acc_ready:'Ответ «Всё понятно — регистрация»',acc_no:'Ответ «Нет, создать»',acc_yes:'Ответ «Да, уже есть»'};
 const fmtDelay=m=>m===0?'сразу':m%1440===0?'через '+(m/1440)+' дн.':m%60===0?'через '+(m/60)+' ч':'через '+m+' мин';
 const sample=t=>t.replaceAll('{имя}','Аня').replaceAll('{стример}','Иван').replaceAll('{промокод}','LIO669');
 
@@ -2728,7 +2728,7 @@ function buttonsEditor(initial){
   };
   (initial||[]).forEach(add);
   const addBtn=el('button',{class:'btn o s',type:'button',onclick:()=>{if(rows.length<4)add()}},'+ Кнопка');
-  return{node:el('div',{style:'display:grid;gap:8px'},el('span',{class:'mut sm'},'Кнопки под сообщением (до 4)'),box,addBtn),
+  return{set:l=>{rows.splice(0).forEach(r=>r.node.remove());(l||[]).forEach(add)},node:el('div',{style:'display:grid;gap:8px'},el('span',{class:'mut sm'},'Кнопки под сообщением (до 4)'),box,addBtn),
     get:()=>rows.filter(r=>r.label.value.trim()).map(r=>{const k=r.type.value;
       const keep={...(r.orig.style?{style:r.orig.style}:{}),...(r.orig.inline?{inline:true}:{})};
       if(k==='acc_no'||k==='acc_yes'||k==='acc_ready')return{label:r.label.value.trim(),type:'callback',data:k,...keep};
@@ -2778,7 +2778,7 @@ async function viewPush(){
       el('button',{class:'btn o s',type:'button',onclick:async e=>{const b=e.currentTarget;if(b.dataset.s){await api('/push/rules/'+r.id,{method:'DELETE'});render()}else{b.dataset.s='1';b.textContent='Точно удалить?'}}},'Удалить'))]),'Правил пока нет.');
 
   // --- рассылка
-  const SEGL={all:'Все',new:'Не зарегистрировались',registered:'Зарегистрировались, без депозита',ftd:'С депозитом',access:'С открытым доступом',churned:'Отвалились'};
+  const SEGL={all:'Все',new:'Не зарегистрировались',registered:'Зарегистрировались, без депозита',ftd:'С депозитом',access:'С открытым доступом',churned:'Отвалились',withdrew:'Выводили средства'};
   const sel=el('select',{},Object.entries(SEGL).map(([k,v])=>el('option',{value:k},v+' ('+seg[k]+')')));
   const owner=el('select',{},el('option',{value:''},'Все стримеры'),...staff.filter(x=>(x.streams||['streamer','teamlead','buyer'].includes(x.role))).map(x=>el('option',{value:x.id},x.name)));
   owner.addEventListener('change',async()=>{const c=await api('/push/segments'+(owner.value?'?owner_id='+owner.value:''));[...sel.options].forEach(o=>o.textContent=SEGL[o.value]+' ('+c[o.value]+')')});
@@ -2810,6 +2810,7 @@ async function viewPush(){
     catch(x){berr.textContent=x.message;delete sendBtn.dataset.s;sendBtn.textContent='Отправить'}});
   const bform=el('div',{class:'card',style:'display:grid;gap:12px'},el('h3',{style:'font-size:14px'},'Рассылка вручную'),
     el('div',{class:'form'},el('label',{},'Кому',sel),el('label',{},'Стример',owner)),
+    el('div',{},el('button',{class:'btn o s',type:'button',onclick:()=>{bt.value='{имя}, у нас к вам просьба. Если вам нравится работа с командой, оставьте короткий отзыв: оценка и пара слов, можно с фото. Это займёт меньше минуты и поможет тем, кто только присматривается.';bt.dispatchEvent(new Event('input'));bbe.set([{label:'Оставить отзыв',type:'review',style:'success'}]);bbe.node.dispatchEvent(new Event('input',{bubbles:true}));sel.value='withdrew'}},'Шаблон: просьба об отзыве')),
     el('label',{},'Текст. Подстановки: {имя} {стример} {промокод}',bt),bbe.node,el('div',{},el('div',{class:'mut sm',style:'margin-bottom:6px'},'Так увидит клиент'),bpv),
     el('div',{class:'mut sm'},'Получают только те, кто нажал /start у бота и не заблокировал его. Отправка идёт очередью, примерно 20 сообщений в секунду.'),
     el('div',{},sendBtn),berr);

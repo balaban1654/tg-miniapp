@@ -180,6 +180,8 @@ CREATE TABLE IF NOT EXISTS push_rules (
   starts_at    TIMESTAMPTZ NOT NULL DEFAULT now(),  -- правило не трогает тех, у кого срок наступил раньше
   created_at   TIMESTAMPTZ DEFAULT now()
 );
+ALTER TABLE push_rules DROP CONSTRAINT IF EXISTS push_rules_trigger_check;
+ALTER TABLE push_rules ADD CONSTRAINT push_rules_trigger_check CHECK (trigger IN ('start','no_reg','no_deposit','ftd','inactive','withdrawal'));
 -- Каждое правило отправляется человеку один раз
 CREATE TABLE IF NOT EXISTS push_log (
   rule_id INT NOT NULL REFERENCES push_rules(id) ON DELETE CASCADE,

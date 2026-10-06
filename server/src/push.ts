@@ -5,10 +5,10 @@ import { config } from './config.js';
 import { bot } from './tg.js';
 import { withClickId } from './app.js';
 
-export type Trigger = 'start' | 'no_reg' | 'no_deposit' | 'ftd' | 'inactive';
+export type Trigger = 'start' | 'no_reg' | 'no_deposit' | 'ftd' | 'inactive' | 'withdrawal';
 export interface Button {
   label: string;
-  type: 'miniapp' | 'url' | 'support' | 'register' | 'callback';
+  type: 'miniapp' | 'url' | 'support' | 'register' | 'callback' | 'review';
   url?: string;
   data?: string;
   /** Цвет кнопки в Telegram: primary — синяя, success — зелёная */
@@ -99,6 +99,7 @@ export function buildKeyboard(buttons: Button[], t: Target): InlineKeyboard | un
       if (u) btn = InlineKeyboard.url(b.label, u);
       else if (config.miniAppUrl) btn = InlineKeyboard.webApp(b.label, config.miniAppUrl);
     } else if (b.type === 'miniapp' && config.miniAppUrl) btn = InlineKeyboard.webApp(b.label, config.miniAppUrl);
+    else if (b.type === 'review' && config.miniAppUrl) btn = InlineKeyboard.webApp(b.label, config.miniAppUrl + (config.miniAppUrl.includes('?') ? '&' : '?') + 'go=review');
     if (!btn) continue;
     kb.add(b.style ? { ...btn, style: b.style } : btn);
     if (!b.inline) kb.row();
@@ -152,6 +153,7 @@ const T: Record<Trigger, string> = {
   no_deposit: `(SELECT min(e.created_at) FROM events e WHERE e.tg_id = d.tg_id AND e.type = 'reg')`,
   ftd: `(SELECT min(e.created_at) FROM events e WHERE e.tg_id = d.tg_id AND e.type IN ('ftd','dep'))`,
   inactive: 'coalesce(d.last_seen_at, d.created_at)',
+  withdrawal: `(SELECT min(e.created_at) FROM events e WHERE e.tg_id = d.tg_id AND e.type = 'wd')`,
 };
 const COND: Record<Trigger, string> = {
   start: 'TRUE',
@@ -159,6 +161,8 @@ const COND: Record<Trigger, string> = {
   no_deposit: `d.status = 'registered'`,
   ftd: `d.status IN ('ftd','active')`,
   inactive: 'd.access',
+  // Просим отзыв один раз после первого успешного вывода, если клиент ещё не писал отзыв
+  withdrawal: `NOT EXISTS (SELECT 1 FROM reviews rv WHERE rv.tg_id = d.tg_id)`,
 };
 
 async function dueTargets(rule: Rule, limit: number, tgId?: string): Promise<Target[]> {
@@ -238,6 +242,7 @@ export const SEGMENTS: Record<string, string> = {
   access: 'd.access',
   churned: `d.status = 'churned'`,
   testers: 'd.is_tester',
+  withdrew: `EXISTS (SELECT 1 FROM events e WHERE e.tg_id = d.tg_id AND e.type = 'wd')`,
 };
 
 export function segmentWhere(segment: string, ownerId?: number | null): { sql: string; params: unknown[] } {
@@ -319,12 +324,22 @@ export const GREETING_BUTTONS: Button[] = [
   { label: 'Написать в поддержку', type: 'support' },
 ];
 
+export const REVIEW_ASK_TEXT = '{имя}, поздравляем с выводом средств! 🎉\n\nЕсли вам нравится работа с командой, оставьте короткий отзыв: оценка и пара слов, можно с фото. Это займёт меньше минуты и поможет новичкам решиться.';
+export const REVIEW_BUTTON: Button = { label: 'Оставить отзыв', type: 'review', style: 'success' };
+
 export async function seedDefaultRules(): Promise<void> {
   // Новое приветствие, если админ не менял прежнее
   await db.query(`UPDATE push_rules SET text = $1, buttons = $2 WHERE trigger = 'start' AND text = $3`, [GREETING_TEXT, JSON.stringify(GREETING_BUTTONS), GREETING_OLD]);
   // Переименование «клуб» в «команда» для уже сохранённых текстов и подписей
   await db.query(`UPDATE push_rules SET text = replace(text, 'материалы клуба', 'материалы команды') WHERE text LIKE '%материалы клуба%'`);
   await db.query(`UPDATE media_items SET subtitle = replace(subtitle, 'Трейдер клуба', 'Трейдер команды') WHERE subtitle LIKE '%Трейдер клуба%'`);
+  // Просьба об отзыве после успешного вывода (добавляется один раз, дальше админ правит её в «Пушах»)
+  await db.query(
+    `INSERT INTO push_rules (name, trigger, delay_min, text, buttons, daytime_only, sort)
+     SELECT 'Отзыв после вывода', 'withdrawal', 30, $1, $2, TRUE, 90
+      WHERE NOT EXISTS (SELECT 1 FROM push_rules WHERE trigger = 'withdrawal')`,
+    [REVIEW_ASK_TEXT, JSON.stringify([REVIEW_BUTTON])],
+  );
   const c = await db.query('SELECT count(*)::int AS n FROM push_rules');
   if (c.rows[0].n > 0) return;
   const support: Button = { label: 'Написать в поддержку', type: 'support' };
