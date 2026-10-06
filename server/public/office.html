@@ -1708,7 +1708,9 @@ async function viewLinks(){
   const adm=me.role==='admin';
   const slug=el('input',{id:'nSlug',placeholder:'ivan-instagram',required:'',pattern:'[a-z0-9][a-z0-9_\\-]{1,39}',title:'a-z, 0-9, - и _'});
   const src=el('input',{id:'nSrc',placeholder:'Instagram'});
-  const owner=el('select',{id:'nOwner'},el('option',{value:''},'Я сам'),...staff.filter(s=>s.id!==me.id&&['streamer','buyer'].includes(s.role)).map(s=>el('option',{value:s.id},s.name+' · '+ROLE[s.role])));
+  const owner=me.role==='admin'
+    ?el('select',{id:'nOwner'},...staff.filter(s=>s.active!==false).map(s=>el('option',{value:s.id,selected:s.id===me.id?'':null},s.name+' · '+(ROLE[s.role]||s.role))))
+    :el('select',{id:'nOwner'},el('option',{value:''},'Я сам'),...staff.filter(s=>s.id!==me.id&&['streamer','buyer'].includes(s.role)).map(s=>el('option',{value:s.id},s.name+' · '+ROLE[s.role])));
   const err=el('div',{class:'err',role:'alert'});
   const form=el('form',{class:'card form',onsubmit:async e=>{e.preventDefault();err.textContent='';
     try{await api('/links',{method:'POST',body:{slug:slug.value,source:src.value,owner_id:owner.value||undefined}});render()}catch(x){err.textContent=x.message}}},
