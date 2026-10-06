@@ -2713,7 +2713,7 @@ async function viewChats(){
 const TRIG={start:'Нажал /start',no_reg:'Нет регистрации',no_deposit:'Регистрация без депозита',ftd:'Депозит получен',inactive:'Давно не заходил',withdrawal:'Успешный вывод средств'};
 const BTYPE={miniapp:'Открыть кабинет',review:'Оставить отзыв (окно отзыва в Mini App)',support:'Поддержка (чат в боте)',register:'Регистрация',url:'Своя ссылка',acc_ready:'Ответ «Всё понятно — регистрация»',acc_no:'Ответ «Нет, создать»',acc_yes:'Ответ «Да, уже есть»'};
 const fmtDelay=m=>m===0?'сразу':m%1440===0?'через '+(m/1440)+' дн.':m%60===0?'через '+(m/60)+' ч':'через '+m+' мин';
-const sample=t=>t.replaceAll('{имя}','Аня').replaceAll('{стример}','Иван').replaceAll('{промокод}','LIO669');
+const sample=t=>t.replace(/\{время:(\d{10,14})\}/g,(_m,ms)=>new Date(+ms).toLocaleTimeString('ru-RU',{timeZone:'Europe/Kyiv',hourCycle:'h23'})+' (Киев)').replaceAll('{имя}','Аня').replaceAll('{стример}','Иван').replaceAll('{промокод}','LIO669');
 
 function buttonsEditor(initial){
   const box=el('div',{style:'display:grid;gap:8px'});
@@ -2816,7 +2816,7 @@ async function viewPush(){
     el('label',{},'Текст. Подстановки: {имя} {стример} {промокод}',bt),bbe.node,el('div',{},el('div',{class:'mut sm',style:'margin-bottom:6px'},'Так увидит клиент'),bpv),
     el('div',{class:'mut sm'},'Получают только те, кто нажал /start у бота и не заблокировал его. Отправка идёт очередью, примерно 20 сообщений в секунду.'),
     el('div',{},sendBtn),berr);
-  const castT=table(['Когда','Кому','Текст','Всего','Отправлено','Ошибок','В очереди'],casts.map(c=>[td(new Date(c.created_at).toLocaleString('ru-RU',{timeZone:'Europe/Kyiv',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})),td(SEGL[c.segment]||c.segment),el('td',{style:'max-width:320px;white-space:normal'},c.text.slice(0,80)),td(c.total,'n'),td(c.sent,'n'),td(c.failed,'n'),td(c.pending,'n')]),'Рассылок пока не было.');
+  const castT=table(['Когда','Кому','Текст','Всего','Отправлено','Ошибок','В очереди'],casts.map(c=>[td(new Date(c.created_at).toLocaleString('ru-RU',{timeZone:'Europe/Kyiv',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})),td(SEGL[c.segment]||c.segment),el('td',{style:'max-width:320px;white-space:normal'},c.text.replace(/\{время:(\d{10,14})\}/g,(_m,ms)=>new Date(+ms).toLocaleTimeString('ru-RU',{timeZone:'Europe/Kyiv',hourCycle:'h23'})+' (Киев)').slice(0,110)),td(c.total,'n'),td(c.sent,'n'),td(c.failed,'n'),td(c.pending,'n')]),'Рассылок пока не было.');
   return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Пуши и рассылки'),el('span',{class:'mut sm'},'Каждое правило уходит человеку один раз')),
     el('h3',{style:'font-size:15px'},'Автоматические пуши'),rulesT,form,
     el('h3',{style:'font-size:15px'},'Рассылки'),bform,castT];

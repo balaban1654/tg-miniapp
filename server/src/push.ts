@@ -46,9 +46,9 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 // ---------- Тексты и кнопки ----------
 
-/** Время вида «13:30» в часовом поясе клиента. Если пояс неизвестен, берём Киев и добавляем пометку */
+/** Время вида «13:30:15» в часовом поясе клиента. Если пояс неизвестен, берём Киев и добавляем пометку */
 export function clockFor(ms: number, tz: string | null | undefined): string {
-  const fmt = (zone: string) => new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digit', timeZone: zone }).format(new Date(ms));
+  const fmt = (zone: string) => new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23', timeZone: zone }).format(new Date(ms));
   if (tz) {
     try {
       return fmt(tz);

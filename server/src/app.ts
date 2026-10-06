@@ -356,11 +356,11 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
 
   // Активные сигналы клиента. Общий (от аналитика) работает так же, как сигнал по запросу: свёрнутая карточка, полный экран с
   // расписанием входа и перекрытий, оценка или «Пропустить». Общий сигнал живёт, пока не пройдут все события расписания плюс 5 минут.
-  // Сигнал по запросу остаётся у клиента, пока он его не оценит. Обычные видят клиенты с открытым доступом, тестовые только тестовые аккаунты
+  // Сигнал по запросу остаётся у клиента, пока он его не оценит. Обычные видят все клиенты, тестовые только тестовые аккаунты
   const VIS = `(s.requested_by = d.tg_id
        OR (s.requested_by IS NULL AND s.created_at > now() - interval '2 hours'
            AND s.entry_at + make_interval(secs => (SELECT max_events * overlap_gap_sec + 300 FROM signal_settings WHERE id = 1)) > now()
-           AND ((NOT s.is_test AND (d.access OR d.is_tester)) OR (s.is_test AND d.is_tester))))`;
+           AND (NOT s.is_test OR d.is_tester)))`;
   const ACTIVE = `${VIS} AND NOT EXISTS (SELECT 1 FROM signal_steps t WHERE t.signal_id = s.id AND t.tg_id = d.tg_id)`;
   app.get('/signals/active', { preHandler: auth }, async (req) => {
     const r = await db.query(

@@ -1229,7 +1229,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     let pushed = 0;
     if (o.push) {
       const text = `${o.isTest ? 'ТЕСТ. Не для торговли.\n' : ''}Новый сигнал: ${o.pair}, ${o.direction === 'up' ? 'вверх' : 'вниз'}, экспирация ${o.expirySec ? `${o.expirySec} сек` : `${o.expiry} мин`}.\nВход в {время:${entryAt.getTime()}}. Откройте кабинет.`;
-      const r = await createBroadcast({ text, buttons: [{ label: 'Открыть кабинет', type: 'miniapp' }], segment: o.isTest ? 'testers' : 'access', createdBy: o.by });
+      const r = await createBroadcast({ text, buttons: [{ label: 'Открыть кабинет', type: 'miniapp' }], segment: o.isTest ? 'testers' : 'all', createdBy: o.by });
       pushed = r.total;
     }
     return { id: ins.rows[0].id, pushed };
