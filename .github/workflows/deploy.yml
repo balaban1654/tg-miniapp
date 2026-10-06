@@ -46,6 +46,19 @@ jobs:
             printf "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\n30 3 * * * root /usr/local/bin/hunter-backup >> /var/log/hunter-backup.log 2>&1\n*/5 * * * * root /usr/local/bin/hunter-watch >> /var/log/hunter-watch.log 2>&1\n" > /etc/cron.d/hunter-backup
             chmod 644 /etc/cron.d/hunter-backup'
 
+      # Разовая копия перед рискованными изменениями данных: срабатывает, если в сообщении коммита есть [backup].
+      # Копия вида before-change_*.sql.gz не удаляется автоматической очисткой (она трогает только hunter_*)
+      - name: Резервная копия базы перед изменениями ([backup] в коммите)
+        if: contains(github.event.head_commit.message, '[backup]')
+        run: |
+          ssh -i ~/.ssh/id_deploy "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" '
+            set -e
+            /usr/local/bin/hunter-backup
+            LAST=$(ls -t /var/backups/hunter/hunter_*.sql.gz | head -1)
+            cp "$LAST" "/var/backups/hunter/before-change_$(date +%F_%H%M).sql.gz"
+            chmod 600 /var/backups/hunter/before-change_*.sql.gz
+            ls -lh /var/backups/hunter | tail -5'
+
       - name: Запуск приложения
         run: |
           ssh -i ~/.ssh/id_deploy "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \

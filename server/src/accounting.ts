@@ -114,7 +114,7 @@ async function kpiCompute(staffId: number, period: string, plan: KpiPlan): Promi
       `SELECT coalesce(e.amount, 0)::float AS amount,
               to_char((e.created_at AT TIME ZONE '${TZ}') - ($3 || ' hours')::interval, 'YYYY-MM-DD') AS dkey
          FROM events e JOIN leads d ON d.tg_id = e.tg_id
-        WHERE d.owner_id = $1 AND d.lead_role = 'lead' AND e.type = 'ftd' AND to_char(e.created_at AT TIME ZONE '${TZ}', 'YYYY-MM') = $2`,
+        WHERE d.owner_id = $1 AND d.lead_role = 'lead' AND e.type = 'ftd' AND coalesce(e.raw->>'nopay', '') <> '1' AND to_char(e.created_at AT TIME ZONE '${TZ}', 'YYYY-MM') = $2`,
       [staffId, period, String(plan.day.cutoffH)],
     )
   ).rows as { amount: number; dkey: string }[];

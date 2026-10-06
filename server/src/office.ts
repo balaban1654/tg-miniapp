@@ -1121,10 +1121,14 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     return { ok: true };
   });
 
-  // Импорт выгрузки постбеков из партнёрки (CSV «postbacks_logs»). Берём только строки официального бота Pocket
-  // (partner-bot.affpartners.io): остальные адреса дублируют те же события. Уже принятые не задваиваются
+  // Импорт выгрузки постбеков из партнёрки (CSV «postbacks_logs»). Берём события со всех адресов (официальный бот Pocket,
+  // Make, наш сервер), склеиваем одинаковые (одно событие приходит на несколько адресов и повторяется «Replay»)
+  // и добавляем только те, которых ещё нет. С dry=true только считает и ничего не пишет.
+  // Стримерам события за прошлые месяцы не оплачиваются (nopay), в общий пул и в карточки лидов они идут как обычно
   app.post('/postbacks/import', { preHandler: need('admin') }, async (req, reply) => {
-    const text = String(((req.body ?? {}) as any).csv ?? '').replace(/^\uFEFF/, '');
+    const body = (req.body ?? {}) as any;
+    const dry = body.dry === true;
+    const text = String(body.csv ?? '').replace(/^\uFEFF/, '');
     if (!text.trim()) return reply.code(400).send({ error: 'Файл пустой' });
     if (!config.postbackSecret || config.postbackSecret.length < 16) return reply.code(500).send({ error: 'На сервере не задан POSTBACK_SECRET (от 16 символов)' });
     const table: string[][] = [];
@@ -1143,35 +1147,74 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     }
     const head = (table.shift() ?? []).map((x) => x.trim().toLowerCase());
     const iUrl = head.indexOf('url');
+    const iName = head.indexOf('событие');
     if (iUrl < 0) return reply.code(400).send({ error: 'Это не выгрузка постбеков: нет колонки URL' });
-    if (table.length > 5000) return reply.code(400).send({ error: 'Слишком много строк (больше 5000)' });
-    const out = { total: 0, added: 0, exists: 0, unknown: 0, errors: 0, unknownIds: [] as string[] };
+    if (table.length > 20000) return reply.code(400).send({ error: 'Слишком много строк (больше 20000)' });
+
+    const NAMES: Record<string, string> = { 'регистрация': 'reg', 'первый депозит': 'ftd', 'повторный депозит': 'dep', 'комиссия': 'comm', 'вывод средств': 'wd', 'успешная заявка на вывод': 'wd' };
+    const PATHS: Record<string, string> = { registration: 'reg', ftd: 'ftd', redeposit: 'dep', commission: 'comm' };
+    type Ev = { event: string; trader: string; dt: string; amount: string; qp: URLSearchParams };
+    const uniq = new Map<string, Ev>();
+    const out = {
+      rows: table.length, events: 0, duplicatesInFile: 0, otherHosts: 0, noTrader: 0, wdNotSuccess: 0,
+      exists: 0, added: 0, unknown: 0, errors: 0, unknownTraders: 0, unknownIds: [] as string[],
+      byType: {} as Record<string, { n: number; sum: number }>, noPay: 0, dry,
+    };
+    const HOSTS = /(^|\.)(affpartners\.io|hook\.eu1\.make\.com|hunterai\.space)$/i;
     for (const r of table) {
       let u: URL;
       try { u = new URL(r[iUrl]); } catch { continue; }
-      // Источник правды: официальный бот Pocket (partner-bot.affpartners.io). Остальные адреса в выгрузке дублируют его события
-      if (!/(^|\.)affpartners\.io$/i.test(u.hostname)) continue;
-      const kind = /\/(registration|ftd|redeposit|commission)$/.exec(u.pathname);
-      if (!kind) continue;
-      out.total++;
-      const event = ({ registration: 'reg', ftd: 'ftd', redeposit: 'dep', commission: 'comm' } as Record<string, string>)[kind[1]];
+      if (!HOSTS.test(u.hostname)) { out.otherHosts++; continue; }
+      let event = '';
+      if (/affpartners\.io$/i.test(u.hostname)) event = PATHS[u.pathname.split('/').pop() ?? ''] ?? '';
+      if (!event && iName >= 0) event = NAMES[(r[iName] ?? '').trim().toLowerCase()] ?? '';
+      if (!event) continue;
       const qp = u.searchParams;
-      const dt = (qp.get('date_time') ?? '').trim();
       const trader = (qp.get('trader_id') ?? '').trim();
+      const dt = (qp.get('date_time') ?? '').trim();
+      // Вывод считаем один раз, по успешному статусу. Заявки (pending) и отмены деньгами не являются
+      if (event === 'wd' && (qp.get('status') ?? 'success') !== 'success') { out.wdNotSuccess++; continue; }
+      // Строки Make без Pocket ID: это копии событий, у которых ID есть в других строках
+      if (!trader) { out.noTrader++; continue; }
+      const amount = event === 'reg' ? '' : (qp.get('sumdep') ?? qp.get('commission') ?? qp.get('wdr_sum') ?? '').trim();
+      const key = event === 'reg' || event === 'ftd' ? `${event}|${trader}` : [event, trader, dt, Number(amount) || 0].join('|');
+      const prev = uniq.get(key);
+      if (prev) {
+        out.duplicatesInFile++;
+        if ((event === 'reg' || event === 'ftd') && dt && dt < prev.dt) uniq.set(key, { event, trader, dt, amount, qp });
+        continue;
+      }
+      uniq.set(key, { event, trader, dt, amount, qp });
+    }
+    out.events = uniq.size;
+    const monthStart = (await db.query(`SELECT to_char(date_trunc('month', now() AT TIME ZONE 'Europe/Kyiv'), 'YYYY-MM-DD HH24:MI:SS') AS m`)).rows[0].m as string;
+    const unknownSet = new Set<string>();
+    const list = [...uniq.values()].sort((x, y) => x.dt.localeCompare(y.dt));
+    for (const ev of list) {
+      const { event, trader, dt, amount, qp } = ev;
+      const num = Number(amount) || 0;
       // уже принятый нашим сервером тот же постбек
-      if (dt && trader && (await db.query(`SELECT 1 FROM postback_log WHERE event = $1 AND query->>'trader_id' = $2 AND query->>'date_time' = $3 AND (result = 'ok' OR result LIKE 'дубль%') LIMIT 1`, [event, trader, dt])).rowCount) { out.exists++; continue; }
-      const amount = qp.get('sumdep') ?? qp.get('commission') ?? qp.get('wdr_sum') ?? '';
-      // то же событие уже есть в базе (журнал могли очистить): первое по типу, либо та же сумма в пределах нескольких минут
-      const known = (await db.query('SELECT tg_id FROM leads WHERE trader_id = $1 LIMIT 1', [trader])).rows[0];
+      if (dt && (await db.query(`SELECT 1 FROM postback_log WHERE event = $1 AND query->>'trader_id' = $2 AND query->>'date_time' = $3 AND (result = 'ok' OR result LIKE 'дубль%') LIMIT 1`, [event, trader, dt])).rowCount) { out.exists++; continue; }
+      const click = Number(qp.get('click_id'));
+      const known = (await db.query('SELECT tg_id FROM leads WHERE trader_id = $1 OR ($2::bigint IS NOT NULL AND tg_id = $2) LIMIT 1', [trader, Number.isSafeInteger(click) && click > 0 ? click : null])).rows[0];
       if (known && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(dt)) {
         const dup = event === 'reg' || event === 'ftd'
           ? await db.query('SELECT 1 FROM events WHERE tg_id = $1 AND type = $2 LIMIT 1', [known.tg_id, event])
-          : await db.query(`SELECT 1 FROM events WHERE tg_id = $1 AND type = $2 AND amount = $3::numeric AND abs(extract(epoch FROM created_at - ($4::timestamp AT TIME ZONE 'Etc/GMT-2'))) < 600 LIMIT 1`, [known.tg_id, event, Number(amount) || 0, dt]);
+          : await db.query(`SELECT 1 FROM events WHERE tg_id = $1 AND type = $2 AND amount = $3::numeric AND abs(extract(epoch FROM created_at - ($4::timestamp AT TIME ZONE 'Etc/GMT-2'))) < 600 LIMIT 1`, [known.tg_id, event, num, dt]);
         if (dup.rowCount) { out.exists++; continue; }
       }
+      const nopay = dt && dt < monthStart;
+      if (known) {
+        const t = (out.byType[event] ??= { n: 0, sum: 0 });
+        t.n++; t.sum = Math.round((t.sum + num) * 100) / 100;
+        if (nopay) out.noPay++;
+      } else { out.unknown++; if (!unknownSet.has(trader)) { unknownSet.add(trader); out.unknownTraders++; if (out.unknownIds.length < 200) out.unknownIds.push(trader); } }
+      if (dry) { if (known) out.added++; continue; }
       const tx = 'imp-' + createHash('sha1').update([event, trader, dt, amount].join('|')).digest('hex').slice(0, 16);
       const q = new URLSearchParams({ secret: config.postbackSecret, txid: tx, imported: '1' });
-      for (const [k, v] of qp) if (k !== 'secret' && k !== 'txid' && v !== '') q.set(k, v);
+      if (nopay) q.set('nopay', '1');
+      for (const [k, v] of qp) if (k !== 'secret' && k !== 'txid' && k !== 'nopay' && v !== '') q.set(k, v);
+      if (event === 'wd') q.delete('status');
       await db.query(`DELETE FROM postback_log WHERE query->>'txid' = $1 AND result LIKE 'пропущен%'`, [tx]); // повторная загрузка не плодит строки
       const res = await app.inject({ method: 'GET', url: `/postback/${event}?${q.toString()}` });
       const o = res.json() as { ok?: boolean; ignored?: boolean; duplicate?: boolean };
@@ -1181,11 +1224,11 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
         await db.query(`UPDATE postback_log SET created_at = ($2::timestamp AT TIME ZONE 'Etc/GMT-2') WHERE query->>'txid' = $1`, [tx, dt]);
         if (!o.ignored && !o.duplicate) await db.query(`UPDATE events SET created_at = ($2::timestamp AT TIME ZONE 'Etc/GMT-2') WHERE external_id = $1`, [`${event}:${tx}`, dt]);
       }
-      if (o.ignored) { out.unknown++; if (trader && !out.unknownIds.includes(trader)) out.unknownIds.push(trader); continue; }
+      if (o.ignored) continue;
       if (o.duplicate) { out.exists++; continue; }
       out.added++;
     }
-    return { ok: true, ...out, unknownIds: out.unknownIds.slice(0, 200) };
+    return { ok: true, ...out };
   });
 
   // Привязка Telegram ID к Pocket ID прямо из журнала постбеков. Лид заводится (или находится), все пропущенные

@@ -518,6 +518,21 @@ function askC(text){return new Promise(res=>{const prev=document.activeElement;c
   const ov=el('div',{class:'lc-overlay ask-ov',role:'alertdialog','aria-modal':'true',style:'z-index:120',onclick:e=>{if(e.target===ov)done(false)}},
     el('div',{class:'card',style:'max-width:420px;width:100%;display:grid;gap:16px;text-align:center'},el('div',{style:'white-space:pre-line;line-height:1.45'},text),el('div',{style:'display:flex;gap:10px;justify-content:center'},ok,no)));
   document.body.append(ov);document.addEventListener('keydown',kd,true);ok.focus()})}
+/** Импорт выгрузки постбеков: сначала сводка без записи, потом подтверждение, потом сама загрузка */
+async function runImport(f){
+  const csv=await f.text();
+  const d=await api('/postbacks/import',{method:'POST',body:{csv,dry:true}});
+  const T={reg:'регистраций',ftd:'FTD',dep:'додепов',comm:'комиссий',wd:'выводов'};
+  const lines=['Файл: '+f.name,'Строк в файле: '+d.rows+', уникальных событий: '+d.events+' (копий и повторов: '+d.duplicatesInFile+')','Уже есть в базе: '+d.exists,
+    'Добавится лидам, которые уже есть: '+d.added+(Object.keys(d.byType).length?' ('+Object.entries(d.byType).map(([k,v])=>v.n+' '+(T[k]||k)+(k==='reg'?'':' на '+money(v.sum))).join(', ')+')':''),
+    'Без лида (ляжет в журнал, привяжете сами): '+d.unknown+' событий, '+d.unknownTraders+' Pocket ID'];
+  if(d.noPay)lines.push('Без оплаты стримерам (прошлые месяцы): '+d.noPay);
+  if(!d.added&&!d.unknown){toast('Нечего добавлять: всё уже есть в базе');return d}
+  if(!await askC(lines.join('\n')+'\n\nЗагрузить?'))return null;
+  const r=await api('/postbacks/import',{method:'POST',body:{csv}});
+  toast('Добавлено '+r.added+', уже было '+r.exists+(r.unknown?', без лида '+r.unknown:'')+(r.errors?', ошибок '+r.errors:''));
+  return r;
+}
 function toast(t){document.querySelectorAll('.toast').forEach(x=>x.remove());const n=el('div',{class:'toast',role:'status'},t);document.body.append(n);setTimeout(()=>n.remove(),2050)}
 (function(){const r=document.getElementById('rain');if(!r||matchMedia('(prefers-reduced-motion:reduce)').matches)return;
   for(let i=0;i<26;i++){const c=document.createElement('i');c.style.cssText='left:'+Math.random()*100+'%;height:'+(14+Math.random()*34)+'px;background:'+(Math.random()<.5?'#43b82f':'#ff3b1d')+';opacity:'+(.15+Math.random()*.3)+';animation-duration:'+(14+Math.random()*18)+'s;animation-delay:-'+Math.random()*30+'s';r.appendChild(c)}})();
@@ -3287,9 +3302,10 @@ function pbManualDialog(done){
     if(f.size>8*1024*1024){err.textContent='Файл больше 8 МБ';return}
     drop.textContent='Загружаю: '+f.name+'…';drop.classList.add('busy');
     try{
-      const r=await api('/postbacks/import',{method:'POST',body:{csv:await f.text()}});
+      const r=await runImport(f);
+      if(!r){drop.textContent='Перетащите сюда файл выгрузки (CSV)';drop.classList.remove('busy');file.value='';return}
       drop.textContent='Готово: '+f.name;
-      res.replaceChildren(...[el('div',{},'Постбеков официального бота Pocket в файле: ',el('b',{},String(r.total))),
+      res.replaceChildren(...[el('div',{},'Уникальных событий в файле: ',el('b',{},String(r.events))),
         el('div',{style:'color:var(--ok)'},'Добавлено: '+r.added),
         el('div',{class:'mut'},'Уже были в базе: '+r.exists),
         r.unknown?el('div',{style:'color:var(--warn)'},'Клиент не из бота (Pocket ID не привязан ни к одному лиду): '+r.unknown+(r.unknownIds.length?' · '+r.unknownIds.slice(0,12).join(', ')+(r.unknownIds.length>12?'…':''):'')):null,
@@ -3347,7 +3363,7 @@ async function viewPostbacks(){
     if(f.size>8*1024*1024){toast('Файл больше 8 МБ');return}
     upBtn.disabled=true;toast('Загружаю '+f.name+'…');
     try{
-      const r=await api('/postbacks/import',{method:'POST',body:{csv:await f.text()}});
+      const r=await runImport(f);if(!r){toast('Загрузка отменена');render({soft:true});return}
       toast('Добавлено '+r.added+', уже было '+r.exists+(r.unknown?', без лида '+r.unknown:'')+(r.errors?', ошибок '+r.errors:''));
     }catch(x){toast(x.message)}
     render({soft:true});
