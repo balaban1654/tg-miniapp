@@ -1217,16 +1217,18 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
   // Сигналы. Публикует человек. Случайный режим есть только для тестов и виден только тестовым аккаунтам
   const PAIR = /^[A-Za-z0-9]{2,8}\/[A-Za-z0-9]{2,8}( OTC)?$/;
   const EXPIRY = [1, 2, 3, 5, 10, 15];
+  // Пока общие сигналы публикуются только с экспирацией 5 секунд
+  const EXPIRY_SEC = [5];
 
-  async function publishSignal(o: { pair: string; direction: 'up' | 'down'; expiry: number; enterIn: number; note: string | null; source: 'analyst' | 'test' | 'engine'; isTest: boolean; by: number; push: boolean }) {
+  async function publishSignal(o: { pair: string; direction: 'up' | 'down'; expiry: number; expirySec?: number; enterIn: number; note: string | null; source: 'analyst' | 'test' | 'engine'; isTest: boolean; by: number; push: boolean }) {
     const entryAt = new Date(Date.now() + o.enterIn * 60_000);
     const ins = await db.query(
-      `INSERT INTO signals (pair, direction, expiry_min, entry_at, note, source, is_test, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`,
-      [o.pair, o.direction, o.expiry, entryAt, o.note, o.source, o.isTest, o.by],
+      `INSERT INTO signals (pair, direction, expiry_min, expiry_sec, entry_at, note, source, is_test, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id`,
+      [o.pair, o.direction, o.expiry, o.expirySec ?? null, entryAt, o.note, o.source, o.isTest, o.by],
     );
     let pushed = 0;
     if (o.push) {
-      const text = `${o.isTest ? 'ТЕСТ. Не для торговли.\n' : ''}Новый сигнал: ${o.pair}, ${o.direction === 'up' ? 'вверх' : 'вниз'}, экспирация ${o.expiry} мин.\nВход в {время:${entryAt.getTime()}}. Откройте кабинет.`;
+      const text = `${o.isTest ? 'ТЕСТ. Не для торговли.\n' : ''}Новый сигнал: ${o.pair}, ${o.direction === 'up' ? 'вверх' : 'вниз'}, экспирация ${o.expirySec ? `${o.expirySec} сек` : `${o.expiry} мин`}.\nВход в {время:${entryAt.getTime()}}. Откройте кабинет.`;
       const r = await createBroadcast({ text, buttons: [{ label: 'Открыть кабинет', type: 'miniapp' }], segment: o.isTest ? 'testers' : 'access', createdBy: o.by });
       pushed = r.total;
     }
@@ -1258,13 +1260,15 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     const b = (req.body ?? {}) as Record<string, unknown>;
     const pair = str(b.pair, 20).toUpperCase();
     const direction = str(b.direction, 4);
-    const expiry = Number(b.expiry_min);
+    const expirySec = b.expiry_sec === undefined || b.expiry_sec === '' ? null : Number(b.expiry_sec);
+    const expiry = expirySec ? 1 : Number(b.expiry_min);
     const enterIn = b.enter_in_min === undefined || b.enter_in_min === '' ? 2 : Math.trunc(Number(b.enter_in_min));
     if (!PAIR.test(pair)) return reply.code(400).send({ error: 'Пара в формате EUR/USD или EUR/USD OTC' });
     if (!['up', 'down'].includes(direction)) return reply.code(400).send({ error: 'Выберите направление' });
-    if (!EXPIRY.includes(expiry)) return reply.code(400).send({ error: 'Экспирация: 1, 2, 3, 5, 10 или 15 минут' });
+    if (expirySec !== null && !EXPIRY_SEC.includes(expirySec)) return reply.code(400).send({ error: 'Пока доступна только экспирация 5 секунд' });
+    if (expirySec === null && !EXPIRY.includes(expiry)) return reply.code(400).send({ error: 'Экспирация: 1, 2, 3, 5, 10 или 15 минут' });
     if (!Number.isFinite(enterIn) || enterIn < 0 || enterIn > 60) return reply.code(400).send({ error: 'Вход через 0–60 минут' });
-    return publishSignal({ pair, direction: direction as 'up' | 'down', expiry, enterIn, note: str(b.note, 200) || null, source: 'analyst', isTest: Boolean(b.is_test), by: req.staff!.id, push: b.push !== false });
+    return publishSignal({ pair, direction: direction as 'up' | 'down', expiry, expirySec: expirySec ?? undefined, enterIn, note: str(b.note, 200) || null, source: 'analyst', isTest: Boolean(b.is_test), by: req.staff!.id, push: b.push !== false });
   });
 
   // Настройка сигналов по запросу клиента: общие параметры, пары и текущее направление по каждой паре

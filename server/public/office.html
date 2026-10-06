@@ -2883,20 +2883,20 @@ async function viewSignals(){
   const rows=await api('/signals');
   const cfgBlock=await signalConfigBlock();
   const f={pair:el('input',{required:'',placeholder:'EUR/USD OTC',list:'pairs'}),dir:el('select',{},el('option',{value:'up'},'Вверх'),el('option',{value:'down'},'Вниз')),
-    exp:el('select',{},[1,2,3,5,10,15].map(n=>el('option',{value:n},n+' мин'))),enter:el('input',{type:'number',min:'0',max:'60',value:'2'}),
+    exp:el('select',{},el('option',{value:5},'5 сек')),enter:el('input',{type:'number',min:'0',max:'60',value:'2'}),
     note:el('input',{placeholder:'Почему такой сигнал (необязательно)',maxlength:'200'}),
     push:el('input',{type:'checkbox',checked:'',style:'width:auto'})};
   const dl=el('datalist',{id:'pairs'},['EUR/USD','GBP/USD','USD/JPY','AUD/CAD','EUR/GBP','EUR/USD OTC','GBP/USD OTC'].map(v=>el('option',{value:v})));
   const err=el('div',{class:'err',role:'alert'});
   const form=el('form',{class:'card',style:'display:grid;gap:12px',onsubmit:async e=>{e.preventDefault();err.className='err';err.textContent='';
-    try{const r=await api('/signals',{method:'POST',body:{pair:f.pair.value,direction:f.dir.value,expiry_min:Number(f.exp.value),enter_in_min:f.enter.value,note:f.note.value,push:f.push.checked}});
+    try{const r=await api('/signals',{method:'POST',body:{pair:f.pair.value,direction:f.dir.value,expiry_sec:Number(f.exp.value),enter_in_min:f.enter.value,note:f.note.value,push:f.push.checked}});
       err.className='ok-msg';err.textContent='Сигнал опубликован'+(r.pushed?'. Пуш поставлен в очередь: '+r.pushed+' получателей':'');setTimeout(render,900)}catch(x){err.textContent=x.message}}},
     dl,el('h3',{style:'font-size:14px'},'Новый сигнал'),
     el('div',{class:'form'},el('label',{},'Пара',f.pair),el('label',{},'Направление',f.dir),el('label',{},'Экспирация',f.exp),el('label',{},'Вход через, мин',f.enter)),
     el('label',{},'Комментарий',f.note),
     el('label',{style:'display:flex;gap:8px;align-items:center'},f.push,'Отправить пуш клиентам с открытым доступом'),
     el('div',{style:'display:flex;gap:8px;flex-wrap:wrap'},el('button',{class:'btn',type:'submit'},'Опубликовать')),
-    err,el('p',{class:'mut sm',style:'margin:0'},'Общий сигнал публикует человек. Сигналы по запросу клиента выдаются из настроек выше (направление ставит аналитик). Режим «Авто» (случайное направление) нужен только для проверки бота.'));
+    err,el('p',{class:'mut sm',style:'margin:0'},'Общий сигнал публикует человек. Сигналы по запросу клиента выдаются из настроек ниже (направление ставит аналитик). Режим «Авто» (случайное направление) нужен только для проверки бота.'));
   const t=r=>new Date(r).toLocaleString('ru-RU',{timeZone:'Europe/Kyiv',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
   const list=table(['Опубликован','Пара','Направление','Экспирация','Вход','Источник','Вошли','Плюс','Минус'],rows.map(r=>[td(t(r.created_at)),td(r.pair),el('td',{},el('span',{class:'pill '+(r.direction==='up'?'p-ok':'p-bad')},r.direction==='up'?'Вверх':'Вниз')),td(r.expiry_sec?(r.expiry_sec>=3600&&r.expiry_sec%3600===0?r.expiry_sec/3600+' ч':r.expiry_sec>=60&&r.expiry_sec%60===0?r.expiry_sec/60+' мин':r.expiry_sec+' сек'):r.expiry_min+' мин'),td(new Date(r.entry_at).toLocaleTimeString('ru-RU',{timeZone:'Europe/Kyiv',hour:'2-digit',minute:'2-digit'})),el('td',{},el('span',{class:'pill p-pur'},lroleName(r.source_role))),td(r.taken,'n'),td(r.wins+(Object.keys(r.win_steps||{}).length?' ('+Object.entries(r.win_steps).map(([k,v])=>(k==1?'вход':'пер.'+(k-1))+' '+v).join(', ')+')':''),'n'),td(r.losses,'n')]),'Сигналов пока не было.');
   list.classList.add('ctr');
@@ -2907,7 +2907,7 @@ async function viewSignals(){
     el('button',{class:'btn o s',type:'button',onclick:()=>{sureClr.hidden=true;askClr.hidden=false}},'Отмена'));
   const histHead=el('div',{class:'head'},el('h3',{style:'font-size:15px'},'История'),me.role==='admin'?el('span',{},askClr,sureClr):null);
 
-  return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Сигналы')),cfgBlock,form,histHead,list];
+  return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Сигналы')),form,cfgBlock,histHead,list];
 }
 
 let mediaEdit=null;
