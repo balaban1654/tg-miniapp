@@ -354,25 +354,24 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
     return { ok: true };
   });
 
-  // Активный сигнал: обычные видят клиенты с открытым доступом, тестовые только тестовые аккаунты
-  // Общий сигнал живёт 3 минуты после входа. Сигнал по запросу остаётся у клиента 30 минут: за это время его можно оценить
-  // Сигнал по запросу остаётся у клиента, пока он его не оценит
-  const ACTIVE = `((s.requested_by IS NULL AND now() <= s.entry_at + interval '3 minutes' AND s.created_at > now() - interval '2 hours')
-       OR (s.requested_by = d.tg_id AND NOT EXISTS (SELECT 1 FROM signal_steps t WHERE t.signal_id = s.id AND t.tg_id = d.tg_id)))
-     AND ((NOT s.is_test AND (d.access OR d.is_tester)) OR (s.is_test AND d.is_tester) OR s.requested_by = d.tg_id)
-     AND (s.requested_by IS NULL OR s.requested_by = d.tg_id)`;
+  // Активные сигналы клиента. Общий (от аналитика) работает так же, как сигнал по запросу: свёрнутая карточка, полный экран с
+  // расписанием входа и перекрытий, оценка или «Пропустить». Общий сигнал живёт, пока не пройдут все события расписания плюс 5 минут.
+  // Сигнал по запросу остаётся у клиента, пока он его не оценит. Обычные видят клиенты с открытым доступом, тестовые только тестовые аккаунты
+  const VIS = `(s.requested_by = d.tg_id
+       OR (s.requested_by IS NULL AND s.created_at > now() - interval '2 hours'
+           AND s.entry_at + make_interval(secs => (SELECT max_events * overlap_gap_sec + 300 FROM signal_settings WHERE id = 1)) > now()
+           AND ((NOT s.is_test AND (d.access OR d.is_tester)) OR (s.is_test AND d.is_tester))))`;
+  const ACTIVE = `${VIS} AND NOT EXISTS (SELECT 1 FROM signal_steps t WHERE t.signal_id = s.id AND t.tg_id = d.tg_id)`;
   app.get('/signals/active', { preHandler: auth }, async (req) => {
     const r = await db.query(
       `SELECT s.id, s.pair, s.direction, s.expiry_min, s.expiry_sec, s.entry_at, s.note, s.source, s.is_test, s.requested_by,
               EXISTS (SELECT 1 FROM deals x WHERE x.signal_id = s.id AND x.tg_id = d.tg_id) AS taken
-         FROM signals s JOIN leads d ON d.tg_id = $1 WHERE ${ACTIVE} ORDER BY s.id DESC LIMIT 1`,
+         FROM signals s JOIN leads d ON d.tg_id = $1 WHERE ${ACTIVE} ORDER BY s.entry_at, s.id LIMIT 6`,
       [req.tg!.id],
     );
-    const sg = r.rows[0] ?? null;
-    if (!sg?.requested_by) return { signal: sg, now: new Date().toISOString() };
-    const steps = (await db.query('SELECT step, result FROM signal_steps WHERE signal_id = $1 AND tg_id = $2 ORDER BY step', [sg.id, req.tg!.id])).rows;
+    const signals = r.rows;
     const set = (await db.query('SELECT * FROM signal_settings WHERE id = 1')).rows[0];
-    return { signal: sg, steps, cfg: cfgOf(set), now: new Date().toISOString() };
+    return { signal: signals[0] ?? null, signals, steps: [], cfg: cfgOf(set), now: new Date().toISOString() };
   });
 
   // Прошедшие сигналы. Показываем ВСЕ завершённые, без отбора. Итог считается по отметкам клиентов
@@ -475,7 +474,7 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
   // Пропустить сигнал: доступно всем. Сигнал закрывается без оценки и без статистики, можно запросить новый
   app.post<{ Params: { id: string } }>('/signals/:id/skip', { preHandler: auth }, async (req, reply) => {
     const id = Number(req.params.id);
-    const sg = (await db.query('SELECT id FROM signals WHERE id = $1 AND requested_by = $2', [id, req.tg!.id])).rows[0];
+    const sg = (await db.query(`SELECT s.id FROM signals s JOIN leads d ON d.tg_id = $2 WHERE s.id = $1 AND ${VIS}`, [id, req.tg!.id])).rows[0];
     if (!sg) return reply.code(404).send({ error: 'Сигнал не найден' });
     if ((await db.query('SELECT 1 FROM signal_steps WHERE signal_id = $1 AND tg_id = $2 LIMIT 1', [id, req.tg!.id])).rowCount) return reply.code(409).send({ error: 'Сигнал уже закрыт' });
     await db.query(`INSERT INTO signal_steps (signal_id, tg_id, step, result) VALUES ($1,$2,0,'skip') ON CONFLICT DO NOTHING`, [id, req.tg!.id]);
@@ -490,7 +489,7 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
     const set = (await db.query('SELECT max_events FROM signal_settings WHERE id = 1')).rows[0];
     if (!['win', 'loss'].includes(result)) return reply.code(400).send({ error: 'Неверная оценка' });
     if (result === 'win' && !(step >= 1 && step <= set.max_events)) return reply.code(400).send({ error: 'Укажите, с какого шага зашёл плюс' });
-    const sg = (await db.query(`SELECT id, pair, direction, expiry_min, entry_at <= now() AS started FROM signals WHERE id = $1 AND requested_by = $2`, [id, req.tg!.id])).rows[0];
+    const sg = (await db.query(`SELECT s.id, s.pair, s.direction, s.expiry_min, s.entry_at <= now() AS started FROM signals s JOIN leads d ON d.tg_id = $2 WHERE s.id = $1 AND ${VIS}`, [id, req.tg!.id])).rows[0];
     if (!sg) return reply.code(404).send({ error: 'Сигнал не найден' });
     if (!sg.started) return reply.code(409).send({ error: 'Оценить можно после времени входа' });
     if ((await db.query('SELECT 1 FROM signal_steps WHERE signal_id = $1 AND tg_id = $2 LIMIT 1', [id, req.tg!.id])).rowCount) return reply.code(409).send({ error: 'Сигнал уже оценён' });
@@ -502,7 +501,7 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
     }
     await db.query(
       `INSERT INTO deals (tg_id, pair, direction, expiry_min, signal_id, result, step) VALUES ($1,$2,$3,$4,$5,$6,$7)
-       ON CONFLICT (tg_id, signal_id) WHERE signal_id IS NOT NULL DO NOTHING`,
+       ON CONFLICT (tg_id, signal_id) WHERE signal_id IS NOT NULL DO UPDATE SET result = EXCLUDED.result, step = EXCLUDED.step WHERE deals.result IS NULL`,
       [req.tg!.id, sg.pair, sg.direction, sg.expiry_min, id, result, result === 'win' ? step - 1 : null],
     );
     return { ok: true };

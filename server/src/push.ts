@@ -94,10 +94,8 @@ export function buildKeyboard(buttons: Button[], t: Target): InlineKeyboard | un
     else if (b.type === 'url' && b.url) btn = InlineKeyboard.url(b.label, b.url);
     else if (b.type === 'support') btn = InlineKeyboard.url(b.label, `https://t.me/${config.botUsername}?start=support`);
     else if (b.type === 'register') {
-      const u = registerUrl(t);
-      // Регион ещё неизвестен: ведём в Mini App, там клиент выберет регион
-      if (u) btn = InlineKeyboard.url(b.label, u);
-      else if (config.miniAppUrl) btn = InlineKeyboard.webApp(b.label, config.miniAppUrl);
+      // Регистрация только в Mini App: ссылки Pocket Option в боте не показываем, регион и ссылка выбираются там
+      if (config.miniAppUrl) btn = InlineKeyboard.webApp(b.label, config.miniAppUrl);
     } else if (b.type === 'miniapp' && config.miniAppUrl) btn = InlineKeyboard.webApp(b.label, config.miniAppUrl);
     else if (b.type === 'review' && config.miniAppUrl) btn = InlineKeyboard.webApp(b.label, config.miniAppUrl + (config.miniAppUrl.includes('?') ? '&' : '?') + 'go=review');
     if (!btn) continue;
