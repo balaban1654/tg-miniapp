@@ -588,6 +588,18 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     };
   });
 
+  // Самая ранняя дата в данных (по Киеву): нужна кнопке «За всё время» в выборе периода
+  app.get('/range-start', { preHandler: auth }, async () => {
+    const r = await db.query(
+      `SELECT to_char(least(
+          (SELECT min(created_at AT TIME ZONE 'Europe/Kyiv') FROM events),
+          (SELECT min(created_at AT TIME ZONE 'Europe/Kyiv') FROM leads),
+          (SELECT min(day)::timestamp FROM shift_reports),
+          (SELECT min(day)::timestamp FROM expenses)), 'YYYY-MM-DD') AS d`,
+    );
+    return { from: r.rows[0].d ?? null };
+  });
+
   // Итоги по источникам: все ссылки с одним и тем же источником складываются вместе
   app.get('/sources', { preHandler: auth }, async (req) => {
     const me = req.staff!;

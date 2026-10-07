@@ -912,10 +912,13 @@ const dxMonthRange=(off=0)=>{let m=kyivToday().slice(0,7);if(off)m=perShift(m,of
 const dxCur=()=>dxRange||dxMonthRange(0);
 const dxText=r=>dmy(r.from)+' - '+dmy(r.to);
 const dxSame=(a,b)=>a&&b&&a.from===b.from&&a.to===b.to;
-function dxPresets(){const t=kyivToday();return[['Сегодня',{from:t,to:t}],['Вчера',{from:addDay(t,-1),to:addDay(t,-1)}],['Последние 7 дней',{from:addDay(t,-6),to:t}],['За последние 30 дней',{from:addDay(t,-29),to:t}],['Текущий месяц',dxMonthRange(0)],['Прошлый месяц',dxMonthRange(-1)]]}
+let dxFirst=null; // самая ранняя дата данных для «За всё время»
+function dxPresets(){const t=kyivToday();const wd=(new Date(t+'T00:00:00Z').getUTCDay()+6)%7;const mon=addDay(t,-wd);
+  return[['Сегодня',{from:t,to:t}],['Вчера',{from:addDay(t,-1),to:addDay(t,-1)}],['Текущая неделя',{from:mon,to:addDay(mon,6)}],['Текущий месяц',dxMonthRange(0)],['Прошлый месяц',dxMonthRange(-1)],['За всё время',{from:dxFirst||(t.slice(0,4)+'-01-01'),to:t}]]}
 const IC_CHEVD='<path d="M6 9l6 6 6-6"/>';
 function rangeBar(onApply){
   let sel={...dxCur()},anchor=null,view=perShift(sel.to.slice(0,7),-1);
+  if(dxFirst===null&&me)api('/range-start').then(x=>{dxFirst=x.from||'';if(!pop.hidden)draw()}).catch(()=>{dxFirst=''});
   const today=kyivToday();
   const pillText=el('span',{});
   const pill=el('button',{type:'button',class:'rb-pill','aria-haspopup':'dialog','aria-expanded':'false'},svgIcon(IC_CAL,18),pillText,(()=>{const c=svgIcon(IC_CHEVD,16);c.classList.add('chv');return c})());
@@ -945,7 +948,7 @@ function rangeBar(onApply){
     pillText.textContent=anchor?dmy(sel.from)+' - …':dxText(sel);
     days.length=0;
     const presets=dxPresets();
-    const ps=el('div',{class:'rb-ps'},...presets.map(([t,r])=>el('button',{type:'button',class:dxSame(r,sel)&&!anchor?'on':'',onclick:()=>{sel={...r};anchor=null;view=perShift(r.to.slice(0,7),-1);draw()}},t)),el('button',{type:'button',class:!anchor&&!presets.some(([,r])=>dxSame(r,sel))||anchor?'on':'',onclick:()=>{anchor=null}},'Свободный период'));
+    const ps=el('div',{class:'rb-ps'},...presets.map(([t,r])=>el('button',{type:'button',class:dxSame(r,sel)&&!anchor?'on':'',onclick:()=>{sel={...r};anchor=null;view=perShift(r.to.slice(0,7),-1);draw()}},t)),el('button',{type:'button',class:!anchor&&!presets.some(([,r])=>dxSame(r,sel))||anchor?'on':'',onclick:()=>{anchor=null}},'Свободный выбор'));
     pop.replaceChildren(ps,el('div',{class:'rb-cal'},monthEl(view,'l'),monthEl(perShift(view,1),'r')),el('div',{class:'rb-sum'},anchor?'Выберите последний день':dmy(sel.from)+(sel.to!==sel.from?' – '+dmy(sel.to):'')),el('button',{type:'button',class:'btn rb-apply',onclick:()=>go.click()},'Применить'));
     paint(sel);
   }
