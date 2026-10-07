@@ -3300,7 +3300,13 @@ async function viewSignals(mode){
   const histHead=el('div',{class:'head'},el('h3',{style:'font-size:15px'},'История'),me.role==='admin'?el('span',{},askClr,sureClr):null);
 
   if(mode==='new'){
-    const head=el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Новый сигнал'));
+    const st=await api('/signals/stats').catch(()=>null);
+    const stBox=st?el('div',{class:'pb-tots',style:'margin:0'},
+      el('span',{class:'pb-tot'},el('span',{class:'pill p-ok'},'Плюс'),el('b',{},st.win+' шт')),
+      ...Object.keys(st.wins).sort((a,b)=>a-b).map(k=>el('span',{class:'pb-tot'},el('span',{class:'mut sm'},k==='0'?'вход':'перекрытие '+k),el('b',{},st.wins[k]+' шт'))),
+      el('span',{class:'pb-tot'},el('span',{class:'pill p-bad'},'Минус'),el('b',{},st.loss+' шт')),
+      el('span',{class:'pb-tot'},el('span',{class:'pill p-pur'},'Винрейт'),el('b',{},st.rate===null?'—':st.rate+'%'))):null;
+    const head=el('div',{class:'head',style:'flex-wrap:wrap;gap:8px 18px'},el('h2',{style:'font-size:20px'},'Новый сигнал'),stBox);
     const recent=recentSignals(rows);
     if(me.role!=='admin')return[head,form,recent];
     // Вкладки: сам сигнал и шаблон пуша, который уходит клиентам при публикации

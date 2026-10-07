@@ -1561,6 +1561,22 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     return { ok: true, pushed, chErrors };
   });
 
+  // Итоги общих сигналов (только ручные, не тестовые и не по запросу клиента): плюсы по шагам, минусы, винрейт
+  app.get('/signals/stats', { preHandler: need('admin', 'analyst') }, async () => {
+    const r = await db.query(
+      `SELECT result, coalesce(result_step, 0) AS step, count(*)::int AS n FROM signals
+        WHERE result IS NOT NULL AND requested_by IS NULL AND NOT is_test GROUP BY 1, 2`,
+    );
+    const wins: Record<string, number> = {};
+    let loss = 0;
+    for (const x of r.rows) {
+      if (x.result === 'loss') loss += x.n;
+      else wins[x.step] = (wins[x.step] ?? 0) + x.n;
+    }
+    const win = Object.values(wins).reduce((a, b) => a + b, 0);
+    return { wins, win, loss, rate: win + loss ? Math.round((win / (win + loss)) * 1000) / 10 : null };
+  });
+
   app.get('/signals', { preHandler: need('admin', 'analyst') }, async () => {
     const r = await db.query(
       `SELECT s.id, s.pair, s.direction, s.expiry_min, s.expiry_sec, s.requested_by IS NOT NULL AS requested, s.entry_at, s.note, s.source, s.is_test, s.created_at, s.result, s.result_step, s.result_at, st.name AS author,
