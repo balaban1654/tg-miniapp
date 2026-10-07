@@ -83,7 +83,8 @@ bot.callbackQuery('acc_yes', async (ctx) => {
 export async function setupBotProfile(): Promise<void> {
   try {
     await bot.api.setMyDescription(
-      'Что умеет этот бот?\n\nАссистент выдаёт готовые торговые сигналы: пара, направление, точки входа. Тебе остаётся только повторить.\n\nНажми «Старт» — за 1 минуту покажу, как это работает.',
+      // Заголовок «Что умеет этот бот?» Telegram добавляет сам
+      'Ассистент выдаёт готовые торговые сигналы: пара, направление, точки входа. Тебе остаётся только повторить.\n\nНажми «Старт» — за 1 минуту покажу, как это работает.',
     );
     if (config.miniAppUrl) {
       await bot.api.setChatMenuButton({ menu_button: { type: 'web_app', text: 'Hunter AI', web_app: { url: config.miniAppUrl } } });
