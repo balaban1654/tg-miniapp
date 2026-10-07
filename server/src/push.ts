@@ -158,6 +158,21 @@ export async function deliver(tgId: string, text: string, kb?: InlineKeyboard, p
   }
 }
 
+/** Гифка или короткое видео (GIF/MP4) в чат или канал */
+export async function deliverAnimation(chatId: string, data: Buffer, mime: string): Promise<Delivery> {
+  if (config.disableBot) {
+    outbox.push({ tgId: chatId, text: '', photo: mime, buttons: null } as (typeof outbox)[number]);
+    return { ok: true };
+  }
+  try {
+    await bot.api.sendAnimation(chatId, new InputFile(data, mime === 'video/mp4' ? 'result.mp4' : 'result.gif'));
+    return { ok: true };
+  } catch (e) {
+    if (e instanceof GrammyError) return { ok: false, error: e.description };
+    return { ok: false, error: String(e) };
+  }
+}
+
 async function markBlocked(tgId: string) {
   await db.query('UPDATE leads SET bot_blocked = TRUE WHERE tg_id = $1', [tgId]);
 }

@@ -5,7 +5,7 @@ import { InputFile } from 'grammy';
 import { db } from './db.js';
 import { bot } from './bot.js';
 import { config } from './config.js';
-import { createBroadcast, segmentWhere, SEGMENTS, type Button } from './push.js';
+import { createBroadcast, segmentWhere, SEGMENTS, deliverAnimation, type Button } from './push.js';
 import { randomInt, randomBytes, createHash } from 'node:crypto';
 const sha256 = (v: string) => createHash('sha256').update(v).digest('hex');
 import { accountingRoutes } from './accounting.js';
@@ -1561,6 +1561,68 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     return { ok: true, pushed, chErrors };
   });
 
+  // Гифки «плюс» и «минус»: админ загружает, по кнопке в таблице сигналов уходят в каналы шаблона «Результат сигнала»
+  const GIF_MAX = 10 * 1024 * 1024;
+  function parseGif(raw: unknown): { data: Buffer; mime: string } | string {
+    if (typeof raw !== 'string' || !raw) return 'Выберите файл';
+    const data = Buffer.from(raw.replace(/^data:[^,]*,/, ''), 'base64');
+    let mime = '';
+    if (data.length > 12) {
+      if (data.subarray(0, 4).toString() === 'GIF8') mime = 'image/gif';
+      else if (data.subarray(4, 8).toString() === 'ftyp') mime = 'video/mp4';
+    }
+    if (!mime) return 'Нужна гифка (GIF) или короткое видео MP4';
+    if (data.length > GIF_MAX) return 'Файл больше 10 МБ';
+    return { data, mime };
+  }
+  app.get('/signal-gifs', { preHandler: need('admin', 'analyst') }, async () =>
+    (await db.query('SELECT kind, mime, length(data) AS size, updated_at FROM signal_gifs')).rows);
+  app.get<{ Params: { kind: string } }>('/signal-gifs/:kind/file', { preHandler: need('admin', 'analyst') }, async (req, reply) => {
+    const r = (await db.query('SELECT data, mime FROM signal_gifs WHERE kind = $1', [req.params.kind])).rows[0];
+    if (!r) return reply.code(404).send({ error: 'Не найдено' });
+    return reply.type(r.mime).header('Cache-Control', 'no-cache').send(r.data);
+  });
+  app.put<{ Params: { kind: string } }>('/signal-gifs/:kind', { preHandler: need('admin'), bodyLimit: 16 * 1024 * 1024 }, async (req, reply) => {
+    const kind = req.params.kind;
+    if (kind !== 'win' && kind !== 'loss') return reply.code(400).send({ error: 'Неизвестный тип' });
+    const g = parseGif((req.body as any)?.file);
+    if (typeof g === 'string') return reply.code(400).send({ error: g });
+    await db.query(
+      `INSERT INTO signal_gifs (kind, data, mime) VALUES ($1,$2,$3)
+       ON CONFLICT (kind) DO UPDATE SET data = EXCLUDED.data, mime = EXCLUDED.mime, updated_at = now()`,
+      [kind, g.data, g.mime],
+    );
+    return { ok: true };
+  });
+  app.delete<{ Params: { kind: string } }>('/signal-gifs/:kind', { preHandler: need('admin') }, async (req) => {
+    await db.query('DELETE FROM signal_gifs WHERE kind = $1', [req.params.kind]);
+    return { ok: true };
+  });
+  // Отправка гифки в каналы: тип по итогу сигнала, а если итога ещё нет, его выбирает человек
+  app.post<{ Params: { id: string } }>('/signals/:id/gif', { preHandler: need('admin', 'analyst') }, async (req, reply) => {
+    const b = (req.body ?? {}) as Record<string, unknown>;
+    const sg = (await db.query('SELECT id, result, gif_sent_at, requested_by FROM signals WHERE id = $1', [Number(req.params.id)])).rows[0];
+    if (!sg) return reply.code(404).send({ error: 'Сигнал не найден' });
+    if (sg.requested_by) return reply.code(400).send({ error: 'Это сигнал по запросу клиента' });
+    if (sg.gif_sent_at) return reply.code(409).send({ error: 'Гифка по этому сигналу уже отправлена' });
+    const kind = sg.result ?? (b.kind === 'win' || b.kind === 'loss' ? b.kind : null);
+    if (!kind) return reply.code(400).send({ error: 'Выберите плюс или минус' });
+    const g = (await db.query('SELECT data, mime FROM signal_gifs WHERE kind = $1', [kind])).rows[0];
+    if (!g) return reply.code(400).send({ error: `Гифка «${kind === 'win' ? 'плюс' : 'минус'}» не загружена: вкладка «Гифка»` });
+    const channels: string[] = (await db.query(`SELECT channels FROM push_templates WHERE key = 'result'`)).rows[0]?.channels ?? [];
+    if (!channels.length) return reply.code(400).send({ error: 'Канал не указан в шаблоне «Результат сигнала»' });
+    let sent = 0;
+    const errors: string[] = [];
+    for (const ch of channels) {
+      if (!CHANNEL_RE.test(ch)) { errors.push(`${ch}: не похоже на канал`); continue; }
+      const r = await deliverAnimation(ch, g.data, g.mime);
+      if (r.ok) sent++;
+      else errors.push(`${ch}: ${r.error}`);
+    }
+    if (sent) await db.query('UPDATE signals SET gif_kind = $2, gif_sent_at = now() WHERE id = $1', [sg.id, kind]);
+    return { ok: sent > 0, sent, errors };
+  });
+
   // Итоги общих сигналов (только ручные, не тестовые и не по запросу клиента): плюсы по шагам, минусы, винрейт
   app.get('/signals/stats', { preHandler: need('admin', 'analyst') }, async () => {
     const r = await db.query(
@@ -1579,7 +1641,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
 
   app.get('/signals', { preHandler: need('admin', 'analyst') }, async () => {
     const r = await db.query(
-      `SELECT s.id, s.pair, s.direction, s.expiry_min, s.expiry_sec, s.requested_by IS NOT NULL AS requested, s.entry_at, s.note, s.source, s.is_test, s.created_at, s.result, s.result_step, s.result_at, st.name AS author,
+      `SELECT s.id, s.pair, s.direction, s.expiry_min, s.expiry_sec, s.requested_by IS NOT NULL AS requested, s.entry_at, s.note, s.source, s.is_test, s.created_at, s.result, s.result_step, s.result_at, s.gif_kind, s.gif_sent_at, st.name AS author,
               CASE WHEN s.requested_by IS NOT NULL THEN coalesce(l.lead_role, 'lead')
                    ELSE CASE st.role WHEN 'teamlead' THEN 'moder' WHEN 'admin' THEN 'admin' WHEN 'streamer' THEN 'streamer' WHEN 'buyer' THEN 'buyer' ELSE 'analyst' END END AS source_role,
               (SELECT count(*)::int FROM deals x WHERE x.signal_id = s.id) AS taken,

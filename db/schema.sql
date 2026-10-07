@@ -695,3 +695,13 @@ ALTER TABLE signals ADD COLUMN IF NOT EXISTS result TEXT CHECK (result IN ('win'
 ALTER TABLE signals ADD COLUMN IF NOT EXISTS result_step INT;
 ALTER TABLE signals ADD COLUMN IF NOT EXISTS result_at TIMESTAMPTZ;
 ALTER TABLE signals ADD COLUMN IF NOT EXISTS result_by INT REFERENCES staff(id) ON DELETE SET NULL;
+
+-- Гифки «плюс» и «минус»: уходят в каналы по кнопке в таблице последних сигналов
+CREATE TABLE IF NOT EXISTS signal_gifs (
+  kind       TEXT PRIMARY KEY CHECK (kind IN ('win','loss')),
+  data       BYTEA NOT NULL,
+  mime       TEXT NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+ALTER TABLE signals ADD COLUMN IF NOT EXISTS gif_kind TEXT CHECK (gif_kind IN ('win','loss'));
+ALTER TABLE signals ADD COLUMN IF NOT EXISTS gif_sent_at TIMESTAMPTZ;
