@@ -192,7 +192,7 @@ th.n{text-align:right}
 .p-ok{background:#3ddc9722;color:var(--ok)}.p-warn{background:#ffb84d22;color:var(--warn)}.p-bad{background:#ff6b8a22;color:var(--bad)}.p-pur{background:#9b5cff33;color:var(--acc2)}
 .cn-two{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr);gap:14px}@media(max-width:820px){.cn-two{grid-template-columns:minmax(0,1fr)}}
 .cn-row{display:flex;gap:10px;flex-wrap:wrap}.cn-ok{padding:10px 12px;border:1px solid #3ddc9755;background:#3ddc9712;border-radius:12px}.cn-ok b{color:var(--ok)}
-.cn-tg{background:#17212b;border-radius:14px;padding:12px 14px;max-width:420px;line-height:1.45;color:#e8eef5}.cn-tgb{margin-top:10px;background:#2b5278;border-radius:9px;text-align:center;padding:8px;font-weight:600;font-size:14px}
+.cn-tg{white-space:pre-wrap;background:#17212b;border-radius:14px;padding:12px 14px;max-width:420px;line-height:1.45;color:#e8eef5}.cn-tgb{margin-top:10px;background:#2b5278;border-radius:9px;text-align:center;padding:8px;font-weight:600;font-size:14px}
 .nb-t{font-weight:700}.nb-r{color:var(--reg,#ffd54d);font-weight:700}
 .nb-n{color:#fff;font-weight:800;background:var(--acc);border-radius:99px;display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 5px;font-size:11px;line-height:1;vertical-align:middle;animation:nbPulse 1.8s ease-in-out infinite}
 @keyframes nbPulse{0%,100%{opacity:1;box-shadow:0 0 0 0 #9b5cff55}50%{opacity:.45;box-shadow:0 0 10px 3px #9b5cff66}}
@@ -3278,7 +3278,7 @@ async function signalResultDialog(sg,done){
   const profit=el('input',{type:'number',min:'0',step:'any',inputmode:'decimal',placeholder:'Например 92','aria-label':'Прибыль, $'});
   const profitBox=el('div',{class:'lc-field'},el('label',{},'Прибыль, $ (обязательно для плюса)'),profit);
   profit.addEventListener('input',()=>draw());
-  const push=el('input',{type:'checkbox',checked:'',style:'width:auto'});
+  const push=el('input',{type:'checkbox',style:'width:auto'});
   const prev=el('div',{});const err=el('div',{class:'err',role:'alert'});
   // Скриншот обязателен для плюса не со входа: файл, перетаскивание, Ctrl+V или кнопка «Вставить»
   let shot=null;
