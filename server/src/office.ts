@@ -1504,6 +1504,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
       [o.pair, o.direction, o.expiry, o.expirySec ?? null, entryAt, o.note, o.source, o.isTest, o.by],
     );
     let pushed = 0;
+    let chErrors: string[] = [];
     if (o.push) {
       // Текст, кнопки, получатели и каналы берутся из шаблона «Новый сигнал» (Пуши → Шаблоны)
       const r = await dispatchTemplate('signal', {
@@ -1516,8 +1517,9 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
         createdBy: o.by,
       });
       pushed = r.users + r.channels;
+      chErrors = r.chErrors ?? [];
     }
-    return { id: ins.rows[0].id, pushed };
+    return { id: ins.rows[0].id, pushed, chErrors };
   }
 
   // Итог сигнала даёт человек: плюс (со входа или с перекрытия №) либо минус. Уходит всем по шаблону «Результат сигнала»
@@ -1535,6 +1537,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     if (+new Date(sg.entry_at) > Date.now()) return reply.code(409).send({ error: 'Сигнал ещё не начался' });
     await db.query('UPDATE signals SET result = $2, result_step = $3, result_at = now(), result_by = $4 WHERE id = $1', [sg.id, result, step, req.staff!.id]);
     let pushed = 0;
+    let chErrors: string[] = [];
     if (b.push !== false) {
       const where = step ? `с перекрытия ${step}` : 'со входа';
       const r = await dispatchTemplate('result', {
@@ -1551,8 +1554,9 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
         createdBy: req.staff!.id,
       });
       pushed = r.users + r.channels;
+      chErrors = r.chErrors ?? [];
     }
-    return { ok: true, pushed };
+    return { ok: true, pushed, chErrors };
   });
 
   app.get('/signals', { preHandler: need('admin', 'analyst') }, async () => {

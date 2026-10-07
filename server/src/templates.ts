@@ -88,7 +88,7 @@ export interface Dispatch {
 }
 
 /** Рассылает шаблон: клиентам бота по выбранному списку и в Telegram-каналы. Возвращает, сколько получателей поставлено в очередь */
-export async function dispatchTemplate(key: TemplateKey, d: Dispatch): Promise<{ users: number; channels: number; skipped?: string }> {
+export async function dispatchTemplate(key: TemplateKey, d: Dispatch): Promise<{ users: number; channels: number; skipped?: string; chErrors?: string[] }> {
   const t = await load(key);
   if (!t || !t.enabled) return { users: 0, channels: 0, skipped: 'выключен' };
   let text = t.text;
@@ -108,17 +108,18 @@ export async function dispatchTemplate(key: TemplateKey, d: Dispatch): Promise<{
     users = r.total;
   }
   let channels = 0;
+  const chErrors: string[] = [];
   const cb = channelButtons(buttons);
   const targets = [...t.channels];
   if (t.toStaffChannel && d.staffChannel && !targets.includes(d.staffChannel)) targets.push(d.staffChannel);
   for (const ch of targets) {
-    if (!CHANNEL_RE.test(ch)) continue;
+    if (!CHANNEL_RE.test(ch)) { chErrors.push(`${ch}: не похоже на канал (нужно @имя или -100…)`); continue; }
     const kb = buildKeyboard(cb, { tg_id: '0', first_name: null, username: null, region: null, owner_name: null, po_promo: null, po_link: null, po_link_ru: null, tz: null });
     const res = await deliver(ch, renderText(text, { first_name: null, username: null, owner_name: null, po_promo: null, tz: null }), kb, t.photo);
     if (res.ok) channels++;
-    else console.error(`Шаблон ${key}: не удалось отправить в ${ch}: ${res.error}`);
+    else { chErrors.push(`${ch}: ${res.error}`); console.error(`Шаблон ${key}: не удалось отправить в ${ch}: ${res.error}`); }
   }
-  return { users, channels };
+  return { users, channels, ...(chErrors.length ? { chErrors } : {}) };
 }
 
 const lastLive = new Map<number, number>();

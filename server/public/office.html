@@ -3258,7 +3258,7 @@ async function signalResultDialog(sg,done){
   };
   pl.onclick=()=>{result='win';draw()};mn.onclick=()=>{result='loss';draw()};stepSel.addEventListener('change',draw);
   const send=el('button',{class:'btn',type:'button',onclick:async()=>{err.textContent='';send.disabled=true;
-    try{const r=await api('/signals/'+sg.id+'/result',{method:'POST',body:{result,step:result==='win'?Number(stepSel.value):undefined,push:push.checked}});close();toast(push.checked?'Результат отправлен: '+r.pushed+' получателей':'Результат сохранён');done&&done()}
+    try{const r=await api('/signals/'+sg.id+'/result',{method:'POST',body:{result,step:result==='win'?Number(stepSel.value):undefined,push:push.checked}});close();toast(push.checked?'Результат отправлен: '+r.pushed+' получателей'+((r.chErrors||[]).length?'. Каналы не получили: '+r.chErrors.join('; '):''):'Результат сохранён');done&&done()}
     catch(x){err.textContent=x.message;send.disabled=false}}},'Отправить результат');
   draw();
   ov.append(el('div',{class:'lc',style:'width:min(520px,100%);display:grid;gap:12px'},
@@ -3282,7 +3282,7 @@ async function viewSignals(mode){
   const err=el('div',{class:'err',role:'alert'});
   const form=el('form',{class:'card',style:'display:grid;gap:12px',onsubmit:async e=>{e.preventDefault();err.className='err';err.textContent='';
     try{const r=await api('/signals',{method:'POST',body:{pair:f.pair.value,direction:f.dir.value,expiry_sec:Number(f.exp.value),enter_time:f.enter.value,note:f.note.value,push:f.push.checked}});
-      err.className='ok-msg';err.textContent='Сигнал опубликован'+(r.pushed?'. Пуш поставлен в очередь: '+r.pushed+' получателей':'');setTimeout(render,900)}catch(x){err.textContent=x.message}}},
+      err.className='ok-msg';err.textContent='Сигнал опубликован'+(r.pushed?'. Пуш поставлен в очередь: '+r.pushed+' получателей':'')+((r.chErrors||[]).length?'. Каналы не получили: '+r.chErrors.join('; '):'');setTimeout(render,900)}catch(x){err.textContent=x.message}}},
     dl,el('h3',{style:'font-size:14px'},'Новый сигнал'),
     el('div',{class:'form'},el('label',{},'Пара (OTC)',f.pair),el('label',{},'Направление',f.dir),el('label',{},'Экспирация',f.exp),el('label',{},'Вход (Киев): ч : мин : сек',f.enter.node)),
     el('label',{},'Комментарий',f.note),
