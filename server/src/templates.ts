@@ -3,7 +3,7 @@ import { config } from './config.js';
 import { createBroadcast, buildKeyboard, deliver, renderText, SEGMENTS, type Button, type Photo } from './push.js';
 
 /** Сообщения, которые бот шлёт сам. Текст, картинку, кнопки, получателей и каналы настраивает админ в Office */
-export const TEMPLATE_KEYS = ['signal', 'live'] as const;
+export const TEMPLATE_KEYS = ['signal', 'live', 'result'] as const;
 export type TemplateKey = (typeof TEMPLATE_KEYS)[number];
 
 export const DEFAULTS: Record<TemplateKey, { enabled: boolean; text: string; buttons: Button[]; segment: string }> = {
@@ -12,6 +12,12 @@ export const DEFAULTS: Record<TemplateKey, { enabled: boolean; text: string; but
     text: 'Новый сигнал: {пара}, {направление}, экспирация {экспирация}.\nВход в {время}. Откройте кабинет.',
     buttons: [{ label: 'Открыть кабинет', type: 'miniapp' }],
     segment: 'all',
+  },
+  result: {
+    enabled: true,
+    text: '{иконка} Результат сигнала: {пара}, {направление}, экспирация {экспирация}.\n**{итог}**',
+    buttons: [{ label: 'Открыть кабинет', type: 'miniapp' }],
+    segment: 'access',
   },
   live: {
     enabled: false,

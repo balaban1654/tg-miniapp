@@ -689,3 +689,9 @@ CREATE INDEX IF NOT EXISTS lead_notices_open ON lead_notices (staff_id, created_
 
 -- Когда админ последний раз открывал «Постбеки»: новые после этого считаются в меню
 ALTER TABLE staff ADD COLUMN IF NOT EXISTS pb_seen_at TIMESTAMPTZ;
+
+-- Итог сигнала, который даёт человек (кнопка «Дать результат» на странице «Новый сигнал»): плюс со входа или с перекрытия №, либо минус
+ALTER TABLE signals ADD COLUMN IF NOT EXISTS result TEXT CHECK (result IN ('win','loss'));
+ALTER TABLE signals ADD COLUMN IF NOT EXISTS result_step INT;
+ALTER TABLE signals ADD COLUMN IF NOT EXISTS result_at TIMESTAMPTZ;
+ALTER TABLE signals ADD COLUMN IF NOT EXISTS result_by INT REFERENCES staff(id) ON DELETE SET NULL;

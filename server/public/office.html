@@ -3001,7 +3001,7 @@ async function viewChats(){
 const TRIG={start:'Нажал /start',no_reg:'Нет регистрации',no_deposit:'Регистрация без депозита',ftd:'Депозит получен',inactive:'Давно не заходил',withdrawal:'Успешный вывод средств'};
 const BTYPE={miniapp:'Открыть кабинет',review:'Оставить отзыв (окно отзыва в Mini App)',support:'Поддержка (чат в боте)',register:'Регистрация',url:'Своя ссылка',acc_ready:'Ответ «Всё понятно — регистрация»',acc_no:'Ответ «Нет, создать»',acc_yes:'Ответ «Да, уже есть»'};
 const fmtDelay=m=>m===0?'сразу':m%1440===0?'через '+(m/1440)+' дн.':m%60===0?'через '+(m/60)+' ч':'через '+m+' мин';
-const sample=t=>t.replaceAll('{пара}','EUR/USD OTC').replaceAll('{направление}','вверх').replaceAll('{экспирация}','5 сек').replaceAll('{время}','12:30:00 (Киев)').replace(/\{время:(\d{10,14})\}/g,(_m,ms)=>new Date(+ms).toLocaleTimeString('ru-RU',{timeZone:'Europe/Kyiv',hourCycle:'h23'})+' (Киев)').replaceAll('{имя}','Аня').replaceAll('{стример}','Иван').replaceAll('{промокод}','LIO669');
+const sample=t=>t.replaceAll('{пара}','EUR/USD OTC').replaceAll('{направление}','вверх').replaceAll('{экспирация}','5 сек').replaceAll('{время}','12:30:00 (Киев)').replace(/\{время:(\d{10,14})\}/g,(_m,ms)=>new Date(+ms).toLocaleTimeString('ru-RU',{timeZone:'Europe/Kyiv',hourCycle:'h23'})+' (Киев)').replaceAll('{иконка}','✅').replaceAll('{итог}','плюс со входа').replaceAll('{результат}','плюс').replaceAll('{шаг}','со входа').replaceAll('{имя}','Аня').replaceAll('{стример}','Иван').replaceAll('{промокод}','LIO669');
 
 function buttonsEditor(initial,types){
   const TYPES=types||BTYPE;
@@ -3033,6 +3033,7 @@ function preview(text,buttons){
 const SEG_LABELS={all:'Все, кто запускал бота',new:'Не зарегистрировались',registered:'Зарегистрировались, без депозита',ftd:'С депозитом',access:'С открытым доступом',churned:'Отвалились',withdrew:'Выводили средства'};
 const TPL_INFO={
   signal:{title:'Новый сигнал от аналитика',when:'Уходит при публикации в «Новый сигнал» (если стоит галочка «Отправить пуш»).',vars:'{пара} {направление} {экспирация} {время} {имя}',types:{miniapp:'Открыть кабинет',url:'Своя ссылка',support:'Поддержка (чат в боте)'}},
+  result:{title:'Результат сигнала',when:'Уходит, когда вы нажимаете «Дать результат» у сигнала на странице «Новый сигнал» и оставляете галочку отправки.',vars:'{пара} {направление} {экспирация} {иконка} {итог} {результат} {шаг} {имя}',types:{miniapp:'Открыть кабинет',url:'Своя ссылка',support:'Поддержка (чат в боте)'}},
   live:{title:'Стример в прямом эфире',when:'Уходит, когда стример открывает смену. Кнопка «Смотреть эфир» ведёт на ту ссылку, с которой он начал смену. Повтор от одного стримера не чаще раза в 30 минут.',vars:'{стример} {имя}',types:{stream:'Смотреть эфир (ссылка смены)',miniapp:'Открыть кабинет',url:'Своя ссылка'}}
 };
 function templateCard(t){
@@ -3224,9 +3225,53 @@ async function signalConfigBlock(){
       el('div',{},el('button',{class:'btn o s',type:'button',onclick:async()=>{try{const r=await api('/signal-pairs/bulk',{method:'POST',body:{text:bulk.value}});bulk.value='';flash('Загружено пар: '+r.count);setTimeout(()=>render({soft:true}),700)}catch(x){fail(x)}}},'Загрузить'))):null,
     isAdmin?el('div',{style:'display:flex;gap:8px;align-items:center'},newPair,el('button',{class:'btn o s',type:'button',onclick:async()=>{try{await api('/signal-pairs',{method:'POST',body:{pair:newPair.value}});render({soft:true})}catch(x){fail(x)}}},'Добавить пару')):null);
 }
+
+/** Последние опубликованные вручную сигналы с кнопкой «Дать результат» */
+function recentSignals(rows){
+  const list=rows.filter(r=>!r.requested&&!r.is_test).slice(0,12);
+  const tm=v=>new Date(v).toLocaleString('ru-RU',{timeZone:'Europe/Kyiv',day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'});
+  const res=r=>r.result==='win'?el('span',{class:'pill p-ok'},'Плюс · '+(r.result_step?'перекрытие '+r.result_step:'со входа')):r.result==='loss'?el('span',{class:'pill p-bad'},'Минус'):el('span',{class:'mut'},'—');
+  const btn=r=>{if(r.result)return el('span',{class:'mut sm'},'Результат отправлен');const early=new Date(r.entry_at)>new Date();
+    return el('button',{class:'btn o s',type:'button',disabled:early?'':null,title:early?'Сигнал ещё не начался':'',onclick:()=>signalResultDialog(r,()=>render({soft:true}))},'Дать результат')};
+  return el('div',{style:'display:grid;gap:8px'},el('h3',{style:'font-size:15px'},'Последние отправленные сигналы'),
+    ctrT(table(['Вход (Киев)','Пара','Направление','Экспирация','Отправил','Результат',''],list.map(r=>[td(tm(r.entry_at)),td(r.pair),td(r.direction==='up'?'Вверх':'Вниз'),td(r.expiry_sec?r.expiry_sec+' сек':r.expiry_min+' мин'),td(r.author||'—'),el('td',{},res(r)),el('td',{style:'white-space:nowrap'},btn(r))]),'Сигналов пока нет')));
+}
+/** Окно «Дать результат»: плюс (со входа или с перекрытия №) или минус, пуш всем по шаблону «Результат сигнала» */
+async function signalResultDialog(sg,done){
+  document.querySelectorAll('.sr-ov').forEach(x=>x.remove());
+  let maxEv=4;try{maxEv=Number((await api('/signal-config')).settings.max_events)||4}catch{}
+  let tpl=null;if(me.role==='admin'){try{tpl=(await api('/push/templates')).find(x=>x.key==='result')}catch{}}
+  const ov=el('div',{class:'lc-overlay sr-ov',style:'z-index:70',role:'dialog','aria-modal':'true'});
+  const close=()=>ov.remove();ov.addEventListener('mousedown',e=>{if(e.target===ov)close()});
+  let result='win';
+  const pl=el('button',{type:'button',class:'btn',style:'flex:1'},'Плюс'),mn=el('button',{type:'button',class:'btn o',style:'flex:1'},'Минус');
+  const stepSel=el('select',{'aria-label':'Где зашёл'},...Array.from({length:maxEv},(_,i)=>el('option',{value:i},i?'С перекрытия '+i:'Со входа')));
+  const stepBox=el('div',{class:'lc-field'},el('label',{},'Где зашёл плюс'),stepSel);
+  const push=el('input',{type:'checkbox',checked:'',style:'width:auto'});
+  const prev=el('div',{});const err=el('div',{class:'err',role:'alert'});
+  const dir=sg.direction==='up'?'вверх':'вниз',exp=sg.expiry_sec?sg.expiry_sec+' сек':sg.expiry_min+' мин';
+  const draw=()=>{
+    pl.className='btn'+(result==='win'?'':' o');mn.className='btn'+(result==='loss'?' r':' o');stepBox.style.display=result==='win'?'':'none';
+    const where=Number(stepSel.value)?'с перекрытия '+stepSel.value:'со входа';
+    const t=(tpl?tpl.text:'{иконка} Результат сигнала: {пара}, {направление}, экспирация {экспирация}.\n**{итог}**').replaceAll('{пара}',sg.pair).replaceAll('{направление}',dir).replaceAll('{экспирация}',exp).replaceAll('{иконка}',result==='win'?'✅':'❌').replaceAll('{итог}',result==='win'?'плюс '+where:'минус').replaceAll('{результат}',result==='win'?'плюс':'минус').replaceAll('{шаг}',result==='win'?where:'').replaceAll('{имя}','Аня');
+    prev.replaceChildren(el('div',{class:'mut sm'},'Так увидят клиенты'),el('div',{class:'cn-tg'},...cnBold(t)));
+  };
+  pl.onclick=()=>{result='win';draw()};mn.onclick=()=>{result='loss';draw()};stepSel.addEventListener('change',draw);
+  const send=el('button',{class:'btn',type:'button',onclick:async()=>{err.textContent='';send.disabled=true;
+    try{const r=await api('/signals/'+sg.id+'/result',{method:'POST',body:{result,step:result==='win'?Number(stepSel.value):undefined,push:push.checked}});close();toast(push.checked?'Результат отправлен: '+r.pushed+' получателей':'Результат сохранён');done&&done()}
+    catch(x){err.textContent=x.message;send.disabled=false}}},'Отправить результат');
+  draw();
+  ov.append(el('div',{class:'lc',style:'width:min(520px,100%);display:grid;gap:12px'},
+    el('div',{class:'lc-head'},el('h3',{style:'font-size:17px'},'Результат сигнала'),el('button',{class:'btn o s',type:'button','aria-label':'Закрыть',onclick:close},'✕')),
+    el('div',{class:'mut sm'},sg.pair+' · '+dir+' · '+exp),
+    el('div',{style:'display:flex;gap:8px'},pl,mn),stepBox,
+    el('label',{style:'display:flex;gap:8px;align-items:center;cursor:pointer'},push,'Отправить пуш всем (шаблон «Результат сигнала» во вкладке «Шаблон»)'),
+    prev,err,el('div',{style:'display:flex;gap:8px'},send,el('button',{class:'btn o',type:'button',onclick:close},'Отмена'))));
+  document.body.append(ov);
+}
 let newSigTab='form';
 async function viewSignals(mode){
-  const rows=mode==='new'?[]:await api('/signals');
+  const rows=await api('/signals');
   const cfgBlock=mode==='new'?null:await signalConfigBlock();
   const otcPairs=((await api('/signal-config').catch(()=>({pairs:[]}))).pairs||[]).filter(p=>p.enabled&&/ OTC$/.test(p.pair)).map(p=>p.pair);
   const f={pair:el('select',{required:'','aria-label':'Пара'},el('option',{value:''},'Выберите пару'),...otcPairs.map(v=>el('option',{value:v},v))),dir:el('select',{},el('option',{value:'up'},'Вверх'),el('option',{value:'down'},'Вниз'),el('option',{value:'auto'},'Авто')),
@@ -3256,14 +3301,15 @@ async function viewSignals(mode){
 
   if(mode==='new'){
     const head=el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Новый сигнал'));
-    if(me.role!=='admin')return[head,form];
+    const recent=recentSignals(rows);
+    if(me.role!=='admin')return[head,form,recent];
     // Вкладки: сам сигнал и шаблон пуша, который уходит клиентам при публикации
     const bar=el('div',{class:'lc-tabs',role:'tablist'}),body=el('div',{style:'display:grid;gap:14px'});
     const draw=async()=>{
       bar.replaceChildren(...[['form','Сигнал'],['tpl','Шаблон']].map(([k,t])=>el('button',{type:'button',role:'tab','aria-selected':String(k===newSigTab),class:'lc-tab'+(k===newSigTab?' on':''),onclick:()=>{newSigTab=k;draw()}},t)));
-      if(newSigTab==='form'){body.replaceChildren(form);return}
+      if(newSigTab==='form'){body.replaceChildren(form,recent);return}
       body.replaceChildren(el('div',{class:'mut'},'Загрузка…'));
-      try{const t=(await api('/push/templates')).find(x=>x.key==='signal');body.replaceChildren(t?templateCard(t):el('div',{class:'mut'},'Шаблон не найден'))}catch(x){body.replaceChildren(el('div',{class:'err',role:'alert'},x.message))}
+      try{const all=await api('/push/templates');const cards=['signal','result'].map(k=>all.find(x=>x.key===k)).filter(Boolean).map(templateCard);body.replaceChildren(...(cards.length?cards:[el('div',{class:'mut'},'Шаблоны не найдены')]))}catch(x){body.replaceChildren(el('div',{class:'err',role:'alert'},x.message))}
     };
     draw();
     return[head,bar,body];

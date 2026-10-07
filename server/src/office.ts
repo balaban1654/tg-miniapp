@@ -1520,9 +1520,44 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     return { id: ins.rows[0].id, pushed };
   }
 
+  // Итог сигнала даёт человек: плюс (со входа или с перекрытия №) либо минус. Уходит всем по шаблону «Результат сигнала»
+  app.post<{ Params: { id: string } }>('/signals/:id/result', { preHandler: need('admin', 'analyst') }, async (req, reply) => {
+    const b = (req.body ?? {}) as Record<string, unknown>;
+    const result = b.result === 'win' || b.result === 'loss' ? b.result : null;
+    if (!result) return reply.code(400).send({ error: 'Выберите плюс или минус' });
+    const maxEv = Number((await db.query('SELECT max_events FROM signal_settings WHERE id = 1')).rows[0]?.max_events) || 4;
+    const step = result === 'win' ? Math.trunc(Number(b.step ?? 0)) : null;
+    if (step !== null && !(step >= 0 && step < maxEv)) return reply.code(400).send({ error: 'Неверный шаг: со входа или перекрытие 1–' + (maxEv - 1) });
+    const sg = (await db.query('SELECT id, pair, direction, expiry_min, expiry_sec, entry_at, requested_by, is_test, result FROM signals WHERE id = $1', [Number(req.params.id)])).rows[0];
+    if (!sg) return reply.code(404).send({ error: 'Сигнал не найден' });
+    if (sg.requested_by) return reply.code(400).send({ error: 'Это сигнал по запросу клиента, итог ставит сам клиент' });
+    if (sg.result) return reply.code(409).send({ error: 'Результат уже отправлен' });
+    if (+new Date(sg.entry_at) > Date.now()) return reply.code(409).send({ error: 'Сигнал ещё не начался' });
+    await db.query('UPDATE signals SET result = $2, result_step = $3, result_at = now(), result_by = $4 WHERE id = $1', [sg.id, result, step, req.staff!.id]);
+    let pushed = 0;
+    if (b.push !== false) {
+      const where = step ? `с перекрытия ${step}` : 'со входа';
+      const r = await dispatchTemplate('result', {
+        vars: {
+          'пара': sg.pair,
+          'направление': sg.direction === 'up' ? 'вверх' : 'вниз',
+          'экспирация': sg.expiry_sec ? `${sg.expiry_sec} сек` : `${sg.expiry_min} мин`,
+          'иконка': result === 'win' ? '✅' : '❌',
+          'результат': result === 'win' ? 'плюс' : 'минус',
+          'шаг': result === 'win' ? where : '',
+          'итог': result === 'win' ? `плюс ${where}` : 'минус',
+          'время': `{время:${new Date(sg.entry_at).getTime()}}`,
+        },
+        createdBy: req.staff!.id,
+      });
+      pushed = r.users + r.channels;
+    }
+    return { ok: true, pushed };
+  });
+
   app.get('/signals', { preHandler: need('admin', 'analyst') }, async () => {
     const r = await db.query(
-      `SELECT s.id, s.pair, s.direction, s.expiry_min, s.expiry_sec, s.requested_by IS NOT NULL AS requested, s.entry_at, s.note, s.source, s.is_test, s.created_at, st.name AS author,
+      `SELECT s.id, s.pair, s.direction, s.expiry_min, s.expiry_sec, s.requested_by IS NOT NULL AS requested, s.entry_at, s.note, s.source, s.is_test, s.created_at, s.result, s.result_step, s.result_at, st.name AS author,
               CASE WHEN s.requested_by IS NOT NULL THEN coalesce(l.lead_role, 'lead')
                    ELSE CASE st.role WHEN 'teamlead' THEN 'moder' WHEN 'admin' THEN 'admin' WHEN 'streamer' THEN 'streamer' WHEN 'buyer' THEN 'buyer' ELSE 'analyst' END END AS source_role,
               (SELECT count(*)::int FROM deals x WHERE x.signal_id = s.id) AS taken,
