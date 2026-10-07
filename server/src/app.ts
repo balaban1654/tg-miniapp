@@ -218,27 +218,42 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
     return { ok: true };
   });
 
-  app.get<{ Querystring: { period?: string } }>('/deals', { preHandler: auth }, async (req) => {
-    const days = req.query.period === '30' ? 30 : req.query.period === 'all' ? 36500 : 7;
+  // Период для сделок: from/to (даты YYYY-MM-DD в часовом поясе клиента), all=1 или старое period=7|30|all
+  const dealRange = async (q: { period?: string; from?: string; to?: string; all?: string; tz?: string }) => {
+    const okD = (v?: string) => (v && /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(v)) ? v : null);
+    let tz = 'UTC';
+    if (q.tz && /^[A-Za-z0-9_\/+-]{1,40}$/.test(q.tz) && (await db.query('SELECT 1 FROM pg_timezone_names WHERE name = $1', [q.tz])).rowCount) tz = q.tz;
+    const from = okD(q.from), to = okD(q.to);
+    const all = q.all === '1' || q.period === 'all';
+    const dayExpr = `(created_at AT TIME ZONE $2)::date`;
+    // условие и параметры после $1 (tg_id): $2 = пояс, $3 = с, $4 = по
+    if (all) return { tz, sql: 'TRUE', args: [tz], all: true, custom: true };
+    if (from && to && from <= to) return { tz, sql: `${dayExpr} BETWEEN $3::date AND $4::date`, args: [tz, from, to], all: false, custom: true };
+    const days = q.period === '30' ? 30 : 7;
+    return { tz, sql: `created_at > now() - interval '${days} days'`, args: [tz], all: false, custom: false };
+  };
+
+  app.get<{ Querystring: { period?: string; from?: string; to?: string; all?: string; tz?: string } }>('/deals', { preHandler: auth }, async (req) => {
+    const r = await dealRange(req.query);
     const rows = (
       await db.query(
         `SELECT id, pair, direction, expiry_min, coalesce((SELECT s.expiry_sec FROM signals s WHERE s.id = deals.signal_id), expiry_min * 60) AS expiry_sec, result, created_at FROM deals
-          WHERE tg_id = $1 AND created_at > now() - ($2 || ' days')::interval ORDER BY id DESC LIMIT 200`,
-        [req.tg!.id, String(days)],
+          WHERE tg_id = $1 AND $2::text IS NOT NULL AND ${r.sql} ORDER BY id DESC LIMIT 200`,
+        [req.tg!.id, ...r.args],
       )
     ).rows;
     const by = await db.query(
-      `SELECT to_char(date_trunc('day', created_at AT TIME ZONE 'UTC'), 'YYYY-MM-DD') AS day,
+      `SELECT to_char((created_at AT TIME ZONE $2)::date, 'YYYY-MM-DD') AS day,
               count(*) FILTER (WHERE result = 'win')::int AS wins,
               count(*) FILTER (WHERE result = 'loss')::int AS losses
-         FROM deals WHERE tg_id = $1 AND created_at > now() - interval '7 days' GROUP BY 1 ORDER BY 1`,
-      [req.tg!.id],
+         FROM deals WHERE tg_id = $1 AND ${r.sql} GROUP BY 1 ORDER BY 1`,
+      [req.tg!.id, ...r.args],
     );
     // Плюсы по шагам: 0 = вход, 1.. = перекрытия; период тот же, что у списка
     const st = await db.query(
       `SELECT step, count(*)::int AS c FROM deals
-        WHERE tg_id = $1 AND result = 'win' AND step IS NOT NULL AND created_at > now() - ($2 || ' days')::interval GROUP BY step`,
-      [req.tg!.id, String(days)],
+        WHERE tg_id = $1 AND $2::text IS NOT NULL AND result = 'win' AND step IS NOT NULL AND ${r.sql} GROUP BY step`,
+      [req.tg!.id, ...r.args],
     );
     const maxEv = Number((await db.query('SELECT max_events FROM signal_settings WHERE id = 1')).rows[0]?.max_events) || 4;
     const winSteps = Array.from({ length: maxEv }, (_, i) => Number(st.rows.find((r) => r.step === i)?.c || 0));
@@ -249,6 +264,8 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
       losses: rows.filter((x) => x.result === 'loss').length,
       total: rows.filter((x) => x.result && x.result !== 'skip').length,
       byDay: by.rows,
+      tz: r.tz,
+      all: r.all,
     };
   });
 
@@ -276,9 +293,16 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
     return { ok: true };
   });
 
-  // Очистка истории сделок клиента (его статистика обнуляется)
-  app.delete('/deals', { preHandler: auth }, async (req) => {
-    const r = await db.query('DELETE FROM deals WHERE tg_id = $1', [req.tg!.id]);
+  // Очистка истории сделок: за выбранный период (from/to) или за всё время (all=1, либо без параметров). Статистика клиента пересчитывается
+  app.delete<{ Querystring: { from?: string; to?: string; all?: string; tz?: string } }>('/deals', { preHandler: auth }, async (req, reply) => {
+    const hasRange = Boolean(req.query.from || req.query.to);
+    if (!hasRange) {
+      const r = await db.query('DELETE FROM deals WHERE tg_id = $1', [req.tg!.id]);
+      return { ok: true, removed: r.rowCount };
+    }
+    const r0 = await dealRange(req.query);
+    if (!r0.custom || r0.all) return reply.code(400).send({ error: 'Неверный период' });
+    const r = await db.query(`DELETE FROM deals WHERE tg_id = $1 AND $2::text IS NOT NULL AND ${r0.sql}`, [req.tg!.id, ...r0.args]);
     return { ok: true, removed: r.rowCount };
   });
 

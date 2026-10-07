@@ -219,6 +219,12 @@ svg{max-width:100%}
 .rv-view{position:fixed;inset:0;z-index:90;background:rgba(5,3,10,.94);display:grid;place-items:center;padding:16px}
 .rv-view img{max-width:100%;max-height:100%;border-radius:12px;object-fit:contain}
 .rv-view button{position:absolute;top:max(14px,env(safe-area-inset-top,0px));right:14px;width:38px;height:38px;border-radius:50%;border:0;background:var(--card2);color:#fff;font-size:20px;cursor:pointer}
+.dr-btn{flex:1;min-width:0;display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--line);border-radius:14px;color:var(--fg);padding:10px 12px;font:600 13px var(--fb);cursor:pointer;text-align:left}.dr-btn svg{flex:none;color:var(--acc2)}.dr-btn span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dr-btn i{margin-left:auto;font-style:normal;color:var(--mut)}
+.dr-pre{display:flex;gap:6px;flex-wrap:wrap}
+.dr-cal{display:grid;gap:6px}.dr-hd{display:flex;align-items:center;justify-content:space-between;font-weight:700;font-size:14px;text-transform:capitalize}.dr-hd button{width:36px;height:36px;border-radius:50%;border:1px solid var(--line);background:var(--card);color:var(--fg);font-size:18px;cursor:pointer}.dr-hd button:disabled{opacity:.3}
+.dr-g{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));row-gap:2px}.dr-g b{font-size:11px;color:var(--mut);text-align:center;font-weight:600;padding:4px 0}
+.dr-d{height:40px;border:0;background:none;color:var(--fg);font:600 14px var(--fb);cursor:pointer;border-radius:0}.dr-d.out{visibility:hidden}.dr-d.dis{color:#ffffff30;cursor:default}.dr-d.mid{background:#9b5cff33}.dr-d.edge{background:var(--acc);color:#fff;border-radius:10px}.dr-d.l{border-radius:10px 0 0 10px}.dr-d.r{border-radius:0 10px 10px 0}.dr-d.edge.l.r{border-radius:10px}
+.dr-sum{font-size:13px;color:var(--mut);text-align:center;min-height:18px}
 .rv-sheet{position:fixed;inset:0;z-index:80;background:rgba(5,3,10,.7);display:flex;align-items:flex-end;justify-content:center}
 .rv-form{width:min(520px,100%);background:var(--bg2);border:1px solid var(--line);border-bottom:0;border-radius:20px 20px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom,0px));display:grid;gap:12px;max-height:92vh;overflow:auto}
 .rv-form h3{font-size:17px}
@@ -814,33 +820,126 @@ async function pastSignals(){
   return[wrap];
 }
 
-let period='7';
+/* ---------- Период для «Моих сделок»: пресеты и календарь, как в офисе ---------- */
+const pad2=n=>String(n).padStart(2,'0');
+const ymd=d=>d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate());
+const ymdParse=v=>{const [y,m,d]=v.split('-').map(Number);return new Date(y,m-1,d)};
+const drDmy=(v,yr)=>{const [y,m,d]=v.split('-');return d+'.'+m+(yr?'.'+y:'')};
+const addDays=(d,n)=>{const x=new Date(d);x.setDate(x.getDate()+n);return x};
+const PRESETS=[['today','Сегодня'],['yesterday','Вчера'],['7','7 дней'],['30','30 дней'],['month','Этот месяц'],['prev','Прошлый месяц'],['all','Всё время']];
+function presetRange(k){
+  const t=new Date();t.setHours(12,0,0,0);
+  if(k==='today')return{from:ymd(t),to:ymd(t)};
+  if(k==='yesterday'){const y=addDays(t,-1);return{from:ymd(y),to:ymd(y)}}
+  if(k==='7')return{from:ymd(addDays(t,-6)),to:ymd(t)};
+  if(k==='30')return{from:ymd(addDays(t,-29)),to:ymd(t)};
+  if(k==='month')return{from:ymd(new Date(t.getFullYear(),t.getMonth(),1)),to:ymd(t)};
+  if(k==='prev')return{from:ymd(new Date(t.getFullYear(),t.getMonth()-1,1)),to:ymd(new Date(t.getFullYear(),t.getMonth(),0))};
+  return{from:null,to:null};
+}
+let dealRng={preset:'7',...presetRange('7')};
+const rangeText=r=>{
+  if(r.preset==='all')return 'Всё время';
+  const name=(PRESETS.find(p=>p[0]===r.preset)||[])[1];
+  const sameYear=r.from.slice(0,4)===r.to.slice(0,4)&&r.to.slice(0,4)===String(new Date().getFullYear());
+  const dates=r.from===r.to?drDmy(r.from,true):drDmy(r.from,!sameYear)+' – '+drDmy(r.to,true);
+  return (name?name+' · ':'')+dates;
+};
+function openRange(cur,apply){
+  document.querySelectorAll('.dr-sheet').forEach(x=>x.remove());
+  let sel={...cur};
+  let a=cur.from,b=cur.to; // выбранные границы; при выборе нового периода сначала ставим начало
+  let picking=false;
+  const today=ymd(new Date());
+  let view=ymdParse(b||today);view=new Date(view.getFullYear(),view.getMonth(),1);
+  const close=()=>sh.remove();
+  const sum=el('div',{class:'dr-sum'});
+  const cal=el('div',{class:'dr-cal'});
+  const pre=el('div',{class:'dr-pre'});
+  const apBtn=el('button',{class:'btn',type:'button',onclick:()=>{
+    if(sel.preset!=='all'&&!(a&&b)){toast('Выберите конец периода');return}
+    close();apply(sel.preset==='all'?{preset:'all',from:null,to:null}:{preset:sel.preset||'custom',from:a,to:b})}},'Применить');
+  const drawSum=()=>{sum.textContent=sel.preset==='all'?'За всё время':picking?'Выберите последний день':a&&b?(a===b?drDmy(a,true):drDmy(a,true)+' – '+drDmy(b,true)):''};
+  const drawPre=()=>pre.replaceChildren(...PRESETS.map(([k,t])=>el('button',{type:'button',class:'chip'+(sel.preset===k?' on':''),onclick:()=>{
+    sel={preset:k,...presetRange(k)};a=sel.from;b=sel.to;picking=false;if(b)view=new Date(ymdParse(b).getFullYear(),ymdParse(b).getMonth(),1);drawPre();drawCal();drawSum()}},t)));
+  const drawCal=()=>{
+    const y=view.getFullYear(),m=view.getMonth();
+    const first=new Date(y,m,1),lead=(first.getDay()+6)%7,days=new Date(y,m+1,0).getDate();
+    const title=view.toLocaleDateString('ru-RU',{month:'long'})+' '+y;
+    const nextOk=new Date(y,m+1,1)<=ymdParse(today);
+    const cells=[];
+    for(let i=0;i<lead;i++)cells.push(el('span',{class:'dr-d out'}));
+    for(let d=1;d<=days;d++){
+      const key=y+'-'+pad2(m+1)+'-'+pad2(d);
+      const fut=key>today,lo=a&&b?(a<b?a:b):a,hi=a&&b?(a<b?b:a):a;
+      const inR=lo&&hi&&key>=lo&&key<=hi,edge=key===lo||key===hi;
+      const cls='dr-d'+(fut?' dis':'')+(inR&&!edge?' mid':'')+(edge&&inR?' edge'+(key===lo?' l':'')+(key===hi?' r':''):'');
+      cells.push(el('button',{type:'button',class:cls,disabled:fut?'':null,onclick:()=>{
+        if(fut)return;
+        sel.preset='custom';
+        if(!picking){a=key;b=null;picking=true}
+        else{if(key<a){b=a;a=key}else b=key;picking=false}
+        drawPre();drawCal();drawSum()}},String(d)));
+    }
+    cal.replaceChildren(
+      el('div',{class:'dr-hd'},el('button',{type:'button','aria-label':'Предыдущий месяц',onclick:()=>{view=new Date(y,m-1,1);drawCal()}},'‹'),el('span',{},title),el('button',{type:'button','aria-label':'Следующий месяц',disabled:nextOk?null:'',onclick:()=>{view=new Date(y,m+1,1);drawCal()}},'›')),
+      el('div',{class:'dr-g'},...['Пн','Вт','Ср','Чт','Пт','Сб','Вс'].map(t=>el('b',{},t)),...cells));
+  };
+  const sh=el('div',{class:'rv-sheet dr-sheet',role:'dialog','aria-modal':'true',onclick:e=>{if(e.target===sh)close()}},
+    el('div',{class:'rv-form'},el('div',{class:'row'},el('h3',{},'Период'),el('button',{class:'rv-x',type:'button','aria-label':'Закрыть',onclick:close},'×')),
+      pre,cal,sum,apBtn));
+  drawPre();drawCal();drawSum();document.body.append(sh);
+}
+const CAL_I='<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M8 3v4M16 3v4M3.5 10h17"/></svg>';
+const dealQuery=()=>{
+  const tz=encodeURIComponent((Intl.DateTimeFormat().resolvedOptions().timeZone)||'UTC');
+  return dealRng.preset==='all'?'all=1&tz='+tz:'from='+dealRng.from+'&to='+dealRng.to+'&tz='+tz;
+};
 async function viewDeals(){
   if(!me)await refreshMe();
-  const d=await api('/deals?period='+period);
-  const chips=el('div',{class:'chips'},[['7','7 дней'],['30','30 дней'],['all','Всё время']].map(([k,t])=>el('button',{type:'button',class:'chip'+(k===period?' on':''),onclick:()=>{period=k;render()}},t)));
+  const d=await api('/deals?'+dealQuery());
+  const pickBtn=el('button',{type:'button',class:'dr-btn','aria-label':'Выбрать период'},svgEl(CAL_I),el('span',{},rangeText(dealRng)),el('i',{},'▾'));
+  pickBtn.addEventListener('click',()=>openRange(dealRng,r=>{dealRng=r;render()}));
   const sum=stats4({deals:d.total,wins:d.wins,losses:d.losses,rate:d.wins+d.losses?Math.round(d.wins/(d.wins+d.losses)*100):null});
-  const days=[];for(let i=6;i>=0;i--){const t=new Date(Date.now()-i*864e5);days.push(t.toISOString().slice(0,10))}
+  // Диаграмма: по дням до 14 дней, дальше по неделям, а за очень длинный период по месяцам
   const byDay=Object.fromEntries(d.byDay.map(x=>[x.day,x]));
-  const max=Math.max(1,...days.map(k=>(byDay[k]?.wins||0)+(byDay[k]?.losses||0)));
-  const chart=el('div',{class:'card'},el('div',{class:'row'},el('b',{},'По дням'),el('span',{class:'sm'},'плюс · минус')),
-    el('div',{class:'bars',style:'margin-top:10px'},days.map(k=>{const x=byDay[k]||{wins:0,losses:0};return el('div',{},el('i',{class:'w'+(x.wins?' has':''),style:'height:'+(x.wins/max*100)+'%'}),el('i',{class:'l'+(x.losses?' has':''),style:'height:'+(x.losses/max*100)+'%'}))})),
-    el('div',{class:'days',style:'margin-top:4px'},days.map(k=>el('span',{},new Date(k+'T12:00:00').toLocaleDateString('ru-RU',{weekday:'short'})))));
+  const today=ymd(new Date());
+  let from=dealRng.preset==='all'?(d.byDay[0]?.day||today):dealRng.from,to=dealRng.preset==='all'?today:dealRng.to;
+  const nDays=Math.round((ymdParse(to)-ymdParse(from))/864e5)+1;
+  const mode=nDays<=14?'day':nDays<=84?'week':'month';
+  const buckets=new Map();
+  for(let i=0;i<nDays;i++){
+    const dt=addDays(ymdParse(from),i),k=ymd(dt);
+    let key,label;
+    if(mode==='day'){key=k;label=nDays<=7?dt.toLocaleDateString('ru-RU',{weekday:'short'}):String(dt.getDate())}
+    else if(mode==='week'){const w=addDays(dt,-((dt.getDay()+6)%7));key=ymd(w);label=pad2(w.getDate())+'.'+pad2(w.getMonth()+1)}
+    else{key=k.slice(0,7);label=dt.toLocaleDateString('ru-RU',{month:'short'}).replace('.','')}
+    const x=byDay[k]||{wins:0,losses:0};
+    const bk=buckets.get(key)||{label,wins:0,losses:0};bk.wins+=x.wins;bk.losses+=x.losses;buckets.set(key,bk);
+  }
+  const cols=[...buckets.values()].slice(-12);
+  const max=Math.max(1,...cols.map(c=>c.wins+c.losses));
+  const chart=el('div',{class:'card'},el('div',{class:'row'},el('b',{},'По '+(mode==='day'?'дням':mode==='week'?'неделям':'месяцам')),el('span',{class:'sm'},'плюс · минус')),
+    el('div',{class:'bars',style:'margin-top:10px'},cols.map(x=>el('div',{},el('i',{class:'w'+(x.wins?' has':''),style:'height:'+(x.wins/max*100)+'%'}),el('i',{class:'l'+(x.losses?' has':''),style:'height:'+(x.losses/max*100)+'%'})))),
+    el('div',{class:'days',style:'margin-top:4px'},cols.map(c=>el('span',{},c.label))));
   const ws=d.winSteps||[],wmax=Math.max(1,...ws),wtot=ws.reduce((a,b)=>a+b,0);
   const ovr=el('div',{class:'card'},
     wtot?el('div',{class:'bars',style:'margin-top:10px;height:96px'},ws.map(c=>el('div',{style:'align-items:center;gap:4px'},el('i',{class:'w'+(c?' has':''),style:'width:100%;height:'+(c/wmax*70)+'%'}),el('span',{class:'sm'},c)))):el('div',{class:'sm',style:'margin-top:10px'},'Пока нет плюсов, чтобы показать статистику.'),
     el('div',{class:'days',style:'margin-top:4px'},ws.map((c,i)=>el('span',{},i?'Пер. '+i:'Вход'))));
   const hist=d.deals.length?el('div',{style:'display:grid;gap:8px'},d.deals.slice(0,3).map(x=>el('div',{class:'card row'},el('div',{},el('b',{},x.pair),el('div',{class:'sm'},(x.direction==='up'?'Вверх':'Вниз')+' · '+fmtDur(x.expiry_sec)+' · '+hm(x.created_at))),
     x.result==='win'?el('span',{class:'pill p-ok'},'плюс'):x.result==='loss'?el('span',{class:'pill p-bad'},'минус'):x.result==='skip'?el('span',{class:'pill p-pur'},'не входил'):el('span',{class:'pill p-warn'},'ждёт итога')))):
-    el('div',{class:'card',style:'padding:20px 22px;color:var(--mut)'},'Сделок пока нет. Когда появится сигнал, он будет на главной, а ваша сделка появится здесь.');
-  // Корзина справа от периода: очистка истории с подтверждением «Да / Нет»
+    el('div',{class:'card',style:'padding:20px 22px;color:var(--mut)'},'Сделок за этот период нет. Когда появится сигнал, он будет на главной, а ваша сделка появится здесь.');
+  // Корзина справа от периода: спрашиваем, за выбранный период чистить или за всё время
   const confirmBox=el('div',{});
   const TRASH='<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 002 2h6a2 2 0 002-2l1-12M9 7V4h6v3"/></svg>';
+  const clear=async url=>{try{await api(url,{method:'DELETE'});await refreshMe().catch(()=>{});toast('История очищена');render()}catch(e){toast(e.message)}};
   const trash=el('button',{type:'button','aria-label':'Очистить историю',title:'Очистить историю',style:'flex:none;width:38px;height:38px;border-radius:50%;border:1px solid var(--line);background:var(--card);color:var(--mut);display:grid;place-items:center;cursor:pointer',onclick:()=>{
-    if(!d.deals.length){toast('История уже пуста');return}
-    confirmBox.replaceChildren(el('div',{class:'card',style:'display:grid;gap:10px'},el('b',{},'Очистить всю историю сделок?'),el('div',{class:'sm'},'Статистика обнулится. Это действие нельзя отменить.'),
-      el('div',{class:'two'},el('button',{class:'btn r',type:'button',onclick:async()=>{try{await api('/deals',{method:'DELETE'});await refreshMe().catch(()=>{});toast('История очищена');render()}catch(e){toast(e.message)}}},'Да'),el('button',{class:'btn o',type:'button',onclick:()=>confirmBox.replaceChildren()},'Нет'))))}},svgEl(TRASH));
-  shell('Мои сделки',[el('div',{style:'display:flex;gap:8px;align-items:center'},el('div',{style:'flex:1;min-width:0'},chips),trash),confirmBox,sum,chart,el('b',{},'История'),hist,el('b',{},'Перекрытия'),ovr]);
+    const isAll=dealRng.preset==='all';
+    confirmBox.replaceChildren(el('div',{class:'card',style:'display:grid;gap:10px'},el('b',{},'Очистить историю сделок?'),el('div',{class:'sm'},'Статистика пересчитается. Это действие нельзя отменить.'),
+      isAll?null:el('button',{class:'btn r',type:'button',onclick:()=>clear('/deals?'+dealQuery())},'За выбранный период'+(dealRng.from?' ('+(dealRng.from===dealRng.to?drDmy(dealRng.from):drDmy(dealRng.from)+' – '+drDmy(dealRng.to))+')':'')),
+      el('button',{class:'btn r',type:'button',style:isAll?'':'background:none;border:1px solid var(--bad);color:var(--bad)',onclick:()=>clear('/deals?all=1')},'За всё время'),
+      el('button',{class:'btn o',type:'button',onclick:()=>confirmBox.replaceChildren()},'Отмена')))}},svgEl(TRASH));
+  shell('Мои сделки',[el('div',{style:'display:flex;gap:8px;align-items:center'},pickBtn,trash),confirmBox,sum,chart,el('b',{},'История'),hist,el('b',{},'Перекрытия'),ovr]);
 }
 
 let lessons=null;
@@ -1311,7 +1410,7 @@ function reviewCard(r){
     el('span',{class:'th'},el('img',{src:r.photo,alt:'',loading:'lazy'}),(()=>{const i=el('i');i.innerHTML=IC_IMG;return i})()),
     el('span',{class:'op'},'Открыть фото')):null;
   return el('div',{class:'card rv'},
-    el('div',{class:'rv-top'},el('div',{class:'ava'},(r.author||'?').slice(0,1).toUpperCase()),el('div',{},el('b',{},r.author),el('div',{class:'sm'},dmy(r.created_at))),r.status==='pending'?el('span',{class:'rv-pend'},'На проверке'):starsEl(r.rating)),
+    el('div',{class:'rv-top'},el('div',{class:'ava'},(r.author||'?').slice(0,1).toUpperCase()),el('div',{},el('b',{},r.author),el('div',{class:'sm'},drDmy(r.created_at))),r.status==='pending'?el('span',{class:'rv-pend'},'На проверке'):starsEl(r.rating)),
     r.status==='pending'?starsEl(r.rating):null,
     el('div',{class:'rv-body'},r.body),photo);
 }
