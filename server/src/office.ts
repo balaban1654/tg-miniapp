@@ -1372,6 +1372,10 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
   // Отзывы: админ пишет сам, отзывы клиентов из Mini App проходят проверку и выходят после «Опубликовать»
   const REVIEW_COLS = `id, tg_id, author, rating, body, status, by_admin, created_at, (photo IS NOT NULL) AS has_photo, photo_key,
     (SELECT username FROM leads l WHERE l.tg_id = reviews.tg_id) AS username`;
+  // Сколько отзывов ждут проверки: цифра у пункта «Медиа» в меню
+  app.get('/reviews/count', { preHandler: need('admin') }, async () => ({
+    pending: Number((await db.query(`SELECT count(*)::int AS n FROM reviews WHERE status = 'pending'`)).rows[0].n),
+  }));
   app.get('/reviews', { preHandler: need('admin') }, async () => {
     return (await db.query(`SELECT ${REVIEW_COLS} FROM reviews ORDER BY (status = 'pending') DESC, created_at DESC, id DESC`)).rows;
   });
@@ -1753,6 +1757,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     // Стример открыл карточку своего лида: отказы по бонусам считаются просмотренными, уведомление исчезает
     if (me.role === 'streamer' && r.rows[0].owner_id === me.id) {
       await db.query(`UPDATE dep_bonus_requests SET seen_at = now() WHERE tg_id = $1 AND staff_id = $2 AND status = 'rejected' AND seen_at IS NULL`, [tgId, me.id]);
+      await db.query(`UPDATE lead_notices SET seen_at = now() WHERE tg_id = $1 AND staff_id = $2 AND seen_at IS NULL`, [tgId, me.id]);
     }
     // Подключение: сколько нужно внести, действующая акция, прошлые отправки (админу, а стримеру только у его лидов)
     // Стример видит блок только у своих лидов и без суммы внесённых депозитов

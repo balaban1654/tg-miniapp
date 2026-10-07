@@ -97,6 +97,18 @@ export async function postbackRoutes(app: FastifyInstance): Promise<void> {
       return { ok: true, duplicate: true };
     }
 
+    // Стримеру сообщаем о новом событии его клиента (без суммы). Импорт и ручное добавление задним числом не в счёт
+    if (['reg', 'ftd', 'dep', 'wd'].includes(event) && q.imported !== '1' && q.manual !== '1') {
+      await db
+        .query(
+          `INSERT INTO lead_notices (staff_id, tg_id, kind)
+           SELECT d.owner_id, d.tg_id, $2 FROM leads d JOIN staff s ON s.id = d.owner_id AND s.role = 'streamer' AND s.active
+            WHERE d.tg_id = $1 AND coalesce(d.lead_role, 'lead') = 'lead' AND d.removed_at IS NULL`,
+          [tgId, event],
+        )
+        .catch(() => {});
+    }
+
     const cur = lead.rows[0];
     if (event === 'reg' && cur.status === 'new') {
       await db.query(`UPDATE leads SET status = 'registered' WHERE tg_id = $1`, [tgId]);

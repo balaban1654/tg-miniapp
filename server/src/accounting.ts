@@ -798,6 +798,20 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     ).rows as any[];
     return { eligible, recent: recent.map((r) => ({ ...r, tier_name: cfg.tiers[r.tier - 1]?.name })) };
   };
+  // Новые события клиентов стримера (без сумм): сгруппированы по клиенту и виду события, показываются, пока он не откроет карточку
+  const leadNoticesMine = async (me: { id: number; role: string }) => {
+    if (me.role !== 'streamer') return [] as any[];
+    return (
+      await db.query(
+        `SELECT n.tg_id, n.kind, count(*)::int AS n, max(n.created_at) AS at,
+                coalesce('@' || d.username, nullif(d.first_name, ''), n.tg_id::text) AS name
+           FROM lead_notices n JOIN leads d ON d.tg_id = n.tg_id
+          WHERE n.staff_id = $1 AND n.seen_at IS NULL AND n.created_at > now() - interval '7 days' AND d.removed_at IS NULL
+          GROUP BY n.tg_id, n.kind, d.username, d.first_name ORDER BY max(n.created_at) DESC LIMIT 20`,
+        [me.id],
+      )
+    ).rows as any[];
+  };
   app.get('/dep-bonus/mine', { preHandler: stream }, async (req) => depBonusMine(req.staff!));
   app.get('/dep-bonus', { preHandler: admin }, async () => {
     const cfg = await loadDepConfig();
@@ -1417,7 +1431,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
         minForAdvance: plan.advance,
       },
       tasks,
-      alerts: { depBonus: await depBonusMine(me), rejected, shortfalls: short, awaiting: (await db.query(`SELECT id, started_at, ended_at, to_char(day, 'YYYY-MM-DD') AS day FROM shift_reports WHERE staff_id = $1 AND status = 'await' ORDER BY id`, [me.id])).rows },
+      alerts: { depBonus: await depBonusMine(me), notices: await leadNoticesMine(me), rejected, shortfalls: short, awaiting: (await db.query(`SELECT id, started_at, ended_at, to_char(day, 'YYYY-MM-DD') AS day FROM shift_reports WHERE staff_id = $1 AND status = 'await' ORDER BY id`, [me.id])).rows },
       fields: defs.map((d) => d.name),
       last: last.map((r: any) => ({ id: r.id, day: r.day, status: r.status, minutes: r.minutes, reject_reason: r.reject_reason, values: Object.fromEntries((r.fields as any[]).filter((f) => f.kind === 'number').map((f) => [f.name, f.value])) })),
     };

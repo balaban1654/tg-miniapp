@@ -675,3 +675,14 @@ CREATE TABLE IF NOT EXISTS tg_avatars (
 
 -- Стример увидел отказ по бонусу за градацию: после этого уведомление пропадает
 ALTER TABLE dep_bonus_requests ADD COLUMN IF NOT EXISTS seen_at TIMESTAMPTZ;
+
+-- Уведомления стримеру о событиях его клиентов (регистрация, FTD, додеп, вывод): без сумм, пропадают после просмотра карточки клиента
+CREATE TABLE IF NOT EXISTS lead_notices (
+  id         BIGSERIAL PRIMARY KEY,
+  staff_id   INT NOT NULL REFERENCES staff(id) ON DELETE CASCADE,
+  tg_id      BIGINT NOT NULL REFERENCES leads(tg_id) ON DELETE CASCADE,
+  kind       TEXT NOT NULL CHECK (kind IN ('reg','ftd','dep','wd')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  seen_at    TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS lead_notices_open ON lead_notices (staff_id, created_at DESC) WHERE seen_at IS NULL;

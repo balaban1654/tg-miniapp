@@ -77,6 +77,7 @@ html{background:#0a0613}
 .nav button.grp{justify-content:flex-start}.nav button.grp .chv{margin-left:auto;transition:transform .15s;font-size:16px;line-height:1}.nav button.grp[aria-expanded=true] .chv{transform:rotate(90deg)}.nav button.grp.act{color:var(--fg)}.nav button.sub{padding-left:26px;font-size:13.5px}.nav button.sub svg{width:16px;height:16px}
 @media(max-width:760px){.nav button.sub{padding-left:12px}.nav button.grp .chv{margin-left:4px}}
 .lc-tab .nbadge.tb{margin-left:6px;display:inline-grid;min-width:17px;height:17px;font-size:10.5px;padding:0 5px;vertical-align:1px}
+.nbadge.pulse{animation:bdPulse 1.6s ease-in-out infinite}@keyframes bdPulse{0%,100%{opacity:1;box-shadow:0 0 0 0 #ff6b8a66}50%{opacity:.45;box-shadow:0 0 10px 3px #ff6b8a77}}@media(prefers-reduced-motion:reduce){.nbadge.pulse{animation:none}}
 .nbadge{margin-left:auto;min-width:19px;height:19px;border-radius:99px;background:var(--bad);color:#fff;font:700 11px var(--fm);display:grid;place-items:center;padding:0 6px}
 .me-row{display:flex;align-items:center;gap:8px}.gear{background:none;border:0;padding:3px;color:var(--mut);cursor:pointer;display:grid;place-items:center;border-radius:6px}.gear:hover{color:var(--fg);background:var(--card2)}
 .lc-field{display:grid;gap:4px}.lc-field label{font-size:12px;color:var(--mut)}.lc-tabs{display:flex;gap:6px;border-bottom:1px solid var(--line);flex-wrap:wrap}.lc-tab{background:none;border:0;border-bottom:2px solid transparent;padding:10px 14px;color:var(--mut);font-weight:600;cursor:pointer;margin-bottom:-1px}.lc-tab.on{color:var(--fg);border-bottom-color:var(--acc)}.lc-pane{display:grid;gap:14px;min-height:190px;align-content:start}
@@ -636,7 +637,7 @@ function drawNav(){
   const nav=$('#nav');if(!nav||!me)return;
   const lay=reconcileLayout(me.nav_layout,navItems,me.role);
   const label=k=>(navItems.find(x=>x[0]===k)||[])[1]||k;
-  const mkBtn=(k,ic,sub)=>el('button',{type:'button','data-t':k,class:(k===tab?'on':'')+(sub?' sub':''),onclick:()=>{tab=k;showApp();render()}},ic?iconNamed(ic):icon(k),el('span',{class:'lbl'},...(k==='chats'||k==='leads'?navLblNodes(k):[label(k)])),k==='mytasks'?el('span',{class:'nbadge',id:'tasksBadge',hidden:''}):null,k==='acc'&&me.role==='admin'?el('span',{class:'nbadge',id:'accBadge',hidden:''}):null);
+  const mkBtn=(k,ic,sub)=>el('button',{type:'button','data-t':k,class:(k===tab?'on':'')+(sub?' sub':''),onclick:()=>{tab=k;showApp();render()}},ic?iconNamed(ic):icon(k),el('span',{class:'lbl'},...(k==='chats'||k==='leads'?navLblNodes(k):[label(k)])),k==='mytasks'?el('span',{class:'nbadge',id:'tasksBadge',hidden:''}):null,k==='acc'&&me.role==='admin'?el('span',{class:'nbadge',id:'accBadge',hidden:''}):null,k==='media'&&me.role==='admin'?el('span',{class:'nbadge pulse',id:'mediaBadge',hidden:mediaPend?null:'',title:'Новые отзывы ждут проверки'},String(mediaPend||'')):null);
   const out=[];
   for(const n of lay.nodes){
     if(n.t==='i'){out.push(mkBtn(n.k,n.icon,false));continue}
@@ -644,7 +645,7 @@ function drawNav(){
     const inGroup=n.items.some(x=>x.k===tab);
     let open=false;try{open=localStorage.getItem('hunterNav_'+n.id)==='1'}catch{}
     if(inGroup)open=true;
-    out.push(el('button',{type:'button',class:'grp'+(inGroup?' act':''),'aria-expanded':String(open),onclick:()=>{if(inGroup)return;try{localStorage.setItem('hunterNav_'+n.id,open?'0':'1')}catch{}drawNav()}},iconNamed(n.icon||'folder'),el('span',{class:'lbl'},n.title),el('span',{class:'chv'},'›')));
+    out.push(el('button',{type:'button',class:'grp'+(inGroup?' act':''),'aria-expanded':String(open),onclick:()=>{if(inGroup)return;try{localStorage.setItem('hunterNav_'+n.id,open?'0':'1')}catch{}drawNav()}},iconNamed(n.icon||'folder'),el('span',{class:'lbl'},n.title),!open&&me.role==='admin'&&mediaPend&&n.items.some(x=>x.k==='media')?el('span',{class:'nbadge pulse',title:'Новые отзывы ждут проверки'},String(mediaPend)):null,el('span',{class:'chv'},'›')));
     if(open)n.items.forEach(x=>out.push(mkBtn(x.k,x.icon,true)));
   }
   nav.replaceChildren(...out);
@@ -861,7 +862,7 @@ async function render(opt){
     else if(tab==='chats')m.replaceChildren(...await viewChats());
     else if(tab==='signals')m.replaceChildren(...await viewSignals());
     else if(tab==='push')m.replaceChildren(...await viewPush());
-    else if(tab==='media')m.replaceChildren(...await viewMedia());
+    else if(tab==='media'){m.replaceChildren(...await viewMedia());updateBadge()}
     else if(tab==='pb')m.replaceChildren(...await viewPostbacks());
     else if(tab==='shifts')m.replaceChildren(...await viewShifts());
     else if(tab==='acc')m.replaceChildren(...await viewAcc());
@@ -1445,6 +1446,9 @@ function smTasks(d){
   const db0=d.alerts.depBonus||{eligible:[],recent:[]};
   db0.eligible.forEach(x=>items.push(el('button',{type:'button',class:'dx-tk',title:'Открыть карточку лида',onclick:()=>openLeadCard(x.tg_id)},el('span',{class:'dx-ic w'},svgIcon(IC_ALERT,18)),el('span',{class:'dx-tx'},el('span',{class:'tt'},'Бонус за додепы: '+x.name),el('span',{class:'ts'},'Лид достиг градации «'+x.tier_name+'». Откройте карточку и запросите бонус')),svgIcon(IC_CHEV,16))));
   db0.recent.forEach(x=>items.push(el('button',{type:'button',class:'dx-tk',onclick:()=>openLeadCard(x.tg_id)},el('span',{class:'dx-ic r'},svgIcon(IC_ALERT,18)),el('span',{class:'dx-tx'},el('span',{class:'tt'},'Бонус «'+x.tier_name+'» ('+x.name+') отклонён'),el('span',{class:'ts'},x.reject_reason||'')),svgIcon(IC_CHEV,16))));
+  // Новые события клиентов (без сумм): открыли карточку клиента, уведомление исчезло
+  const NK={reg:['Регистрация клиента','a'],ftd:['Первый депозит клиента','ok'],dep:['Додеп клиента','ok'],wd:['Вывод клиента','w']};
+  (d.alerts.notices||[]).forEach(x=>{const k=NK[x.kind]||[x.kind,'a'];items.push(el('button',{type:'button',class:'dx-tk',title:'Открыть карточку клиента',onclick:()=>openLeadCard(x.tg_id)},el('span',{class:'dx-ic '+k[1]},svgIcon(IC_ALERT,18)),el('span',{class:'dx-tx'},el('span',{class:'tt'},k[0]+' '+x.name),el('span',{class:'ts'},(x.n>1?x.n+' новых · ':'')+'Откройте карточку клиента')),svgIcon(IC_CHEV,16)))});
   d.alerts.rejected.forEach(x=>items.push(alertRow('r','Отчёт за '+dxDay(x.day)+' отклонён',x.reject_reason||'Исправьте и отправьте снова')));
   d.alerts.shortfalls.forEach(x=>items.push(alertRow('w','Недобор часов '+dxDay(x.day),'Напишите причину, её прочтёт руководитель')));
   d.tasks.forEach(t=>{
@@ -1868,13 +1872,16 @@ async function refreshAccPending(){
     if(window.__accTabsRedraw)window.__accTabsRedraw();
   }catch{}
 }
+let mediaPend=0; // отзывы, ждущие проверки (цифра у «Медиа»)
 async function updateBadge(){
   if(!me)return;
+  if(me.role==='admin'){try{const c=await api('/reviews/count');if(c.pending!==mediaPend){mediaPend=c.pending;drawNav()}}catch{}}
   if(['admin','teamlead','streamer'].includes(me.role)){
     try{const c=await api('/chats');navLblSet('chats',{total:c.length,reg:0,fresh:c.filter(x=>x.waiting).length})}catch{}
   }
   try{const t=await api('/leads/today');navLblSet('leads',{total:t.total,reg:t.reg,fresh:t.fresh})}catch{}
   if(me.role==='streamer')await setTasksBadge();
+
   await refreshAccPending();
 }
 /** Цифра у пункта «Мои задачи»: сколько задач ещё не закрыто */
@@ -3305,7 +3312,7 @@ async function reviewsAdmin(){
       r.status!=='published'?tb(r.status==='pending'?'Опубликовать':'Показать',act(()=>api('/reviews/'+r.id,{method:'PUT',body:{author:r.author,rating:r.rating,body:r.body,status:'published'}}))):tb('Скрыть',act(()=>api('/reviews/'+r.id,{method:'PUT',body:{author:r.author,rating:r.rating,body:r.body,status:'hidden'}}))),
       tb('Изменить',()=>{reviewEdit=r.id;render()}),delBtn(r))];
   const pend=rows.filter(r=>r.status==='pending').length;
-  return[el('div',{class:'head',style:'margin-top:26px'},el('h2',{style:'font-size:20px'},'Отзывы в Mini App',pend?el('span',{class:'nbadge',style:'margin-left:10px;display:inline-block',title:'Ждут проверки'},String(pend)):null)),
+  return[el('div',{class:'head',style:'margin-top:26px'},el('h2',{style:'font-size:20px'},'Отзывы в Mini App',pend?el('span',{class:'nbadge',style:'margin-left:10px;display:inline-grid;vertical-align:middle;line-height:1',title:'Ждут проверки'},String(pend)):null)),
     el('div',{class:'hint',style:'margin:-4px 0 10px'},'Отзывы клиентов из Mini App сначала попадают сюда. Пока вы не нажмёте «Опубликовать», их видит только автор.'),
     form,table(['Автор','Отзыв','Фото','Статус',''],rows.map(r=>r.id===reviewEdit?editRow(r):viewRow(r)),'Отзывов пока нет.'),rowErr];
 }
