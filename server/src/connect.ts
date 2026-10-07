@@ -198,8 +198,14 @@ export async function connectRoutes(app: FastifyInstance, h: { need: Need; str: 
 
     if (b.test === true) {
       const un = (await db.query('SELECT tg_username FROM staff WHERE id = $1', [me.id])).rows[0]?.tg_username as string | null;
-      const lead = un ? (await db.query(`SELECT tg_id FROM leads WHERE lower(username) = lower($1) AND bot_started LIMIT 1`, [String(un).replace(/^@/, '')])).rows[0] : null;
-      if (!lead) return reply.code(404).send({ error: 'Не нашёл вас в боте. Укажите свой Telegram в профиле и нажмите «Старт» у бота' });
+      let lead = un ? (await db.query(`SELECT tg_id FROM leads WHERE lower(username) = lower($1) AND bot_started AND NOT bot_blocked LIMIT 1`, [String(un).replace(/^@/, '')])).rows[0] : null;
+      // Telegram в профиле не указан: если в админ составе ровно один админ, это вы
+      if (!lead) {
+        const adm = (await db.query(`SELECT d.tg_id, lower(coalesce(d.first_name, '')) = lower(s.name) AS same FROM leads d, staff s
+            WHERE s.id = $1 AND d.lead_role = 'admin' AND d.bot_started AND NOT d.bot_blocked AND d.removed_at IS NULL`, [me.id])).rows as { tg_id: string; same: boolean }[];
+        lead = adm.find((x) => x.same) ?? (adm.length === 1 ? adm[0] : null);
+      }
+      if (!lead) return reply.code(404).send({ error: 'Не нашёл вас в боте. Впишите свой Telegram в карточке сотрудника (шестерёнка внизу слева) и нажмите «Старт» у бота' });
       // Тест не создаёт акцию лиду: отправляем сообщение напрямую
       const base = await getMinDeposit();
       const required = r2(base * (1 - o.discount_pct / 100));

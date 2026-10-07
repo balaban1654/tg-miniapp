@@ -651,3 +651,15 @@ CREATE TABLE IF NOT EXISTS connect_sends (
   connected_amount NUMERIC(12,2)
 );
 CREATE INDEX IF NOT EXISTS connect_sends_tg ON connect_sends(tg_id, sent_at DESC);
+
+-- Один раз: убрать одинаковые копии акций (кнопка «Отправить тест» раньше создавала новую копию при каждом нажатии). Акции с отправками не трогаем
+ALTER TABLE connect_settings ADD COLUMN IF NOT EXISTS offers_dedup_done BOOLEAN NOT NULL DEFAULT FALSE;
+DO $$
+BEGIN
+  IF NOT (SELECT offers_dedup_done FROM connect_settings WHERE id = 1) THEN
+    DELETE FROM connect_offers a USING connect_offers b
+     WHERE a.id > b.id AND a.name = b.name AND a.discount_pct = b.discount_pct AND a.days = b.days AND a.text = b.text
+       AND NOT EXISTS (SELECT 1 FROM connect_sends s WHERE s.offer_id = a.id);
+    UPDATE connect_settings SET offers_dedup_done = TRUE WHERE id = 1;
+  END IF;
+END $$;

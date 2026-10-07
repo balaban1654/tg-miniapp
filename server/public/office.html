@@ -3444,11 +3444,12 @@ function cnOf(d){
   [pct,days,text].forEach(x=>x.addEventListener('input',upd));upd();
   const err=el('div',{class:'err',role:'alert'});
   const body=()=>({name:name.value.trim(),discount_pct:Number(pct.value),days:Number(days.value),text:text.value});
+  // Первое сохранение создаёт акцию, дальше правится она же: «Тест» и «Отправить всем» не плодят копии
   const saveOffer=async()=>{err.textContent='';
     if(cur.id){await api('/connect/offers/'+cur.id,{method:'PATCH',body:body()});return cur.id}
-    const r=await api('/connect/offers',{method:'POST',body:body()});return r.id};
+    const r=await api('/connect/offers',{method:'POST',body:body()});cur.id=r.id;connState.edit={...body(),id:r.id};return r.id};
   const save=el('button',{class:'btn',type:'button',onclick:async()=>{save.disabled=true;try{const id=await saveOffer();connState.edit=null;toast('Акция сохранена');render({soft:true})}catch(x){err.textContent=x.message;save.disabled=false}}},cur.id?'Сохранить изменения':'Создать акцию');
-  const test=el('button',{class:'btn o',type:'button',onclick:async()=>{try{const id=await saveOffer();await api('/connect/offers/'+id+'/send',{method:'POST',body:{test:true}});toast('Тест отправлен вам в бота');if(!cur.id){connState.edit=null;render({soft:true})}}catch(x){err.textContent=x.message}}},'Отправить тест мне');
+  const test=el('button',{class:'btn o',type:'button',onclick:async()=>{try{const id=await saveOffer();await api('/connect/offers/'+id+'/send',{method:'POST',body:{test:true}});toast('Тест отправлен вам в бота')}catch(x){err.textContent=x.message}}},'Отправить тест мне');
   const owner=el('select',{'aria-label':'Кому'},el('option',{value:''},'Все стримеры'),...d.audience.filter(a=>a.owner_id).map(a=>el('option',{value:a.owner_id},(a.owner_name||'Без владельца')+' · '+a.ready)));
   const ready=()=>owner.value?(d.audience.find(a=>String(a.owner_id)===owner.value)||{ready:0}).ready:d.audience.reduce((s,a)=>s+a.ready,0);
   const sendAll=el('button',{class:'btn o',type:'button'});
