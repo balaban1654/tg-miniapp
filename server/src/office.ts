@@ -1750,6 +1750,10 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
         canRequest: me.role === 'streamer' && r.rows[0].owner_id === me.id && Boolean(st.eligible),
       };
     }
+    // Стример открыл карточку своего лида: отказы по бонусам считаются просмотренными, уведомление исчезает
+    if (me.role === 'streamer' && r.rows[0].owner_id === me.id) {
+      await db.query(`UPDATE dep_bonus_requests SET seen_at = now() WHERE tg_id = $1 AND staff_id = $2 AND status = 'rejected' AND seen_at IS NULL`, [tgId, me.id]);
+    }
     // Подключение: сколько нужно внести, действующая акция, прошлые отправки (админу, а стримеру только у его лидов)
     // Стример видит блок только у своих лидов и без суммы внесённых депозитов
     const connectOk = me.role === 'admin' || (me.role === 'streamer' && r.rows[0].owner_id === me.id);

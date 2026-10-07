@@ -40,7 +40,7 @@ export interface TierState {
   ftd: number; // первый депозит
   reached: number; // самая высокая достигнутая градация 0..4 (по сумме)
   baseline: number; // градация, которую лид взял уже первым депозитом: за неё бонус не платим
-  last: number; // самая высокая градация, по которой уже есть запрос (не отклонённый)
+  last: number; // самая высокая градация, по которой уже есть запрос (в том числе отклонённый)
   eligible: number; // за какую градацию можно запросить бонус сейчас, 0 если нет
   tiers: { name: string; reached: boolean }[];
 }
@@ -63,7 +63,8 @@ export async function leadTierState(tgId: number, cfg: DepConfig): Promise<TierS
   cfg.tiers.forEach((t, i) => {
     if (ftd >= t.from) baseline = i + 1;
   });
-  const last = Number((await db.query(`SELECT coalesce(max(tier), 0)::int AS t FROM dep_bonus_requests WHERE tg_id = $1 AND status <> 'rejected'`, [tgId])).rows[0].t);
+  // Отклонённый запрос закрывает градацию навсегда: по ней повторно не запросить, стример ждёт следующую
+  const last = Number((await db.query(`SELECT coalesce(max(tier), 0)::int AS t FROM dep_bonus_requests WHERE tg_id = $1`, [tgId])).rows[0].t);
   // Дата достижения градации не важна: бонус можно запросить и по старым лидам, если за градацию ещё не платили
   let eligible = 0;
   for (let t = reached; t > Math.max(baseline, last); t--) {

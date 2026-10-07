@@ -672,3 +672,6 @@ CREATE TABLE IF NOT EXISTS tg_avatars (
   key        TEXT NOT NULL,
   fetched_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Стример увидел отказ по бонусу за градацию: после этого уведомление пропадает
+ALTER TABLE dep_bonus_requests ADD COLUMN IF NOT EXISTS seen_at TIMESTAMPTZ;

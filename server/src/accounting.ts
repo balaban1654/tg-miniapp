@@ -792,7 +792,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
       await db.query(
         `SELECT r.id, r.tg_id, r.tier, r.status, r.reject_reason, r.decided_at, coalesce('@' || d.username, d.first_name, r.tg_id::text) AS name
            FROM dep_bonus_requests r JOIN leads d ON d.tg_id = r.tg_id
-          WHERE r.staff_id = $1 AND r.status = 'rejected' AND r.decided_at > now() - interval '14 days' ORDER BY r.decided_at DESC LIMIT 10`,
+          WHERE r.staff_id = $1 AND r.status = 'rejected' AND r.seen_at IS NULL ORDER BY r.decided_at DESC LIMIT 10`,
         [me.id],
       )
     ).rows as any[];
