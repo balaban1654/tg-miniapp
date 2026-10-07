@@ -1513,6 +1513,8 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
           'направление': o.direction === 'up' ? 'вверх' : 'вниз',
           'экспирация': o.expirySec ? `${o.expirySec} сек` : `${o.expiry} мин`,
           'время': `{время:${entryAt.getTime()}}`,
+          'сделка': o.direction === 'up' ? 'BUY (Вверх)' : 'SELL (Вниз)',
+          'вход': new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: config.pushTz }).format(entryAt),
         },
         createdBy: o.by,
         channelsOnly: !o.push,
