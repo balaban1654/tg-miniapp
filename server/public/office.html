@@ -3316,12 +3316,12 @@ function pbManualDialog(done){
   const tg=el('input',{placeholder:'Telegram ID (если нет Pocket ID)',inputmode:'numeric',autocomplete:'off'});
   const amount=el('input',{type:'number',min:'0',step:'0.01',placeholder:'Сумма, $'});
   const t0=new Date(),kDate=d=>d.toLocaleDateString('sv-SE',{timeZone:'Europe/Kyiv'}),kTime=d=>d.toLocaleTimeString('en-GB',{timeZone:'Europe/Kyiv',hour:'2-digit',minute:'2-digit'});
-  const day=dateWheel({value:kDate(t0),min:kDate(new Date(Date.now()-60*864e5)),max:kDate(t0)}),tm=timeWheel({value:kTime(t0)});
+  const day=dateWheel({value:kDate(t0),min:'2026-01-01',max:kDate(t0)}),tm=timeWheel({value:kTime(t0)});
   const err=el('div',{class:'err',role:'alert'});
   const send=el('button',{class:'btn',type:'button',onclick:async()=>{
     err.textContent='';send.disabled=true;
-    try{await api('/postbacks/manual',{method:'POST',body:{event:ev.value,pocket_id:pocket.value.trim(),tg_id:tg.value.trim(),amount:ev.value==='reg'?undefined:Number(amount.value),when:day.value+'T'+tm.value}});
-      close();toast('Постбек добавлен');done()}
+    try{const r0=await api('/postbacks/manual',{method:'POST',body:{event:ev.value,pocket_id:pocket.value.trim(),tg_id:tg.value.trim(),amount:ev.value==='reg'?undefined:Number(amount.value),when:day.value+'T'+tm.value}});
+      close();toast(r0.pending?'Записан в журнал без лида: привяжите Telegram ID кнопкой «Указать»':'Постбек добавлен');done()}
     catch(x){err.textContent=x.message;send.disabled=false}}},'Добавить');
   ev.onchange=()=>{amount.parentElement.style.display=ev.value==='reg'?'none':''};
   // Загрузка выгрузки постбеков из партнёрки (CSV): перетащить в окно или выбрать файл скрепкой
@@ -3358,7 +3358,7 @@ function pbManualDialog(done){
     el('div',{class:'lc-two'},el('div',{class:'lc-field'},el('label',{},'Событие'),ev),el('div',{class:'lc-field'},el('label',{},'Сумма, $'),amount),
       el('div',{class:'lc-field'},el('label',{},'Pocket ID'),pocket),el('div',{class:'lc-field'},el('label',{},'Telegram ID'),tg),
       el('div',{class:'lc-field'},el('label',{},'Дата'),day),el('div',{class:'lc-field'},el('label',{},'Время'),tm)),
-    err,res,el('div',{style:'display:flex;gap:12px;align-items:stretch;justify-content:space-between'},dropWrap,send)));
+    err,el('div',{style:'display:flex;justify-content:flex-end'},send)));
   document.body.append(ov);
 }
 function pbDeleteDialog(r,done){
@@ -3455,7 +3455,7 @@ async function viewPostbacks(){
     cnt.textContent=list.length===rows.length?rows.length+' всего':list.length+' из '+rows.length;
   };
   draw();
-  return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Постбеки'),rangeBar(()=>render({soft:true}))),el('div',{style:'display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end;margin:-4px 0 10px'},cnt,upBtn,upFile,clearBox,el('button',{class:'btn o s',type:'button',onclick:()=>render({soft:true})},'Обновить')),bar,totBox,holder];
+  return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Постбеки'),rangeBar(()=>render({soft:true}))),el('div',{style:'display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end;margin:-4px 0 10px'},el('button',{class:'btn s',type:'button',style:'margin-right:auto;display:inline-flex;align-items:center;gap:6px',onclick:()=>pbManualDialog(()=>render({soft:true}))},svgIcon('<path d="M12 5v14M5 12h14"/>',16),'Добавить'),cnt,upBtn,upFile,clearBox,el('button',{class:'btn o s',type:'button',onclick:()=>render({soft:true})},'Обновить')),bar,totBox,holder];
 }
 
 (async()=>{try{me=await api('/me');readHash();showApp()}catch{showLogin()}})();

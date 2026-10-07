@@ -1121,7 +1121,6 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     const res = await app.inject({ method: 'GET', url: `/postback/${event}?${qs.toString()}` });
     const out = res.json() as { ok?: boolean; ignored?: boolean; duplicate?: boolean; reason?: string; error?: string };
     if (!out.ok) return reply.code(400).send({ error: out.error || 'Не удалось добавить' });
-    if (out.ignored) return reply.code(404).send({ error: 'Клиент не найден: ' + (out.reason || '') });
     if (out.duplicate) return reply.code(409).send({ error: 'Такое событие уже есть' });
     if (when) {
       const ev = await db.query(
@@ -1129,8 +1128,11 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
         [`${event}:${tx}`, when.replace('T', ' ')],
       );
       if (ev.rowCount) await db.query(`UPDATE postback_log SET created_at = ($2::timestamp AT TIME ZONE 'Europe/Kyiv') WHERE event_id = $1`, [ev.rows[0].id, when.replace('T', ' ')]);
+      // Клиента ещё нет: запись лежит в журнале как «пропущен», время ей тоже ставим, чтобы после привязки Telegram ID событие встало на своё место
+      else await db.query(`UPDATE postback_log SET created_at = ($2::timestamp AT TIME ZONE 'Europe/Kyiv') WHERE query->>'txid' = $1`, [tx, when.replace('T', ' ')]);
     }
-    return { ok: true };
+    // Клиент не найден: не ошибка, постбек записан в журнал, Telegram ID привяжете кнопкой «Указать»
+    return { ok: true, pending: Boolean(out.ignored) };
   });
 
   // Импорт выгрузки постбеков из партнёрки (CSV «postbacks_logs»). Берём события со всех адресов (официальный бот Pocket,
