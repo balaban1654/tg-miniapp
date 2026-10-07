@@ -188,7 +188,7 @@ th.n{text-align:right}
 .cp{display:inline-flex;align-items:center;gap:8px}.cp button{background:none;border:0;padding:2px;color:var(--mut);cursor:pointer;display:grid;place-items:center;border-radius:6px}.cp button:hover{color:var(--fg);background:var(--card2)}
 .pill{display:inline-block;border-radius:99px;padding:2px 10px;font:600 11px var(--fm)}
 .p-ok{background:#3ddc9722;color:var(--ok)}.p-warn{background:#ffb84d22;color:var(--warn)}.p-bad{background:#ff6b8a22;color:var(--bad)}.p-pur{background:#9b5cff33;color:var(--acc2)}
-.nb-t{font-weight:700}.nb-r{color:#ffd54d;font-weight:700}
+.nb-t{font-weight:700}.nb-r{color:var(--reg,#ffd54d);font-weight:700}
 .nb-n{color:#fff;font-weight:800;background:var(--acc);border-radius:99px;padding:0 7px;font-size:.85em;animation:nbPulse 1.8s ease-in-out infinite}
 @keyframes nbPulse{0%,100%{opacity:1;box-shadow:0 0 0 0 #9b5cff55}50%{opacity:.45;box-shadow:0 0 10px 3px #9b5cff66}}
 @media(prefers-reduced-motion:reduce){.nb-n{animation:none}}
@@ -1842,7 +1842,7 @@ function navLblNodes(k){
   if(!c)return[base];
   const out=[base];
   if(c.total!==null&&c.total!==undefined)out.push(' ',el('span',{class:'nb-t'},String(c.total)));
-  if(c.reg)out.push(' ',el('span',{class:'nb-r',title:'В статусе «Регистрация»'},'('+c.reg+')'));
+  if(c.reg)out.push(' (',el('span',{class:'nb-r',title:'В статусе «Регистрация»'},String(c.reg)),')');
   if(c.fresh)out.push(' ',el('span',{class:'nb-n',title:k==='chats'?'Ждут ответа':'Новые'},String(c.fresh)));
   return out;
 }
