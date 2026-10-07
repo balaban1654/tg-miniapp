@@ -115,7 +115,15 @@ export async function dispatchTemplate(key: TemplateKey, d: Dispatch): Promise<{
   for (const ch of targets) {
     if (!CHANNEL_RE.test(ch)) { chErrors.push(`${ch}: не похоже на канал (нужно @имя или -100…)`); continue; }
     const kb = buildKeyboard(cb, { tg_id: '0', first_name: null, username: null, region: null, owner_name: null, po_promo: null, po_link: null, po_link_ru: null, tz: null });
-    const res = await deliver(ch, renderText(text, { first_name: null, username: null, owner_name: null, po_promo: null, tz: null }), kb, t.photo);
+    const body = renderText(text, { first_name: null, username: null, owner_name: null, po_promo: null, tz: null });
+    let res = await deliver(ch, body, kb, t.photo);
+    // Если с картинкой не вышло, пробуем отправить один текст: сигнал в канале важнее картинки
+    if (!res.ok && t.photo && body.trim()) {
+      const first = res.error;
+      res = await deliver(ch, body, kb, null);
+      if (res.ok) console.error(`Шаблон ${key}: в ${ch} ушло без картинки (${first})`);
+      else res = { ok: false, error: `${first}; без картинки: ${res.error}` };
+    }
     if (res.ok) channels++;
     else { chErrors.push(`${ch}: ${res.error}`); console.error(`Шаблон ${key}: не удалось отправить в ${ch}: ${res.error}`); }
   }
