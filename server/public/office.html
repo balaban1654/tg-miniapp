@@ -3032,7 +3032,7 @@ function preview(text,buttons){
 
 const SEG_LABELS={all:'Все, кто запускал бота',new:'Не зарегистрировались',registered:'Зарегистрировались, без депозита',ftd:'С депозитом',access:'С открытым доступом',churned:'Отвалились',withdrew:'Выводили средства'};
 const TPL_INFO={
-  signal:{title:'Новый сигнал от аналитика',when:'Уходит при публикации в «Новый сигнал» (если стоит галочка «Отправить пуш»).',vars:'{пара} {направление} {экспирация} {время} {имя}',types:{miniapp:'Открыть кабинет',url:'Своя ссылка',support:'Поддержка (чат в боте)'}},
+  signal:{title:'Новый сигнал от аналитика',when:'Уходит при публикации в «Новый сигнал» (в каналы уходит всегда, клиентам в боте только если стоит галочка «Отправить пуш»).',vars:'{пара} {направление} {экспирация} {время} {имя}',types:{miniapp:'Открыть кабинет',url:'Своя ссылка',support:'Поддержка (чат в боте)'}},
   result:{title:'Результат сигнала',when:'Уходит, когда вы нажимаете «Дать результат» у сигнала на странице «Новый сигнал» и оставляете галочку отправки.',vars:'{пара} {направление} {экспирация} {иконка} {итог} {результат} {шаг} {имя}',types:{miniapp:'Открыть кабинет',url:'Своя ссылка',support:'Поддержка (чат в боте)'}},
   live:{title:'Стример в прямом эфире',when:'Уходит, когда стример открывает смену. Кнопка «Смотреть эфир» ведёт на ту ссылку, с которой он начал смену. Повтор от одного стримера не чаще раза в 30 минут.',vars:'{стример} {имя}',types:{stream:'Смотреть эфир (ссылка смены)',miniapp:'Открыть кабинет',url:'Своя ссылка'}}
 };
@@ -3258,14 +3258,14 @@ async function signalResultDialog(sg,done){
   };
   pl.onclick=()=>{result='win';draw()};mn.onclick=()=>{result='loss';draw()};stepSel.addEventListener('change',draw);
   const send=el('button',{class:'btn',type:'button',onclick:async()=>{err.textContent='';send.disabled=true;
-    try{const r=await api('/signals/'+sg.id+'/result',{method:'POST',body:{result,step:result==='win'?Number(stepSel.value):undefined,push:push.checked}});close();toast(push.checked?'Результат отправлен: '+r.pushed+' получателей'+((r.chErrors||[]).length?'. Каналы не получили: '+r.chErrors.join('; '):''):'Результат сохранён');done&&done()}
+    try{const r=await api('/signals/'+sg.id+'/result',{method:'POST',body:{result,step:result==='win'?Number(stepSel.value):undefined,push:push.checked}});close();toast('Результат отправлен: '+r.pushed+' получателей'+((r.chErrors||[]).length?'. Каналы не получили: '+r.chErrors.join('; '):''));done&&done()}
     catch(x){err.textContent=x.message;send.disabled=false}}},'Отправить результат');
   draw();
   ov.append(el('div',{class:'lc',style:'width:min(520px,100%);display:grid;gap:12px'},
     el('div',{class:'lc-head'},el('h3',{style:'font-size:17px'},'Результат сигнала'),el('button',{class:'btn o s',type:'button','aria-label':'Закрыть',onclick:close},'✕')),
     el('div',{class:'mut sm'},sg.pair+' · '+dir+' · '+exp),
     el('div',{style:'display:flex;gap:8px'},pl,mn),stepBox,
-    el('label',{style:'display:flex;gap:8px;align-items:center;cursor:pointer'},push,'Отправить пуш всем (шаблон «Результат сигнала» во вкладке «Шаблон»)'),
+    el('label',{style:'display:flex;gap:8px;align-items:center;cursor:pointer'},push,'Отправить пуш клиентам в боте (в канал результат уходит всегда; шаблон во вкладке «Шаблон»)'),
     prev,err,el('div',{style:'display:flex;gap:8px'},send,el('button',{class:'btn o',type:'button',onclick:close},'Отмена'))));
   document.body.append(ov);
 }
@@ -3286,7 +3286,7 @@ async function viewSignals(mode){
     dl,el('h3',{style:'font-size:14px'},'Новый сигнал'),
     el('div',{class:'form'},el('label',{},'Пара (OTC)',f.pair),el('label',{},'Направление',f.dir),el('label',{},'Экспирация',f.exp),el('label',{},'Вход (Киев): ч : мин : сек',f.enter.node)),
     el('label',{},'Комментарий',f.note),
-    el('label',{style:'display:flex;gap:8px;align-items:center'},f.push,'Отправить пуш клиентам с открытым доступом'),
+    el('label',{style:'display:flex;gap:8px;align-items:center'},f.push,'Отправить пуш клиентам с открытым доступом (в канал уходит всегда)'),
     el('div',{style:'display:flex;gap:8px;flex-wrap:wrap'},el('button',{class:'btn',type:'submit'},'Опубликовать')),
     err,el('p',{class:'mut sm',style:'margin:0'},'Общий сигнал публикует человек. Сигналы по запросу клиента выдаются из настроек в разделе «Сигналы» (направление ставит аналитик).'));
   const t=r=>new Date(r).toLocaleString('ru-RU',{timeZone:'Europe/Kyiv',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});

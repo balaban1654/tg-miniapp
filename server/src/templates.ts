@@ -85,6 +85,8 @@ export interface Dispatch {
   createdBy: number;
   /** Приписка в начало текста, например «ТЕСТ» */
   prefix?: string;
+  /** Не слать клиентам в бота, только в каналы */
+  channelsOnly?: boolean;
 }
 
 /** Рассылает шаблон: клиентам бота по выбранному списку и в Telegram-каналы. Возвращает, сколько получателей поставлено в очередь */
@@ -103,7 +105,7 @@ export async function dispatchTemplate(key: TemplateKey, d: Dispatch): Promise<{
   }
   let users = 0;
   const seg = t.segment;
-  if (seg !== 'none' && (seg === 'own' ? d.ownerId : seg in SEGMENTS)) {
+  if (!d.channelsOnly && seg !== 'none' && (seg === 'own' ? d.ownerId : seg in SEGMENTS)) {
     const r = await createBroadcast({ text, buttons, segment: seg === 'own' ? 'all' : seg, ownerId: seg === 'own' ? d.ownerId : null, createdBy: d.createdBy, photo: t.photo });
     users = r.total;
   }

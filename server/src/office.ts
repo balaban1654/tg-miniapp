@@ -1505,7 +1505,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     );
     let pushed = 0;
     let chErrors: string[] = [];
-    if (o.push) {
+    {
       // Текст, кнопки, получатели и каналы берутся из шаблона «Новый сигнал» (Пуши → Шаблоны)
       const r = await dispatchTemplate('signal', {
         vars: {
@@ -1515,6 +1515,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
           'время': `{время:${entryAt.getTime()}}`,
         },
         createdBy: o.by,
+        channelsOnly: !o.push,
       });
       pushed = r.users + r.channels;
       chErrors = r.chErrors ?? [];
@@ -1538,7 +1539,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     await db.query('UPDATE signals SET result = $2, result_step = $3, result_at = now(), result_by = $4 WHERE id = $1', [sg.id, result, step, req.staff!.id]);
     let pushed = 0;
     let chErrors: string[] = [];
-    if (b.push !== false) {
+    {
       const where = step ? `с перекрытия ${step}` : 'со входа';
       const r = await dispatchTemplate('result', {
         vars: {
@@ -1552,6 +1553,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
           'время': `{время:${new Date(sg.entry_at).getTime()}}`,
         },
         createdBy: req.staff!.id,
+        channelsOnly: b.push === false,
       });
       pushed = r.users + r.channels;
       chErrors = r.chErrors ?? [];
