@@ -109,7 +109,9 @@ export async function postbackRoutes(app: FastifyInstance): Promise<void> {
         if (event === 'ftd' || (event === 'dep' && !['ftd', 'active'].includes(cur.status))) {
           // Первый достаточный депозит: открываем анализ. Лид из старого бота приходит сразу с додепом без FTD:
           // он «активный» (его первый депозит был раньше), а не FTD
-          await db.query(`UPDATE leads SET status = $2, access = (removed_at IS NULL) WHERE tg_id = $1`, [tgId, event === 'ftd' ? 'ftd' : 'active']);
+          // FTD, пришедший позже додепа (события приходят не по порядку), не должен понижать «Активного» до FTD
+          const hasDep = event === 'ftd' && (await db.query(`SELECT 1 FROM events WHERE tg_id = $1 AND type = 'dep' LIMIT 1`, [tgId])).rowCount;
+          await db.query(`UPDATE leads SET status = $2, access = (removed_at IS NULL) WHERE tg_id = $1`, [tgId, event === 'ftd' && !hasDep ? 'ftd' : 'active']);
         } else {
           await db.query(`UPDATE leads SET status = 'active' WHERE tg_id = $1 AND status = 'ftd'`, [tgId]);
         }

@@ -611,3 +611,6 @@ CREATE TABLE IF NOT EXISTS lead_pockets (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS lead_pockets_tg ON lead_pockets(tg_id);
+
+-- Починка статусов: лид с додепом не может оставаться в статусе FTD (раньше поздний FTD мог понизить «Активного»)
+UPDATE leads SET status = 'active' WHERE status = 'ftd' AND EXISTS (SELECT 1 FROM events e WHERE e.tg_id = leads.tg_id AND e.type = 'dep');
