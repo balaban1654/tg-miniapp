@@ -3107,7 +3107,7 @@ async function viewPush(){
     try{if(editId)await api('/push/rules/'+editId,{method:'PATCH',body});else await api('/push/rules',{method:'POST',body});render()}catch(x){err.textContent=x.message}}},
     formTitle,
     el('div',{class:'form'},el('label',{},'Название',f.name),el('label',{},'Когда',f.trig),el('label',{},'Задержка',el('div',{style:'display:flex;gap:6px'},f.delay,f.unit))),
-    el('label',{style:'display:flex;gap:8px;align-items:center'},f.day,'Только днём ('+'10:00–22:00'+' по Москве)'),
+    el('label',{style:'display:flex;gap:8px;align-items:center'},f.day,'Только днём ('+'10:00–22:00'+' по Киеву)'),
     el('label',{},'Текст. Подстановки: {имя} {стример} {промокод}',f.text),bbox,
     el('div',{},el('div',{class:'mut sm',style:'margin-bottom:6px'},'Так увидит клиент'),pv),
     el('div',{style:'display:flex;gap:8px'},el('button',{class:'btn',type:'submit'},'Сохранить'),el('button',{class:'btn o',type:'button',onclick:()=>fill(null)},'Новое правило')),err);
