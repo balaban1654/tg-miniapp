@@ -362,7 +362,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     const TZ = 'Europe/Kyiv';
     const leads = await db.query(
       `SELECT d.status, count(*)::int AS n FROM leads d WHERE d.lead_role = 'lead' AND ${ownerScope(me, 'd.owner_id')}
-         ${range ? `AND (${leadStatusDate('d')} AT TIME ZONE '${TZ}')::date BETWEEN $1::date AND $2::date` : ''} GROUP BY d.status`,
+         ${range ? `AND (${leadStatusDate('d', true)} AT TIME ZONE '${TZ}')::date BETWEEN $1::date AND $2::date` : ''} GROUP BY d.status`,
       (range ?? []) as string[],
     );
     const clicks = range
