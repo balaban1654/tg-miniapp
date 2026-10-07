@@ -2101,25 +2101,25 @@ function dwCol(items,idx,onPick){const H=DW_H;
   }
 
 /** Выбор времени как на iPhone: две колонки (часы и минуты). .value вида ЧЧ:ММ */
-function timeWheel({value='',placeholder='Выбрать время'}={}){
+function timeWheel({value='',placeholder='Выбрать время',sec=false}={}){
   const p2=n=>String(n).padStart(2,'0');
   let val=value||'';
   const btn=el('button',{type:'button',class:'dw-btn'},val||placeholder);
   Object.defineProperty(btn,'value',{get:()=>val,set:v=>{val=v||'';btn.textContent=val||placeholder}});
   function open(){
     document.querySelectorAll('.dw-ov').forEach(x=>x.remove());
-    const now=new Date();let h=val?+val.slice(0,2):now.getHours(),m=val?+val.slice(3,5):now.getMinutes();
+    const now=new Date();let h=val?+val.slice(0,2):now.getHours(),m=val?+val.slice(3,5):now.getMinutes(),sc=val&&val.length>5?+val.slice(6,8):(sec?now.getSeconds():0);
     const hs=Array.from({length:24},(_,i)=>p2(i)),ms=Array.from({length:60},(_,i)=>p2(i));
-    const ch=dwCol(hs,h,i=>{h=i}),cm=dwCol(ms,m,i=>{m=i});
+    const ch=dwCol(hs,h,i=>{h=i}),cm=dwCol(ms,m,i=>{m=i}),cs=sec?dwCol(ms,sc,i=>{sc=i}):null;
     const ov=el('div',{class:'lc-overlay dw-ov',role:'dialog','aria-modal':'true'});
     const close=()=>{ov.remove();document.removeEventListener('keydown',onKey)};
     const onKey=e=>{if(e.key==='Escape')close()};document.addEventListener('keydown',onKey);
     ov.addEventListener('mousedown',e=>{if(e.target===ov)close()});
     ov.append(el('div',{class:'dw-sheet'},
-      el('div',{class:'dw-top'},el('button',{type:'button',class:'btn o s',onclick:close},'Отмена'),el('b',{},'Выберите время'),el('button',{type:'button',class:'btn s',onclick:()=>{val=p2(h)+':'+p2(m);btn.textContent=val;btn.dispatchEvent(new Event('change'));close()}},'Готово')),
-      el('div',{class:'dw-wheels',style:'grid-template-columns:1fr 1fr'},ch.el,cm.el,el('div',{class:'dw-bar'}))));
+      el('div',{class:'dw-top'},el('button',{type:'button',class:'btn o s',onclick:close},'Отмена'),el('b',{},'Выберите время'),el('button',{type:'button',class:'btn s',onclick:()=>{val=p2(h)+':'+p2(m)+(sec?':'+p2(sc):'');btn.textContent=val;btn.dispatchEvent(new Event('change'));close()}},'Готово')),
+      el('div',{class:'dw-wheels',style:'grid-template-columns:'+(sec?'1fr 1fr 1fr':'1fr 1fr')},ch.el,cm.el,...(cs?[cs.el]:[]),el('div',{class:'dw-bar'}))));
     document.body.append(ov);
-    requestAnimationFrame(()=>{ch.jump(h);cm.jump(m)});
+    requestAnimationFrame(()=>{ch.jump(h);cm.jump(m);if(cs)cs.jump(sc)});
   }
   btn.addEventListener('click',open);
   return btn;
@@ -3488,7 +3488,7 @@ function pbManualDialog(done){
   const tg=el('input',{placeholder:'Telegram ID (если нет Pocket ID)',inputmode:'numeric',autocomplete:'off'});
   const amount=el('input',{type:'number',min:'0',step:'0.01',placeholder:'Сумма, $'});
   const t0=new Date(),kDate=d=>d.toLocaleDateString('sv-SE',{timeZone:'Europe/Kyiv'}),kTime=d=>d.toLocaleTimeString('en-GB',{timeZone:'Europe/Kyiv',hour:'2-digit',minute:'2-digit'});
-  const day=dateWheel({value:kDate(t0),min:'2026-01-01',max:kDate(t0)}),tm=timeWheel({value:kTime(t0)});
+  const day=dateWheel({value:kDate(t0),min:'2026-01-01',max:kDate(t0)}),tm=timeWheel({value:new Date(t0).toLocaleTimeString('en-GB',{timeZone:'Europe/Kyiv',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'}),sec:true});
   const err=el('div',{class:'err',role:'alert'});
   const send=el('button',{class:'btn',type:'button',onclick:async()=>{
     err.textContent='';send.disabled=true;

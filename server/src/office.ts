@@ -9,7 +9,7 @@ import { createBroadcast, segmentWhere, SEGMENTS, deliverAnimation, type Button 
 import { randomInt, randomBytes, createHash } from 'node:crypto';
 const sha256 = (v: string) => createHash('sha256').update(v).digest('hex');
 import { accountingRoutes } from './accounting.js';
-import { connectRoutes, connectInfo } from './connect.js';
+import { connectRoutes, connectInfo, requiredFor, TOL } from './connect.js';
 import { toVoice, toVideoNote } from './media.js';
 import { parseReviewPhoto, cleanReviewText, cleanRating } from './reviews.js';
 import { loadDepConfig, leadTierState } from './depbonus.js';
@@ -1112,7 +1112,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     const amount = Number(b.amount);
     if (event !== 'reg' && !(amount > 0 && amount < 1e7)) return reply.code(400).send({ error: 'Укажите сумму' });
     const when = str(b.when, 20);
-    if (when && !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(when)) return reply.code(400).send({ error: 'Неверная дата' });
+    if (when && !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/.test(when)) return reply.code(400).send({ error: 'Неверная дата' });
     if (!config.postbackSecret || config.postbackSecret.length < 16) return reply.code(500).send({ error: 'На сервере не задан POSTBACK_SECRET (от 16 символов)' });
     const tx = 'manual-' + randomBytes(6).toString('hex');
     const qs = new URLSearchParams({ secret: config.postbackSecret, txid: tx, manual: '1' });
@@ -1307,7 +1307,10 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     if (!row) return reply.code(404).send({ error: 'Запись не найдена' });
     let removedEvent = false;
     if (req.query.with_event && row.event_id) {
+      const ev = (await db.query('SELECT tg_id, type FROM events WHERE id = $1', [row.event_id])).rows[0];
       removedEvent = ((await db.query('DELETE FROM events WHERE id = $1', [row.event_id])).rowCount ?? 0) > 0;
+      // Событие удалено совсем: убираем и его следы у лида (уведомление стримеру, статус и доступ), чтобы счётчики сошлись
+      if (removedEvent && ev) await rollbackLeadAfterEventRemoval(Number(ev.tg_id), String(ev.type));
     }
     await db.query('DELETE FROM postback_log WHERE id = $1', [id]);
     return { ok: true, removedEvent };
@@ -2018,4 +2021,34 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
 
   await accountingRoutes(app, { need, str, num });
   await connectRoutes(app, { need, str });
+}
+
+/** После полного удаления события пересчитываем то, что оно меняло у лида: уведомление стримеру, статус, доступ */
+export async function rollbackLeadAfterEventRemoval(tgId: number, type: string): Promise<void> {
+  if (['reg', 'ftd', 'dep', 'wd'].includes(type)) {
+    await db.query(
+      `DELETE FROM lead_notices WHERE id = (SELECT id FROM lead_notices WHERE tg_id = $1 AND kind = $2 ORDER BY id DESC LIMIT 1)`,
+      [tgId, type],
+    );
+  }
+  if (!['reg', 'ftd', 'dep'].includes(type)) return;
+  const lead = (await db.query('SELECT status, removed_at, trader_id FROM leads WHERE tg_id = $1', [tgId])).rows[0];
+  if (!lead || lead.removed_at || !['registered', 'ftd', 'active'].includes(lead.status)) return;
+  const e = (
+    await db.query(
+      `SELECT bool_or(type = 'reg') AS reg, bool_or(type = 'ftd') AS ftd, bool_or(type = 'dep') AS dep,
+              bool_or(type = 'comm' AND amount > 0) AS comm,
+              coalesce(sum(amount) FILTER (WHERE type IN ('ftd','dep')), 0)::float AS tot
+         FROM events WHERE tg_id = $1`,
+      [tgId],
+    )
+  ).rows[0];
+  const hasPay = Boolean(e.ftd || e.dep);
+  // Комиссия по клиенту значит, что он торгует на своих депозитах (перенос из старого бота): остаётся активным
+  if (!hasPay && e.comm) return;
+  const enough = hasPay && Number(e.tot) >= (await requiredFor(tgId)).required * TOL;
+  const next = enough ? (e.dep ? 'active' : 'ftd') : e.reg || hasPay || lead.trader_id ? 'registered' : 'new';
+  if (next === lead.status) return;
+  const paid = next === 'ftd' || next === 'active';
+  await db.query(`UPDATE leads SET status = $2${paid ? '' : ', access = FALSE'} WHERE tg_id = $1`, [tgId, next]);
 }
