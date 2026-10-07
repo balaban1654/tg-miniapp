@@ -3,7 +3,7 @@ import { config } from './config.js';
 import { createBroadcast, buildKeyboard, deliver, renderText, SEGMENTS, type Button, type Photo } from './push.js';
 
 /** Сообщения, которые бот шлёт сам. Текст, картинку, кнопки, получателей и каналы настраивает админ в Office */
-export const TEMPLATE_KEYS = ['signal', 'live', 'result'] as const;
+export const TEMPLATE_KEYS = ['signal', 'live', 'result', 'result_win', 'result_step'] as const;
 export type TemplateKey = (typeof TEMPLATE_KEYS)[number];
 
 export const DEFAULTS: Record<TemplateKey, { enabled: boolean; text: string; buttons: Button[]; segment: string }> = {
@@ -19,6 +19,20 @@ export const DEFAULTS: Record<TemplateKey, { enabled: boolean; text: string; but
     buttons: [{ label: 'Открыть кабинет', type: 'miniapp' }],
     segment: 'access',
   },
+  // Плюс со входа: короткое сообщение без скриншота
+  result_win: {
+    enabled: true,
+    text: '🟢 **Сигнал отработал в плюс**\n**{пара} — {сделка}** 📈\n\n{экспирация} — сделка закрылась в профит 💸\n\nПрибыль = {прибыль}$\n\nКто успел войти — поздравляю 🎉',
+    buttons: [],
+    segment: 'access',
+  },
+  // Плюс с перекрытия: к сообщению прикрепляется скриншот сделки
+  result_step: {
+    enabled: true,
+    text: '✅ **Результат сигнала: +{прибыль}$**\n{пара} — {сделка}\n\n{отработка}\n\nЛетим дальше 🔥',
+    buttons: [],
+    segment: 'access',
+  },
   live: {
     enabled: false,
     text: '🔴 {стример} сейчас в прямом эфире!\n\nЗаходите, пока идёт трансляция.',
@@ -30,10 +44,17 @@ export const DEFAULTS: Record<TemplateKey, { enabled: boolean; text: string; but
 export async function seedTemplates(): Promise<void> {
   for (const k of TEMPLATE_KEYS) {
     const d = DEFAULTS[k];
-    await db.query(
+    const ins = await db.query(
       `INSERT INTO push_templates (key, enabled, text, buttons, segment) VALUES ($1,$2,$3,$4,$5) ON CONFLICT (key) DO NOTHING`,
       [k, d.enabled, d.text, JSON.stringify(d.buttons), d.segment],
     );
+    // Новые шаблоны результата сразу получают каналы и получателей уже настроенного шаблона «Результат сигнала»
+    if (ins.rowCount && (k === 'result_win' || k === 'result_step')) {
+      await db.query(
+        `UPDATE push_templates t SET channels = r.channels, segment = r.segment FROM push_templates r WHERE t.key = $1 AND r.key = 'result'`,
+        [k],
+      );
+    }
   }
 }
 

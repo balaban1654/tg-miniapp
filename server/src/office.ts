@@ -1538,6 +1538,11 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     if (sg.requested_by) return reply.code(400).send({ error: 'Это сигнал по запросу клиента, итог ставит сам клиент' });
     if (sg.result) return reply.code(409).send({ error: 'Результат уже отправлен' });
     if (+new Date(sg.entry_at) > Date.now()) return reply.code(409).send({ error: 'Сигнал ещё не начался' });
+    let profit: number | null = null;
+    if (result === 'win') {
+      profit = Math.round(Number(String(b.profit ?? '').replace(',', '.')) * 100) / 100;
+      if (!(profit > 0 && profit < 10_000_000)) return reply.code(400).send({ error: 'Укажите прибыль в долларах' });
+    }
     // Плюс не со входа подтверждается скриншотом: он уходит вместе с результатом
     let shot: { data: Buffer; type: string } | null = null;
     if (result === 'win' && step) {
@@ -1551,16 +1556,25 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     let chErrors: string[] = [];
     {
       const where = step ? `с перекрытия ${step}` : 'со входа';
-      const r = await dispatchTemplate('result', {
+      // Время отработки по каждому событию: вход и перекрытия через равные интервалы, последнее закрылось в плюс
+      const gapSec = Number((await db.query('SELECT overlap_gap_sec FROM signal_settings WHERE id = 1')).rows[0]?.overlap_gap_sec) || 30;
+      const hms = (ms: number) => new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23', timeZone: config.pushTz }).format(new Date(ms));
+      const entryMs = new Date(sg.entry_at).getTime();
+      const worked = Array.from({ length: (step ?? 0) + 1 }, (_, i) => `Время отработки: ${hms(entryMs + i * gapSec * 1000)}/M5 ${i === (step ?? 0) ? '✅' : '🔄'}`).join('\n');
+      const key: TemplateKey = result === 'loss' ? 'result' : step ? 'result_step' : 'result_win';
+      const r = await dispatchTemplate(key, {
         vars: {
           'пара': sg.pair,
           'направление': sg.direction === 'up' ? 'вверх' : 'вниз',
+          'сделка': sg.direction === 'up' ? 'BUY (Вверх)' : 'SELL (Вниз)',
           'экспирация': sg.expiry_sec ? `${sg.expiry_sec} сек` : `${sg.expiry_min} мин`,
           'иконка': result === 'win' ? '✅' : '❌',
           'результат': result === 'win' ? 'плюс' : 'минус',
           'шаг': result === 'win' ? where : '',
           'итог': result === 'win' ? `плюс ${where}` : 'минус',
-          'время': `{время:${new Date(sg.entry_at).getTime()}}`,
+          'прибыль': profit === null ? '' : String(profit),
+          'отработка': worked,
+          'время': `{время:${entryMs}}`,
         },
         createdBy: req.staff!.id,
         channelsOnly: b.push === false,
@@ -1621,7 +1635,8 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     if (!kind) return reply.code(400).send({ error: 'Выберите плюс или минус' });
     const g = (await db.query('SELECT data, mime FROM signal_gifs WHERE kind = $1', [kind])).rows[0];
     if (!g) return reply.code(400).send({ error: `Гифка «${kind === 'win' ? 'плюс' : 'минус'}» не загружена: вкладка «Гифка»` });
-    const channels: string[] = (await db.query(`SELECT channels FROM push_templates WHERE key = 'result'`)).rows[0]?.channels ?? [];
+    const channels: string[] = (await db.query(`SELECT channels FROM push_templates WHERE key IN ('result','result_win','result_step')`)).rows.flatMap((x) => x.channels as string[]);
+    channels.splice(0, channels.length, ...new Set(channels));
     if (!channels.length) return reply.code(400).send({ error: 'Канал не указан в шаблоне «Результат сигнала»' });
     let sent = 0;
     const errors: string[] = [];
