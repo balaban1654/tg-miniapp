@@ -1544,7 +1544,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
   app.post('/signals', { preHandler: need('admin', 'analyst') }, async (req, reply) => {
     const b = (req.body ?? {}) as Record<string, unknown>;
     const pair = str(b.pair, 20).toUpperCase();
-    const direction = str(b.direction, 4);
+    let direction = str(b.direction, 4);
     const expirySec = b.expiry_sec === undefined || b.expiry_sec === '' ? null : Number(b.expiry_sec);
     const expiry = expirySec ? 1 : Number(b.expiry_min);
     const enterIn = b.enter_in_min === undefined || b.enter_in_min === '' ? 2 : Math.trunc(Number(b.enter_in_min));
@@ -1561,6 +1561,11 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
       const t = (await db.query(`SELECT (((now() AT TIME ZONE 'Europe/Kyiv')::date + $1::time) AT TIME ZONE 'Europe/Kyiv') AS t`, [hms])).rows[0].t as Date;
       if (+t < Date.now() - 5_000) return reply.code(400).send({ error: 'Это время уже прошло. Укажите время входа позже текущего (по Киеву)' });
       entryAt = t;
+    }
+    // «Авто»: направление выбирается само, как у пар с режимом «Авто» (случайное, своё на каждую минуту входа)
+    if (direction === 'auto') {
+      const minute = Math.floor((entryAt ? +entryAt : Date.now()) / 60_000);
+      direction = createHash('sha256').update(`${pair}:${minute}`).digest()[0] % 2 ? 'up' : 'down';
     }
     if (!['up', 'down'].includes(direction)) return reply.code(400).send({ error: 'Выберите направление' });
     if (expirySec !== null && !EXPIRY_SEC.includes(expirySec)) return reply.code(400).send({ error: 'Пока доступна только экспирация 5 секунд' });
