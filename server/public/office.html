@@ -413,6 +413,7 @@ textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10
 .rb-d.start,.rb-d.end{background:var(--acc);color:#fff}.rb-d.start{border-radius:10px 0 0 10px}.rb-d.end{border-radius:0 10px 10px 0}.rb-d.start.end{border-radius:10px}
 .rb-d.today{color:var(--acc2);font-weight:800}.rb-d.today.start,.rb-d.today.end{color:#fff}
 .rb-sum{display:none;font-size:13px;color:var(--mut);text-align:center;min-height:18px}
+.rb-top{display:none}
 .rb-hint{grid-column:1/-1;color:var(--mut);font-size:12px}
 
 .rb-apply{display:none}
@@ -422,6 +423,8 @@ textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10
  .rb-ps{flex-direction:row;flex-wrap:wrap;padding:0;gap:6px}
  .rb-ps button{border:1px solid var(--line);padding:7px 14px;font-size:13px;color:var(--mut)}.rb-ps button.on{background:var(--acc);border-color:var(--acc);color:#fff}
  .rb-sum{display:block}
+ .rb-top{display:flex;align-items:center;justify-content:space-between}.rb-top h3{font:700 17px var(--fd);margin:0}.rb-x{width:34px;height:34px;border-radius:50%;border:0;background:var(--card2);color:#fff;font-size:20px;cursor:pointer;padding:0}
+ .rb-w{text-transform:none;font:600 11px var(--fm)}
  .rb-cal{grid-template-columns:minmax(0,1fr);gap:0}.rb-cal .rb-m:first-child{display:none}.rb-nav.mob{display:grid}
  .rb-nav{width:34px;height:34px;top:-2px}.rb-mh{height:34px;font-size:17px}
  .rb-d{height:38px;font-size:15px}.rb-w{font-size:11px;padding:4px 0}
@@ -913,8 +916,8 @@ const dxCur=()=>dxRange||dxMonthRange(0);
 const dxText=r=>dmy(r.from)+' - '+dmy(r.to);
 const dxSame=(a,b)=>a&&b&&a.from===b.from&&a.to===b.to;
 let dxFirst=null; // самая ранняя дата данных для «За всё время»
-function dxPresets(){const t=kyivToday();const wd=(new Date(t+'T00:00:00Z').getUTCDay()+6)%7;const mon=addDay(t,-wd);
-  return[['Сегодня',{from:t,to:t}],['Вчера',{from:addDay(t,-1),to:addDay(t,-1)}],['Текущая неделя',{from:mon,to:addDay(mon,6)}],['Текущий месяц',dxMonthRange(0)],['Прошлый месяц',dxMonthRange(-1)],['За всё время',{from:dxFirst||(t.slice(0,4)+'-01-01'),to:t}]]}
+function dxPresets(){const t=kyivToday();
+  return[['Сегодня',{from:t,to:t}],['Вчера',{from:addDay(t,-1),to:addDay(t,-1)}],['7 дней',{from:addDay(t,-6),to:t}],['30 дней',{from:addDay(t,-29),to:t}],['Этот месяц',dxMonthRange(0)],['Прошлый месяц',dxMonthRange(-1)],['Всё время',{from:dxFirst||(t.slice(0,4)+'-01-01'),to:t}]]}
 const IC_CHEVD='<path d="M6 9l6 6 6-6"/>';
 function rangeBar(onApply){
   let sel={...dxCur()},anchor=null,view=perShift(sel.to.slice(0,7),-1);
@@ -948,8 +951,8 @@ function rangeBar(onApply){
     pillText.textContent=anchor?dmy(sel.from)+' - …':dxText(sel);
     days.length=0;
     const presets=dxPresets();
-    const ps=el('div',{class:'rb-ps'},...presets.map(([t,r])=>el('button',{type:'button',class:dxSame(r,sel)&&!anchor?'on':'',onclick:()=>{sel={...r};anchor=null;view=perShift(r.to.slice(0,7),-1);draw()}},t)),el('button',{type:'button',class:!anchor&&!presets.some(([,r])=>dxSame(r,sel))||anchor?'on':'',onclick:()=>{anchor=null}},'Свободный выбор'));
-    pop.replaceChildren(ps,el('div',{class:'rb-cal'},monthEl(view,'l'),monthEl(perShift(view,1),'r')),el('div',{class:'rb-sum'},anchor?'Выберите последний день':dmy(sel.from)+(sel.to!==sel.from?' – '+dmy(sel.to):'')),el('button',{type:'button',class:'btn rb-apply',onclick:()=>go.click()},'Применить'));
+    const ps=el('div',{class:'rb-ps'},...presets.map(([t,r])=>el('button',{type:'button',class:dxSame(r,sel)&&!anchor?'on':'',onclick:()=>{sel={...r};anchor=null;view=perShift(r.to.slice(0,7),-1);draw()}},t)));
+    pop.replaceChildren(el('div',{class:'rb-top'},el('h3',{},'Период'),el('button',{type:'button',class:'rb-x','aria-label':'Закрыть',onclick:()=>dxCloseAll()},'×')),ps,el('div',{class:'rb-cal'},monthEl(view,'l'),monthEl(perShift(view,1),'r')),el('div',{class:'rb-sum'},anchor?'Выберите последний день':dmy(sel.from)+(sel.to!==sel.from?' – '+dmy(sel.to):'')),el('button',{type:'button',class:'btn rb-apply',onclick:()=>go.click()},'Применить'));
     paint(sel);
   }
   pill.addEventListener('click',e=>{e.stopPropagation();const open=pop.hidden;dxCloseAll();if(open){sel={...dxCur()};anchor=null;view=perShift(sel.to.slice(0,7),-1);draw();pop.hidden=false;pill.classList.add('on');pill.setAttribute('aria-expanded','true')}});
