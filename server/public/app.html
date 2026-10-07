@@ -179,6 +179,7 @@ main{flex:1;padding:6px 16px 96px;display:grid;gap:12px;align-content:start}
 .bars i{display:block;border-radius:3px}.bars i.has{min-height:3px}
 .bars .w{background:var(--ok)}.bars .l{background:var(--bad)}
 .days{display:flex;gap:6px;color:var(--mut);font-size:10px}.days span{flex:1;text-align:center}
+.sighint{display:flex;gap:12px;align-items:center;background:rgba(139,92,246,.14);border:1px solid rgba(167,139,250,.55);border-radius:14px;padding:12px 14px}.sighint .ld{width:10px;height:10px;border-radius:50%;background:#a78bfa;flex:none;animation:blink 1.2s infinite}.sighint .sm{font-size:12.5px;line-height:1.45}
 .livehint{display:flex;gap:12px;align-items:center;background:rgba(255,59,78,.12);border:1px solid rgba(255,59,78,.55);border-radius:14px;padding:12px 14px}.livehint .ld{width:10px;height:10px;border-radius:50%;background:#ff3b4e;flex:none;animation:blink 1.2s infinite}.livehint b{font-size:14px}.livehint .sm{margin-top:3px;font-size:12.5px;line-height:1.4}
 .avl{position:relative;flex:none;width:48px;height:48px;border-radius:50%;cursor:pointer;box-shadow:0 0 0 2px #ff3b4e;animation:lvp 1.6s ease-out infinite}.avl .ava{width:100%;height:100%;border-color:#ff3b4e}.lvb{position:absolute;left:50%;bottom:-6px;transform:translateX(-50%);background:#ff3b4e;color:#fff;font:800 8px/1 var(--fb);letter-spacing:.5px;padding:2px 5px;border-radius:6px;pointer-events:none}
 @keyframes lvp{0%{box-shadow:0 0 0 2px #ff3b4e,0 0 0 2px rgba(255,59,78,.65)}70%{box-shadow:0 0 0 2px #ff3b4e,0 0 0 12px rgba(255,59,78,0)}100%{box-shadow:0 0 0 2px #ff3b4e,0 0 0 2px rgba(255,59,78,0)}}
@@ -650,6 +651,7 @@ function signalRated(sg,result,step){
   clearTimers();
   const win=result==='win';
   shell('Анализ',[
+    el('div',{class:'sighint',role:'status'},el('i',{class:'ld'}),el('div',{class:'sm'},'Хотите ещё сигнал по этой же паре? Нажмите «Повторить анализ». Чтобы выбрать другую пару, нажмите «Запросить новый анализ».')),
     el('div',{class:'card',style:'display:grid;gap:6px;text-align:center'},
       el('b',{style:'font-size:20px;color:var(--'+(win?'ok':'bad')+')'},win?'Плюс':'Минус'),
       el('div',{class:'sm'},sg.pair+(win?' · '+(step===1?'со входа':'с перекрытия '+(step-1)):'')),
