@@ -1620,7 +1620,9 @@ function ownerCell(r){
   show();return td;
 }
 async function viewLeads(){
-  const [rows,legacy,owners0]=await Promise.all([api('/leads'),me.role==='admin'?api('/legacy').catch(()=>null):Promise.resolve(null),me.role==='admin'?streamersList().catch(()=>[]):Promise.resolve([])]);
+  dxReg.length=0;
+  const rg=dxCur();
+  const [rows,legacy,owners0]=await Promise.all([api('/leads?from='+rg.from+'&to='+rg.to),me.role==='admin'?api('/legacy').catch(()=>null):Promise.resolve(null),me.role==='admin'?streamersList().catch(()=>[]):Promise.resolve([])]);
   leadsStaff=owners0;
   const showOwner=me.role==='admin'||me.role==='teamlead';
   const showComm=me.role==='admin';
@@ -1675,7 +1677,7 @@ async function viewLeads(){
       legacy?el('div',{class:'sm'},'В списке: '+legacy.total+' · подключились: '+legacy.claimed):null,ta,
       el('div',{},el('button',{class:'btn o s',type:'button',onclick:async()=>{try{const r=await api('/legacy/bulk',{method:'POST',body:{text:ta.value}});ta.value='';toast('Добавлено: '+r.added+(r.skipped?', уже были: '+r.skipped:''));setTimeout(render,700)}catch(x){toast(x.message)}}},'Загрузить')));
   }
-  return[el('div',{class:'head'},el('div',{style:'display:flex;align-items:center;gap:16px;flex-wrap:wrap;min-width:0'},el('h2',{style:'font-size:20px'},'Лиды'),tots),cnt),bar,holder,legacyCard].filter(Boolean);
+  return[el('div',{class:'head'},el('div',{style:'display:flex;align-items:center;gap:16px;flex-wrap:wrap;min-width:0'},el('h2',{style:'font-size:20px'},'Лиды'),tots),el('div',{style:'display:flex;align-items:center;gap:12px;flex-wrap:wrap'},cnt,rangeBar(()=>render({soft:true})))),bar,holder,legacyCard].filter(Boolean);
 }
 
 function goUrl(slug){return 'https://'+location.host.replace(/^(crm|go|app)\./,'')+'/'+slug}

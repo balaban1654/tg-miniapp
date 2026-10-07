@@ -1953,14 +1953,21 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // Лиды
-  app.get<{ Querystring: { status?: string } }>('/leads', { preHandler: auth }, async (req) => {
+  app.get<{ Querystring: { status?: string; from?: string; to?: string } }>('/leads', { preHandler: auth }, async (req) => {
     const me = req.staff!;
     const status = str(req.query.status, 20);
     const vals: unknown[] = [];
     let extra = '';
     if (status) {
       vals.push(status);
-      extra = ` AND d.status = $1`;
+      extra = ` AND d.status = $${vals.length}`;
+    }
+    // Период по Киеву: FTD и активные по дате первого депозита, остальные по дате прихода. Сотрудников (админ состав) не фильтруем
+    const D = /^\d{4}-\d{2}-\d{2}$/;
+    if (D.test(String(req.query.from)) && D.test(String(req.query.to))) {
+      const [a, b] = String(req.query.from) <= String(req.query.to) ? [req.query.from, req.query.to] : [req.query.to, req.query.from];
+      vals.push(a, b);
+      extra += ` AND (coalesce(d.lead_role, 'lead') <> 'lead' OR (${leadStatusDate('d')} AT TIME ZONE 'Europe/Kyiv')::date BETWEEN $${vals.length - 1}::date AND $${vals.length}::date)`;
     }
     const DT = depTypes(me);
     const r = await db.query(
