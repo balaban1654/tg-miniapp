@@ -1627,11 +1627,10 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
   app.put('/signal-config', { preHandler: need('admin') }, async (req, reply) => {
     const b = (req.body ?? {}) as Record<string, unknown>;
     const enterIn = Math.trunc(Number(b.enter_in_sec));
-    const ttl = Math.trunc(Number(b.direction_ttl_min));
-    const cooldown = Math.trunc(Number(b.cooldown_sec));
+    const ttl = b.direction_ttl_min == null ? 10 : Math.trunc(Number(b.direction_ttl_min));
+    const cooldown = 0; // паузы между запросами больше нет
     if (!(enterIn >= 30 && enterIn <= 600)) return reply.code(400).send({ error: 'Время до входа: 30–600 секунд' });
     if (!(ttl >= 1 && ttl <= 240)) return reply.code(400).send({ error: 'Срок действия направления: 1–240 минут' });
-    if (!(cooldown >= 0 && cooldown <= 3600)) return reply.code(400).send({ error: 'Пауза между запросами: 0–3600 секунд' });
     const entrySec = Math.trunc(Number(b.entry_second));
     const gap = Math.trunc(Number(b.overlap_gap_sec));
     const maxEv = Math.trunc(Number(b.max_events));
