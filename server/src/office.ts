@@ -1536,7 +1536,8 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     if (typeof b.enter_time === 'string' && b.enter_time) {
       const m = /^([01]?\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?$/.exec(b.enter_time.trim());
       if (!m) return reply.code(400).send({ error: 'Время входа в формате чч:мм:сс' });
-      const hms = `${m[1].padStart(2, '0')}:${m[2]}:${m[3] ?? '00'}`;
+      // Секунда входа всегда 15, что бы ни прислали
+      const hms = `${m[1].padStart(2, '0')}:${m[2]}:15`;
       // Время по Киеву, на сегодня. Если оно уже прошло, сигнал бессмысленен
       const t = (await db.query(`SELECT (((now() AT TIME ZONE 'Europe/Kyiv')::date + $1::time) AT TIME ZONE 'Europe/Kyiv') AS t`, [hms])).rows[0].t as Date;
       if (+t < Date.now() - 5_000) return reply.code(400).send({ error: 'Это время уже прошло. Укажите время входа позже текущего (по Киеву)' });
