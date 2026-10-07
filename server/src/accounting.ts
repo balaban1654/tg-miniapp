@@ -1,3 +1,4 @@
+import { leadStatusDate } from './leaddate.js';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { db } from './db.js';
 import { announceLive } from './templates.js';
@@ -1355,7 +1356,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     );
     const clicksSince = (await db.query(`SELECT to_char(min(at AT TIME ZONE '${TZ}'), 'YYYY-MM-DD') AS d FROM link_clicks`)).rows[0].d as string | null;
     const byStatus: Record<string, number> = {};
-    for (const r of (await db.query(`SELECT status, count(*)::int AS n FROM leads WHERE owner_id = $1 AND removed_at IS NULL AND coalesce(lead_role, 'lead') = 'lead' AND (created_at AT TIME ZONE '${TZ}')::date BETWEEN $2::date AND $3::date GROUP BY status`, [me.id, from, to])).rows) byStatus[r.status] = r.n;
+    for (const r of (await db.query(`SELECT d.status, count(*)::int AS n FROM leads d WHERE d.owner_id = $1 AND d.removed_at IS NULL AND coalesce(d.lead_role, 'lead') = 'lead' AND (${leadStatusDate('d')} AT TIME ZONE '${TZ}')::date BETWEEN $2::date AND $3::date GROUP BY d.status`, [me.id, from, to])).rows) byStatus[r.status] = r.n;
 
     const live = (await db.query(`SELECT id, stream_url, started_at FROM shift_reports WHERE staff_id = $1 AND status = 'live' ORDER BY id DESC LIMIT 1`, [me.id])).rows[0] ?? null;
     const t = await todayInfo(me.id);

@@ -9,6 +9,7 @@ import { createBroadcast, segmentWhere, SEGMENTS, deliverAnimation, type Button 
 import { randomInt, randomBytes, createHash } from 'node:crypto';
 const sha256 = (v: string) => createHash('sha256').update(v).digest('hex');
 import { accountingRoutes } from './accounting.js';
+import { leadStatusDate } from './leaddate.js';
 import { connectRoutes, connectInfo, requiredFor, TOL } from './connect.js';
 import { toVoice, toVideoNote } from './media.js';
 import { parseReviewPhoto, cleanReviewText, cleanRating } from './reviews.js';
@@ -360,8 +361,8 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     }
     const TZ = 'Europe/Kyiv';
     const leads = await db.query(
-      `SELECT status, count(*)::int AS n FROM leads WHERE lead_role = 'lead' AND ${ownerScope(me, 'owner_id')}
-         ${range ? `AND (created_at AT TIME ZONE '${TZ}')::date BETWEEN $1::date AND $2::date` : ''} GROUP BY status`,
+      `SELECT d.status, count(*)::int AS n FROM leads d WHERE d.lead_role = 'lead' AND ${ownerScope(me, 'd.owner_id')}
+         ${range ? `AND (${leadStatusDate('d')} AT TIME ZONE '${TZ}')::date BETWEEN $1::date AND $2::date` : ''} GROUP BY d.status`,
       (range ?? []) as string[],
     );
     const clicks = range
