@@ -165,7 +165,9 @@ export async function deliverAnimation(chatId: string, data: Buffer, mime: strin
     return { ok: true };
   }
   try {
-    await bot.api.sendAnimation(chatId, new InputFile(data, mime === 'video/mp4' ? 'result.mp4' : 'result.gif'));
+    // Видеостикер (WEBM) Telegram принимает только как стикер
+    if (mime === 'video/webm') await bot.api.sendSticker(chatId, new InputFile(data, 'sticker.webm'));
+    else await bot.api.sendAnimation(chatId, new InputFile(data, mime === 'video/mp4' ? 'result.mp4' : 'result.gif'));
     return { ok: true };
   } catch (e) {
     if (e instanceof GrammyError) return { ok: false, error: e.description };

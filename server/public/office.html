@@ -3232,16 +3232,16 @@ async function gifCard(){
   let have={};try{(await api('/signal-gifs')).forEach(g=>have[g.kind]=g)}catch{}
   const err=el('div',{class:'err',role:'alert'});
   const box=(kind,title)=>{
-    const g=have[kind];const inp=el('input',{type:'file',accept:'image/gif,video/mp4',hidden:''});
+    const g=have[kind];const inp=el('input',{type:'file',accept:'image/gif,video/mp4,video/webm,.webm',hidden:''});
     inp.addEventListener('change',async()=>{const f=inp.files[0];if(!f)return;err.textContent='';
       if(f.size>10*1024*1024){err.textContent='Файл больше 10 МБ';return}
       try{await api('/signal-gifs/'+kind,{method:'PUT',body:{file:await fileToDataUrl(f)}});toast('Гифка сохранена');render({soft:true})}catch(x){err.textContent=x.message}});
     const src='/api/office/signal-gifs/'+kind+'/file?'+(g?g.updated_at:'');
-    const pv=g?(g.mime==='video/mp4'?el('video',{src,muted:'',loop:'',autoplay:'',playsinline:'',style:'max-width:100%;max-height:200px;border-radius:10px'}):el('img',{src,alt:'',style:'max-width:100%;max-height:200px;border-radius:10px'})):el('div',{class:'mut sm'},'Не загружена');
+    const pv=g?(g.mime.startsWith('video/')?el('video',{src,muted:'',loop:'',autoplay:'',playsinline:'',style:'max-width:100%;max-height:200px;border-radius:10px'}):el('img',{src,alt:'',style:'max-width:100%;max-height:200px;border-radius:10px'})):el('div',{class:'mut sm'},'Не загружена');
     return el('div',{class:'card',style:'display:grid;gap:10px;align-content:start'},el('h3',{style:'font-size:15px'},title),pv,
       el('div',{style:'display:flex;gap:8px;flex-wrap:wrap'},el('button',{class:'btn o s',type:'button',onclick:()=>inp.click()},g?'Заменить':'Загрузить'),g?el('button',{class:'btn o s',type:'button',onclick:async()=>{try{await api('/signal-gifs/'+kind,{method:'DELETE'});render({soft:true})}catch(x){err.textContent=x.message}}},'Удалить'):null),inp)};
   return el('div',{style:'display:grid;gap:12px'},
-    el('p',{class:'mut sm',style:'margin:0'},'Гифка (GIF) или короткое видео MP4 до 10 МБ. В таблице «Последние отправленные сигналы» у каждого сигнала есть кнопка «Гифка в канал»: уйдёт гифка плюса или минуса, в те же каналы, что указаны в шаблоне «Результат сигнала». Клиентам в бота гифка не отправляется.'),
+    el('p',{class:'mut sm',style:'margin:0'},'Гифка (GIF), видео MP4 или видеостикер WEBM до 10 МБ (WEBM уходит в канал как стикер: он должен быть в формате стикера Telegram, 512 пикселей, до 3 секунд). В таблице «Последние отправленные сигналы» у каждого сигнала есть кнопка «Гифка в канал»: уйдёт гифка плюса или минуса, в те же каналы, что указаны в шаблоне «Результат сигнала». Клиентам в бота гифка не отправляется.'),
     el('div',{style:'display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px'},box('win','Плюс'),box('loss','Минус')),err)
 }
 function recentSignals(rows){

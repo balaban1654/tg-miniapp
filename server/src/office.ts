@@ -1570,8 +1570,9 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     if (data.length > 12) {
       if (data.subarray(0, 4).toString() === 'GIF8') mime = 'image/gif';
       else if (data.subarray(4, 8).toString() === 'ftyp') mime = 'video/mp4';
+      else if (data[0] === 0x1a && data[1] === 0x45 && data[2] === 0xdf && data[3] === 0xa3) mime = 'video/webm';
     }
-    if (!mime) return 'Нужна гифка (GIF) или короткое видео MP4';
+    if (!mime) return 'Нужна гифка (GIF), видео MP4 или стикер WEBM';
     if (data.length > GIF_MAX) return 'Файл больше 10 МБ';
     return { data, mime };
   }
