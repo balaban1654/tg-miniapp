@@ -338,7 +338,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
       const tiers = normTiers(b.depTiers.map((t: any) => ({ from: n(t?.from, 0, 0, 1e9), bonus: n(t?.bonus, 0, 0, 1e6) })));
       for (let i = 1; i < tiers.length; i++) if (tiers[i].from <= tiers[i - 1].from) return reply.code(400).send({ error: 'Пороги градаций должны расти: каждая следующая сумма больше предыдущей' });
       next.depTiers = tiers;
-      // Бонусы за додепы начинают действовать с момента, когда их впервые включили: старых лидов задним числом не поднимаем
+      // Дата первого включения бонусов хранится для справки: запрашивать можно и по старым лидам
       if (!next.depStart && tiers.some((t) => t.bonus > 0)) next.depStart = new Date().toISOString();
     }
     await db.query('UPDATE kpi_settings SET data = $1::jsonb WHERE id = 1', [JSON.stringify(next)]);

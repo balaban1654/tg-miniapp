@@ -17,7 +17,7 @@ export const DEFAULT_DEP_TIERS: DepTier[] = [
 
 export interface DepConfig {
   tiers: DepTier[];
-  /** Бонусы действуют для градаций, достигнутых после этой даты (ставится при первом включении бонусов), чтобы не поднимать старых лидов */
+  /** Когда бонусы впервые включили. Только для справки: запрашивать можно и за градации, достигнутые раньше (старые лиды тоже) */
   start: string | null;
 }
 
@@ -47,16 +47,12 @@ export interface TierState {
 
 /** Состояние градаций лида. Бонус платится только за градации выше той, что лид взял первым депозитом, и выше уже запрошенной; если лид перепрыгнул несколько, платим за высшую */
 export async function leadTierState(tgId: number, cfg: DepConfig): Promise<TierState> {
-  const ev = (await db.query(`SELECT type, amount::float AS amount, created_at FROM events WHERE tg_id = $1 AND type IN ('ftd','dep') ORDER BY created_at, id`, [tgId])).rows as { type: string; amount: number; created_at: Date }[];
+  const ev = (await db.query(`SELECT type, amount::float AS amount, created_at FROM events WHERE tg_id = $1 AND type IN ('ftd','dep') ORDER BY created_at, id`, [tgId])).rows as { type: string; amount: number }[];
   let sum = 0;
   let ftd = 0;
-  const at: (Date | null)[] = cfg.tiers.map(() => null);
   for (const e of ev) {
     sum += e.amount || 0;
     if (e.type === 'ftd' && !ftd) ftd = e.amount || 0;
-    cfg.tiers.forEach((t, i) => {
-      if (!at[i] && sum >= t.from) at[i] = e.created_at;
-    });
   }
   if (!ftd && ev.length) ftd = ev[0].amount || 0;
   let reached = 0;
@@ -68,12 +64,10 @@ export async function leadTierState(tgId: number, cfg: DepConfig): Promise<TierS
     if (ftd >= t.from) baseline = i + 1;
   });
   const last = Number((await db.query(`SELECT coalesce(max(tier), 0)::int AS t FROM dep_bonus_requests WHERE tg_id = $1 AND status <> 'rejected'`, [tgId])).rows[0].t);
-  const start = cfg.start ? new Date(cfg.start) : null;
+  // Дата достижения градации не важна: бонус можно запросить и по старым лидам, если за градацию ещё не платили
   let eligible = 0;
   for (let t = reached; t > Math.max(baseline, last); t--) {
-    const tier = cfg.tiers[t - 1];
-    const when = at[t - 1];
-    if (tier.bonus > 0 && start && when && +when >= +start) {
+    if (cfg.tiers[t - 1].bonus > 0) {
       eligible = t;
       break;
     }
