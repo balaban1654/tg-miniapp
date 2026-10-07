@@ -678,6 +678,11 @@ function watchAccess(){
   },15000));
 }
 const cfgPocketUrl=()=>'https://pocketoption.com/';
+/** Скидка на подключение: сколько и до какого числа действует */
+function offerBanner(){
+  const until=new Date(me.offer.until).toLocaleDateString('ru-RU',{day:'numeric',month:'long'});
+  return el('div',{class:'sighint',style:'background:rgba(61,220,151,.12);border-color:rgba(61,220,151,.55)',role:'status'},el('div',{class:'sm',style:'line-height:1.5'},el('b',{style:'color:var(--ok)'},'🔥 Для вас скидка '+me.offer.pct+'%'),el('br'),'Достаточно пополнить счёт на '+(me.minDeposit||10)+' $. Скидка действует до '+until+'.'));
+}
 async function viewHome(){
   if(!me)await refreshMe();
   if(!me.access&&me.status==='registered'){
@@ -687,8 +692,8 @@ async function viewHome(){
     shell('Hunter AI',[profileCard(),stats4({deals:0,wins:0,losses:0,rate:null}),...lockedSig2,
       el('div',{class:'card hero'},heroArt(),
         el('h2',{style:'font-size:17px'},'Шаг 2 · Пополните счёт'),
+        me.offer?offerBanner():null,
         el('p',{class:'sm',style:'margin:0'},'Регистрация подтверждена. Чтобы открыть доступ, пополните счёт Pocket Option минимум на '+min+' $. Рекомендуем 100 $ и больше, так проще соблюдать риск-менеджмент. Доступ откроется автоматически.'),
-        me.offer?el('p',{class:'sm',style:'margin:0;color:var(--ok);font-weight:700'},'🔥 Для вас скидка '+me.offer.pct+'%: достаточно '+min+' $ до '+new Date(me.offer.until).toLocaleDateString('ru-RU',{day:'2-digit',month:'2-digit'})):null,
         got>0?el('p',{class:'sm',style:'margin:0;color:var(--acc2);font-weight:700'},'Пополнено: '+usd(got).replace(',00 $',' $')+' из '+min+' $'):null,
         el('button',{class:'btn',type:'button',onclick:()=>openLink(cfgPocketUrl())},'Открыть Pocket Option'),
         el('p',{class:'sm',style:'margin:0'},'Торговля связана с риском потери денег. Сигналы не гарантируют результат.')),
@@ -726,6 +731,7 @@ async function viewHome(){
       el('div',{class:'card hero'},heroArt(),
         el('h2',{style:'font-size:17px'},'Доступ откроется после регистрации'),
         el('p',{class:'sm',style:'margin:0'},'Создайте аккаунт Pocket Option по нашей ссылке и пополните счёт — доступ откроется автоматически. Рекомендуем пополнять от 100 $, так проще соблюдать риск-менеджмент.'),
+        me.offer?offerBanner():null,
         btnBox,
         el('p',{class:'sm',style:'margin:0'},'Нажимая «Зарегистрироваться», вы подтверждаете, что вам 18+ и вы понимаете: торговля связана с риском потери денег.')),
       ...await pastSignals().catch(()=>[])]);
