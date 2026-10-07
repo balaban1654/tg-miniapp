@@ -640,7 +640,7 @@ function drawNav(){
   const nav=$('#nav');if(!nav||!me)return;
   const lay=reconcileLayout(me.nav_layout,navItems,me.role);
   const label=k=>(navItems.find(x=>x[0]===k)||[])[1]||k;
-  const mkBtn=(k,ic,sub)=>el('button',{type:'button','data-t':k,class:(k===tab?'on':'')+(sub?' sub':''),onclick:()=>{tab=k;showApp();render()}},ic?iconNamed(ic):icon(k),el('span',{class:'lbl'},...(k==='chats'||k==='leads'?navLblNodes(k):[label(k)])),k==='mytasks'?el('span',{class:'nbadge',id:'tasksBadge',hidden:''}):null,k==='acc'&&me.role==='admin'?el('span',{class:'nbadge',id:'accBadge',hidden:''}):null,k==='pb'&&me.role==='admin'&&pbNew?el('span',{class:'nbadge vio pulse',id:'pbBadge',title:'Новые постбеки'},pbNew>99?'99+':String(pbNew)):null,k==='media'&&me.role==='admin'?el('span',{class:'nbadge vio pulse',id:'mediaBadge',hidden:mediaPend?null:'',title:'Новые отзывы ждут проверки'},String(mediaPend||'')):null);
+  const mkBtn=(k,ic,sub)=>el('button',{type:'button','data-t':k,class:(k===tab?'on':'')+(sub?' sub':''),onclick:()=>{tab=k;showApp();render()}},ic?iconNamed(ic):icon(k),el('span',{class:'lbl'},...(k==='chats'||k==='leads'?navLblNodes(k):[label(k)])),k==='mytasks'?el('span',{class:'nbadge',id:'tasksBadge',hidden:''}):null,k==='home'&&me.role==='streamer'&&noticeN?el('span',{class:'nbadge vio pulse',id:'noticeBadge',title:'Новые события ваших клиентов'},noticeN>99?'99+':String(noticeN)):null,k==='acc'&&me.role==='admin'?el('span',{class:'nbadge',id:'accBadge',hidden:''}):null,k==='pb'&&me.role==='admin'&&pbNew?el('span',{class:'nbadge vio pulse',id:'pbBadge',title:'Новые постбеки'},pbNew>99?'99+':String(pbNew)):null,k==='media'&&me.role==='admin'?el('span',{class:'nbadge vio pulse',id:'mediaBadge',hidden:mediaPend?null:'',title:'Новые отзывы ждут проверки'},String(mediaPend||'')):null);
   const out=[];
   for(const n of lay.nodes){
     if(n.t==='i'){out.push(mkBtn(n.k,n.icon,false));continue}
@@ -1884,6 +1884,7 @@ async function refreshAccPending(){
   }catch{}
 }
 let mediaPend=0; // отзывы, ждущие проверки (цифра у «Медиа»)
+let noticeN=0; // новые события клиентов стримера (цифра у «Дашборда»)
 let pbNew=0; // новые постбеки с прошлого просмотра (цифра у «Постбеки»)
 async function updateBadge(){
   if(!me)return;
@@ -1892,7 +1893,7 @@ async function updateBadge(){
     try{const c=await api('/chats');navLblSet('chats',{total:c.length,reg:0,fresh:c.filter(x=>x.waiting).length})}catch{}
   }
   try{const t=await api('/leads/today');navLblSet('leads',{total:t.total,reg:t.reg,fresh:t.fresh})}catch{}
-  if(me.role==='streamer')await setTasksBadge();
+  if(me.role==='streamer'){await setTasksBadge();try{const c=await api('/lead-notices/count');if(c.n!==noticeN){noticeN=c.n;drawNav()}}catch{}}
 
   await refreshAccPending();
 }
@@ -1913,6 +1914,7 @@ const REGION_NAME={ru:'RU, СНГ',ww:'EU, Мир'};
 /** Карточка лида: откуда пришёл, путь, депозиты, кнопка «Открыть чат» */
 async function openLeadCard(tgId){
   document.querySelectorAll('.lc-overlay').forEach(x=>x.remove());
+  if(me.role==='streamer')setTimeout(updateBadge,1500); // уведомление по этому клиенту погасло, обновляем цифру у «Дашборда»
   const ov=el('div',{class:'lc-overlay',role:'dialog','aria-modal':'true'});
   const close=()=>{ov.remove();document.removeEventListener('keydown',onKey)};
   const onKey=e=>{if(e.key==='Escape')close()};

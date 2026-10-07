@@ -812,6 +812,8 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
       )
     ).rows as any[];
   };
+  // Цифра у «Дашборда» стримера: сколько строк новых событий его клиентов ждёт в «Требует внимания»
+  app.get('/lead-notices/count', { preHandler: stream }, async (req) => ({ n: (await leadNoticesMine(req.staff!)).length }));
   app.get('/dep-bonus/mine', { preHandler: stream }, async (req) => depBonusMine(req.staff!));
   app.get('/dep-bonus', { preHandler: admin }, async () => {
     const cfg = await loadDepConfig();
