@@ -1460,6 +1460,7 @@ function smTasks(d){
   // Новые события клиентов (без сумм): открыли карточку клиента, уведомление исчезло
   const NK={reg:['Регистрация клиента','a'],ftd:['Первый депозит клиента','ok'],dep:['Додеп клиента','ok'],wd:['Вывод клиента','w']};
   (d.alerts.notices||[]).forEach(x=>{const k=NK[x.kind]||[x.kind,'a'];items.push(el('button',{type:'button',class:'dx-tk',title:'Открыть карточку клиента',onclick:()=>openLeadCard(x.tg_id)},el('span',{class:'dx-ic '+k[1]},svgIcon(IC_ALERT,18)),el('span',{class:'dx-tx'},el('span',{class:'tt'},k[0]+' '+x.name+(x.kind==='ftd'&&x.amount?' · '+usd2(x.amount):'')),el('span',{class:'ts'},(x.n>1?x.n+' новых · ':'')+'Откройте карточку клиента')),svgIcon(IC_CHEV,16)))});
+  (d.alerts.chats||[]).forEach(x=>items.push(el('button',{type:'button',class:'dx-tk',title:'Открыть чат',onclick:()=>{pendingChat=x.tg_id;tab='chats';showApp()}},el('span',{class:'dx-ic a'},svgIcon(IC_ALERT,18)),el('span',{class:'dx-tx'},el('span',{class:'tt'},'Новое сообщение в поддержке: '+(x.username?'@'+x.username:x.first_name||x.tg_id)),el('span',{class:'ts'},x.last_text?String(x.last_text).slice(0,80):'Откройте чат и ответьте')),svgIcon(IC_CHEV,16))));
   d.alerts.rejected.forEach(x=>items.push(alertRow('r','Отчёт за '+dxDay(x.day)+' отклонён',x.reject_reason||'Исправьте и отправьте снова')));
   d.alerts.shortfalls.forEach(x=>items.push(alertRow('w','Недобор часов '+dxDay(x.day),'Напишите причину, её прочтёт руководитель')));
   d.tasks.forEach(t=>{
@@ -1479,6 +1480,8 @@ async function streamerDash(){
   dxReg.length=0;dxCloseModal();
   const r=dxCur();
   const d=await api('/my/dashboard?from='+r.from+'&to='+r.to);
+  // Клиенты, которые написали в поддержку и ждут ответа
+  d.alerts.chats=(await api('/chats').catch(()=>[])).filter(x=>x.waiting);
   const skew=Date.parse(d.now)-Date.now();
   stopPoll();
   poll=setInterval(()=>{
