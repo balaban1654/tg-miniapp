@@ -1459,7 +1459,7 @@ function smTasks(d){
   db0.recent.forEach(x=>items.push(el('button',{type:'button',class:'dx-tk',onclick:()=>openLeadCard(x.tg_id)},el('span',{class:'dx-ic r'},svgIcon(IC_ALERT,18)),el('span',{class:'dx-tx'},el('span',{class:'tt'},'Бонус «'+x.tier_name+'» ('+x.name+') отклонён'),el('span',{class:'ts'},x.reject_reason||'')),svgIcon(IC_CHEV,16))));
   // Новые события клиентов (без сумм): открыли карточку клиента, уведомление исчезло
   const NK={reg:['Регистрация клиента','a'],ftd:['Первый депозит клиента','ok'],dep:['Додеп клиента','ok'],wd:['Вывод клиента','w']};
-  (d.alerts.notices||[]).forEach(x=>{const k=NK[x.kind]||[x.kind,'a'];items.push(el('button',{type:'button',class:'dx-tk',title:'Открыть карточку клиента',onclick:()=>openLeadCard(x.tg_id)},el('span',{class:'dx-ic '+k[1]},svgIcon(IC_ALERT,18)),el('span',{class:'dx-tx'},el('span',{class:'tt'},k[0]+' '+x.name),el('span',{class:'ts'},(x.n>1?x.n+' новых · ':'')+'Откройте карточку клиента')),svgIcon(IC_CHEV,16)))});
+  (d.alerts.notices||[]).forEach(x=>{const k=NK[x.kind]||[x.kind,'a'];items.push(el('button',{type:'button',class:'dx-tk',title:'Открыть карточку клиента',onclick:()=>openLeadCard(x.tg_id)},el('span',{class:'dx-ic '+k[1]},svgIcon(IC_ALERT,18)),el('span',{class:'dx-tx'},el('span',{class:'tt'},k[0]+' '+x.name+(x.kind==='ftd'&&x.amount?' · '+usd2(x.amount):'')),el('span',{class:'ts'},(x.n>1?x.n+' новых · ':'')+'Откройте карточку клиента')),svgIcon(IC_CHEV,16)))});
   d.alerts.rejected.forEach(x=>items.push(alertRow('r','Отчёт за '+dxDay(x.day)+' отклонён',x.reject_reason||'Исправьте и отправьте снова')));
   d.alerts.shortfalls.forEach(x=>items.push(alertRow('w','Недобор часов '+dxDay(x.day),'Напишите причину, её прочтёт руководитель')));
   d.tasks.forEach(t=>{

@@ -803,7 +803,9 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     if (me.role !== 'streamer') return [] as any[];
     return (
       await db.query(
+        // Сумма только у первого депозита (FTD). У додепов и выводов суммы стримеру не отдаём
         `SELECT n.tg_id, n.kind, count(*)::int AS n, max(n.created_at) AS at,
+                CASE WHEN n.kind = 'ftd' THEN (SELECT e.amount::float FROM events e WHERE e.tg_id = n.tg_id AND e.type = 'ftd' ORDER BY e.id LIMIT 1) END AS amount,
                 coalesce('@' || d.username, nullif(d.first_name, ''), n.tg_id::text) AS name
            FROM lead_notices n JOIN leads d ON d.tg_id = n.tg_id
           WHERE n.staff_id = $1 AND n.seen_at IS NULL AND n.created_at > now() - interval '7 days' AND d.removed_at IS NULL
