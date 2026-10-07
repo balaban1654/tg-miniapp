@@ -97,8 +97,8 @@ export async function postbackRoutes(app: FastifyInstance): Promise<void> {
       return { ok: true, duplicate: true };
     }
 
-    // Стримеру сообщаем о новом событии его клиента (без суммы). Импорт и ручное добавление задним числом не в счёт
-    if (['reg', 'ftd', 'dep', 'wd'].includes(event) && q.imported !== '1' && q.manual !== '1') {
+    // Стримеру сообщаем о новом событии его клиента. Импорт задним числом не в счёт, ручное добавление уведомляет как настоящий постбек
+    if (['reg', 'ftd', 'dep', 'wd'].includes(event) && q.imported !== '1') {
       await db
         .query(
           `INSERT INTO lead_notices (staff_id, tg_id, kind)
