@@ -686,3 +686,6 @@ CREATE TABLE IF NOT EXISTS lead_notices (
   seen_at    TIMESTAMPTZ
 );
 CREATE INDEX IF NOT EXISTS lead_notices_open ON lead_notices (staff_id, created_at DESC) WHERE seen_at IS NULL;
+
+-- Когда админ последний раз открывал «Постбеки»: новые после этого считаются в меню
+ALTER TABLE staff ADD COLUMN IF NOT EXISTS pb_seen_at TIMESTAMPTZ;

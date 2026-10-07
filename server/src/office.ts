@@ -1313,6 +1313,25 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     return { ok: true, removedEvent };
   });
 
+  // Сколько новых постбеков с прошлого просмотра страницы (без комиссий, импорта и ручных добавлений): цифра у «Постбеки» в меню
+  app.get('/postbacks/count', { preHandler: need('admin') }, async (req) => {
+    const seen = (await db.query('SELECT pb_seen_at FROM staff WHERE id = $1', [req.staff!.id])).rows[0]?.pb_seen_at as Date | null;
+    if (!seen) {
+      await db.query('UPDATE staff SET pb_seen_at = now() WHERE id = $1', [req.staff!.id]);
+      return { n: 0 };
+    }
+    const r = await db.query(
+      `SELECT count(*)::int AS n FROM postback_log
+        WHERE created_at > $1 AND event <> 'comm' AND coalesce(query->>'imported', '') <> '1' AND coalesce(query->>'manual', '') <> '1'`,
+      [seen],
+    );
+    return { n: r.rows[0].n };
+  });
+  app.post('/postbacks/seen', { preHandler: need('admin') }, async (req) => {
+    await db.query('UPDATE staff SET pb_seen_at = now() WHERE id = $1', [req.staff!.id]);
+    return { ok: true };
+  });
+
   // Журнал постбеков для админа
   app.get<{ Querystring: { from?: string; to?: string } }>('/postbacks', { preHandler: need('admin') }, async (req) => {
     const ok = (v?: string) => (v && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null);
