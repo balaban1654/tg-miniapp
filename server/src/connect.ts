@@ -52,7 +52,7 @@ const usd = (n: number) => '$' + String(r2(n)).replace('.', ',');
 const kyivDate = (d: Date) => new Intl.DateTimeFormat('ru-RU', { day: '2-digit', month: '2-digit', timeZone: 'Europe/Kyiv' }).format(d);
 
 export const DEFAULT_OFFER_TEXT = '🔥 Для вас скидка {скидка}%: подключитесь всего от **{сумма}**! Предложение действует до {дата}.';
-const OFFER_BUTTONS: Button[] = [{ label: 'Пополнить в приложении', type: 'miniapp', style: 'success' }];
+const OFFER_BUTTONS: Button[] = [{ label: 'Активировать скидку', type: 'miniapp', style: 'success' }];
 
 interface Offer {
   id: number;

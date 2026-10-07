@@ -3552,7 +3552,7 @@ let connState={tab:'th',edit:null};
 const cnMoney=n=>'$'+String(Math.round(Number(n)*100)/100).replace('.',',');
 const cnBold=t=>{const out=[];String(t).split(/\*\*(.+?)\*\*/gs).forEach((p,i)=>out.push(i%2?el('b',{},p):p));return out};
 const cnFill=(text,pct,need,days)=>{const u=new Date(addDay(kyivToday(),days)+'T12:00:00Z');const dd=u.toLocaleDateString('ru-RU',{day:'2-digit',month:'2-digit',timeZone:'Europe/Kyiv'});return String(text).replaceAll('{скидка}',pct).replaceAll('{сумма}',cnMoney(need)).replaceAll('{дата}',dd)};
-const tgPreview=(text,pct,need,days)=>el('div',{class:'cn-tg'},el('div',{},...cnBold(cnFill(text,pct,need,days))),el('div',{class:'cn-tgb'},'Пополнить в приложении'));
+const tgPreview=(text,pct,need,days)=>el('div',{class:'cn-tg'},el('div',{},...cnBold(cnFill(text,pct,need,days))),el('div',{class:'cn-tgb'},'Активировать скидку'));
 async function viewConnect(){
   const d=await api('/connect');
   const bar=el('div',{class:'lc-tabs',role:'tablist'}),body=el('div',{style:'display:grid;gap:14px'});
