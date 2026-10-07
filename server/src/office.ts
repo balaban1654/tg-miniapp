@@ -2059,4 +2059,12 @@ export async function rollbackLeadAfterEventRemoval(tgId: number, type: string):
   if (next === lead.status) return;
   const paid = next === 'ftd' || next === 'active';
   await db.query(`UPDATE leads SET status = $2${paid ? '' : ', access = FALSE'} WHERE tg_id = $1`, [tgId, next]);
+  // Депозит удалён, лид снова не подключён: отмечаем подключение отменённым, чтобы акцию можно было предложить заново
+  if (!paid) {
+    await db.query(
+      `UPDATE connect_sends SET connected_at = NULL, connected_amount = NULL, reverted_at = now(), expires_at = LEAST(expires_at, now())
+        WHERE id = (SELECT id FROM connect_sends WHERE tg_id = $1 AND connected_at IS NOT NULL ORDER BY id DESC LIMIT 1)`,
+      [tgId],
+    );
+  }
 }

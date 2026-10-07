@@ -1974,7 +1974,7 @@ async function openLeadCard(tgId){
   const connBox=C&&!L.access&&['new','registered'].includes(L.status)?el('div',{style:'display:grid;gap:8px'},el('h4',{class:'lc-h'},'Подключение'),
     el('div',{class:'lc-grid'},kv('Нужно пополнить',cnMoney(C.required)+' (от '+cnMoney(C.from)+')'),...(C.deposited!==null&&C.deposited!==undefined?[kv('Внесено',cnMoney(C.deposited))]:[]),
       C.offer?kv('Акция',C.offer.name+' до '+new Date(C.offer.until).toLocaleDateString('ru-RU',{day:'2-digit',month:'2-digit',timeZone:'Europe/Kyiv'})):kv('Акция','нет')),
-    ...(C.sends||[]).slice(0,2).map(q=>el('div',{class:'mut sm'},fmtDT(q.sent_at)+' · '+q.offer_name+' · '+(q.delivery==='failed'?'не доставлено':q.connected_at?'подключился':new Date(q.expires_at)<new Date()?'срок вышел':'ждём'))),
+    ...(C.sends||[]).slice(0,2).map(q=>el('div',{class:'mut sm'},fmtDT(q.sent_at)+' · '+q.offer_name+' · '+(q.delivery==='failed'?'не доставлено':q.reverted_at?'отменено (депозит удалён)':q.connected_at?'подключился':new Date(q.expires_at)<new Date()?'срок вышел':'ждём'))),
     el('div',{},el('button',{class:'btn',type:'button',disabled:C.gapDays?'':null,title:C.gapDays?'Акцию уже отправляли за последние '+C.gapDays+' дня':'',onclick:()=>connectDialog(L,C,()=>{close();openLeadCard(tgId)})},'Предложить скидку'))):null;
   box.replaceChildren(...[
     el('div',{class:'lc-head'},el('div',{style:'min-width:0'},el('h3',{style:'font-size:21px;line-height:1.2;overflow:hidden;text-overflow:ellipsis'},fname),L.first_name&&L.username?el('div',{class:'mut',style:'font-size:13px;margin-top:2px'},'@'+L.username):null),
@@ -3630,7 +3630,7 @@ function cnOf(d){
 }
 async function cnSn(d){
   const rows=await api('/connect/sends');
-  const ST={connected:['подключился','p-ok'],pending:['ждём','p-pur'],expired:['срок вышел','p-bad'],failed:['не доставлено','p-bad'],queued:['отправляется','p-warn']};
+  const ST={reverted:['отменено','p-warn'],connected:['подключился','p-ok'],pending:['ждём','p-pur'],expired:['срок вышел','p-bad'],failed:['не доставлено','p-bad'],queued:['отправляется','p-warn']};
   return[ctrT(table(['Лид','Акция','Отправил','Отправлено','До','Нужно','Итог'],rows.map(r=>{const st=ST[r.state]||[r.state,''];
     return[el('td',{},el('a',{href:'#',onclick:e=>{e.preventDefault();openLeadCard(r.tg_id)},style:'color:var(--acc2)'},r.lead_name)),td(r.offer_name+' (−'+r.discount_pct+'%)'),td(r.by_name||'—'),td(fmtDT(r.sent_at)),td(fmtDT(r.expires_at)),td(cnMoney(r.required),'n'),
       el('td',{},el('span',{class:'pill '+st[1],title:r.error||''},st[0]),r.state==='connected'?el('span',{class:'mut sm'},' '+cnMoney(r.connected_amount)):null)]}),'Акции ещё не отправляли'))];

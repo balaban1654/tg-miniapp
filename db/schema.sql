@@ -707,3 +707,17 @@ ALTER TABLE signals ADD COLUMN IF NOT EXISTS gif_kind TEXT CHECK (gif_kind IN ('
 ALTER TABLE signals ADD COLUMN IF NOT EXISTS gif_sent_at TIMESTAMPTZ;
 ALTER TABLE signals ADD COLUMN IF NOT EXISTS result_shot BYTEA;
 ALTER TABLE signals ADD COLUMN IF NOT EXISTS result_shot_type TEXT;
+
+-- Подключение отменено: депозит лида удалили совсем, акцию можно предложить снова
+ALTER TABLE connect_sends ADD COLUMN IF NOT EXISTS reverted_at TIMESTAMPTZ;
+-- Один раз чиним тех, у кого депозит уже удалён, а отметка «подключился» осталась
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM app_flags WHERE key = 'connect_revert_repair') THEN
+    UPDATE connect_sends s SET connected_at = NULL, connected_amount = NULL, reverted_at = now(), expires_at = LEAST(s.expires_at, now())
+     WHERE s.connected_at IS NOT NULL
+       AND EXISTS (SELECT 1 FROM leads d WHERE d.tg_id = s.tg_id AND d.status IN ('new','registered') AND NOT d.access)
+       AND NOT EXISTS (SELECT 1 FROM events e WHERE e.tg_id = s.tg_id AND e.type IN ('ftd','dep'));
+    INSERT INTO app_flags (key) VALUES ('connect_revert_repair');
+  END IF;
+END $$;

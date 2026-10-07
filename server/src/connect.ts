@@ -94,7 +94,7 @@ async function sendOffer(o: Offer, tgId: string, by: number | null): Promise<{ o
 }
 
 const NOT_CONNECTED = `d.removed_at IS NULL AND coalesce(d.lead_role, 'lead') = 'lead' AND d.status IN ('new','registered') AND NOT d.access`;
-const GAP = `NOT EXISTS (SELECT 1 FROM connect_sends s WHERE s.tg_id = d.tg_id AND s.delivery <> 'failed' AND s.sent_at > now() - interval '${OFFER_GAP_DAYS} days')`;
+const GAP = `NOT EXISTS (SELECT 1 FROM connect_sends s WHERE s.tg_id = d.tg_id AND s.delivery <> 'failed' AND s.reverted_at IS NULL AND s.sent_at > now() - interval '${OFFER_GAP_DAYS} days')`;
 
 /** Данные для карточки лида: сколько нужно, что внесено, действующая акция, прошлые отправки */
 export async function connectInfo(tgId: number, hideDeposit = false) {
@@ -103,12 +103,12 @@ export async function connectInfo(tgId: number, hideDeposit = false) {
   const offers = (await db.query(`SELECT id, name, discount_pct, days, text FROM connect_offers WHERE active ORDER BY id`)).rows as Offer[];
   const sends = (
     await db.query(
-      `SELECT offer_name, discount_pct, required, sent_at, expires_at, delivery, connected_at, connected_amount::float AS connected_amount
+      `SELECT offer_name, discount_pct, required, sent_at, expires_at, delivery, connected_at, reverted_at, connected_amount::float AS connected_amount
          FROM connect_sends WHERE tg_id = $1 ORDER BY id DESC LIMIT 5`,
       [tgId],
     )
   ).rows;
-  const gap = (await db.query(`SELECT 1 FROM connect_sends s WHERE s.tg_id = $1 AND s.delivery <> 'failed' AND s.sent_at > now() - interval '${OFFER_GAP_DAYS} days' LIMIT 1`, [tgId])).rowCount;
+  const gap = (await db.query(`SELECT 1 FROM connect_sends s WHERE s.tg_id = $1 AND s.delivery <> 'failed' AND s.reverted_at IS NULL AND s.sent_at > now() - interval '${OFFER_GAP_DAYS} days' LIMIT 1`, [tgId])).rowCount;
   return {
     required: rq.required,
     base: rq.base,
@@ -224,7 +224,7 @@ export async function connectRoutes(app: FastifyInstance, h: { need: Need; str: 
       const d = (await db.query(`SELECT d.tg_id, d.bot_started, d.bot_blocked FROM leads d WHERE d.tg_id = $1 AND ${NOT_CONNECTED} AND ($2::int IS NULL OR d.owner_id = $2)`, [tgId, mine ? me.id : null])).rows[0];
       if (!d) return reply.code(409).send({ error: mine ? 'Лид не найден среди ваших или уже подключён: скидка ему не нужна' : 'Лид уже подключён или не найден: скидка ему не нужна' });
       if (!d.bot_started || d.bot_blocked) return reply.code(409).send({ error: 'Лид не запускал бота или заблокировал его: пуш не дойдёт' });
-      const gap = (await db.query(`SELECT 1 FROM connect_sends s WHERE s.tg_id = $1 AND s.delivery <> 'failed' AND s.sent_at > now() - interval '${OFFER_GAP_DAYS} days' LIMIT 1`, [tgId])).rowCount;
+      const gap = (await db.query(`SELECT 1 FROM connect_sends s WHERE s.tg_id = $1 AND s.delivery <> 'failed' AND s.reverted_at IS NULL AND s.sent_at > now() - interval '${OFFER_GAP_DAYS} days' LIMIT 1`, [tgId])).rowCount;
       if (gap) return reply.code(409).send({ error: `Этому лиду акцию уже отправляли за последние ${OFFER_GAP_DAYS} дня. Подождите` });
       const res = await sendOffer(o, String(tgId), me.id);
       if (!res.ok) return reply.code(502).send({ error: 'Не удалось отправить: ' + (res.error ?? 'ошибка Telegram') });
@@ -256,11 +256,11 @@ export async function connectRoutes(app: FastifyInstance, h: { need: Need; str: 
   app.get('/connect/sends', { preHandler: admin }, async () => {
     const r = await db.query(
       `SELECT s.id, s.tg_id, s.offer_name, s.discount_pct, s.required::float AS required, s.sent_at, s.expires_at, s.delivery, s.error,
-              s.connected_at, s.connected_amount::float AS connected_amount,
+              s.connected_at, s.reverted_at, s.connected_amount::float AS connected_amount,
               coalesce(nullif(d.first_name,''), nullif(d.username,''), s.tg_id::text) AS lead_name, d.username, st.name AS by_name
          FROM connect_sends s LEFT JOIN leads d ON d.tg_id = s.tg_id LEFT JOIN staff st ON st.id = s.sent_by
         ORDER BY s.id DESC LIMIT 300`,
     );
-    return r.rows.map((x) => ({ ...x, state: x.delivery === 'failed' ? 'failed' : x.delivery === 'queued' ? 'queued' : x.connected_at ? 'connected' : new Date(x.expires_at) < new Date() ? 'expired' : 'pending' }));
+    return r.rows.map((x) => ({ ...x, state: x.delivery === 'failed' ? 'failed' : x.delivery === 'queued' ? 'queued' : x.reverted_at ? 'reverted' : x.connected_at ? 'connected' : new Date(x.expires_at) < new Date() ? 'expired' : 'pending' }));
   });
 }
