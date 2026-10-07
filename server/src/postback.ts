@@ -3,6 +3,7 @@ import { createHash, timingSafeEqual } from 'node:crypto';
 import { db } from './db.js';
 import { config } from './config.js';
 import { processLead } from './push.js';
+import { requiredFor, markConnected, TOL } from './connect.js';
 
 type Ev = 'reg' | 'ftd' | 'dep' | 'wd' | 'comm';
 const EVENTS: Ev[] = ['reg', 'ftd', 'dep', 'wd', 'comm'];
@@ -104,7 +105,7 @@ export async function postbackRoutes(app: FastifyInstance): Promise<void> {
       // Доступ открывается, когда сумма пополнений достигла минимума. Если партнёрка не прислала сумму, проверить нечем, открываем
       const tot = Number((await db.query(`SELECT coalesce(sum(amount), 0) AS s FROM events WHERE tg_id = $1 AND type IN ('ftd','dep')`, [tgId])).rows[0].s);
       // 10% запас: сумма в постбеке может быть чуть меньше из-за курса в Pocket Option
-      const enough = amount === null || tot >= config.minDeposit * 0.9;
+      const enough = amount === null || tot >= (await requiredFor(tgId)).required * TOL;
       if (enough) {
         if (event === 'ftd' || (event === 'dep' && !['ftd', 'active'].includes(cur.status))) {
           // Первый достаточный депозит: открываем анализ. Лид из старого бота приходит сразу с додепом без FTD:
@@ -115,6 +116,7 @@ export async function postbackRoutes(app: FastifyInstance): Promise<void> {
         } else {
           await db.query(`UPDATE leads SET status = 'active' WHERE tg_id = $1 AND status = 'ftd'`, [tgId]);
         }
+        await markConnected(tgId, tot).catch(() => {});
       } else if (cur.status === 'new') {
         await db.query(`UPDATE leads SET status = 'registered' WHERE tg_id = $1`, [tgId]);
       }

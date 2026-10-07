@@ -686,6 +686,7 @@ async function viewHome(){
       el('div',{class:'card hero'},heroArt(),
         el('h2',{style:'font-size:17px'},'Шаг 2 · Пополните счёт'),
         el('p',{class:'sm',style:'margin:0'},'Регистрация подтверждена. Чтобы открыть доступ, пополните счёт Pocket Option минимум на '+min+' $. Рекомендуем 100 $ и больше, так проще соблюдать риск-менеджмент. Доступ откроется автоматически.'),
+        me.offer?el('p',{class:'sm',style:'margin:0;color:var(--ok);font-weight:700'},'🔥 Для вас скидка '+me.offer.pct+'%: достаточно '+min+' $ до '+new Date(me.offer.until).toLocaleDateString('ru-RU',{day:'2-digit',month:'2-digit'})):null,
         got>0?el('p',{class:'sm',style:'margin:0;color:var(--acc2);font-weight:700'},'Пополнено: '+usd(got).replace(',00 $',' $')+' из '+min+' $'):null,
         el('button',{class:'btn',type:'button',onclick:()=>openLink(cfgPocketUrl())},'Открыть Pocket Option'),
         el('p',{class:'sm',style:'margin:0'},'Торговля связана с риском потери денег. Сигналы не гарантируют результат.')),

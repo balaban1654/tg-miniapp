@@ -9,6 +9,7 @@ import { createBroadcast, segmentWhere, SEGMENTS, type Button } from './push.js'
 import { randomInt, randomBytes, createHash } from 'node:crypto';
 const sha256 = (v: string) => createHash('sha256').update(v).digest('hex');
 import { accountingRoutes } from './accounting.js';
+import { connectRoutes, connectInfo } from './connect.js';
 import { toVoice, toVideoNote } from './media.js';
 import { parseReviewPhoto, cleanReviewText, cleanRating } from './reviews.js';
 import { loadDepConfig, leadTierState } from './depbonus.js';
@@ -1749,9 +1750,12 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
         canRequest: me.role === 'streamer' && r.rows[0].owner_id === me.id && Boolean(st.eligible),
       };
     }
+    // Подключение: сколько нужно внести, действующая акция, прошлые отправки (только админу, пока лид не подключён)
+    const connect = me.role === 'admin' && (!r.rows[0].lead_role || r.rows[0].lead_role === 'lead') ? await connectInfo(tgId) : null;
     return {
       fin,
       tier,
+      connect,
       lead: r.rows[0],
       country: last('country'),
       promo: last('promo'),
@@ -1832,4 +1836,5 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
   });
 
   await accountingRoutes(app, { need, str, num });
+  await connectRoutes(app, { need, str });
 }

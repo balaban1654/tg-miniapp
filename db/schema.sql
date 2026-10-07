@@ -614,3 +614,40 @@ CREATE INDEX IF NOT EXISTS lead_pockets_tg ON lead_pockets(tg_id);
 
 -- Починка статусов: лид с додепом не может оставаться в статусе FTD (раньше поздний FTD мог понизить «Активного»)
 UPDATE leads SET status = 'active' WHERE status = 'ftd' AND EXISTS (SELECT 1 FROM events e WHERE e.tg_id = leads.tg_id AND e.type = 'dep');
+
+-- Подключение: порог депозита для доступа и акции со скидкой для тех, кто ещё не подключился
+CREATE TABLE IF NOT EXISTS connect_settings (
+  id          INT PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+  min_deposit NUMERIC(10,2) NOT NULL DEFAULT 50
+);
+INSERT INTO connect_settings (id, min_deposit) VALUES (1, 50) ON CONFLICT (id) DO NOTHING;
+
+CREATE TABLE IF NOT EXISTS connect_offers (
+  id           SERIAL PRIMARY KEY,
+  name         TEXT NOT NULL,
+  discount_pct INT NOT NULL CHECK (discount_pct BETWEEN 1 AND 95),
+  days         INT NOT NULL CHECK (days BETWEEN 1 AND 60),
+  text         TEXT NOT NULL,
+  active       BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at   TIMESTAMPTZ DEFAULT now()
+);
+INSERT INTO connect_offers (name, discount_pct, days, text)
+  SELECT 'Скидка 50%', 50, 3, E'🔥 Для вас скидка {скидка}%: подключитесь всего от **{сумма}**! Предложение действует до {дата}.'
+  WHERE NOT EXISTS (SELECT 1 FROM connect_offers);
+
+CREATE TABLE IF NOT EXISTS connect_sends (
+  id               SERIAL PRIMARY KEY,
+  offer_id         INT REFERENCES connect_offers(id) ON DELETE SET NULL,
+  offer_name       TEXT NOT NULL,
+  tg_id            BIGINT NOT NULL REFERENCES leads(tg_id) ON DELETE CASCADE,
+  discount_pct     INT NOT NULL,
+  required         NUMERIC(10,2) NOT NULL,
+  sent_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+  expires_at       TIMESTAMPTZ NOT NULL,
+  sent_by          INT REFERENCES staff(id) ON DELETE SET NULL,
+  delivery         TEXT NOT NULL DEFAULT 'queued',
+  error            TEXT,
+  connected_at     TIMESTAMPTZ,
+  connected_amount NUMERIC(12,2)
+);
+CREATE INDEX IF NOT EXISTS connect_sends_tg ON connect_sends(tg_id, sent_at DESC);
