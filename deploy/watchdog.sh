@@ -36,7 +36,10 @@ get() { cat "$STATE_DIR/$1" 2>/dev/null || echo "$2"; }
 put() { printf '%s' "$2" > "$STATE_DIR/$1"; }
 
 # ---- замеры ----
-http_code() { curl -sS --max-time 15 -o /dev/null -w '%{http_code}' "$1" 2>/dev/null || echo 000; }
+# Код ответа; если соединения не вышло (DNS, сертификат, таймаут), то 000
+http_code() { local c; c="$(curl -sS --max-time 15 -o /dev/null -w '%{http_code}' "$1" 2>/dev/null)" || true; echo "${c:-000}"; }
+# Почему не открылось: первая строка ошибки curl
+http_err() { curl -sS --max-time 15 -o /dev/null "$1" 2>&1 | head -1 | cut -c1-160; }
 LOCAL_CODE="$(http_code "$LOCAL_URL")"
 EXT_CODE=""; [ -n "$EXT_URL" ] && EXT_CODE="$(http_code "$EXT_URL")"
 DISK_PCT="${FAKE_DISK_PCT:-$(df -P / | awk 'NR==2{gsub("%","",$5);print $5}')}"
@@ -74,7 +77,8 @@ check app "$([ "$LOCAL_CODE" = 200 ] && echo 1 || echo 0)" 2 "🔴 Прилож�
 # Снаружи через Cloudflare: если приложение уже упало, это то же самое, отдельно не пишем
 if [ -n "$EXT_URL" ]; then
   if [ "$LOCAL_CODE" = 200 ]; then
-    check ext "$([ "$EXT_CODE" = 200 ] && echo 1 || echo 0)" 2 "🌐 Сайт снаружи не открывается (ответ $EXT_CODE) — проверь Cloudflare и домен" "сайт снаружи открывается"
+    EXT_WHY=""; [ "$EXT_CODE" = 200 ] || EXT_WHY="$(http_err "$EXT_URL")"
+    check ext "$([ "$EXT_CODE" = 200 ] && echo 1 || echo 0)" 2 "🌐 Сайт снаружи не открывается: $EXT_URL, ответ $EXT_CODE${EXT_WHY:+ ($EXT_WHY)}. Проверь Cloudflare и домен (PUBLIC_URL в .env)" "сайт снаружи открывается"
   fi
 fi
 check disk "$([ "$DISK_PCT" -lt "$DISK_WARN" ] && echo 1 || echo 0)" 1 "💾 Диск заполнен на ${DISK_PCT}%, свободно ${DISK_FREE_MB} МБ. Нужно почистить место или увеличить диск, иначе база перестанет писаться" "места на диске достаточно"
