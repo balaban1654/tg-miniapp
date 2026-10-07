@@ -3485,8 +3485,8 @@ function cnOf(d){
 async function cnSn(d){
   const rows=await api('/connect/sends');
   const ST={connected:['подключился','p-ok'],pending:['ждём','p-pur'],expired:['срок вышел','p-bad'],failed:['не доставлено','p-bad'],queued:['отправляется','p-warn']};
-  return[ctrT(table(['Лид','Акция','Отправлено','До','Нужно','Итог'],rows.map(r=>{const st=ST[r.state]||[r.state,''];
-    return[el('td',{},el('a',{href:'#',onclick:e=>{e.preventDefault();openLeadCard(r.tg_id)},style:'color:var(--acc2)'},r.lead_name)),td(r.offer_name+' (−'+r.discount_pct+'%)'),td(fmtDT(r.sent_at)),td(fmtDT(r.expires_at)),td(cnMoney(r.required),'n'),
+  return[ctrT(table(['Лид','Акция','Отправил','Отправлено','До','Нужно','Итог'],rows.map(r=>{const st=ST[r.state]||[r.state,''];
+    return[el('td',{},el('a',{href:'#',onclick:e=>{e.preventDefault();openLeadCard(r.tg_id)},style:'color:var(--acc2)'},r.lead_name)),td(r.offer_name+' (−'+r.discount_pct+'%)'),td(r.by_name||'—'),td(fmtDT(r.sent_at)),td(fmtDT(r.expires_at)),td(cnMoney(r.required),'n'),
       el('td',{},el('span',{class:'pill '+st[1],title:r.error||''},st[0]),r.state==='connected'?el('span',{class:'mut sm'},' '+cnMoney(r.connected_amount)):null)]}),'Акции ещё не отправляли'))];
 }
 /** Окно «Предложить скидку» в карточке лида */
