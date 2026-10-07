@@ -1690,7 +1690,8 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
   app.get('/leads/today', { preHandler: auth }, async (req) => {
     const me = req.staff!;
     const r = await db.query(
-      `SELECT count(*) FILTER (WHERE status IN ('ftd','active'))::int AS paid, count(*) FILTER (WHERE status = 'registered')::int AS reg
+      `SELECT count(*)::int AS total, count(*) FILTER (WHERE status IN ('ftd','active'))::int AS paid, count(*) FILTER (WHERE status = 'registered')::int AS reg,
+              count(*) FILTER (WHERE status = 'new')::int AS fresh
          FROM leads d
         WHERE d.removed_at IS NULL AND coalesce(d.lead_role, 'lead') = 'lead' AND ${ownerScope(me, 'd.owner_id')}`,
     );
