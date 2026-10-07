@@ -1411,7 +1411,7 @@ function reviewCard(r){
     el('span',{class:'th'},el('img',{src:r.photo,alt:'',loading:'lazy'}),(()=>{const i=el('i');i.innerHTML=IC_IMG;return i})()),
     el('span',{class:'op'},'Открыть фото')):null;
   return el('div',{class:'card rv'},
-    el('div',{class:'rv-top'},el('div',{class:'ava'},(r.author||'?').slice(0,1).toUpperCase()),el('div',{},el('b',{},r.author),el('div',{class:'sm'},drDmy(r.created_at))),r.status==='pending'?el('span',{class:'rv-pend'},'На проверке'):starsEl(r.rating)),
+    el('div',{class:'rv-top'},el('div',{class:'ava'},...(()=>{const ch=(r.author||'?').slice(0,1).toUpperCase();if(!r.avatar)return[ch];const im=el('img',{src:r.avatar,alt:'',loading:'lazy'});im.addEventListener('error',()=>im.replaceWith(ch));return[im]})()),el('div',{},el('b',{},r.author),el('div',{class:'sm'},dmy(r.created_at))),r.status==='pending'?el('span',{class:'rv-pend'},'На проверке'):starsEl(r.rating)),
     r.status==='pending'?starsEl(r.rating):null,
     el('div',{class:'rv-body'},r.body),photo);
 }

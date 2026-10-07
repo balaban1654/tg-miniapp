@@ -1,5 +1,5 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
+import { createHash, createHmac, timingSafeEqual, randomBytes } from 'node:crypto';
 import { db, attachLead } from './db.js';
 import { bot } from './bot.js';
 import { config } from './config.js';
@@ -521,16 +521,60 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // Отзывы. Видны опубликованные и свои на проверке. Фото отдаётся по случайному ключу (для <img> без заголовков)
+  // Аватарка автора из Telegram. Скрытое приватностью фото повторно пробуем раз в сутки, найденное обновляем раз в неделю
+  const ensureAvatars = async (ids: string[]) => {
+    if (config.disableBot || !ids.length) return;
+    const have = (await db.query(`SELECT tg_id, (photo IS NOT NULL) AS has, fetched_at FROM tg_avatars WHERE tg_id = ANY($1::bigint[])`, [ids])).rows as { tg_id: string; has: boolean; fetched_at: Date }[];
+    const fresh = new Set(have.filter((x) => Date.now() - +new Date(x.fetched_at) < (x.has ? 7 * 86_400_000 : 86_400_000)).map((x) => String(x.tg_id)));
+    const todo = ids.filter((i) => !fresh.has(i)).slice(0, 12);
+    await Promise.allSettled(
+      todo.map(async (id) => {
+        let data: Buffer | null = null;
+        let type = 'image/jpeg';
+        try {
+          const ph = await bot.api.getUserProfilePhotos(Number(id), { limit: 1 });
+          const sizes = ph.photos[0];
+          const pick = sizes ? sizes[Math.min(1, sizes.length - 1)] : null;
+          if (pick) {
+            const f = await bot.api.getFile(pick.file_id);
+            const resp = await fetch(`https://api.telegram.org/file/bot${config.botToken}/${f.file_path}`);
+            if (resp.ok) {
+              data = Buffer.from(await resp.arrayBuffer());
+              if (f.file_path?.endsWith('.png')) type = 'image/png';
+            }
+          }
+        } catch (e) {
+          req_log(String(e));
+        }
+        await db.query(
+          `INSERT INTO tg_avatars (tg_id, photo, photo_type, key, fetched_at) VALUES ($1,$2,$3,$4,now())
+           ON CONFLICT (tg_id) DO UPDATE SET photo = EXCLUDED.photo, photo_type = EXCLUDED.photo_type, fetched_at = now()`,
+          [id, data, data ? type : null, randomBytes(12).toString('hex')],
+        );
+      }),
+    );
+  };
+  const req_log = (m: string) => console.warn('avatar:', m);
   app.get('/reviews', { preHandler: auth }, async (req) => {
     const r = await db.query(
-      `SELECT id, author, rating, body, status, created_at, photo_key, (tg_id = $1) AS mine
+      `SELECT id, tg_id, author, rating, body, status, created_at, photo_key, (tg_id = $1) AS mine
          FROM reviews WHERE status = 'published' OR (tg_id = $1 AND status = 'pending')
         ORDER BY created_at DESC, id DESC LIMIT 100`,
       [req.tg!.id],
     );
-    const rows = r.rows.map((x) => ({ ...x, photo_key: undefined, photo: x.photo_key ? `/api/app/reviews/photo/${x.photo_key}` : null }));
+    const ids = [...new Set(r.rows.map((x) => x.tg_id).filter(Boolean).map(String))] as string[];
+    await Promise.race([ensureAvatars(ids).catch(() => {}), new Promise((res) => setTimeout(res, 4000))]);
+    const av = new Map<string, string>();
+    if (ids.length) for (const a of (await db.query(`SELECT tg_id, key FROM tg_avatars WHERE tg_id = ANY($1::bigint[]) AND photo IS NOT NULL`, [ids])).rows) av.set(String(a.tg_id), a.key);
+    const rows = r.rows.map((x) => ({ ...x, tg_id: undefined, photo_key: undefined, avatar: x.tg_id && av.has(String(x.tg_id)) ? `/api/app/avatar/${av.get(String(x.tg_id))}` : null, photo: x.photo_key ? `/api/app/reviews/photo/${x.photo_key}` : null }));
     const stats = (await db.query(`SELECT count(*)::int AS n, coalesce(round(avg(rating)::numeric, 1), 0)::float AS avg FROM reviews WHERE status = 'published'`)).rows[0];
     return { items: rows, count: stats.n, avg: stats.avg };
+  });
+  app.get<{ Params: { key: string } }>('/avatar/:key', async (req, reply) => {
+    if (!/^[0-9a-f]{24}$/.test(req.params.key)) return reply.code(404).send();
+    const r = (await db.query('SELECT photo, photo_type FROM tg_avatars WHERE key = $1 AND photo IS NOT NULL', [req.params.key])).rows[0];
+    if (!r) return reply.code(404).send();
+    return reply.type(r.photo_type ?? 'image/jpeg').header('Cache-Control', 'public, max-age=86400').header('X-Content-Type-Options', 'nosniff').send(r.photo);
   });
   app.get<{ Params: { key: string } }>('/reviews/photo/:key', async (req, reply) => {
     if (!/^[0-9a-f]{24}$/.test(req.params.key)) return reply.code(404).send();

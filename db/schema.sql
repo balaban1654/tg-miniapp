@@ -663,3 +663,12 @@ BEGIN
     UPDATE connect_settings SET offers_dedup_done = TRUE WHERE id = 1;
   END IF;
 END $$;
+
+-- Аватарки пользователей из Telegram (для отзывов): ключ случайный, картинка отдаётся без авторизации по нему
+CREATE TABLE IF NOT EXISTS tg_avatars (
+  tg_id      BIGINT PRIMARY KEY,
+  photo      BYTEA,
+  photo_type TEXT,
+  key        TEXT NOT NULL,
+  fetched_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
