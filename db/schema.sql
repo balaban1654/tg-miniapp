@@ -705,3 +705,5 @@ CREATE TABLE IF NOT EXISTS signal_gifs (
 );
 ALTER TABLE signals ADD COLUMN IF NOT EXISTS gif_kind TEXT CHECK (gif_kind IN ('win','loss'));
 ALTER TABLE signals ADD COLUMN IF NOT EXISTS gif_sent_at TIMESTAMPTZ;
+ALTER TABLE signals ADD COLUMN IF NOT EXISTS result_shot BYTEA;
+ALTER TABLE signals ADD COLUMN IF NOT EXISTS result_shot_type TEXT;

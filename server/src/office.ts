@@ -1524,7 +1524,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
   }
 
   // Итог сигнала даёт человек: плюс (со входа или с перекрытия №) либо минус. Уходит всем по шаблону «Результат сигнала»
-  app.post<{ Params: { id: string } }>('/signals/:id/result', { preHandler: need('admin', 'analyst') }, async (req, reply) => {
+  app.post<{ Params: { id: string } }>('/signals/:id/result', { preHandler: need('admin', 'analyst'), bodyLimit: 9 * 1024 * 1024 }, async (req, reply) => {
     const b = (req.body ?? {}) as Record<string, unknown>;
     const result = b.result === 'win' || b.result === 'loss' ? b.result : null;
     if (!result) return reply.code(400).send({ error: 'Выберите плюс или минус' });
@@ -1536,7 +1536,15 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     if (sg.requested_by) return reply.code(400).send({ error: 'Это сигнал по запросу клиента, итог ставит сам клиент' });
     if (sg.result) return reply.code(409).send({ error: 'Результат уже отправлен' });
     if (+new Date(sg.entry_at) > Date.now()) return reply.code(409).send({ error: 'Сигнал ещё не начался' });
-    await db.query('UPDATE signals SET result = $2, result_step = $3, result_at = now(), result_by = $4 WHERE id = $1', [sg.id, result, step, req.staff!.id]);
+    // Плюс не со входа подтверждается скриншотом: он уходит вместе с результатом
+    let shot: { data: Buffer; type: string } | null = null;
+    if (result === 'win' && step) {
+      const ph = parseReviewPhoto(b.screenshot);
+      if (!ph) return reply.code(400).send({ error: 'Для плюса с перекрытия прикрепите скриншот' });
+      if (typeof ph === 'string') return reply.code(400).send({ error: ph });
+      shot = { data: ph.data, type: ph.type };
+    }
+    await db.query('UPDATE signals SET result = $2, result_step = $3, result_at = now(), result_by = $4, result_shot = $5, result_shot_type = $6 WHERE id = $1', [sg.id, result, step, req.staff!.id, shot?.data ?? null, shot?.type ?? null]);
     let pushed = 0;
     let chErrors: string[] = [];
     {
@@ -1554,6 +1562,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
         },
         createdBy: req.staff!.id,
         channelsOnly: b.push === false,
+        photo: shot,
       });
       pushed = r.users + r.channels;
       chErrors = r.chErrors ?? [];

@@ -87,12 +87,15 @@ export interface Dispatch {
   prefix?: string;
   /** Не слать клиентам в бота, только в каналы */
   channelsOnly?: boolean;
+  /** Картинка вместо картинки шаблона, например скрин плюса с перекрытия */
+  photo?: Photo | null;
 }
 
 /** Рассылает шаблон: клиентам бота по выбранному списку и в Telegram-каналы. Возвращает, сколько получателей поставлено в очередь */
 export async function dispatchTemplate(key: TemplateKey, d: Dispatch): Promise<{ users: number; channels: number; skipped?: string; chErrors?: string[] }> {
   const t = await load(key);
   if (!t || !t.enabled) return { users: 0, channels: 0, skipped: 'выключен' };
+  if (d.photo) t.photo = d.photo;
   let text = t.text;
   for (const [k, v] of Object.entries(d.vars)) text = text.replaceAll(`{${k}}`, v);
   text = (d.prefix ?? '') + text;
