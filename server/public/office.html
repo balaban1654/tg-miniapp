@@ -1946,7 +1946,7 @@ async function openLeadCard(tgId){
   // Подключение (только админ): сколько нужно, что внесено, акция
   const C=d.connect;
   const connBox=C&&!L.access&&['new','registered'].includes(L.status)?el('div',{style:'display:grid;gap:8px'},el('h4',{class:'lc-h'},'Подключение'),
-    el('div',{class:'lc-grid'},kv('Нужно пополнить',cnMoney(C.required)+' (от '+cnMoney(C.from)+')'),kv('Внесено',cnMoney(C.deposited)),
+    el('div',{class:'lc-grid'},kv('Нужно пополнить',cnMoney(C.required)+' (от '+cnMoney(C.from)+')'),...(C.deposited!==null&&C.deposited!==undefined?[kv('Внесено',cnMoney(C.deposited))]:[]),
       C.offer?kv('Акция',C.offer.name+' до '+new Date(C.offer.until).toLocaleDateString('ru-RU',{day:'2-digit',month:'2-digit',timeZone:'Europe/Kyiv'})):kv('Акция','нет')),
     ...(C.sends||[]).slice(0,2).map(q=>el('div',{class:'mut sm'},fmtDT(q.sent_at)+' · '+q.offer_name+' · '+(q.delivery==='failed'?'не доставлено':q.connected_at?'подключился':new Date(q.expires_at)<new Date()?'срок вышел':'ждём'))),
     el('div',{},el('button',{class:'btn',type:'button',disabled:C.gapDays?'':null,title:C.gapDays?'Акцию уже отправляли за последние '+C.gapDays+' дня':'',onclick:()=>connectDialog(L,C,()=>{close();openLeadCard(tgId)})},'Предложить скидку'))):null;

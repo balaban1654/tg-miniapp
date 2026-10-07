@@ -1750,8 +1750,10 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
         canRequest: me.role === 'streamer' && r.rows[0].owner_id === me.id && Boolean(st.eligible),
       };
     }
-    // Подключение: сколько нужно внести, действующая акция, прошлые отправки (только админу, пока лид не подключён)
-    const connect = me.role === 'admin' && (!r.rows[0].lead_role || r.rows[0].lead_role === 'lead') ? await connectInfo(tgId) : null;
+    // Подключение: сколько нужно внести, действующая акция, прошлые отправки (админу, а стримеру только у его лидов)
+    // Стример видит блок только у своих лидов и без суммы внесённых депозитов
+    const connectOk = me.role === 'admin' || (me.role === 'streamer' && r.rows[0].owner_id === me.id);
+    const connect = connectOk && (!r.rows[0].lead_role || r.rows[0].lead_role === 'lead') ? await connectInfo(tgId, me.role !== 'admin') : null;
     return {
       fin,
       tier,

@@ -97,7 +97,7 @@ const NOT_CONNECTED = `d.removed_at IS NULL AND coalesce(d.lead_role, 'lead') = 
 const GAP = `NOT EXISTS (SELECT 1 FROM connect_sends s WHERE s.tg_id = d.tg_id AND s.delivery <> 'failed' AND s.sent_at > now() - interval '${OFFER_GAP_DAYS} days')`;
 
 /** Данные для карточки лида: сколько нужно, что внесено, действующая акция, прошлые отправки */
-export async function connectInfo(tgId: number) {
+export async function connectInfo(tgId: number, hideDeposit = false) {
   const rq = await requiredFor(tgId);
   const dep = Number((await db.query(`SELECT coalesce(sum(amount),0) AS s FROM events WHERE tg_id = $1 AND type IN ('ftd','dep')`, [tgId])).rows[0].s);
   const offers = (await db.query(`SELECT id, name, discount_pct, days, text FROM connect_offers WHERE active ORDER BY id`)).rows as Offer[];
@@ -114,7 +114,7 @@ export async function connectInfo(tgId: number) {
     base: rq.base,
     from: r2(rq.required * TOL),
     offer: rq.offer,
-    deposited: r2(dep),
+    deposited: hideDeposit ? null : r2(dep),
     offers: offers.map((o) => ({ id: o.id, name: o.name, pct: o.discount_pct, days: o.days, text: o.text, required: r2(rq.base * (1 - o.discount_pct / 100)) })),
     sends,
     gapDays: gap ? OFFER_GAP_DAYS : 0,
@@ -190,9 +190,12 @@ export async function connectRoutes(app: FastifyInstance, h: { need: Need; str: 
   });
 
   // Отправка акции: одному лиду (tg_id), себе для проверки (test) или всем «не подключившимся» (по желанию одного стримера)
-  app.post<{ Params: { id: string } }>('/connect/offers/:id/send', { preHandler: admin }, async (req, reply) => {
-    const me = (req as any).staff as { id: number; tg_username?: string | null };
+  // Стример предлагает скидку только своим лидам и только по одному, из карточки лида. Тест и массовая рассылка у админа
+  app.post<{ Params: { id: string } }>('/connect/offers/:id/send', { preHandler: h.need('admin', 'streamer') }, async (req, reply) => {
+    const me = (req as any).staff as { id: number; role: string; tg_username?: string | null };
     const b = (req.body ?? {}) as Record<string, unknown>;
+    const mine = me.role === 'streamer';
+    if (mine && (b.test === true || b.tg_id === undefined || b.tg_id === null || b.tg_id === '')) return reply.code(403).send({ error: 'Стример предлагает скидку из карточки своего лида' });
     const o = (await db.query(`SELECT id, name, discount_pct, days, text FROM connect_offers WHERE id = $1 AND active`, [Number(req.params.id)])).rows[0] as Offer | undefined;
     if (!o) return reply.code(404).send({ error: 'Акция не найдена' });
 
@@ -218,8 +221,8 @@ export async function connectRoutes(app: FastifyInstance, h: { need: Need; str: 
 
     if (b.tg_id !== undefined && b.tg_id !== null && b.tg_id !== '') {
       const tgId = Number(b.tg_id);
-      const d = (await db.query(`SELECT d.tg_id, d.bot_started, d.bot_blocked FROM leads d WHERE d.tg_id = $1 AND ${NOT_CONNECTED}`, [tgId])).rows[0];
-      if (!d) return reply.code(409).send({ error: 'Лид уже подключён или не найден: скидка ему не нужна' });
+      const d = (await db.query(`SELECT d.tg_id, d.bot_started, d.bot_blocked FROM leads d WHERE d.tg_id = $1 AND ${NOT_CONNECTED} AND ($2::int IS NULL OR d.owner_id = $2)`, [tgId, mine ? me.id : null])).rows[0];
+      if (!d) return reply.code(409).send({ error: mine ? 'Лид не найден среди ваших или уже подключён: скидка ему не нужна' : 'Лид уже подключён или не найден: скидка ему не нужна' });
       if (!d.bot_started || d.bot_blocked) return reply.code(409).send({ error: 'Лид не запускал бота или заблокировал его: пуш не дойдёт' });
       const gap = (await db.query(`SELECT 1 FROM connect_sends s WHERE s.tg_id = $1 AND s.delivery <> 'failed' AND s.sent_at > now() - interval '${OFFER_GAP_DAYS} days' LIMIT 1`, [tgId])).rowCount;
       if (gap) return reply.code(409).send({ error: `Этому лиду акцию уже отправляли за последние ${OFFER_GAP_DAYS} дня. Подождите` });
