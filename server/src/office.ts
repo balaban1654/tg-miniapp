@@ -2043,8 +2043,9 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
         [config.adminLogin ?? ''],
       )
     ).rows[0];
+    // Лид без ссылки пришёл сам (поиск по нику в Telegram, сайт-заглушка): органический трафик, метка miniapp-org
     return r.rows.map((x) =>
-      x.lead_role && x.lead_role !== 'lead' ? { ...x, deposits: 0, commission: 0, owner_id: main?.id ?? x.owner_id, owner_name: main?.name ?? x.owner_name, link_slug: main?.slug ?? x.link_slug } : x,
+      x.lead_role && x.lead_role !== 'lead' ? { ...x, deposits: 0, commission: 0, owner_id: main?.id ?? x.owner_id, owner_name: main?.name ?? x.owner_name, link_slug: main?.slug ?? x.link_slug } : x.link_slug ? x : { ...x, link_slug: 'miniapp-org' },
     );
   });
 

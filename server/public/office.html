@@ -1949,7 +1949,7 @@ async function openLeadCard(tgId){
   const deps=ev.filter(e=>e.type==='ftd'||e.type==='dep');
   const wds=ev.filter(e=>e.type==='wd');
   const step=(t,when,extra)=>el('div',{class:'lc-step'+(when?' done':'')},el('span',{class:'lc-dot'}),el('div',{},el('b',{},t),el('div',{class:'mut sm'},when?fmtDT(when)+(extra?' · '+extra:''):'ещё нет')));
-  const origin=L.link_source||(L.link_slug?'ссылка '+L.link_slug:'не по ссылке');
+  const origin=L.link_source||(L.link_slug?'ссылка '+L.link_slug:'miniapp-org');
   const cpI=v=>{const b=el('button',{type:'button',title:'Копировать','aria-label':'Копировать',style:'background:none;border:0;color:var(--mut);cursor:pointer;padding:0 2px;display:inline-grid'},svgIcon(COPYI,14));
     b.addEventListener('click',async()=>{try{await navigator.clipboard.writeText(String(v))}catch{const t=el('textarea',{style:'position:fixed;opacity:0'});t.value=String(v);document.body.append(t);t.select();try{document.execCommand('copy')}catch{}t.remove()}toast('Скопировано: '+v)});return b};
   const kvc=(k,v)=>v?el('div',{class:'lc-kv'},el('span',{class:'mut sm'},k),el('b',{style:'display:flex;gap:6px;align-items:center'},String(v),cpI(v))):kv(k,null);
