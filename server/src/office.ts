@@ -1670,27 +1670,29 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     return { wins, win, loss, rate: win + loss ? Math.round((win / (win + loss)) * 1000) / 10 : null };
   });
 
-  // Итог каждого сигнала: общий сигнал, которому человек дал результат, или сигнал по запросу, который оценил сам клиент
-  // (первый плюс = плюс с этого шага, иначе минус). Тестовые сигналы в итоги не входят
+  // Итог сигнала в таблице: общий сигнал по результату, который дал человек; сигнал по запросу по оценке самого клиента
+  // (шаг с нуля: 0 вход, 1 первое перекрытие; первый плюс решает, иначе минус)
   const OUTCOME_CTE = `
-    SELECT s.id, s.requested_by, coalesce(s.result, st.res) AS res, coalesce(s.result_step, st.stp) AS stp
+    SELECT s.id, s.requested_by,
+           coalesce(s.result, CASE WHEN s.requested_by IS NOT NULL THEN st.res END) AS res,
+           coalesce(s.result_step, CASE WHEN s.requested_by IS NOT NULL THEN st.stp END) AS stp
       FROM signals s
       LEFT JOIN LATERAL (
         SELECT CASE WHEN bool_or(t.result = 'win') THEN 'win' WHEN bool_or(t.result = 'loss') THEN 'loss' END AS res,
-               (min(t.step) FILTER (WHERE t.result = 'win')) - 1 AS stp
-          FROM signal_steps t WHERE t.signal_id = s.id) st ON TRUE
-     WHERE NOT s.is_test`;
+               min(t.step) FILTER (WHERE t.result = 'win') AS stp
+          FROM signal_steps t WHERE t.signal_id = s.id) st ON TRUE`;
+  // Сводка по всем сигналам, которые получили и оценили в боте: стримеры, лиды и любые клиенты (тестовые тоже). Одна оценка клиента = одна запись
   app.get('/signals/history-stats', { preHandler: need('admin') }, async () => {
-    const tot = (await db.query(`WITH o AS (${OUTCOME_CTE}) SELECT count(*)::int AS total, count(*) FILTER (WHERE requested_by IS NOT NULL)::int AS requested FROM o`)).rows[0];
-    const out = (await db.query(`WITH o AS (${OUTCOME_CTE}) SELECT res, coalesce(stp, 0)::int AS step, count(*)::int AS n FROM o WHERE res IS NOT NULL GROUP BY 1, 2`)).rows;
+    const tot = (await db.query(`SELECT count(*)::int AS total, count(*) FILTER (WHERE requested_by IS NOT NULL)::int AS requested FROM signals`)).rows[0];
+    const out = (await db.query(`SELECT result, coalesce(step, 0)::int AS step, count(*)::int AS n FROM deals WHERE signal_id IS NOT NULL AND result IN ('win','loss') GROUP BY 1, 2`)).rows;
     let loss = 0;
     const wins: Record<string, number> = {};
     for (const x of out) {
-      if (x.res === 'loss') loss += x.n;
+      if (x.result === 'loss') loss += x.n;
       else wins[x.step] = (wins[x.step] ?? 0) + x.n;
     }
     const win = Object.values(wins).reduce((a, b) => a + b, 0);
-    return { total: tot.total, requested: tot.requested, wins, win, loss, rate: win + loss ? Math.round((win / (win + loss)) * 1000) / 10 : null };
+    return { total: tot.total, requested: tot.requested, rated: win + loss, wins, win, loss, rate: win + loss ? Math.round((win / (win + loss)) * 1000) / 10 : null };
   });
   // История постранично: по 50 последних, дальше можно листать
   app.get<{ Querystring: { page?: string } }>('/signals/history', { preHandler: need('admin', 'analyst') }, async (req) => {
@@ -1699,7 +1701,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     const pages = Math.max(1, Math.ceil(total / PER));
     const page = Math.min(pages, Math.max(1, Math.trunc(Number(req.query.page)) || 1));
     const r = await db.query(
-      `WITH o AS (${OUTCOME_CTE.replace('WHERE NOT s.is_test', '')})
+      `WITH o AS (${OUTCOME_CTE})
        SELECT s.id, s.pair, s.direction, s.expiry_min, s.expiry_sec, s.requested_by IS NOT NULL AS requested, s.entry_at, s.note, s.source, s.is_test, s.created_at,
               o.res, o.stp, st.name AS author,
               CASE WHEN s.requested_by IS NOT NULL THEN coalesce(l.lead_role, 'lead')

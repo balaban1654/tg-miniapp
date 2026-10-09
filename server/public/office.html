@@ -3416,6 +3416,7 @@ async function viewSignals(mode){
       sigPage=h.page;
       const stBox=!st?null:el('div',{class:'pb-tots',style:'margin:0'},
         el('span',{class:'pb-tot'},el('span',{class:'pill p-pur'},'Сигналов'),el('b',{},st.total+' шт'),el('span',{class:'mut sm'},st.requested+' по запросу')),
+        el('span',{class:'pb-tot'},el('span',{class:'pill p-pur'},'Оценок'),el('b',{},st.rated+' шт')),
         el('span',{class:'pb-tot'},el('span',{class:'pill p-ok'},'Плюс'),el('b',{},st.win+' шт')),
         ...Object.keys(st.wins).sort((a,b)=>a-b).map(k=>el('span',{class:'pb-tot'},el('span',{class:'mut sm'},k==='0'?'вход':'перекрытие '+k),el('b',{},st.wins[k]+' шт'))),
         el('span',{class:'pb-tot'},el('span',{class:'pill p-bad'},'Минус'),el('b',{},st.loss+' шт')),
