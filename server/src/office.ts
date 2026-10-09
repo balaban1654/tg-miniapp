@@ -776,9 +776,11 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     return { lead: lead.rows[0], messages: msgs.rows.reverse() };
   });
 
-  // Админ закрывает чат (скрывается, пока клиент не напишет) или очищает переписку совсем
-  app.post<{ Params: { tgId: string } }>('/chats/:tgId/close', { preHandler: need('admin') }, async (req, reply) => {
-    const r = await db.query('UPDATE leads SET chat_closed_at = now() WHERE tg_id = $1', [Number(req.params.tgId)]);
+  // Закрытый чат скрывается, пока клиент не напишет снова. Очистить переписку совсем может только админ
+  // Закрыть чат может админ, тимлидер и стример (в пределах своих чатов): он уходит из списка, переписка сохраняется
+  app.post<{ Params: { tgId: string } }>('/chats/:tgId/close', { preHandler: need('admin', 'teamlead', 'streamer') }, async (req, reply) => {
+    const me = req.staff!;
+    const r = await db.query(`UPDATE leads d SET chat_closed_at = now() WHERE d.tg_id = $1 AND ${chatScope(me, 'd.owner_id')}`, [Number(req.params.tgId)]);
     if (!r.rowCount) return reply.code(404).send({ error: 'Чат не найден' });
     return { ok: true };
   });
