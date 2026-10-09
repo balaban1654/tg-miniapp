@@ -1995,7 +1995,8 @@ async function openLeadCard(tgId){
         el('button',{class:'btn o s',type:'button','aria-label':'Закрыть',onclick:close},'✕'))),
     el('div',{class:'lc-grid'},
       kvc('Telegram ID',L.tg_id),kvc('Pocket ID',L.trader_id),...(L.pockets||[]).map((x,i)=>kvc('Pocket ID '+(i+2),x)),kv('Откуда пришёл',origin),
-      kv('Страна',countryName(d.country)),kv('Владелец',L.owner_name||'не закреплён'),kv('Часовой пояс',L.tz),
+      // На компьютере сначала «Владелец», потом «Страна»; в мобильной версии порядок прежний
+      ...(matchMedia('(min-width:521px)').matches?[kv('Владелец',L.owner_name||'не закреплён'),kv('Страна',countryName(d.country))]:[kv('Страна',countryName(d.country)),kv('Владелец',L.owner_name||'не закреплён')]),kv('Часовой пояс',L.tz),
       kvc('Промокод',d.promo),kv('Последний визит',fmtDT(L.last_seen_at))),
     el('div',{class:'lc-two2'},
       el('div',{},el('h4',{class:'lc-h'},'Путь клиента'),
