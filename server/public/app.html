@@ -120,6 +120,7 @@ main{flex:1;padding:6px 16px 96px;display:grid;gap:12px;align-content:start}
 .pshead b{font:700 16px var(--fd);white-space:nowrap}
 .pshead span{font-size:11px;text-align:right}
 .pslist{background:var(--card);border-radius:18px;overflow-y:auto;overflow-x:hidden;max-height:372px;-webkit-overflow-scrolling:touch}
+.clamp{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:4;line-clamp:4;overflow:hidden}.rd-more{background:none;border:0;color:var(--acc2);font:700 12.5px var(--fd);padding:0;cursor:pointer;justify-self:start}
 .nlike{display:inline-flex;align-items:center;gap:6px;background:none;border:1px solid var(--line);border-radius:99px;padding:6px 12px;color:var(--mut);font:700 13px var(--fd);cursor:pointer;transition:color .2s,border-color .2s,transform .15s}.nlike svg{fill:none;display:block;transition:fill .2s}.nlike.on{color:var(--bad);border-color:var(--bad)}.nlike.on svg{fill:currentColor}.nlike:active{transform:scale(.94)}
 .psstat{margin-top:10px;background:var(--card);border-radius:16px;padding:14px;display:grid;gap:10px}.psstat .t3{display:grid;grid-template-columns:repeat(3,1fr);text-align:center}.psstat .t3 b{display:block;font:800 20px var(--fd)}.psstat .t3 span{font-size:11px;color:var(--mut)}.psbar{display:flex;height:10px;border-radius:6px;overflow:hidden;background:#ffffff12}.psbar i{display:block;height:100%}.pscells{display:grid;gap:6px}.pscell{background:var(--card2);border-radius:12px;padding:8px 4px;text-align:center}.pscell b{display:block;font:800 16px var(--fd)}.pscell span{font-size:10.5px;color:var(--mut)}.psstat .sm{text-align:center;font-size:11.5px}
 .ps{overflow:hidden;transition:height .45s cubic-bezier(.2,.8,.2,1),opacity .45s ease}.ps-in{padding:14px 16px;display:grid;gap:8px}.ps+.ps{border-top:1px solid #ffffff10}
@@ -1440,6 +1441,16 @@ function reviewDialog(done){
     el('div',{class:'rv-form'},el('h3',{},'Ваш отзыв'),el('div',{class:'sm',style:'text-align:center'},'Оценка'),pick,ta,att,file,err,send,el('button',{class:'btn o',type:'button',onclick:close},'Отмена')));
   document.body.append(sh);
 }
+/** Длинный текст сворачивается до 4 строк, кнопка «Читать далее» появляется только если текст не поместился */
+function clampBody(text,cls,style){
+  const body=el('div',{class:(cls||'')+' clamp',style:style||''},text);
+  const btn=el('button',{type:'button',class:'rd-more',hidden:''},'Читать далее');
+  let open=false;
+  btn.onclick=()=>{open=!open;body.classList.toggle('clamp',!open);btn.textContent=open?'Свернуть':'Читать далее'};
+  const check=()=>{if(open||!body.isConnected)return;btn.hidden=!(body.scrollHeight>body.clientHeight+1)};
+  requestAnimationFrame(()=>requestAnimationFrame(check));[120,500,1500].forEach(t=>setTimeout(check,t));
+  return el('div',{style:'display:grid;gap:4px'},body,btn);
+}
 function reviewCard(r){
   const photo=r.photo?el('button',{class:'rv-photo',type:'button',onclick:()=>openPhotoView(r.photo),'aria-label':'Открыть фото'},
     el('span',{class:'th'},el('img',{src:r.photo,alt:'',loading:'lazy'}),(()=>{const i=el('i');i.innerHTML=IC_IMG;return i})()),
@@ -1447,7 +1458,7 @@ function reviewCard(r){
   return el('div',{class:'card rv'},
     el('div',{class:'rv-top'},el('div',{class:'ava'},...(()=>{const ch=(r.author||'?').slice(0,1).toUpperCase();if(!r.avatar)return[ch];const im=el('img',{src:r.avatar,alt:'',loading:'lazy'});im.addEventListener('error',()=>im.replaceWith(ch));return[im]})()),el('div',{},el('b',{},r.author),el('div',{class:'sm'},dmy(r.created_at))),r.status==='pending'?el('span',{class:'rv-pend'},'На проверке'):starsEl(r.rating)),
     r.status==='pending'?starsEl(r.rating):null,
-    el('div',{class:'rv-body'},r.body),photo);
+    clampBody(r.body,'rv-body'),photo);
 }
 function reviewsAll(d){
   const close=()=>{v.remove();document.removeEventListener('keydown',onKey)};
@@ -1486,7 +1497,7 @@ function newsBlock(items){
     };
     return b;
   };
-  return el('div',{style:'display:grid;gap:10px'},items.map(n=>el('div',{class:'card',style:'display:grid;gap:6px'},el('div',{class:'sm'},dt(n.created_at)),el('b',{style:'font-size:14.5px'},n.title),el('div',{style:'white-space:pre-wrap;line-height:1.5;font-size:13.5px'},n.body),el('div',{style:'display:flex;justify-content:flex-end'},likeBtn(n)))));
+  return el('div',{style:'display:grid;gap:10px'},items.map(n=>el('div',{class:'card',style:'display:grid;gap:6px'},el('div',{class:'sm'},dt(n.created_at)),el('b',{style:'font-size:14.5px'},n.title),clampBody(n.body,'','white-space:pre-wrap;line-height:1.5;font-size:13.5px;word-break:break-word'),el('div',{style:'display:flex;justify-content:flex-end'},likeBtn(n)))));
 }
 async function viewMedia(){
   if(!me)await refreshMe();
