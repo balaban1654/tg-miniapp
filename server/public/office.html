@@ -3227,7 +3227,7 @@ async function signalConfigBlock(){
       onclick:async()=>{try{await api('/signal-pairs',{method:'PUT',body:{pair:p.pair,enabled:!p.enabled,sort:p.sort}});render({soft:true})}catch(x){toast(x.message)}}},p.enabled?'Показана':'Скрыта');
     return[td(p.pair),el('td',{},en),
       el('td',{style:'white-space:nowrap'},dirBtn(p,'up','Вверх'),dirBtn(p,'down','Вниз'),
-        el('button',{class:'btn s '+(p.auto?'':'o'),type:'button',title:'Тест: направление случайное, каждую минуту своё. Выдаётся всем, но карточка помечена как тестовая',style:'margin-right:6px',onclick:()=>setDir(p.pair,'auto')},'Авто'),
+        el('button',{class:'btn s '+(p.auto?'':'o'),type:'button',title:'Направление случайное, каждую минуту своё',style:'margin-right:6px',onclick:()=>setDir(p.pair,'auto')},'Авто'),
         el('button',{class:'btn s '+(!p.auto&&!(p.direction&&p.fresh)?'':'o'),type:'button',onclick:()=>setDir(p.pair,'')},'Сброс')),
       el('td',{},isAdmin?el('button',{class:'btn o s',type:'button',onclick:async()=>{try{await api('/signal-pairs?pair='+encodeURIComponent(p.pair),{method:'DELETE'});render({soft:true})}catch(x){fail(x)}}},'Удалить'):null)];
   });
@@ -3426,7 +3426,7 @@ async function viewSignals(mode){
         ...Object.keys(st.wins).sort((a,b)=>a-b).map(k=>el('span',{class:'pb-tot'},el('span',{class:'mut sm'},k==='0'?'вход':'перекрытие '+k),el('b',{},st.wins[k]+' шт'))),
         el('span',{class:'pb-tot'},el('span',{class:'pill p-bad'},'Минус'),el('b',{},st.loss+' шт')),
         el('span',{class:'pb-tot'},el('span',{class:'pill p-pur'},'Винрейт'),el('b',{},st.rate===null?'—':st.rate+'%')));
-      const tbl=table(histCol,h.rows.map(r=>[td(t(r.created_at)),td(r.pair+(r.is_test?' (тест)':'')),el('td',{},el('span',{class:'pill '+(r.direction==='up'?'p-ok':'p-bad')},r.direction==='up'?'Вверх':'Вниз')),td(r.expiry_sec?(r.expiry_sec>=3600&&r.expiry_sec%3600===0?r.expiry_sec/3600+' ч':r.expiry_sec>=60&&r.expiry_sec%60===0?r.expiry_sec/60+' мин':r.expiry_sec+' сек'):r.expiry_min+' мин'),td(new Date(r.entry_at).toLocaleTimeString('ru-RU',{timeZone:'Europe/Kyiv',hour:'2-digit',minute:'2-digit'})),el('td',{},el('span',{class:'pill p-pur'},lroleName(r.source_role))),el('td',{},outcome(r)),td(r.taken,'n'),td(r.wins+(Object.keys(r.win_steps||{}).length?' ('+Object.entries(r.win_steps).map(([k,v])=>(k==1?'вход':'пер.'+(k-1))+' '+v).join(', ')+')':''),'n'),td(r.losses,'n')]),'Сигналов пока не было.');
+      const tbl=table(histCol,h.rows.map(r=>[td(t(r.created_at)),td(r.pair),el('td',{},el('span',{class:'pill '+(r.direction==='up'?'p-ok':'p-bad')},r.direction==='up'?'Вверх':'Вниз')),td(r.expiry_sec?(r.expiry_sec>=3600&&r.expiry_sec%3600===0?r.expiry_sec/3600+' ч':r.expiry_sec>=60&&r.expiry_sec%60===0?r.expiry_sec/60+' мин':r.expiry_sec+' сек'):r.expiry_min+' мин'),td(new Date(r.entry_at).toLocaleTimeString('ru-RU',{timeZone:'Europe/Kyiv',hour:'2-digit',minute:'2-digit'})),el('td',{},el('span',{class:'pill p-pur'},lroleName(r.source_role))),el('td',{},outcome(r)),td(r.taken,'n'),td(r.wins+(Object.keys(r.win_steps||{}).length?' ('+Object.entries(r.win_steps).map(([k,v])=>(k==1?'вход':'пер.'+(k-1))+' '+v).join(', ')+')':''),'n'),td(r.losses,'n')]),'Сигналов пока не было.');
       tbl.classList.add('ctr');
       const go=n=>()=>{sigPage=n;drawSig()};
       const pager=h.pages>1?el('div',{style:'display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap'},
@@ -3658,7 +3658,7 @@ function cnOf(d){
     if(cur.id){await api('/connect/offers/'+cur.id,{method:'PATCH',body:body()});return cur.id}
     const r=await api('/connect/offers',{method:'POST',body:body()});cur.id=r.id;connState.edit={...body(),id:r.id};return r.id};
   const save=el('button',{class:'btn',type:'button',onclick:async()=>{save.disabled=true;try{const id=await saveOffer();connState.edit=null;toast('Акция сохранена');render({soft:true})}catch(x){err.textContent=x.message;save.disabled=false}}},cur.id?'Сохранить изменения':'Создать акцию');
-  const test=el('button',{class:'btn o',type:'button',onclick:async()=>{try{const id=await saveOffer();await api('/connect/offers/'+id+'/send',{method:'POST',body:{test:true}});toast('Тест отправлен вам в бота')}catch(x){err.textContent=x.message}}},'Отправить тест мне');
+  const test=el('button',{class:'btn o',type:'button',onclick:async()=>{try{const id=await saveOffer();await api('/connect/offers/'+id+'/send',{method:'POST',body:{test:true}});toast('Отправлено вам в бота')}catch(x){err.textContent=x.message}}},'Отправить мне');
   const owner=el('select',{'aria-label':'Кому'},el('option',{value:''},'Все стримеры'),...d.audience.filter(a=>a.owner_id).map(a=>el('option',{value:a.owner_id},(a.owner_name||'Без владельца')+' · '+a.ready)));
   const ready=()=>owner.value?(d.audience.find(a=>String(a.owner_id)===owner.value)||{ready:0}).ready:d.audience.reduce((s,a)=>s+a.ready,0);
   const sendAll=el('button',{class:'btn o',type:'button'});

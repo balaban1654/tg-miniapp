@@ -214,7 +214,7 @@ export async function connectRoutes(app: FastifyInstance, h: { need: Need; str: 
       const required = r2(base * (1 - o.discount_pct / 100));
       const until = new Date(Date.now() + o.days * 86_400_000);
       const t = await loadTarget(lead.tg_id);
-      const res = await deliver(String(lead.tg_id), '[Тест]\n' + renderText(fillText(o.text, { pct: o.discount_pct, required, until }), t), buildKeyboard(OFFER_BUTTONS, t));
+      const res = await deliver(String(lead.tg_id), renderText(fillText(o.text, { pct: o.discount_pct, required, until }), t), buildKeyboard(OFFER_BUTTONS, t));
       if (!res.ok) return reply.code(502).send({ error: 'Не удалось отправить: ' + res.error });
       return { ok: true, test: true };
     }
