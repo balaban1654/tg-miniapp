@@ -1882,7 +1882,7 @@ function navLblNodes(k){
   const out=[base];
   if(c.total!==null&&c.total!==undefined)out.push(' ',el('span',{class:'nb-t'},String(c.total)));
   if(c.reg)out.push(' (',el('span',{class:'nb-r',title:'В статусе «Регистрация»'},String(c.reg)),')');
-  if(c.fresh)out.push(' ',el('span',{class:'nb-n',title:k==='chats'?'Ждут ответа':'Новые'},String(c.fresh)));
+  if(c.fresh)out.push(' ',el('span',{class:'nb-n',title:k==='chats'?'Ждут ответа':'Новые лиды за сегодня (сбрасывается в 00:00 по Киеву)'},String(c.fresh)));
   return out;
 }
 function navLblSet(k,c){

@@ -1913,12 +1913,12 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     return { ok: true, deleted: r.rowCount };
   });
 
-  // Цифра у пункта «Лиды»: все лиды с депозитом (ftd + активные) и отдельно те, что пока только зарегистрировались
+  // Цифры у пункта «Лиды»: всего, регистрации и (фиолетовая) сколько лидов пришло сегодня по Киеву, счётчик обнуляется в 00:00
   app.get('/leads/today', { preHandler: auth }, async (req) => {
     const me = req.staff!;
     const r = await db.query(
       `SELECT count(*)::int AS total, count(*) FILTER (WHERE status IN ('ftd','active'))::int AS paid, count(*) FILTER (WHERE status = 'registered')::int AS reg,
-              count(*) FILTER (WHERE status = 'new')::int AS fresh
+              count(*) FILTER (WHERE (d.created_at AT TIME ZONE 'Europe/Kyiv')::date = (now() AT TIME ZONE 'Europe/Kyiv')::date)::int AS fresh
          FROM leads d
         WHERE d.removed_at IS NULL AND coalesce(d.lead_role, 'lead') = 'lead' AND ${ownerScope(me, 'd.owner_id')}`,
     );
