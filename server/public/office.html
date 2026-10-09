@@ -1574,11 +1574,9 @@ function pocketCell(r){
   const td=el('td',{class:'n'});
   const save=async v=>{try{await api('/leads/'+r.tg_id+'/trader',{method:'PATCH',body:{trader_id:v}});render({soft:true})}catch(x){toast(x.message)}};
   const show=()=>{
-    const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
-    ['viewBox:0 0 24 24','width:15','height:15','fill:none','stroke:currentColor','stroke-width:2','stroke-linecap:round','stroke-linejoin:round'].forEach(a=>{const[k,...v]=a.split(':');svg.setAttribute(k,v.join(':'))});svg.innerHTML=PENCIL;
-    const b=el('button',{type:'button',title:'Присвоить Pocket ID','aria-label':'Изменить Pocket ID',class:'cp-btn',onclick:edit},svg);
     const cp=r.trader_id?el('button',{type:'button',title:'Скопировать Pocket ID','aria-label':'Скопировать Pocket ID',class:'cp-btn',onclick:async()=>{try{await navigator.clipboard.writeText(String(r.trader_id));toast('Pocket ID скопирован')}catch{toast('Выделите и скопируйте вручную')}}},svgIcon(COPYI)):null;
-    td.replaceChildren(el('span',{class:'cp'},r.trader_id||'—',cp,me.role==='admin'?b:null));
+    // Админ: сам номер (или тире) кнопка, нажмите, чтобы присвоить или изменить Pocket ID
+    td.replaceChildren(el('span',{class:'cp'},me.role==='admin'?el('button',{type:'button',class:'own-btn',title:'Нажмите, чтобы присвоить или изменить Pocket ID',onclick:edit},r.trader_id||'—'):(r.trader_id||'—'),cp));
   };
   const edit=()=>{
     const inp=el('input',{value:r.trader_id||'',placeholder:'Pocket ID',maxlength:'40',style:'width:130px',
