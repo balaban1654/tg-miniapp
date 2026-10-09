@@ -593,7 +593,7 @@ function showApp(){
   if(me.role==='admin')items.splice(1,0,['signals','Сигналы']);
   if(me.role==='analyst'){items.length=0;items.push(['newsig','Новый сигнал'],['signals','Сигналы']);if(!['signals','newsig'].includes(tab))tab='signals'}
   if(me.role==='admin')items.push(['push','Пуши'],['media','Медиа'],['pb','Постбеки']);
-  if(me.role==='streamer')items.splice(items.length,0,['shifts','Смены и отчёты'],['mytasks','Мои задачи']);
+  if(me.role==='streamer')items.splice(items.length,0,['signals','Сигналы'],['shifts','Смены и отчёты'],['mytasks','Мои задачи']);
   if(me.role==='admin'){items.splice(items.findIndex(x=>x[0]==='push'),0,['acc','Бухгалтерия']);items.splice(1,0,['plans','Планы и задачи'])}
   if(me.role==='admin')items.splice(items.findIndex(x=>x[0]==='leads')+1,0,['connect','Подключение']);
   if(me.role==='admin')items.splice(items.findIndex(x=>x[0]==='connect')+1,0,['newsig','Новый сигнал']);
@@ -651,7 +651,7 @@ function drawNav(){
   const nav=$('#nav');if(!nav||!me)return;
   const lay=reconcileLayout(me.nav_layout,navItems,me.role);
   const label=k=>(navItems.find(x=>x[0]===k)||[])[1]||k;
-  const mkBtn=(k,ic,sub)=>el('button',{type:'button','data-t':k,class:(k===tab?'on':'')+(sub?' sub':''),onclick:()=>{tab=k;showApp();render()}},ic?iconNamed(ic):icon(k),el('span',{class:'lbl'},...(k==='chats'||k==='leads'?navLblNodes(k):[label(k)])),k==='mytasks'?el('span',{class:'nbadge',id:'tasksBadge',hidden:''}):null,k==='signals'&&me.role==='admin'&&fraudNew?el('span',{class:'nbadge vio pulse',id:'fraudBadge',title:'Новые подозрения на фрод'},String(fraudNew)):null,k==='home'&&me.role==='streamer'&&noticeN?el('span',{class:'nbadge vio pulse',id:'noticeBadge',title:'Новые события ваших клиентов'},noticeN>99?'99+':String(noticeN)):null,k==='acc'&&me.role==='admin'?el('span',{class:'nbadge',id:'accBadge',hidden:''}):null,k==='pb'&&me.role==='admin'&&pbNew?el('span',{class:'nbadge vio pulse',id:'pbBadge',title:'Новые постбеки'},pbNew>99?'99+':String(pbNew)):null,k==='media'&&me.role==='admin'?el('span',{class:'nbadge vio pulse',id:'mediaBadge',hidden:mediaPend?null:'',title:'Новые отзывы ждут проверки'},String(mediaPend||'')):null);
+  const mkBtn=(k,ic,sub)=>el('button',{type:'button','data-t':k,class:(k===tab?'on':'')+(sub?' sub':''),onclick:()=>{tab=k;showApp();render()}},ic?iconNamed(ic):icon(k),el('span',{class:'lbl'},...(k==='chats'||k==='leads'?navLblNodes(k):[label(k)])),k==='mytasks'?el('span',{class:'nbadge',id:'tasksBadge',hidden:''}):null,k==='signals'&&['admin','streamer'].includes(me.role)&&fraudNew?el('span',{class:'nbadge vio pulse',id:'fraudBadge',title:'Новые подозрения на фрод'},String(fraudNew)):null,k==='home'&&me.role==='streamer'&&noticeN?el('span',{class:'nbadge vio pulse',id:'noticeBadge',title:'Новые события ваших клиентов'},noticeN>99?'99+':String(noticeN)):null,k==='acc'&&me.role==='admin'?el('span',{class:'nbadge',id:'accBadge',hidden:''}):null,k==='pb'&&me.role==='admin'&&pbNew?el('span',{class:'nbadge vio pulse',id:'pbBadge',title:'Новые постбеки'},pbNew>99?'99+':String(pbNew)):null,k==='media'&&me.role==='admin'?el('span',{class:'nbadge vio pulse',id:'mediaBadge',hidden:mediaPend?null:'',title:'Новые отзывы ждут проверки'},String(mediaPend||'')):null);
   const out=[];
   for(const n of lay.nodes){
     if(n.t==='i'){out.push(mkBtn(n.k,n.icon,false));continue}
@@ -672,7 +672,7 @@ async function openNavEditor(){
   const onKey=e=>{if(e.key==='Escape')close()};document.addEventListener('keydown',onKey);
   ov.addEventListener('mousedown',e=>{if(e.target===ov)close()});
   const box=el('div',{class:'lc',style:'width:min(640px,100%)'});ov.append(box);document.body.append(ov);
-  const STREAMER_ITEMS=[['home','Дашборд'],['chats','Чаты'],['leads','Лиды'],['shifts','Смены и отчёты'],['mytasks','Мои задачи']];
+  const STREAMER_ITEMS=[['home','Дашборд'],['chats','Чаты'],['leads','Лиды'],['signals','Сигналы'],['shifts','Смены и отчёты'],['mytasks','Мои задачи']];
   let target='me',streamerLay;
   try{streamerLay=(await api('/nav/streamer')).layout}catch{streamerLay=null}
   let nodes,avail,pick=null,drag=null;
@@ -1916,7 +1916,7 @@ let pbNew=0; // новые постбеки с прошлого просмотр
 async function updateBadge(){
   if(!me)return;
   if(me.role==='admin'){try{const c=await api('/reviews/count');const p=tab==='pb'?{n:0}:await api('/postbacks/count');if(c.pending!==mediaPend||p.n!==pbNew){mediaPend=c.pending;pbNew=p.n;drawNav()}}catch{}}
-  if(me.role==='admin'){try{const f=await api('/fraud/count');if(f.n!==fraudNew){fraudNew=f.n;drawNav()}}catch{}}
+  if(['admin','streamer'].includes(me.role)){try{const f=await api('/fraud/count');if(f.n!==fraudNew){fraudNew=f.n;drawNav()}}catch{}}
   if(['admin','teamlead','streamer'].includes(me.role)){
     try{const c=await api('/chats');navLblSet('chats',{total:c.length,reg:0,fresh:c.filter(x=>x.waiting).length})}catch{}
   }
@@ -3379,8 +3379,8 @@ async function signalTakers(sg){
 let newSigTab='form';
 let sigTab='hist',sigPage=1; // страница «Сигналы»: вкладка и страница истории
 async function viewSignals(mode){
-  const rows=await api('/signals');
-  const otcPairs=((await api('/signal-config').catch(()=>({pairs:[]}))).pairs||[]).filter(p=>p.enabled&&/ OTC$/.test(p.pair)).map(p=>p.pair);
+  const rows=mode==='new'?await api('/signals'):[];
+  const otcPairs=((mode==='new'?await api('/signal-config').catch(()=>({pairs:[]})):{pairs:[]}).pairs||[]).filter(p=>p.enabled&&/ OTC$/.test(p.pair)).map(p=>p.pair);
   const f={pair:el('select',{required:'','aria-label':'Пара'},el('option',{value:''},'Выберите пару'),...otcPairs.map(v=>el('option',{value:v},v))),dir:el('select',{},el('option',{value:'auto'},'Авто'),el('option',{value:'up'},'Вверх'),el('option',{value:'down'},'Вниз')),
     exp:el('select',{},el('option',{value:5},'5 сек')),enter:(()=>{const kv=d=>new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Kyiv',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'}).format(d).split(':');const [h,m,s]=kv(new Date(Date.now()+120000));const mk=(v,max,l)=>el('input',{type:'number',min:'0',max:String(max),value:v,inputmode:'numeric','aria-label':l,style:'text-align:center;min-width:0'});const H=mk(h,23,'Час'),M=mk(m,59,'Минута'),S=mk(15,59,'Секунда (всегда 15)');S.readOnly=true;S.tabIndex=-1;S.title='Секунда входа всегда 15';S.style.opacity='.75';S.style.cursor='default';const pad=x=>String(Math.max(0,Math.trunc(Number(x)||0))).padStart(2,'0');return{node:el('div',{style:'display:grid;grid-template-columns:1fr auto 1fr auto 1fr;gap:6px;align-items:center'},H,el('span',{class:'mut'},':'),M,el('span',{class:'mut'},':'),S),get value(){return pad(H.value)+':'+pad(M.value)+':15'}}})(),
     note:el('input',{placeholder:'Почему такой сигнал (необязательно)',maxlength:'200'}),
@@ -3433,7 +3433,8 @@ async function viewSignals(mode){
   const histCol=['Опубликован','Пара','Направление','Экспирация','Вход','Источник','Итог','Вошли','Плюс','Минус'];
   const outcome=r=>r.res==='win'?el('span',{class:'pill p-ok'},'Плюс · '+(r.stp?'перекрытие '+r.stp:'со входа')):r.res==='loss'?el('span',{class:'pill p-bad'},'Минус'):el('span',{class:'mut'},'—');
   const drawSig=async()=>{
-    sBar.replaceChildren(...[['hist','История'],['cfg','Настройки'],...(me.role==='admin'?[['fraud','Фрод']]:[])].map(([k,t])=>el('button',{type:'button',role:'tab','aria-selected':String(k===sigTab),class:'lc-tab'+(k===sigTab?' on':''),onclick:()=>{sigTab=k;drawSig()}},t,k==='fraud'&&fraudNew?el('span',{class:'nbadge vio pulse',style:'margin-left:6px'},String(fraudNew)):null)));
+    sBar.replaceChildren(...[['hist','История'],...(me.role==='streamer'?[]:[['cfg','Настройки']]),['fraud','Фрод']].map(([k,t])=>el('button',{type:'button',role:'tab','aria-selected':String(k===sigTab),class:'lc-tab'+(k===sigTab?' on':''),onclick:()=>{sigTab=k;drawSig()}},t,k==='fraud'&&fraudNew?el('span',{class:'nbadge vio pulse',style:'margin-left:6px'},String(fraudNew)):null)));
+    if(me.role==='streamer'&&sigTab==='cfg')sigTab='hist';
     sBody.replaceChildren(el('div',{class:'mut'},'Загрузка…'));
     try{
       if(sigTab==='cfg'){sBody.replaceChildren(await signalConfigBlock());return}
@@ -3445,7 +3446,7 @@ async function viewSignals(mode){
           table(['Обновлено','Telegram ID','Имя','Pocket ID','Минусов подряд','Всего плюс / минус','Владелец','Статус'],fr.map(f=>[td(dtf(f.updated_at)),el('td',{class:'n'},el('button',{type:'button',class:'own-btn',title:'Открыть карточку клиента',onclick:()=>openLeadCard(Number(f.tg_id))},String(f.tg_id))),td(f.username?'@'+f.username:(f.first_name||'—')),td(f.trader_id||'—'),el('td',{class:'n'},el('b',{style:'color:var(--bad)'},String(f.streak))),td(f.wins+' / '+f.losses,'n'),td(f.owner_name||'не закреплён'),el('td',{},el('span',{class:'pill '+(f.ongoing?'p-bad':'p-warn')},f.ongoing?'серия идёт':'серия оборвана'),f.fresh?el('span',{class:'pill p-pur',style:'margin-left:6px'},'новое'):null)]),'Подозрительных клиентов пока нет.'));
         return;
       }
-      const [st,h]=await Promise.all([me.role==='admin'?api('/signals/history-stats'):Promise.resolve(null),api('/signals/history?page='+sigPage)]);
+      const [st,h]=await Promise.all([['admin','streamer'].includes(me.role)?api('/signals/history-stats'):Promise.resolve(null),api('/signals/history?page='+sigPage)]);
       sigPage=h.page;
       const stBox=!st?null:el('div',{class:'pb-tots',style:'margin:0'},
         el('span',{class:'pb-tot'},el('span',{class:'pill p-pur'},'Сигналов'),el('b',{},st.total+' шт'),el('span',{class:'mut sm'},st.requested+' по запросу')),

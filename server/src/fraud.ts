@@ -19,12 +19,12 @@ export async function fraudCheck(tgId: number | string): Promise<void> {
     await db.query('UPDATE fraud_alerts SET ongoing = FALSE WHERE tg_id = $1 AND ongoing', [tgId]);
     return;
   }
-  // Новое событие (серия началась заново или выросла) снова подсвечивается как непросмотренное
+  // Запись обновляется (и снова считается новой), когда серия выросла или началась заново
   await db.query(
     `INSERT INTO fraud_alerts (tg_id, streak) VALUES ($1, $2)
      ON CONFLICT (tg_id) DO UPDATE SET
-       seen_at = CASE WHEN NOT fraud_alerts.ongoing OR EXCLUDED.streak > fraud_alerts.streak THEN NULL ELSE fraud_alerts.seen_at END,
-       streak = EXCLUDED.streak, ongoing = TRUE, updated_at = now()`,
+       updated_at = CASE WHEN NOT fraud_alerts.ongoing OR EXCLUDED.streak > fraud_alerts.streak THEN now() ELSE fraud_alerts.updated_at END,
+       streak = EXCLUDED.streak, ongoing = TRUE`,
     [tgId, streak],
   );
 }

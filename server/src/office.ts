@@ -1697,27 +1697,41 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // Кто вошёл в сигнал и как оценил: Telegram ID, Pocket ID, оценка
-  app.get<{ Params: { id: string } }>('/signals/:id/takers', { preHandler: need('admin', 'analyst') }, async (req) =>
-    (await db.query(
+  app.get<{ Params: { id: string } }>('/signals/:id/takers', { preHandler: need('admin', 'analyst', 'streamer') }, async (req) => {
+    // Стример видит только своих клиентов
+    const mine = req.staff!.role === 'streamer';
+    return (await db.query(
       `SELECT d.tg_id, l.username, l.first_name, l.trader_id, d.result, d.step, d.created_at
-         FROM deals d JOIN leads l ON l.tg_id = d.tg_id WHERE d.signal_id = $1 ORDER BY d.id`,
-      [Number(req.params.id)],
-    )).rows);
+         FROM deals d JOIN leads l ON l.tg_id = d.tg_id WHERE d.signal_id = $1 AND ($2::int IS NULL OR l.owner_id = $2) ORDER BY d.id`,
+      [Number(req.params.id), mine ? req.staff!.id : null],
+    )).rows;
+  });
   // Фрод: клиенты, поставившие подряд минус более трёх сигналам
-  app.get('/fraud', { preHandler: need('admin') }, async () =>
-    (await db.query(
-      `SELECT f.tg_id, f.streak, f.ongoing, f.created_at, f.updated_at, f.seen_at IS NULL AS fresh,
+  app.get('/fraud', { preHandler: need('admin', 'streamer') }, async (req) => {
+    const me = req.staff!;
+    const seen = (await db.query('SELECT fraud_seen_at FROM staff WHERE id = $1', [me.id])).rows[0]?.fraud_seen_at ?? null;
+    return (await db.query(
+      `SELECT f.tg_id, f.streak, f.ongoing, f.created_at, f.updated_at, ($2::timestamptz IS NULL OR f.updated_at > $2::timestamptz) AS fresh,
               l.username, l.first_name, l.trader_id, o.name AS owner_name,
               (SELECT count(*)::int FROM deals x WHERE x.tg_id = f.tg_id AND x.signal_id IS NOT NULL AND x.result = 'win') AS wins,
               (SELECT count(*)::int FROM deals x WHERE x.tg_id = f.tg_id AND x.signal_id IS NOT NULL AND x.result = 'loss') AS losses
          FROM fraud_alerts f JOIN leads l ON l.tg_id = f.tg_id LEFT JOIN staff o ON o.id = l.owner_id
-        ORDER BY (f.seen_at IS NULL) DESC, f.updated_at DESC LIMIT 200`,
-    )).rows);
-  app.get('/fraud/count', { preHandler: need('admin') }, async () => ({
-    n: Number((await db.query('SELECT count(*)::int AS n FROM fraud_alerts WHERE seen_at IS NULL')).rows[0].n),
-  }));
-  app.post('/fraud/seen', { preHandler: need('admin') }, async () => {
-    await db.query('UPDATE fraud_alerts SET seen_at = now() WHERE seen_at IS NULL');
+        WHERE ($1::int IS NULL OR l.owner_id = $1)
+        ORDER BY f.updated_at DESC LIMIT 200`,
+      [me.role === 'streamer' ? me.id : null, seen],
+    )).rows;
+  });
+  app.get('/fraud/count', { preHandler: need('admin', 'streamer') }, async (req) => {
+    const me = req.staff!;
+    const r = await db.query(
+      `SELECT count(*)::int AS n FROM fraud_alerts f JOIN leads l ON l.tg_id = f.tg_id, staff s
+        WHERE s.id = $1 AND ($2::int IS NULL OR l.owner_id = $2) AND (s.fraud_seen_at IS NULL OR f.updated_at > s.fraud_seen_at)`,
+      [me.id, me.role === 'streamer' ? me.id : null],
+    );
+    return { n: Number(r.rows[0].n) };
+  });
+  app.post('/fraud/seen', { preHandler: need('admin', 'streamer') }, async (req) => {
+    await db.query('UPDATE staff SET fraud_seen_at = now() WHERE id = $1', [req.staff!.id]);
     return { ok: true };
   });
 
@@ -1733,7 +1747,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
                min(t.step) FILTER (WHERE t.result = 'win') AS stp
           FROM signal_steps t WHERE t.signal_id = s.id) st ON TRUE`;
   // Сводка по всем сигналам, которые получили и оценили в боте: стримеры, лиды и любые клиенты (тестовые тоже). Одна оценка клиента = одна запись
-  app.get('/signals/history-stats', { preHandler: need('admin') }, async () => {
+  app.get('/signals/history-stats', { preHandler: need('admin', 'streamer') }, async () => {
     const tot = (await db.query(`SELECT count(*)::int AS total, count(*) FILTER (WHERE requested_by IS NOT NULL)::int AS requested FROM signals`)).rows[0];
     const out = (await db.query(`SELECT result, coalesce(step, 0)::int AS step, count(*)::int AS n FROM deals WHERE signal_id IS NOT NULL AND result IN ('win','loss') GROUP BY 1, 2`)).rows;
     let loss = 0;
@@ -1746,7 +1760,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     return { total: tot.total, requested: tot.requested, rated: win + loss, wins, win, loss, rate: win + loss ? Math.round((win / (win + loss)) * 1000) / 10 : null };
   });
   // История постранично: по 50 последних, дальше можно листать
-  app.get<{ Querystring: { page?: string } }>('/signals/history', { preHandler: need('admin', 'analyst') }, async (req) => {
+  app.get<{ Querystring: { page?: string } }>('/signals/history', { preHandler: need('admin', 'analyst', 'streamer') }, async (req) => {
     const PER = 50;
     const total = Number((await db.query('SELECT count(*)::int AS n FROM signals')).rows[0].n);
     const pages = Math.max(1, Math.ceil(total / PER));

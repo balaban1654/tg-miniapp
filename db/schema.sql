@@ -744,3 +744,6 @@ CREATE TABLE IF NOT EXISTS fraud_alerts (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   seen_at    TIMESTAMPTZ
 );
+
+-- Фрод: у каждого сотрудника своя отметка «просмотрено» (у стримера свой кружок, у админа свой)
+ALTER TABLE staff ADD COLUMN IF NOT EXISTS fraud_seen_at TIMESTAMPTZ;
