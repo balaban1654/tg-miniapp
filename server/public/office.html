@@ -203,6 +203,7 @@ th.n{text-align:right}
 .nb-t{font-weight:700}.nb-r{color:var(--reg,#ffd54d);font-weight:700}
 .day-sep>td{box-shadow:inset 0 3px 0 rgba(155,92,255,.6)}
 #ptr{position:fixed;left:50%;top:70px;width:38px;height:38px;border-radius:50%;background:var(--card2);border:1px solid var(--line);display:grid;place-items:center;opacity:0;z-index:90;pointer-events:none;transform:translate(-50%,-40px);color:var(--acc2);box-shadow:0 6px 18px rgba(0,0,0,.45);transition:opacity .15s}#ptr.ready{border-color:var(--acc);color:#fff}#ptr.spin svg{animation:ptrspin .8s linear infinite}@keyframes ptrspin{to{transform:rotate(360deg)}}
+.bub small .tk{margin-left:6px;font-weight:800;opacity:.75;letter-spacing:-1px}.bub small .tk.rd{color:#8fe3ff;opacity:1}
 .own-btn{background:none;border:0;color:inherit;font:inherit;cursor:pointer;padding:3px 8px;border-radius:8px}.own-btn:hover,.own-btn:focus-visible{background:var(--card2);outline:none}
 .nb-n{color:#fff;font-weight:800;background:var(--acc);border-radius:99px;display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 5px;font-size:11px;line-height:1;vertical-align:middle;animation:nbPulse 1.8s ease-in-out infinite}
 @keyframes nbPulse{0%,100%{opacity:1;box-shadow:0 0 0 0 #9b5cff55}50%{opacity:.45;box-shadow:0 0 10px 3px #9b5cff66}}
@@ -3000,11 +3001,11 @@ async function viewChats(){
     const d=await api('/chats/'+active);
     const near=msgs.scrollHeight-msgs.scrollTop-msgs.clientHeight<80;
     const L={href:profileUrl(d.lead),target:'_blank',rel:'noopener',title:'Открыть профиль в Telegram',style:'color:#6cb4ff;text-decoration:none'};
-    head.replaceChildren(backBtn,el('div',{},d.lead.username?[d.lead.first_name?el('b',{style:'margin-right:8px'},d.lead.first_name):null,el('a',{...L,style:L.style+';font-weight:600'},'@'+d.lead.username)]:el('a',{...L,style:L.style+';font-weight:700'},cname(d.lead))),el('span',{class:'mut sm'},'Telegram ID '+d.lead.tg_id+' · Pocket ID '+(d.lead.trader_id||'нет')+' · '+(d.lead.owner_name?'ведёт '+d.lead.owner_name:'не закреплён')),
+    head.replaceChildren(backBtn,el('div',{},d.lead.username?[d.lead.first_name?el('b',{style:'margin-right:8px'},d.lead.first_name):null,el('a',{...L,style:L.style+';font-weight:600'},'@'+d.lead.username)]:el('a',{...L,style:L.style+';font-weight:700'},cname(d.lead))),el('span',{class:'mut sm'},'Telegram ID ',el('button',{type:'button',class:'own-btn',style:'padding:0 4px',title:'Открыть карточку лида',onclick:()=>openLeadCard(Number(d.lead.tg_id))},String(d.lead.tg_id)),' · Pocket ID '+(d.lead.trader_id||'нет')+' · '+(d.lead.owner_name?'ведёт '+d.lead.owner_name:'не закреплён')),
       el('div',{class:'inl',style:'margin-top:6px'},
         el('button',{class:'btn o s',type:'button',title:'Скрыть чат из списка, пока клиент не напишет снова. История сохраняется',onclick:()=>chatDone(d.lead.tg_id,'close')},'Закрыть чат'),
         me.role==='admin'?el('button',{class:'btn o s',type:'button',style:'color:var(--bad)',title:'Удалить всю переписку',onclick:()=>chatDone(d.lead.tg_id,'clear')},'Очистить переписку'):null));
-    msgs.replaceChildren(...d.messages.map(m=>{
+    msgs.replaceChildren(...d.messages.map((m,mi)=>{
       const body=[];
       const url='/api/office/chats/'+d.lead.tg_id+'/file/'+m.id;
       const lost=n=>n.addEventListener('error',()=>n.replaceWith(el('span',{class:'mut'},'Файл не открылся (Telegram отдаёт боту файлы до 20 МБ)')),{once:true});
@@ -3022,7 +3023,9 @@ async function viewChats(){
       }
       else if(!m.text)body.push(el('span',{class:'mut'},'['+m.kind+']'));
       if(m.text)body.push(m.text);
-      body.push(el('small',{},(m.direction==='out'?(m.staff_name||'Команда')+' · ':'')+new Date(m.created_at).toLocaleString('ru-RU',{timeZone:'Europe/Kyiv',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})));
+      // Галочки у наших сообщений: ✓ отправлено клиенту, ✓✓ клиент написал после этого сообщения (Telegram не отдаёт боту настоящие отметки о прочтении)
+      const rd=m.direction==='out'&&d.messages.slice(mi+1).some(x=>x.direction==='in');
+      body.push(el('small',{},(m.direction==='out'?(m.staff_name||'Команда')+' · ':'')+new Date(m.created_at).toLocaleString('ru-RU',{timeZone:'Europe/Kyiv',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}),m.direction==='out'?el('span',{class:'tk'+(rd?' rd':''),title:rd?'Клиент ответил после этого сообщения':'Отправлено клиенту'},rd?'✓✓':'✓'):null));
       return el('div',{class:'bub '+m.direction},body);
     }));
     if(near||!msgs.dataset.init){msgs.scrollTop=msgs.scrollHeight;msgs.dataset.init='1'}
