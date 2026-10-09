@@ -120,7 +120,7 @@ main{flex:1;padding:6px 16px 96px;display:grid;gap:12px;align-content:start}
 .pshead b{font:700 16px var(--fd);white-space:nowrap}
 .pshead span{font-size:11px;text-align:right}
 .pslist{background:var(--card);border-radius:18px;overflow-y:auto;overflow-x:hidden;max-height:372px;-webkit-overflow-scrolling:touch}
-.psstat{margin-top:10px;background:var(--card);border-radius:16px;padding:12px 14px;display:grid;gap:8px}.psstat .t3{display:grid;grid-template-columns:repeat(3,1fr);text-align:center}.psstat .t3 b{display:block;font:800 19px var(--fd)}.psstat .t3 span{font-size:11px;color:var(--mut)}.psstat .sm{text-align:center;font-size:11.5px}
+.psstat{margin-top:10px;background:var(--card);border-radius:16px;padding:14px;display:grid;gap:10px}.psstat .t3{display:grid;grid-template-columns:repeat(3,1fr);text-align:center}.psstat .t3 b{display:block;font:800 20px var(--fd)}.psstat .t3 span{font-size:11px;color:var(--mut)}.psbar{display:flex;height:10px;border-radius:6px;overflow:hidden;background:#ffffff12}.psbar i{display:block;height:100%}.pscells{display:grid;gap:6px}.pscell{background:var(--card2);border-radius:12px;padding:8px 4px;text-align:center}.pscell b{display:block;font:800 16px var(--fd)}.pscell span{font-size:10.5px;color:var(--mut)}.psstat .sm{text-align:center;font-size:11.5px}
 .ps{overflow:hidden;transition:height .45s cubic-bezier(.2,.8,.2,1),opacity .45s ease}.ps-in{padding:14px 16px;display:grid;gap:8px}.ps+.ps{border-top:1px solid #ffffff10}
 .pbadge{border:1px solid;border-radius:8px;padding:4px 12px;font-size:13px;font-weight:600;white-space:nowrap}
 .pbadge.w{color:var(--ok);border-color:var(--ok);background:#3ddc9712}.pbadge.l{color:var(--bad);border-color:var(--bad);background:#ff6b8a12}.pbadge.n{color:var(--mut);border-color:var(--line)}
@@ -839,10 +839,12 @@ async function pastSignals(){
     if(!st||!st.rated){statBox.replaceChildren();return}
     const pc=st.rate===null?'—':String(st.rate).replace('.',',')+'%';
     const keys=Object.keys(st.wins).sort((a,b)=>a-b);
-    const parts=keys.map(k=>(k==='0'?'Вход ':'Перекрытие '+k+' ')+st.wins[k]);
+    const wp=st.win+st.loss?st.win/(st.win+st.loss)*100:0;
     statBox.replaceChildren(el('div',{class:'psstat'},
       el('div',{class:'t3'},el('div',{},el('b',{style:'color:var(--ok)'},String(st.win)),el('span',{},'Плюс')),el('div',{},el('b',{style:'color:var(--bad)'},String(st.loss)),el('span',{},'Минус')),el('div',{},el('b',{},pc),el('span',{},'Винрейт'))),
-      el('div',{class:'sm mut'},'Оценок: '+st.rated+(parts.length?' · плюсы: '+parts.join(' · '):''))));
+      el('div',{class:'psbar',role:'img','aria-label':'Плюсов '+pc},el('i',{style:'width:'+wp+'%;background:var(--ok)'}),el('i',{style:'width:'+(100-wp)+'%;background:var(--bad)'})),
+      keys.length?el('div',{class:'pscells',style:'grid-template-columns:repeat('+Math.min(keys.length,4)+',1fr)'},...keys.map(k=>el('div',{class:'pscell'},el('b',{},String(st.wins[k])),el('span',{},k==='0'?'Вход':'Перекр. '+k)))):null,
+      el('div',{class:'sm mut'},'Всего оценок: '+st.rated)));
   };
   const loadStat=async()=>{try{drawStat(await api('/signals/stats'))}catch{}};
   const fetchRows=async()=>{const rows=await api('/signals/past?limit='+limit);more=rows.length>=limit;return rows};
