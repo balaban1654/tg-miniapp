@@ -1350,6 +1350,30 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     return r.rows;
   });
 
+  // Новости команды для вкладки «Медиа» в Mini App
+  app.get('/news', { preHandler: need('admin') }, async () =>
+    (await db.query(`SELECT n.id, n.title, n.body, n.created_at, s.name AS author FROM news n LEFT JOIN staff s ON s.id = n.created_by ORDER BY n.id DESC LIMIT 200`)).rows);
+  app.post('/news', { preHandler: need('admin') }, async (req, reply) => {
+    const b = (req.body ?? {}) as Record<string, unknown>;
+    const title = str(b.title, 120), body = str(b.body, 3000);
+    if (!title) return reply.code(400).send({ error: 'Укажите заголовок' });
+    if (!body) return reply.code(400).send({ error: 'Напишите текст новости' });
+    const r = await db.query('INSERT INTO news (title, body, created_by) VALUES ($1,$2,$3) RETURNING id', [title, body, req.staff!.id]);
+    return { ok: true, id: r.rows[0].id };
+  });
+  app.put<{ Params: { id: string } }>('/news/:id', { preHandler: need('admin') }, async (req, reply) => {
+    const b = (req.body ?? {}) as Record<string, unknown>;
+    const title = str(b.title, 120), body = str(b.body, 3000);
+    if (!title || !body) return reply.code(400).send({ error: 'Заполните заголовок и текст' });
+    const r = await db.query('UPDATE news SET title = $2, body = $3 WHERE id = $1', [Number(req.params.id), title, body]);
+    if (!r.rowCount) return reply.code(404).send({ error: 'Новость не найдена' });
+    return { ok: true };
+  });
+  app.delete<{ Params: { id: string } }>('/news/:id', { preHandler: need('admin') }, async (req) => {
+    await db.query('DELETE FROM news WHERE id = $1', [Number(req.params.id)]);
+    return { ok: true };
+  });
+
   // Медиа для Mini App: трейдеры и каналы
   app.get('/media', { preHandler: need('admin') }, async () => {
     return (await db.query('SELECT id, kind, title, subtitle, url, country, contact_url, staff_id, sort, active FROM media_items ORDER BY kind DESC, sort, id')).rows;

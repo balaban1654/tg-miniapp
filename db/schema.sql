@@ -721,3 +721,13 @@ BEGIN
     INSERT INTO app_flags (key) VALUES ('connect_revert_repair');
   END IF;
 END $$;
+
+-- Новости команды: публикуются в Office (Медиа → Новости) и показываются в мини-аппе, вкладка «Медиа»
+CREATE TABLE IF NOT EXISTS news (
+  id         SERIAL PRIMARY KEY,
+  title      TEXT NOT NULL,
+  body       TEXT NOT NULL,
+  created_by INT REFERENCES staff(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS news_created ON news (created_at DESC);

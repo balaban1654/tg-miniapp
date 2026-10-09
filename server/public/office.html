@@ -3440,7 +3440,7 @@ async function viewSignals(mode){
   return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Сигналы')),sBar,sBody];
 }
 
-let mediaEdit=null;
+let mediaEdit=null,mediaTab='ch';
 const COUNTRIES=[['UA','Украина'],['RU','Россия'],['KZ','Казахстан'],['BY','Беларусь'],['UZ','Узбекистан'],['GE','Грузия'],['AM','Армения'],['AZ','Азербайджан'],['MD','Молдова'],['KG','Кыргызстан'],['PL','Польша'],['LT','Литва'],['LV','Латвия'],['EE','Эстония'],['DE','Германия'],['GB','Великобритания'],['US','США'],['TR','Турция'],['AE','ОАЭ'],['CY','Кипр'],['IL','Израиль'],['ES','Испания'],['IT','Италия'],['FR','Франция'],['CZ','Чехия'],['BR','Бразилия'],['IN','Индия'],['ID','Индонезия'],['VN','Вьетнам'],['TH','Таиланд']];
 const countrySel=()=>el('select',{'aria-label':'Страна'},el('option',{value:''},'Без флага'),COUNTRIES.map(([c,n])=>el('option',{value:c},c+' · '+n)));
 async function viewMedia(){
@@ -3466,14 +3466,50 @@ async function viewMedia(){
     return[el('td',{},e.kind),el('td',{},el('div',{style:'display:grid;gap:6px;min-width:170px'},e.title,e.country,e.contact,e.staff)),el('td',{},e.sub),el('td',{},e.url),el('td',{style:'white-space:nowrap'},e.sort,iconBtn('ok','Сохранить',save),txtBtn('Отмена',()=>{mediaEdit=null;render({soft:true})}))];
   }
   const viewRow=r=>[td(r.kind==='trader'?'Трейдер':'Канал'),td(r.title+(r.country?', '+r.country:'')+(r.contact_url?' · '+r.contact_url.replace('https://t.me/','@'):'')+(r.staff_id?' · эфир: '+((streamers.find(x=>x.id===r.staff_id)||{}).name||'стример'):'')),td(r.subtitle||'—'),el('td',{},el('code',{},r.url)),el('td',{style:'white-space:nowrap'},iconBtn('pen','Изменить',()=>{mediaEdit=r.id;render({soft:true})}),txtBtn('Удалить',async()=>{await api('/media/'+r.id,{method:'DELETE'});render({soft:true})}))];
-  return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Медиа в Mini App')),form,
-    table(['Тип','Имя, страна','Подпись','Ссылка',''],rows.map(r=>r.id===mediaEdit?editRow(r):viewRow(r)),'Пока пусто. Добавьте трейдеров и каналы, они появятся во вкладке «Медиа» в Mini App.'),rowErr,...await reviewsAdmin()];
+  // Вкладки: «Каналы и трейдеры», «Новости», «Отзывы»
+  const MT=[['ch','Каналы и трейдеры'],['news','Новости'],['rev','Отзывы']];
+  const mBar=el('div',{class:'lc-tabs',role:'tablist'}),mBody=el('div',{style:'display:grid;gap:14px'});
+  const drawM=async()=>{
+    mBar.replaceChildren(...MT.map(([k,t])=>el('button',{type:'button',role:'tab','aria-selected':String(k===mediaTab),class:'lc-tab'+(k===mediaTab?' on':''),onclick:()=>{mediaTab=k;drawM()}},t)));
+    if(mediaTab==='ch'){mBody.replaceChildren(form,
+    table(['Тип','Имя, страна','Подпись','Ссылка',''],rows.map(r=>r.id===mediaEdit?editRow(r):viewRow(r)),'Пока пусто. Добавьте трейдеров и каналы, они появятся во вкладке «Медиа» в Mini App.'),rowErr);return}
+    mBody.replaceChildren(el('div',{class:'mut'},'Загрузка…'));
+    try{mBody.replaceChildren(...(mediaTab==='news'?await newsAdmin():await reviewsAdmin()))}catch(x){mBody.replaceChildren(el('div',{class:'err'},x.message))}
+  };
+  drawM();
+  return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Медиа в Mini App')),mBar,mBody];
 }
 
 let reviewEdit=null;
 const RV_STATUS={pending:'На проверке',published:'Опубликован',hidden:'Скрыт'};
 const starsTxt=n=>el('span',{style:'color:var(--warn);letter-spacing:1px;white-space:nowrap',title:n+' из 5'},'★'.repeat(n),el('span',{style:'color:#ffffff30'},'★'.repeat(5-n)));
 const ratingSel=(v)=>{const s=el('select',{'aria-label':'Оценка'},...[5,4,3,2,1].map(n=>el('option',{value:n},'★'.repeat(n)+' '+n)));s.value=String(v||5);return s};
+/** Новости команды: что написали здесь, то видно в мини-аппе во вкладке «Медиа», свежие сверху */
+async function newsAdmin(){
+  const rows=await api('/news');
+  let editId=null;
+  const title=el('input',{placeholder:'Заголовок',maxlength:'120'}),text=el('textarea',{class:'big',rows:'5',maxlength:'3000',placeholder:'Текст новости'});
+  const err=el('div',{class:'err',role:'alert'});
+  const okBtn=el('button',{class:'btn',type:'button'},'Опубликовать');
+  const cancel=el('button',{class:'btn o',type:'button',hidden:'',onclick:()=>{editId=null;title.value='';text.value='';okBtn.textContent='Опубликовать';cancel.hidden=true}},'Отмена');
+  okBtn.onclick=async()=>{err.textContent='';okBtn.disabled=true;
+    try{await api(editId?'/news/'+editId:'/news',{method:editId?'PUT':'POST',body:{title:title.value,body:text.value}});toast(editId?'Новость сохранена':'Новость опубликована');render({soft:true})}
+    catch(x){err.textContent=x.message;okBtn.disabled=false}};
+  const form=el('div',{class:'card',style:'display:grid;gap:10px'},el('b',{style:'font-size:14px'},'Новая новость'),
+    el('label',{},'Заголовок',title),el('label',{},'Текст',text),
+    el('div',{class:'mut sm'},'Новость сразу появляется в мини-аппе, во вкладке «Медиа», блок «Новости команды». Свежие сверху.'),
+    el('div',{style:'display:flex;gap:8px;flex-wrap:wrap'},okBtn,cancel),err);
+  const dt=v=>new Date(v).toLocaleString('ru-RU',{timeZone:'Europe/Kyiv',day:'numeric',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit'});
+  const item=r=>{
+    const del=el('button',{class:'btn o s',type:'button',onclick:()=>{del.hidden=true;sure.hidden=false}},'Удалить');
+    const sure=el('span',{hidden:'',style:'display:inline-flex;gap:6px;align-items:center'},el('span',{class:'mut sm'},'Удалить новость?'),
+      el('button',{class:'btn s',type:'button',onclick:async()=>{try{await api('/news/'+r.id,{method:'DELETE'});render({soft:true})}catch(x){toast(x.message)}}},'Да'),
+      el('button',{class:'btn o s',type:'button',onclick:()=>{sure.hidden=true;del.hidden=false}},'Нет'));
+    const ed=el('button',{class:'btn o s',type:'button',onclick:()=>{editId=r.id;title.value=r.title;text.value=r.body;okBtn.textContent='Сохранить';cancel.hidden=false;form.scrollIntoView({behavior:'smooth',block:'center'})}},'Изменить');
+    return el('div',{class:'card',style:'display:grid;gap:6px'},el('div',{class:'mut sm'},dt(r.created_at)+(r.author?' · '+r.author:'')),el('b',{},r.title),el('div',{style:'white-space:pre-wrap;line-height:1.5'},r.body),el('div',{style:'display:flex;gap:8px;flex-wrap:wrap;align-items:center'},ed,del,sure));
+  };
+  return[form,...(rows.length?rows.map(item):[el('div',{class:'mut'},'Новостей пока нет.')])];
+}
 async function reviewsAdmin(){
   const rows=await api('/reviews');
   if(!rows.some(r=>r.id===reviewEdit))reviewEdit=null;

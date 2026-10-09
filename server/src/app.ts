@@ -515,6 +515,10 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
     return { ok: true };
   });
 
+  // Новости команды: свежие сверху
+  app.get('/news', { preHandler: auth }, async () =>
+    (await db.query('SELECT id, title, body, created_at FROM news ORDER BY id DESC LIMIT 30')).rows);
+
   app.get('/media', { preHandler: auth }, async () => {
     // live: ссылка на эфир, пока у привязанного стримера идёт смена
     const r = await db.query(
