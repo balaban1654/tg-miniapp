@@ -1670,6 +1670,50 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     return { wins, win, loss, rate: win + loss ? Math.round((win / (win + loss)) * 1000) / 10 : null };
   });
 
+  // Итог каждого сигнала: общий сигнал, которому человек дал результат, или сигнал по запросу, который оценил сам клиент
+  // (первый плюс = плюс с этого шага, иначе минус). Тестовые сигналы в итоги не входят
+  const OUTCOME_CTE = `
+    SELECT s.id, s.requested_by, coalesce(s.result, st.res) AS res, coalesce(s.result_step, st.stp) AS stp
+      FROM signals s
+      LEFT JOIN LATERAL (
+        SELECT CASE WHEN bool_or(t.result = 'win') THEN 'win' WHEN bool_or(t.result = 'loss') THEN 'loss' END AS res,
+               (min(t.step) FILTER (WHERE t.result = 'win')) - 1 AS stp
+          FROM signal_steps t WHERE t.signal_id = s.id) st ON TRUE
+     WHERE NOT s.is_test`;
+  app.get('/signals/history-stats', { preHandler: need('admin') }, async () => {
+    const tot = (await db.query(`WITH o AS (${OUTCOME_CTE}) SELECT count(*)::int AS total, count(*) FILTER (WHERE requested_by IS NOT NULL)::int AS requested FROM o`)).rows[0];
+    const out = (await db.query(`WITH o AS (${OUTCOME_CTE}) SELECT res, coalesce(stp, 0)::int AS step, count(*)::int AS n FROM o WHERE res IS NOT NULL GROUP BY 1, 2`)).rows;
+    let loss = 0;
+    const wins: Record<string, number> = {};
+    for (const x of out) {
+      if (x.res === 'loss') loss += x.n;
+      else wins[x.step] = (wins[x.step] ?? 0) + x.n;
+    }
+    const win = Object.values(wins).reduce((a, b) => a + b, 0);
+    return { total: tot.total, requested: tot.requested, wins, win, loss, rate: win + loss ? Math.round((win / (win + loss)) * 1000) / 10 : null };
+  });
+  // История постранично: по 50 последних, дальше можно листать
+  app.get<{ Querystring: { page?: string } }>('/signals/history', { preHandler: need('admin', 'analyst') }, async (req) => {
+    const PER = 50;
+    const total = Number((await db.query('SELECT count(*)::int AS n FROM signals')).rows[0].n);
+    const pages = Math.max(1, Math.ceil(total / PER));
+    const page = Math.min(pages, Math.max(1, Math.trunc(Number(req.query.page)) || 1));
+    const r = await db.query(
+      `WITH o AS (${OUTCOME_CTE.replace('WHERE NOT s.is_test', '')})
+       SELECT s.id, s.pair, s.direction, s.expiry_min, s.expiry_sec, s.requested_by IS NOT NULL AS requested, s.entry_at, s.note, s.source, s.is_test, s.created_at,
+              o.res, o.stp, st.name AS author,
+              CASE WHEN s.requested_by IS NOT NULL THEN coalesce(l.lead_role, 'lead')
+                   ELSE CASE st.role WHEN 'teamlead' THEN 'moder' WHEN 'admin' THEN 'admin' WHEN 'streamer' THEN 'streamer' WHEN 'buyer' THEN 'buyer' ELSE 'analyst' END END AS source_role,
+              (SELECT count(*)::int FROM deals x WHERE x.signal_id = s.id) AS taken,
+              (SELECT count(*)::int FROM deals x WHERE x.signal_id = s.id AND x.result = 'win') AS wins,
+              (SELECT count(*)::int FROM deals x WHERE x.signal_id = s.id AND x.result = 'loss') AS losses,
+              (SELECT coalesce(json_object_agg(t.step + 1, t.c), '{}'::json) FROM (SELECT step, count(*)::int AS c FROM deals x WHERE x.signal_id = s.id AND x.result = 'win' AND x.step IS NOT NULL GROUP BY step) t) AS win_steps
+         FROM signals s JOIN o ON o.id = s.id LEFT JOIN staff st ON st.id = s.created_by LEFT JOIN leads l ON l.tg_id = s.requested_by
+        ORDER BY s.id DESC LIMIT ${PER} OFFSET ${(page - 1) * PER}`,
+    );
+    return { rows: r.rows, total, page, pages, per: PER };
+  });
+
   app.get('/signals', { preHandler: need('admin', 'analyst') }, async () => {
     const r = await db.query(
       `SELECT s.id, s.pair, s.direction, s.expiry_min, s.expiry_sec, s.requested_by IS NOT NULL AS requested, s.entry_at, s.note, s.source, s.is_test, s.created_at, s.result, s.result_step, s.result_at, s.gif_kind, s.gif_sent_at, st.name AS author,
