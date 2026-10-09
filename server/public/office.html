@@ -3,6 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<script>
+// iOS: при строке состояния «black» страница начинается под ней, но env(safe-area-inset-top) всё равно ненулевой, и шапка получает двойной отступ.
+// Если окно не залезает под строку состояния (его высота заметно меньше экрана), верхний отступ не нужен.
+(function(){function f(){try{var sa=navigator.standalone===true||matchMedia('(display-mode:standalone)').matches;var d=document.documentElement.style;
+if(sa&&innerHeight<screen.height-20&&innerWidth<=screen.width)d.setProperty('--sat','0px');else d.removeProperty('--sat')}catch(e){}}
+f();addEventListener('resize',f);addEventListener('orientationchange',f)})();
+</script>
 <meta name="theme-color" content="#0d0817">
 <title>Hunter Office</title>
 <link rel="icon" type="image/png" href="/img/favicon.png">
@@ -235,12 +242,12 @@ textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10
 .bub video{max-width:260px;width:100%;border-radius:8px;display:block;margin-bottom:4px}.bub video.vnote{width:200px;height:200px;border-radius:50%;object-fit:cover}.bub audio{width:250px;max-width:100%;display:block;margin-bottom:4px}.bub .fl{display:inline-flex;gap:6px;align-items:center;color:var(--acc2);text-decoration:none;margin-bottom:4px}.bub img{cursor:zoom-in}
 .vn-stage{position:relative;width:min(300px,70vw);height:min(300px,70vw);margin:0 auto}.vn-ov video{width:100%;height:100%;object-fit:cover;border-radius:50%;background:#000;display:block}.vn-flip{position:absolute;right:-6px;bottom:-6px;width:46px;height:46px;padding:0;border-radius:50%;display:grid;place-items:center;background:var(--card2)}.vn-ov video.mir{transform:scaleX(-1)}
 .reply textarea{flex:1;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px;resize:none;font:inherit;color:inherit;min-height:44px;max-height:120px}
-@media(max-width:760px){.reply{flex-wrap:wrap}.reply textarea{flex:1 1 100%;order:-1}.reply>.btn:last-child{margin-left:auto}.recbar{order:-1;flex:1 1 100%}.chat-wrap{grid-template-columns:minmax(0,1fr);height:auto}.chat-list{max-height:none;overflow:visible}.chat-thread{height:calc(100dvh - 130px);min-height:420px}.chat-wrap:not(.open) .chat-thread{display:none}.chat-wrap.open .chat-list{display:none}.chat-thread .chat-back{display:inline-flex}}
+@media(max-width:760px){.reply{flex-wrap:wrap}.reply textarea{flex:1 1 100%;order:-1}.reply>.btn:last-child{margin-left:auto}.recbar{order:-1;flex:1 1 100%}.chat-wrap{grid-template-columns:minmax(0,1fr);height:auto}.chat-list{max-height:none;overflow:visible}.chat-thread{height:calc(100dvh - 130px - var(--sat,env(safe-area-inset-top,0px)));min-height:380px}.chat-wrap:not(.open) .chat-thread{display:none}.chat-wrap.open .chat-list{display:none}.chat-thread .chat-back{display:inline-flex}}
 .chat-back{display:none;align-items:center;gap:6px;width:fit-content;background:none;border:0;color:var(--acc2);font-weight:700;padding:0 0 6px;cursor:pointer}
 @media(max-width:760px){
  #app{grid-template-columns:minmax(0,1fr)}
  .side{position:static;height:auto;flex-direction:row;flex-wrap:wrap;align-items:center;padding:10px;border-right:0;border-bottom:1px solid var(--line)}
- .side{flex-wrap:wrap;row-gap:8px;padding-top:calc(10px + env(safe-area-inset-top,0px));padding-left:max(10px,env(safe-area-inset-left,0px));padding-right:max(10px,env(safe-area-inset-right,0px))}.side .brand{padding:0;flex:1 1 0;min-width:0}.side .brand .logo{flex:none}.side .brand b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.nav{grid-auto-flow:column;overflow-x:auto;min-width:0;max-width:100%;flex:1 1 100%;order:3}.me{margin:0 0 0 auto;padding:0;display:flex;align-items:center;gap:8px;flex:0 1 auto;min-width:0}.me-row{min-width:0;gap:4px}#meName{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:34vw}@media(max-width:560px){.mrole{display:none}}.me .btn.s{padding:6px 12px;line-height:1.2;white-space:nowrap}#installBtn{padding:6px 9px!important}#installBtn .ilbl{display:none}#installBtn .iic{display:block}
+ .side{flex-wrap:wrap;row-gap:8px;padding-top:calc(10px + var(--sat,env(safe-area-inset-top,0px)));padding-left:max(10px,env(safe-area-inset-left,0px));padding-right:max(10px,env(safe-area-inset-right,0px))}.side .brand{padding:0;flex:1 1 0;min-width:0}.side .brand .logo{flex:none}.side .brand b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.nav{grid-auto-flow:column;overflow-x:auto;min-width:0;max-width:100%;flex:1 1 100%;order:3}.me{margin:0 0 0 auto;padding:0;display:flex;align-items:center;gap:8px;flex:0 1 auto;min-width:0}.me-row{min-width:0;gap:4px}#meName{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:34vw}@media(max-width:560px){.mrole{display:none}}.me .btn.s{padding:6px 12px;line-height:1.2;white-space:nowrap}#installBtn{padding:6px 9px!important}#installBtn .ilbl{display:none}#installBtn .iic{display:block}
 }
 
 .dx-ib.only-m{display:none}
