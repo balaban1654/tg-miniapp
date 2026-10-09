@@ -201,6 +201,7 @@ th.n{text-align:right}
 .cn-row{display:flex;gap:10px;flex-wrap:wrap}.cn-ok{padding:10px 12px;border:1px solid #3ddc9755;background:#3ddc9712;border-radius:12px}.cn-ok b{color:var(--ok)}
 .cn-tg{white-space:pre-wrap;background:#17212b;border-radius:14px;padding:12px 14px;max-width:420px;line-height:1.45;color:#e8eef5}.cn-tgb{margin-top:10px;background:#2b5278;border-radius:9px;text-align:center;padding:8px;font-weight:600;font-size:14px}
 .nb-t{font-weight:700}.nb-r{color:var(--reg,#ffd54d);font-weight:700}
+.day-sep>td{box-shadow:inset 0 3px 0 rgba(155,92,255,.6)}
 .own-btn{background:none;border:0;color:inherit;font:inherit;cursor:pointer;padding:3px 8px;border-radius:8px}.own-btn:hover,.own-btn:focus-visible{background:var(--card2);outline:none}
 .nb-n{color:#fff;font-weight:800;background:var(--acc);border-radius:99px;display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 5px;font-size:11px;line-height:1;vertical-align:middle;animation:nbPulse 1.8s ease-in-out infinite}
 @keyframes nbPulse{0%,100%{opacity:1;box-shadow:0 0 0 0 #9b5cff55}50%{opacity:.45;box-shadow:0 0 10px 3px #9b5cff66}}
@@ -1668,6 +1669,11 @@ async function viewLeads(){
       src().length?'Ничего не найдено. Измените фильтры.':'Лидов пока нет. Они появятся, когда люди перейдут по вашим ссылкам и нажмут «Старт» в боте.');
     tbl.classList.add('ctr');
     const body=tbl.querySelector('tbody');
+    // Граница между днями: первая строка нового дня отделена более заметной линией, когда список идёт по дате
+    if(body&&(F.sort==='new'||F.sort==='old')){
+      const dk=r=>new Date(r.status_at||r.created_at).toLocaleDateString('sv-SE',{timeZone:'Europe/Kyiv'});
+      const shown=sorted;[...body.children].forEach((tr,i)=>{if(i>0&&shown[i]&&shown[i-1]&&!isStaff(shown[i])&&!isStaff(shown[i-1])&&dk(shown[i])!==dk(shown[i-1]))tr.classList.add('day-sep')});
+    }
     if(body&&staffRows.length){
       const band=(t,fn)=>el('tr',{class:'band',style:fn?'cursor:pointer':'',...(fn?{onclick:fn}:{})},el('td',{colspan:String(cols.length)},t));
       const open=!!F.staffOpen,trs=[...body.children];
