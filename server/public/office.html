@@ -855,8 +855,10 @@ $('#lBack').onclick=()=>{loginChallenge=null;loginStep(false);$('#lErr').textCon
 $('#logout').addEventListener('click',async()=>{try{await api('/logout',{method:'POST'})}catch{}showLogin()});
 
 /** render({soft:true}) обновляет страницу на месте: без «Загрузка…» и с сохранением прокрутки, чтобы экран не дёргался */
+let leadsPrevTab=null;
 async function render(opt){
   stopPoll();
+  const wasTab=leadsPrevTab;leadsPrevTab=tab;if(tab==='leads'&&wasTab!=='leads')leadsState.staffOpen=false;
   document.querySelectorAll('.dx-ovl').forEach(x=>x.remove());
   document.querySelectorAll('body > .dx-pop').forEach(x=>x.remove());dxReg.length=0;
   pushHash();
@@ -1633,14 +1635,18 @@ async function viewLeads(){
   leadsStaff=owners0;
   const showOwner=me.role==='admin'||me.role==='teamlead';
   const showComm=me.role==='admin';
-  const cols=['Имя','Лид','Telegram ID','Pocket ID','Статус',...(me.role==='admin'?['Доступ']:[]),...(showOwner?['Владелец']:[]),'Ссылка','Пришёл',...(me.role==='streamer'?[]:['FTD']),me.role==='streamer'?'Депозит':'Депозиты',...(showComm?['Комиссия']:[]),...(me.role==='admin'?['']:[])];
+  const cols=['Пришёл','Имя','Лид','Telegram ID','Pocket ID','Статус',...(me.role==='admin'?['Доступ']:[]),...(showOwner?['Владелец']:[]),'Ссылка',...(me.role==='streamer'?[]:['FTD']),me.role==='streamer'?'Депозит':'Депозиты',...(showComm?['Комиссия']:[]),...(me.role==='admin'?['']:[])];
   // Админ состав сверху: админ, модер, затем остальные роли; потом обычные лиды. При фильтре или своей сортировке показываем общим списком
   const ORDER={admin:0,moder:1,streamer:2,analyst:3,buyer:4};
   const isStaff=r=>r.lead_role&&r.lead_role!=='lead';
   const F=leadsState;
+  // Поиск идёт по всем лидам, независимо от выбранного периода: результат берём с сервера
+  let found=null,srchT=null;
+  const src=()=>(F.q.trim()&&found)?found:rows;
+  const onSearch=()=>{clearTimeout(srchT);const v=F.q.trim();if(!v){found=null;draw();return}srchT=setTimeout(async()=>{try{const r=await api('/leads?q='+encodeURIComponent(v));if(F.q.trim()===v){found=r;draw()}}catch(e){toast(e.message)}},300)};
   const SORTS=[['new','Сначала новые'],['old','Сначала старые'],['dep','Депозиты: больше → меньше'],['depAsc','Депозиты: меньше → больше'],...(showComm?[['comm','Комиссия: больше → меньше']]:[])];
   const sel=(opts,key,all)=>{const x=el('select',{onchange:()=>{F[key]=x.value;draw()}},...(all?[el('option',{value:''},all)]:[]),...opts.map(([v,t])=>el('option',{value:v},t)));x.value=F[key];return x};
-  const q=el('input',{type:'search',placeholder:'Поиск: ник, Telegram ID, Pocket ID',value:F.q,oninput:()=>{F.q=q.value;draw()}});
+  const q=el('input',{type:'search',placeholder:'Поиск: ник, Telegram ID, Pocket ID',value:F.q,oninput:()=>{F.q=q.value;onSearch()}});
   const links=[...new Set(rows.map(r=>r.link_slug).filter(Boolean))].sort();
   const owners=[...new Map(rows.filter(r=>r.owner_id).map(r=>[String(r.owner_id),r.owner_name])).entries()];
   const bar=el('div',{class:'lf'},q,sel(Object.entries(STATUS).map(([k,v])=>[k,v[0]]),'status','Все статусы'),
@@ -1649,7 +1655,7 @@ async function viewLeads(){
   const holder=el('div',{});const cnt=el('span',{class:'mut'},'');const tots=el('div',{class:'pb-tots',style:'margin:0'});
   const draw=()=>{
     const qq=F.q.trim().toLowerCase().replace(/^@/,'');
-    let list=rows.filter(r=>(!F.status||(r.status===F.status&&!isStaff(r)))&&(!F.link||r.link_slug===F.link)&&(!F.owner||(F.owner==='none'?!r.owner_id:String(r.owner_id)===F.owner))
+    let list=src().filter(r=>(!F.status||(r.status===F.status&&!isStaff(r)))&&(!F.link||r.link_slug===F.link)&&(!F.owner||(F.owner==='none'?!r.owner_id:String(r.owner_id)===F.owner))
       &&(!qq||[r.username,r.first_name,r.tg_id,r.trader_id].some(v=>v!=null&&String(v).toLowerCase().includes(qq))));
     const flat=F.q||F.status||F.link||F.owner||F.sort!=='new';
     const by={dep:(a,b)=>b.deposits-a.deposits,depAsc:(a,b)=>a.deposits-b.deposits,comm:(a,b)=>b.commission-a.commission,old:(a,b)=>new Date(a.status_at||a.created_at)-new Date(b.status_at||b.created_at),new:(a,b)=>new Date(b.status_at||b.created_at)-new Date(a.status_at||a.created_at)}[F.sort];
@@ -1658,24 +1664,25 @@ async function viewLeads(){
     const isOwner=r=>String(r.username||'').toLowerCase()==='r1654';
     const staffRows=flat?[]:list.filter(isStaff).sort((a,b)=>(isOwner(b)-isOwner(a))||(ORDER[a.lead_role]??9)-(ORDER[b.lead_role]??9));
     const leadRows=flat?list:list.filter(r=>!isStaff(r));
-    const sorted=[...staffRows,...leadRows];
-    const tbl=table(cols,sorted.map(r=>[td(r.first_name||'—'),td(r.username?'@'+r.username:'—'),el('td',{class:'n'},el('span',{class:'cp'},String(r.tg_id),el('button',{type:'button',title:'Карточка лида','aria-label':'Карточка лида',onclick:()=>openLeadCard(r.tg_id)},svgIcon(PERSON)))),pocketCell(r),el('td',{},isStaff(r)?el('span',{class:'pill p-pur'},({admin:'Админ',moder:'Модер',streamer:'Стример',analyst:'Аналитик',buyer:'Медиабайер',teamlead:'Тимлидер'})[r.lead_role]||r.lead_role):pill(r.status)),...(me.role==='admin'?[accessCell(r)]:[]),...(showOwner?[me.role==='admin'&&!isStaff(r)?ownerCell(r):td(r.owner_name||'не закреплён')]:[]),td(r.link_slug||'—'),td(date(r.status_at||r.created_at)),...(me.role==='streamer'?[]:[td(r.ftd_amount!=null&&!isStaff(r)?money(r.ftd_amount):'—','n')]),td(money(r.deposits),'n'),...(showComm?[td(money(r.commission),'n')]:[]),...(me.role==='admin'?[delLeadCell(r)]:[])]),
-      rows.length?'Ничего не найдено. Измените фильтры.':'Лидов пока нет. Они появятся, когда люди перейдут по вашим ссылкам и нажмут «Старт» в боте.');
+    const sorted=[...(F.staffOpen?staffRows:[]),...leadRows];
+    const tbl=table(cols,sorted.map(r=>[td(date(r.status_at||r.created_at)),td(r.first_name||'—'),td(r.username?'@'+r.username:'—'),el('td',{class:'n'},el('span',{class:'cp'},String(r.tg_id),el('button',{type:'button',title:'Карточка лида','aria-label':'Карточка лида',onclick:()=>openLeadCard(r.tg_id)},svgIcon(PERSON)))),pocketCell(r),el('td',{},isStaff(r)?el('span',{class:'pill p-pur'},({admin:'Админ',moder:'Модер',streamer:'Стример',analyst:'Аналитик',buyer:'Медиабайер',teamlead:'Тимлидер'})[r.lead_role]||r.lead_role):pill(r.status)),...(me.role==='admin'?[accessCell(r)]:[]),...(showOwner?[me.role==='admin'&&!isStaff(r)?ownerCell(r):td(r.owner_name||'не закреплён')]:[]),td(r.link_slug||'—'),...(me.role==='streamer'?[]:[td(r.ftd_amount!=null&&!isStaff(r)?money(r.ftd_amount):'—','n')]),td(money(r.deposits),'n'),...(showComm?[td(money(r.commission),'n')]:[]),...(me.role==='admin'?[delLeadCell(r)]:[])]),
+      src().length?'Ничего не найдено. Измените фильтры.':'Лидов пока нет. Они появятся, когда люди перейдут по вашим ссылкам и нажмут «Старт» в боте.');
     tbl.classList.add('ctr');
     const body=tbl.querySelector('tbody');
     if(body&&staffRows.length){
-      const band=t=>el('tr',{class:'band'},el('td',{colspan:String(cols.length)},t));
-      const trs=[...body.children];
-      body.insertBefore(band('Админ состав'),trs[0]);
-      if(leadRows.length)body.insertBefore(band('Лиды'),trs[staffRows.length]);
+      const band=(t,fn)=>el('tr',{class:'band',style:fn?'cursor:pointer':'',...(fn?{onclick:fn}:{})},el('td',{colspan:String(cols.length)},t));
+      const open=!!F.staffOpen,trs=[...body.children];
+      // Админ состав по умолчанию свёрнут: нажмите на строку, чтобы развернуть
+      body.insertBefore(band((open?'▾ ':'▸ ')+'Админ состав ('+staffRows.length+')',()=>{F.staffOpen=!open;draw()}),trs[0]);
+      if(open&&leadRows.length)body.insertBefore(band('Лиды'),trs[staffRows.length]);
     }
-    holder.replaceChildren(tbl);cnt.textContent=(list.length===rows.length?rows.length+' всего':list.length+' из '+rows.length);
+    holder.replaceChildren(tbl);cnt.textContent=(F.q.trim()&&found?'найдено '+list.length+' (поиск по всем лидам)':list.length===rows.length?rows.length+' всего':list.length+' из '+rows.length);
     // Сводка по статусам: те же фильтры, кроме самого статуса, админ состав не считаем
-    const base=rows.filter(r=>!isStaff(r)&&(!F.link||r.link_slug===F.link)&&(!F.owner||(F.owner==='none'?!r.owner_id:String(r.owner_id)===F.owner))
+    const base=src().filter(r=>!isStaff(r)&&(!F.link||r.link_slug===F.link)&&(!F.owner||(F.owner==='none'?!r.owner_id:String(r.owner_id)===F.owner))
       &&(!qq||[r.username,r.first_name,r.tg_id,r.trader_id].some(v=>v!=null&&String(v).toLowerCase().includes(qq))));
     tots.replaceChildren(...Object.entries(STATUS).map(([k,v])=>[k,v,base.filter(r=>r.status===k).length]).filter(x=>x[2]).map(([k,v,n])=>el('span',{class:'pb-tot'},el('span',{class:'pill '+v[1]},v[0]),el('b',{},n+' шт'))));
   };
-  leadsRows=rows;leadsRedraw=draw;draw();
+  leadsRows=rows;leadsRedraw=draw;draw();if(F.q.trim())onSearch();
   let legacyCard=null;
   if(me.role==='admin'){
     const ta=el('textarea',{class:'big',rows:'4',placeholder:'Pocket ID из старого бота, по одному в строке'});

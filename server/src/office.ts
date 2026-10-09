@@ -9,7 +9,7 @@ import { createBroadcast, segmentWhere, SEGMENTS, deliverAnimation, type Button 
 import { randomInt, randomBytes, createHash } from 'node:crypto';
 const sha256 = (v: string) => createHash('sha256').update(v).digest('hex');
 import { accountingRoutes } from './accounting.js';
-import { leadStatusDate } from './leaddate.js';
+import { leadStatusDate, leadListDate } from './leaddate.js';
 import { connectRoutes, connectInfo, requiredFor, TOL } from './connect.js';
 import { toVoice, toVideoNote } from './media.js';
 import { parseReviewPhoto, cleanReviewText, cleanRating } from './reviews.js';
@@ -1953,7 +1953,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // Лиды
-  app.get<{ Querystring: { status?: string; from?: string; to?: string } }>('/leads', { preHandler: auth }, async (req) => {
+  app.get<{ Querystring: { status?: string; from?: string; to?: string; q?: string } }>('/leads', { preHandler: auth }, async (req) => {
     const me = req.staff!;
     const status = str(req.query.status, 20);
     const vals: unknown[] = [];
@@ -1964,14 +1964,20 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     }
     // Период по Киеву: FTD и активные по дате первого депозита, остальные по дате прихода. Сотрудников (админ состав) не фильтруем
     const D = /^\d{4}-\d{2}-\d{2}$/;
-    if (D.test(String(req.query.from)) && D.test(String(req.query.to))) {
+    // Поиск идёт по всем лидам независимо от периода: ник, имя, Telegram ID, Pocket ID (в том числе второй)
+    const qs = str(req.query.q, 60).replace(/^@/, '').toLowerCase();
+    if (qs) {
+      vals.push('%' + qs.replace(/[\\%_]/g, (c) => '\\' + c) + '%');
+      extra += ` AND (lower(coalesce(d.username,'')) LIKE $${vals.length} OR lower(coalesce(d.first_name,'')) LIKE $${vals.length} OR d.tg_id::text LIKE $${vals.length}
+                      OR coalesce(d.trader_id,'') LIKE $${vals.length} OR EXISTS (SELECT 1 FROM lead_pockets lp WHERE lp.tg_id = d.tg_id AND lp.trader_id LIKE $${vals.length}))`;
+    } else if (D.test(String(req.query.from)) && D.test(String(req.query.to))) {
       const [a, b] = String(req.query.from) <= String(req.query.to) ? [req.query.from, req.query.to] : [req.query.to, req.query.from];
       vals.push(a, b);
-      extra += ` AND (coalesce(d.lead_role, 'lead') <> 'lead' OR (${leadStatusDate('d')} AT TIME ZONE 'Europe/Kyiv')::date BETWEEN $${vals.length - 1}::date AND $${vals.length}::date)`;
+      extra += ` AND (coalesce(d.lead_role, 'lead') <> 'lead' OR (${leadListDate('d')} AT TIME ZONE 'Europe/Kyiv')::date BETWEEN $${vals.length - 1}::date AND $${vals.length}::date)`;
     }
     const DT = depTypes(me);
     const r = await db.query(
-      `SELECT d.tg_id, d.trader_id, d.is_tester, d.lead_role, d.username, d.first_name, d.status, d.access, d.created_at, d.owner_id, ${leadStatusDate('d')} AS status_at,
+      `SELECT d.tg_id, d.trader_id, d.is_tester, d.lead_role, d.username, d.first_name, d.status, d.access, d.created_at, d.owner_id, ${leadListDate('d')} AS status_at,
               s.name AS owner_name, coalesce(l.slug, (SELECT slug FROM links WHERE owner_id = d.owner_id ORDER BY id LIMIT 1)) AS link_slug,
               (SELECT amount FROM events e WHERE e.tg_id = d.tg_id AND e.type = 'ftd' ORDER BY e.created_at, e.id LIMIT 1) AS ftd_amount,
               coalesce((SELECT sum(amount) FROM events e WHERE e.tg_id = d.tg_id AND e.type IN ${DT}),0) AS deposits,
@@ -1980,7 +1986,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
          LEFT JOIN staff s ON s.id = d.owner_id
          LEFT JOIN links l ON l.id = d.link_id
         WHERE d.removed_at IS NULL AND ${ownerScope(me, 'd.owner_id')}${me.role === 'admin' ? '' : " AND coalesce(d.lead_role, 'lead') = 'lead'"}${extra}
-        ORDER BY d.created_at DESC LIMIT 300`,
+        ORDER BY ${leadListDate('d')} DESC LIMIT 300`,
       vals,
     );
     // Сотрудники в списке лидов: владелец и ссылка у них общие (создатель компании), деньги и результаты нулевые
