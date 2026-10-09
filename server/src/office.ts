@@ -1694,6 +1694,31 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     return { wins, win, loss, rate: win + loss ? Math.round((win / (win + loss)) * 1000) / 10 : null };
   });
 
+  // Кто вошёл в сигнал и как оценил: Telegram ID, Pocket ID, оценка
+  app.get<{ Params: { id: string } }>('/signals/:id/takers', { preHandler: need('admin', 'analyst') }, async (req) =>
+    (await db.query(
+      `SELECT d.tg_id, l.username, l.first_name, l.trader_id, d.result, d.step, d.created_at
+         FROM deals d JOIN leads l ON l.tg_id = d.tg_id WHERE d.signal_id = $1 ORDER BY d.id`,
+      [Number(req.params.id)],
+    )).rows);
+  // Фрод: клиенты, поставившие подряд минус более трёх сигналам
+  app.get('/fraud', { preHandler: need('admin') }, async () =>
+    (await db.query(
+      `SELECT f.tg_id, f.streak, f.ongoing, f.created_at, f.updated_at, f.seen_at IS NULL AS fresh,
+              l.username, l.first_name, l.trader_id, o.name AS owner_name,
+              (SELECT count(*)::int FROM deals x WHERE x.tg_id = f.tg_id AND x.signal_id IS NOT NULL AND x.result = 'win') AS wins,
+              (SELECT count(*)::int FROM deals x WHERE x.tg_id = f.tg_id AND x.signal_id IS NOT NULL AND x.result = 'loss') AS losses
+         FROM fraud_alerts f JOIN leads l ON l.tg_id = f.tg_id LEFT JOIN staff o ON o.id = l.owner_id
+        ORDER BY (f.seen_at IS NULL) DESC, f.updated_at DESC LIMIT 200`,
+    )).rows);
+  app.get('/fraud/count', { preHandler: need('admin') }, async () => ({
+    n: Number((await db.query('SELECT count(*)::int AS n FROM fraud_alerts WHERE seen_at IS NULL')).rows[0].n),
+  }));
+  app.post('/fraud/seen', { preHandler: need('admin') }, async () => {
+    await db.query('UPDATE fraud_alerts SET seen_at = now() WHERE seen_at IS NULL');
+    return { ok: true };
+  });
+
   // Итог сигнала в таблице: общий сигнал по результату, который дал человек; сигнал по запросу по оценке самого клиента
   // (шаг с нуля: 0 вход, 1 первое перекрытие; первый плюс решает, иначе минус)
   const OUTCOME_CTE = `

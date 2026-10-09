@@ -734,3 +734,13 @@ CREATE INDEX IF NOT EXISTS news_created ON news (created_at DESC);
 
 -- Лайки новостей убрали: таблица больше не нужна
 DROP TABLE IF EXISTS news_likes;
+
+-- Фрод: клиент подряд поставил минус более трёх сигналам. Одна запись на клиента; seen_at пусто, пока админ не открыл вкладку «Фрод»
+CREATE TABLE IF NOT EXISTS fraud_alerts (
+  tg_id      BIGINT PRIMARY KEY REFERENCES leads(tg_id) ON DELETE CASCADE,
+  streak     INT NOT NULL,
+  ongoing    BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  seen_at    TIMESTAMPTZ
+);

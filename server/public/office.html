@@ -649,7 +649,7 @@ function drawNav(){
   const nav=$('#nav');if(!nav||!me)return;
   const lay=reconcileLayout(me.nav_layout,navItems,me.role);
   const label=k=>(navItems.find(x=>x[0]===k)||[])[1]||k;
-  const mkBtn=(k,ic,sub)=>el('button',{type:'button','data-t':k,class:(k===tab?'on':'')+(sub?' sub':''),onclick:()=>{tab=k;showApp();render()}},ic?iconNamed(ic):icon(k),el('span',{class:'lbl'},...(k==='chats'||k==='leads'?navLblNodes(k):[label(k)])),k==='mytasks'?el('span',{class:'nbadge',id:'tasksBadge',hidden:''}):null,k==='home'&&me.role==='streamer'&&noticeN?el('span',{class:'nbadge vio pulse',id:'noticeBadge',title:'Новые события ваших клиентов'},noticeN>99?'99+':String(noticeN)):null,k==='acc'&&me.role==='admin'?el('span',{class:'nbadge',id:'accBadge',hidden:''}):null,k==='pb'&&me.role==='admin'&&pbNew?el('span',{class:'nbadge vio pulse',id:'pbBadge',title:'Новые постбеки'},pbNew>99?'99+':String(pbNew)):null,k==='media'&&me.role==='admin'?el('span',{class:'nbadge vio pulse',id:'mediaBadge',hidden:mediaPend?null:'',title:'Новые отзывы ждут проверки'},String(mediaPend||'')):null);
+  const mkBtn=(k,ic,sub)=>el('button',{type:'button','data-t':k,class:(k===tab?'on':'')+(sub?' sub':''),onclick:()=>{tab=k;showApp();render()}},ic?iconNamed(ic):icon(k),el('span',{class:'lbl'},...(k==='chats'||k==='leads'?navLblNodes(k):[label(k)])),k==='mytasks'?el('span',{class:'nbadge',id:'tasksBadge',hidden:''}):null,k==='signals'&&me.role==='admin'&&fraudNew?el('span',{class:'nbadge vio pulse',id:'fraudBadge',title:'Новые подозрения на фрод'},String(fraudNew)):null,k==='home'&&me.role==='streamer'&&noticeN?el('span',{class:'nbadge vio pulse',id:'noticeBadge',title:'Новые события ваших клиентов'},noticeN>99?'99+':String(noticeN)):null,k==='acc'&&me.role==='admin'?el('span',{class:'nbadge',id:'accBadge',hidden:''}):null,k==='pb'&&me.role==='admin'&&pbNew?el('span',{class:'nbadge vio pulse',id:'pbBadge',title:'Новые постбеки'},pbNew>99?'99+':String(pbNew)):null,k==='media'&&me.role==='admin'?el('span',{class:'nbadge vio pulse',id:'mediaBadge',hidden:mediaPend?null:'',title:'Новые отзывы ждут проверки'},String(mediaPend||'')):null);
   const out=[];
   for(const n of lay.nodes){
     if(n.t==='i'){out.push(mkBtn(n.k,n.icon,false));continue}
@@ -657,7 +657,7 @@ function drawNav(){
     const inGroup=n.items.some(x=>x.k===tab);
     let open=false;try{open=localStorage.getItem('hunterNav_'+n.id)==='1'}catch{}
     if(inGroup)open=true;
-    out.push(el('button',{type:'button',class:'grp'+(inGroup?' act':''),'aria-expanded':String(open),onclick:()=>{if(inGroup)return;try{localStorage.setItem('hunterNav_'+n.id,open?'0':'1')}catch{}drawNav()}},iconNamed(n.icon||'folder'),el('span',{class:'lbl'},n.title),!open&&me.role==='admin'&&mediaPend&&n.items.some(x=>x.k==='media')?el('span',{class:'nbadge vio pulse',title:'Новые отзывы ждут проверки'},String(mediaPend)):null,el('span',{class:'chv'},'›')));
+    out.push(el('button',{type:'button',class:'grp'+(inGroup?' act':''),'aria-expanded':String(open),onclick:()=>{if(inGroup)return;try{localStorage.setItem('hunterNav_'+n.id,open?'0':'1')}catch{}drawNav()}},iconNamed(n.icon||'folder'),el('span',{class:'lbl'},n.title),!open&&me.role==='admin'&&mediaPend&&n.items.some(x=>x.k==='media')?el('span',{class:'nbadge vio pulse',title:'Новые отзывы ждут проверки'},String(mediaPend)):null,!open&&me.role==='admin'&&fraudNew&&n.items.some(x=>x.k==='signals')?el('span',{class:'nbadge vio pulse',title:'Новые подозрения на фрод'},String(fraudNew)):null,el('span',{class:'chv'},'›')));
     if(open)n.items.forEach(x=>out.push(mkBtn(x.k,x.icon,true)));
   }
   nav.replaceChildren(...out);
@@ -1908,11 +1908,13 @@ async function refreshAccPending(){
   }catch{}
 }
 let mediaPend=0; // отзывы, ждущие проверки (цифра у «Медиа»)
+let fraudNew=0; // новые подозрения на фрод (кружок у «Сигналов»)
 let noticeN=0; // новые события клиентов стримера (цифра у «Дашборда»)
 let pbNew=0; // новые постбеки с прошлого просмотра (цифра у «Постбеки»)
 async function updateBadge(){
   if(!me)return;
   if(me.role==='admin'){try{const c=await api('/reviews/count');const p=tab==='pb'?{n:0}:await api('/postbacks/count');if(c.pending!==mediaPend||p.n!==pbNew){mediaPend=c.pending;pbNew=p.n;drawNav()}}catch{}}
+  if(me.role==='admin'){try{const f=await api('/fraud/count');if(f.n!==fraudNew){fraudNew=f.n;drawNav()}}catch{}}
   if(['admin','teamlead','streamer'].includes(me.role)){
     try{const c=await api('/chats');navLblSet('chats',{total:c.length,reg:0,fresh:c.filter(x=>x.waiting).length})}catch{}
   }
@@ -3356,6 +3358,22 @@ async function signalResultDialog(sg,done){
   drawShot();draw();
   document.body.append(ov);
 }
+/** Кто вошёл в сигнал: Telegram ID (открывает карточку клиента), Pocket ID и как клиент оценил сигнал */
+async function signalTakers(sg){
+  document.querySelectorAll('.lc-overlay').forEach(x=>x.remove());
+  const ov=el('div',{class:'lc-overlay',role:'dialog','aria-modal':'true'});
+  const close=()=>{ov.remove();document.removeEventListener('keydown',onKey)};
+  const onKey=e=>{if(e.key==='Escape')close()};document.addEventListener('keydown',onKey);
+  ov.addEventListener('mousedown',e=>{if(e.target===ov)close()});
+  const box=el('div',{class:'lc',style:'width:min(640px,100%);display:grid;gap:12px'},el('div',{class:'lc-head'},el('h3',{style:'font-size:17px'},'Кто вошёл в сигнал'),el('button',{class:'btn o s',type:'button','aria-label':'Закрыть',onclick:close},'✕')),el('div',{class:'mut sm'},sg.pair+' · '+(sg.direction==='up'?'Вверх':'Вниз')+' · '+new Date(sg.created_at).toLocaleString('ru-RU',{timeZone:'Europe/Kyiv',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})),el('div',{class:'mut'},'Загрузка…'));
+  ov.append(box);document.body.append(ov);
+  try{
+    const rows=await api('/signals/'+sg.id+'/takers');
+    const mark=r=>r.result==='win'?el('span',{class:'pill p-ok'},'Плюс · '+(r.step?'перекрытие '+r.step:'со входа')):r.result==='loss'?el('span',{class:'pill p-bad'},'Минус'):r.result==='skip'?el('span',{class:'pill p-warn'},'Не входил'):el('span',{class:'mut'},'без оценки');
+    const tbl=table(['Telegram ID','Имя','Pocket ID','Оценка'],rows.map(r=>[el('td',{class:'n'},el('button',{type:'button',class:'own-btn',title:'Открыть карточку клиента',onclick:()=>openLeadCard(Number(r.tg_id))},String(r.tg_id))),td(r.username?'@'+r.username:(r.first_name||'—')),td(r.trader_id||'—'),el('td',{},mark(r))]),'Никто не вошёл.');
+    box.lastChild.replaceWith(tbl);
+  }catch(x){box.lastChild.replaceWith(el('div',{class:'err'},x.message))}
+}
 let newSigTab='form';
 let sigTab='hist',sigPage=1; // страница «Сигналы»: вкладка и страница истории
 async function viewSignals(mode){
@@ -3413,10 +3431,18 @@ async function viewSignals(mode){
   const histCol=['Опубликован','Пара','Направление','Экспирация','Вход','Источник','Итог','Вошли','Плюс','Минус'];
   const outcome=r=>r.res==='win'?el('span',{class:'pill p-ok'},'Плюс · '+(r.stp?'перекрытие '+r.stp:'со входа')):r.res==='loss'?el('span',{class:'pill p-bad'},'Минус'):el('span',{class:'mut'},'—');
   const drawSig=async()=>{
-    sBar.replaceChildren(...[['hist','История'],['cfg','Настройки']].map(([k,t])=>el('button',{type:'button',role:'tab','aria-selected':String(k===sigTab),class:'lc-tab'+(k===sigTab?' on':''),onclick:()=>{sigTab=k;drawSig()}},t)));
+    sBar.replaceChildren(...[['hist','История'],['cfg','Настройки'],...(me.role==='admin'?[['fraud','Фрод']]:[])].map(([k,t])=>el('button',{type:'button',role:'tab','aria-selected':String(k===sigTab),class:'lc-tab'+(k===sigTab?' on':''),onclick:()=>{sigTab=k;drawSig()}},t,k==='fraud'&&fraudNew?el('span',{class:'nbadge vio pulse',style:'margin-left:6px'},String(fraudNew)):null)));
     sBody.replaceChildren(el('div',{class:'mut'},'Загрузка…'));
     try{
       if(sigTab==='cfg'){sBody.replaceChildren(await signalConfigBlock());return}
+      if(sigTab==='fraud'){
+        const fr=await api('/fraud');
+        if(fraudNew){await api('/fraud/seen',{method:'POST'}).catch(()=>{});fraudNew=0;drawNav();sBar.replaceChildren(...[...sBar.children].map(b=>{const c=b.querySelector('.nbadge');if(c)c.remove();return b}))}
+        const dtf=v=>new Date(v).toLocaleString('ru-RU',{timeZone:'Europe/Kyiv',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
+        sBody.replaceChildren(el('div',{class:'mut sm'},'Клиенты, которые поставили минус более трёх сигналам подряд (плюс обрывает серию). Нажмите на Telegram ID, чтобы открыть карточку.'),
+          table(['Обновлено','Telegram ID','Имя','Pocket ID','Минусов подряд','Всего плюс / минус','Владелец','Статус'],fr.map(f=>[td(dtf(f.updated_at)),el('td',{class:'n'},el('button',{type:'button',class:'own-btn',title:'Открыть карточку клиента',onclick:()=>openLeadCard(Number(f.tg_id))},String(f.tg_id))),td(f.username?'@'+f.username:(f.first_name||'—')),td(f.trader_id||'—'),el('td',{class:'n'},el('b',{style:'color:var(--bad)'},String(f.streak))),td(f.wins+' / '+f.losses,'n'),td(f.owner_name||'не закреплён'),el('td',{},el('span',{class:'pill '+(f.ongoing?'p-bad':'p-warn')},f.ongoing?'серия идёт':'серия оборвана'),f.fresh?el('span',{class:'pill p-pur',style:'margin-left:6px'},'новое'):null)]),'Подозрительных клиентов пока нет.'));
+        return;
+      }
       const [st,h]=await Promise.all([me.role==='admin'?api('/signals/history-stats'):Promise.resolve(null),api('/signals/history?page='+sigPage)]);
       sigPage=h.page;
       const stBox=!st?null:el('div',{class:'pb-tots',style:'margin:0'},
@@ -3426,7 +3452,7 @@ async function viewSignals(mode){
         ...Object.keys(st.wins).sort((a,b)=>a-b).map(k=>el('span',{class:'pb-tot'},el('span',{class:'mut sm'},k==='0'?'вход':'перекрытие '+k),el('b',{},st.wins[k]+' шт'))),
         el('span',{class:'pb-tot'},el('span',{class:'pill p-bad'},'Минус'),el('b',{},st.loss+' шт')),
         el('span',{class:'pb-tot'},el('span',{class:'pill p-pur'},'Винрейт'),el('b',{},st.rate===null?'—':st.rate+'%')));
-      const tbl=table(histCol,h.rows.map(r=>[td(t(r.created_at)),td(r.pair),el('td',{},el('span',{class:'pill '+(r.direction==='up'?'p-ok':'p-bad')},r.direction==='up'?'Вверх':'Вниз')),td(r.expiry_sec?(r.expiry_sec>=3600&&r.expiry_sec%3600===0?r.expiry_sec/3600+' ч':r.expiry_sec>=60&&r.expiry_sec%60===0?r.expiry_sec/60+' мин':r.expiry_sec+' сек'):r.expiry_min+' мин'),td(new Date(r.entry_at).toLocaleTimeString('ru-RU',{timeZone:'Europe/Kyiv',hour:'2-digit',minute:'2-digit'})),el('td',{},el('span',{class:'pill p-pur'},lroleName(r.source_role))),el('td',{},outcome(r)),td(r.taken,'n'),td(r.wins+(Object.keys(r.win_steps||{}).length?' ('+Object.entries(r.win_steps).map(([k,v])=>(k==1?'вход':'пер.'+(k-1))+' '+v).join(', ')+')':''),'n'),td(r.losses,'n')]),'Сигналов пока не было.');
+      const tbl=table(histCol,h.rows.map(r=>[td(t(r.created_at)),td(r.pair),el('td',{},el('span',{class:'pill '+(r.direction==='up'?'p-ok':'p-bad')},r.direction==='up'?'Вверх':'Вниз')),td(r.expiry_sec?(r.expiry_sec>=3600&&r.expiry_sec%3600===0?r.expiry_sec/3600+' ч':r.expiry_sec>=60&&r.expiry_sec%60===0?r.expiry_sec/60+' мин':r.expiry_sec+' сек'):r.expiry_min+' мин'),td(new Date(r.entry_at).toLocaleTimeString('ru-RU',{timeZone:'Europe/Kyiv',hour:'2-digit',minute:'2-digit'})),el('td',{},el('span',{class:'pill p-pur'},lroleName(r.source_role))),el('td',{},outcome(r)),r.taken?el('td',{class:'n'},el('button',{type:'button',class:'own-btn',title:'Кто вошёл в сигнал и как его оценил',onclick:()=>signalTakers(r)},String(r.taken))):td(r.taken,'n'),td(r.wins+(Object.keys(r.win_steps||{}).length?' ('+Object.entries(r.win_steps).map(([k,v])=>(k==1?'вход':'пер.'+(k-1))+' '+v).join(', ')+')':''),'n'),td(r.losses,'n')]),'Сигналов пока не было.');
       tbl.classList.add('ctr');
       const go=n=>()=>{sigPage=n;drawSig()};
       const pager=h.pages>1?el('div',{style:'display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap'},

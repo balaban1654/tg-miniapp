@@ -1,3 +1,4 @@
+import { fraudBackfill } from './fraud.js';
 import Fastify from 'fastify';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { config } from './config.js';
@@ -24,6 +25,7 @@ await migrate();
 await ensureAdmin();
 await seedDefaultRules();
 await seedTemplates();
+await fraudBackfill().catch((e) => console.error('Проверка фрода при запуске не удалась', e));
 
 // Интерфейс Hunter Office и его API
 const officeHtml = readFileSync(resolve(process.cwd(), 'public/office.html'), 'utf8');

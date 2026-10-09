@@ -1,3 +1,4 @@
+import { fraudCheck } from './fraud.js';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { createHash, createHmac, timingSafeEqual, randomBytes } from 'node:crypto';
 import { db, attachLead } from './db.js';
@@ -496,6 +497,8 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
        ON CONFLICT (tg_id, signal_id) WHERE signal_id IS NOT NULL DO UPDATE SET result = EXCLUDED.result, step = EXCLUDED.step WHERE deals.result IS NULL`,
       [req.tg!.id, sg.pair, sg.direction, sg.expiry_min, id, result, result === 'win' ? step - 1 : null],
     );
+    // Серия минусов подряд попадает во вкладку «Фрод» в Office
+    await fraudCheck(req.tg!.id).catch(() => {});
     return { ok: true };
   });
 
