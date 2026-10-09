@@ -355,7 +355,7 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
 
   // Прошедшие сигналы. Показываем ВСЕ завершённые, без отбора. Итог считается по отметкам клиентов
   app.get<{ Querystring: { limit?: string } }>('/signals/past', { preHandler: auth }, async (req) => {
-    const lim = Math.min(200, Math.max(5, Math.trunc(Number(req.query.limit)) || 5));
+    const lim = Math.min(200, Math.max(5, Math.trunc(Number(req.query.limit)) || 20));
     // В истории: сигналы аналитика с итогами и все реальные сигналы по запросу. Клиентские сигналы по одной паре в одну минуту
     // сводим в одну строку; если исходы разные (и плюс, и минус), публикуем только плюс (positive), минус не показываем
     const r = await db.query(

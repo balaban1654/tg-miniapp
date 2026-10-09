@@ -779,7 +779,7 @@ const plural=(n,a,b,c)=>{const m=n%100,k=n%10;return m>10&&m<20?c:k===1?a:k>1&&k
 async function pastSignals(){
   const wrap=el('div',{});
   const nodes=new Map();   // ключ сигнала → строка списка, чтобы обновлять список без перерисовки
-  let listEl=null,mode='',limit=5,more=true,loading=false;
+  let listEl=null,mode='',limit=20,more=true,loading=false;
   const statBox=el('div',{});
   const keyOf=r=>String(r.id!==undefined?r.id:r.entry_at+r.pair);
   const sigOf=r=>r.wins+'/'+r.losses+(r.positive?'+':'');
