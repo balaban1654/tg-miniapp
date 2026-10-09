@@ -731,3 +731,11 @@ CREATE TABLE IF NOT EXISTS news (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS news_created ON news (created_at DESC);
+
+-- Лайки новостей в мини-аппе: один клиент, один лайк
+CREATE TABLE IF NOT EXISTS news_likes (
+  news_id    INT NOT NULL REFERENCES news(id) ON DELETE CASCADE,
+  tg_id      BIGINT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (news_id, tg_id)
+);

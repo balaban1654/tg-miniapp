@@ -120,6 +120,7 @@ main{flex:1;padding:6px 16px 96px;display:grid;gap:12px;align-content:start}
 .pshead b{font:700 16px var(--fd);white-space:nowrap}
 .pshead span{font-size:11px;text-align:right}
 .pslist{background:var(--card);border-radius:18px;overflow-y:auto;overflow-x:hidden;max-height:372px;-webkit-overflow-scrolling:touch}
+.nlike{display:inline-flex;align-items:center;gap:6px;background:none;border:1px solid var(--line);border-radius:99px;padding:6px 12px;color:var(--mut);font:700 13px var(--fd);cursor:pointer;transition:color .2s,border-color .2s,transform .15s}.nlike svg{fill:none;display:block;transition:fill .2s}.nlike.on{color:var(--bad);border-color:var(--bad)}.nlike.on svg{fill:currentColor}.nlike:active{transform:scale(.94)}
 .psstat{margin-top:10px;background:var(--card);border-radius:16px;padding:14px;display:grid;gap:10px}.psstat .t3{display:grid;grid-template-columns:repeat(3,1fr);text-align:center}.psstat .t3 b{display:block;font:800 20px var(--fd)}.psstat .t3 span{font-size:11px;color:var(--mut)}.psbar{display:flex;height:10px;border-radius:6px;overflow:hidden;background:#ffffff12}.psbar i{display:block;height:100%}.pscells{display:grid;gap:6px}.pscell{background:var(--card2);border-radius:12px;padding:8px 4px;text-align:center}.pscell b{display:block;font:800 16px var(--fd)}.pscell span{font-size:10.5px;color:var(--mut)}.psstat .sm{text-align:center;font-size:11.5px}
 .ps{overflow:hidden;transition:height .45s cubic-bezier(.2,.8,.2,1),opacity .45s ease}.ps-in{padding:14px 16px;display:grid;gap:8px}.ps+.ps{border-top:1px solid #ffffff10}
 .pbadge{border:1px solid;border-radius:8px;padding:4px 12px;font-size:13px;font-weight:600;white-space:nowrap}
@@ -1473,7 +1474,19 @@ async function reviewsBlock(){
 function newsBlock(items){
   if(!items.length)return el('div',{class:'card',style:'display:grid;gap:6px'},el('b',{style:'font-size:14px'},'Скоро здесь появятся новости'),el('div',{class:'sm',style:'line-height:1.5'},'Обновления тренажёра, итоги недели, новые трейдеры и важные объявления команды. Заглядывайте сюда почаще, чтобы ничего не пропустить.'));
   const dt=v=>new Date(v).toLocaleDateString('ru-RU',{day:'numeric',month:'long',year:'numeric'}).replace(/\s*г\.?$/,'');
-  return el('div',{style:'display:grid;gap:10px'},items.map(n=>el('div',{class:'card',style:'display:grid;gap:6px'},el('div',{class:'sm'},dt(n.created_at)),el('b',{style:'font-size:14.5px'},n.title),el('div',{style:'white-space:pre-wrap;line-height:1.5;font-size:13.5px'},n.body))));
+  const HEART='<svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>';
+  const likeBtn=n=>{
+    const cnt=el('span',{},String(n.likes||0)),b=el('button',{type:'button',class:'nlike'+(n.liked?' on':''),'aria-label':'Нравится','aria-pressed':String(!!n.liked)},el('i'),cnt);
+    b.firstChild.innerHTML=HEART;
+    b.onclick=async()=>{
+      // сразу меняем вид, потом сверяем с сервером
+      const was=b.classList.contains('on');b.classList.toggle('on',!was);cnt.textContent=String(Math.max(0,Number(cnt.textContent)+(was?-1:1)));
+      try{const r=await api('/news/'+n.id+'/like',{method:'POST'});b.classList.toggle('on',r.liked);b.setAttribute('aria-pressed',String(r.liked));cnt.textContent=String(r.likes)}
+      catch(e){b.classList.toggle('on',was);cnt.textContent=String(Math.max(0,Number(cnt.textContent)+(was?1:-1)));toast(e.message)}
+    };
+    return b;
+  };
+  return el('div',{style:'display:grid;gap:10px'},items.map(n=>el('div',{class:'card',style:'display:grid;gap:6px'},el('div',{class:'sm'},dt(n.created_at)),el('b',{style:'font-size:14.5px'},n.title),el('div',{style:'white-space:pre-wrap;line-height:1.5;font-size:13.5px'},n.body),el('div',{style:'display:flex;justify-content:flex-end'},likeBtn(n)))));
 }
 async function viewMedia(){
   if(!me)await refreshMe();

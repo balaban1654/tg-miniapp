@@ -516,8 +516,27 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // Новости команды: свежие сверху
-  app.get('/news', { preHandler: auth }, async () =>
-    (await db.query('SELECT id, title, body, created_at FROM news ORDER BY id DESC LIMIT 30')).rows);
+  app.get('/news', { preHandler: auth }, async (req) =>
+    (await db.query(
+      `SELECT n.id, n.title, n.body, n.created_at,
+              (SELECT count(*)::int FROM news_likes l WHERE l.news_id = n.id) AS likes,
+              EXISTS (SELECT 1 FROM news_likes l WHERE l.news_id = n.id AND l.tg_id = $1) AS liked
+         FROM news n ORDER BY n.id DESC LIMIT 30`,
+      [req.tg!.id],
+    )).rows);
+  // Лайк новости: повторное нажатие снимает лайк
+  app.post<{ Params: { id: string } }>('/news/:id/like', { preHandler: auth }, async (req, reply) => {
+    const id = Number(req.params.id);
+    if (!(await db.query('SELECT 1 FROM news WHERE id = $1', [id])).rowCount) return reply.code(404).send({ error: 'Новость не найдена' });
+    const del = await db.query('DELETE FROM news_likes WHERE news_id = $1 AND tg_id = $2', [id, req.tg!.id]);
+    let liked = false;
+    if (!del.rowCount) {
+      await db.query('INSERT INTO news_likes (news_id, tg_id) VALUES ($1,$2) ON CONFLICT DO NOTHING', [id, req.tg!.id]);
+      liked = true;
+    }
+    const likes = Number((await db.query('SELECT count(*)::int AS n FROM news_likes WHERE news_id = $1', [id])).rows[0].n);
+    return { liked, likes };
+  });
 
   app.get('/media', { preHandler: auth }, async () => {
     // live: ссылка на эфир, пока у привязанного стримера идёт смена
