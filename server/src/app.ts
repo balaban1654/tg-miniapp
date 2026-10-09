@@ -354,7 +354,8 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // Прошедшие сигналы. Показываем ВСЕ завершённые, без отбора. Итог считается по отметкам клиентов
-  app.get('/signals/past', { preHandler: auth }, async (req) => {
+  app.get<{ Querystring: { limit?: string } }>('/signals/past', { preHandler: auth }, async (req) => {
+    const lim = Math.min(200, Math.max(5, Math.trunc(Number(req.query.limit)) || 5));
     // В истории: сигналы аналитика с итогами и все реальные сигналы по запросу. Клиентские сигналы по одной паре в одну минуту
     // сводим в одну строку; если исходы разные (и плюс, и минус), публикуем только плюс (positive), минус не показываем
     const r = await db.query(
@@ -378,11 +379,24 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
           GROUP BY s.pair, s.direction, date_trunc('minute', s.entry_at)
        ) q
         WHERE q.wins + q.losses > 0
-        ORDER BY q.entry_at DESC LIMIT 5`,
-      [],
+        ORDER BY q.entry_at DESC LIMIT $1`,
+      [lim],
     );
     if (r.rowCount) return r.rows;
     return [];
+  });
+
+  // Сводка по всем оценкам клиентов (плюсы по месту входа, минусы, винрейт): показывается под списком прошедших сигналов
+  app.get('/signals/stats', { preHandler: auth }, async () => {
+    const out = (await db.query(`SELECT result, coalesce(step, 0)::int AS step, count(*)::int AS n FROM deals WHERE signal_id IS NOT NULL AND result IN ('win','loss') GROUP BY 1, 2`)).rows;
+    let loss = 0;
+    const wins: Record<string, number> = {};
+    for (const x of out) {
+      if (x.result === 'loss') loss += x.n;
+      else wins[x.step] = (wins[x.step] ?? 0) + x.n;
+    }
+    const win = Object.values(wins).reduce((a, b) => a + b, 0);
+    return { rated: win + loss, wins, win, loss, rate: win + loss ? Math.round((win / (win + loss)) * 1000) / 10 : null };
   });
 
   // Сигнал по запросу клиента. Направление берётся из того, что поставил человек в Office, и действует ограниченное время
