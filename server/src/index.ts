@@ -15,6 +15,7 @@ import { postbackRoutes } from './postback.js';
 import { appRoutes } from './app.js';
 import { seedDefaultRules, startScheduler } from './push.js';
 import { seedTemplates } from './templates.js';
+import { seedReplies } from './replies.js';
 import { parseClick } from './clicks.js';
 import { RESERVED_SLUGS, SITE_URL } from './reserved.js';
 
@@ -25,6 +26,7 @@ await migrate();
 await ensureAdmin();
 await seedDefaultRules();
 await seedTemplates();
+await seedReplies();
 await fraudBackfill().catch((e) => console.error('Проверка фрода при запуске не удалась', e));
 
 // Интерфейс Hunter Office и его API

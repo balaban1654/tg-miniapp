@@ -3166,9 +3166,53 @@ function templateCard(t){
     el('div',{style:'display:flex;gap:10px;align-items:center;flex-wrap:wrap'},save,reset,err));
 }
 
+const REPLY_INFO={
+  acc_ready:{title:'После кнопки «Всё понятно — регистрация»',when:'Клиент нажал «Всё понятно — регистрация» в приветствии.'},
+  acc_no:{title:'После кнопки «Нет, создать»',when:'У клиента нет аккаунта Pocket Option. {условия} превращается в ссылку на условия использования.'},
+  acc_yes:{title:'После кнопки «Да, уже есть»',when:'У клиента уже есть аккаунт Pocket Option.'},
+  access_open:{title:'/start, когда доступ уже открыт',when:'Клиент с открытым доступом снова нажал /start.'},
+  support:{title:'Кнопка «Поддержка» в Mini App',when:'Клиент открыл чат поддержки из Mini App. После этого любое его сообщение попадает в «Чаты поддержки».'}
+};
+function replyCard(t){
+  const info=REPLY_INFO[t.key]||{title:t.key,when:''};
+  const err=el('div',{class:'err',role:'alert'});
+  const txt=el('textarea',{class:'big',rows:'5',maxlength:'4000',placeholder:'Текст сообщения. Можно оставить пустым, если есть картинка'});txt.value=t.text||'';
+  const be=buttonsEditor(t.buttons);
+  let photo=null,removePhoto=false;
+  const file=el('input',{type:'file',accept:'image/jpeg,image/png,image/webp',style:'display:none'});
+  const pv=el('div',{style:'display:flex;align-items:center;gap:10px;flex-wrap:wrap'});
+  const bpv=el('div',{});
+  const upd=()=>bpv.replaceChildren(preview(txt.value,be.get()));
+  const drawPv=()=>{
+    const src=photo||(t.has_photo&&!removePhoto?'/api/office/bot-replies/'+t.key+'/photo?'+(t.updated_at||''):null);
+    pv.replaceChildren(el('button',{class:'btn o s',type:'button',onclick:()=>file.click()},src?'Заменить картинку':'Добавить картинку'),
+      src?el('div',{class:'shot-w'},el('img',{src,alt:'',style:'max-height:72px'}),el('button',{class:'shot-del',type:'button',title:'Убрать картинку','aria-label':'Убрать картинку',onclick:()=>{photo=null;if(t.has_photo)removePhoto=true;drawPv()}},'×')):null);
+  };
+  file.addEventListener('change',async()=>{const f=file.files[0];file.value='';if(!f)return;
+    if(!/^image\/(jpeg|png|webp)$/.test(f.type)){err.textContent='Нужна картинка JPG, PNG или WebP';return}
+    if(f.size>5*1024*1024){err.textContent='Картинка больше 5 МБ';return}
+    err.textContent='';photo=await fileToDataUrl(f);removePhoto=false;drawPv()});
+  txt.addEventListener('input',upd);be.node.addEventListener('input',upd);be.node.addEventListener('change',upd);be.node.addEventListener('click',()=>setTimeout(upd,0));
+  drawPv();upd();
+  const save=el('button',{class:'btn',type:'button'},'Сохранить');
+  save.addEventListener('click',async()=>{err.className='err';err.textContent='';
+    try{await api('/bot-replies/'+t.key,{method:'PUT',body:{text:txt.value,buttons:be.get(),photo,remove_photo:removePhoto}});
+      err.className='ok-msg';err.textContent='Сохранено';setTimeout(()=>render({soft:true}),700)}catch(x){err.textContent=x.message}});
+  const reset=el('button',{class:'btn o',type:'button',onclick:async()=>{if(!reset.dataset.s){reset.dataset.s='1';reset.textContent='Точно вернуть стандартный текст и кнопки?';return}
+    try{await api('/bot-replies/'+t.key+'/reset',{method:'POST'});render({soft:true})}catch(x){err.textContent=x.message}}},'Вернуть стандартный');
+  return el('div',{class:'card',style:'display:grid;gap:12px'},
+    el('h3',{style:'font-size:15px'},info.title),
+    el('div',{class:'mut sm'},info.when),
+    el('label',{},'Текст. Подстановки: {имя} {стример} {промокод} {условия}. **жирный**, __курсив__, [текст](https://ссылка)',txt),
+    el('div',{style:'display:grid;gap:6px'},el('span',{class:'mut sm'},'Картинка (необязательно)'),pv,file),
+    be.node,
+    el('div',{},el('div',{class:'mut',style:'font-size:12px;margin-bottom:6px'},'Так увидит клиент'),bpv),
+    el('div',{style:'display:flex;gap:10px;align-items:center;flex-wrap:wrap'},save,reset,err));
+}
+
 let pushTab='auto';
 async function viewPush(){
-  const[rules,seg,casts,staff,tpls]=await Promise.all([api('/push/rules'),api('/push/segments'),api('/push/broadcasts'),api('/staff'),api('/push/templates')]);
+  const[rules,seg,casts,staff,tpls,replies]=await Promise.all([api('/push/rules'),api('/push/segments'),api('/push/broadcasts'),api('/staff'),api('/push/templates'),api('/bot-replies')]);
   // --- правила
   let editId=null;
   const f={name:el('input',{required:'',placeholder:'Например: Нет регистрации, через 3 часа'}),
@@ -3244,11 +3288,11 @@ async function viewPush(){
     el('div',{},sendBtn),berr);
   const castT=table(['Когда','Кому','Текст','Всего','Отправлено','Ошибок','В очереди'],casts.map(c=>[td(new Date(c.created_at).toLocaleString('ru-RU',{timeZone:'Europe/Kyiv',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})),td(SEGL[c.segment]||c.segment),el('td',{style:'max-width:320px;white-space:normal'},c.text.replace(/\{время:(\d{10,14})\}/g,(_m,ms)=>new Date(+ms).toLocaleTimeString('ru-RU',{timeZone:'Europe/Kyiv',hourCycle:'h23'})+' (Киев)').slice(0,110)),td(c.total,'n'),td(c.sent,'n'),td(c.failed,'n'),td(c.pending,'n')]),'Рассылок пока не было.');
   // Вкладки: автоматические пуши, рассылки и шаблон «Стример в прямом эфире»
-  const PT=[['auto','Автоматические пуши'],['cast','Рассылки'],['live','Прямой эфир']];
+  const PT=[['auto','Автоматические пуши'],['replies','Ответы бота'],['cast','Рассылки'],['live','Прямой эфир']];
   const pbar=el('div',{class:'lc-tabs',role:'tablist'}),pbody=el('div',{style:'display:grid;gap:14px'});
   const pdraw=()=>{
     pbar.replaceChildren(...PT.map(([k,t])=>el('button',{type:'button',role:'tab','aria-selected':String(k===pushTab),class:'lc-tab'+(k===pushTab?' on':''),onclick:()=>{pushTab=k;pdraw()}},t)));
-    pbody.replaceChildren(...(pushTab==='auto'?[rulesT,form]:pushTab==='cast'?[bform,castT]:tpls.filter(t=>t.key==='live').map(templateCard)));
+    pbody.replaceChildren(...(pushTab==='auto'?[rulesT,form]:pushTab==='cast'?[bform,castT]:pushTab==='replies'?Object.keys(REPLY_INFO).map(k=>replies.find(r=>r.key===k)).filter(Boolean).map(replyCard):tpls.filter(t=>t.key==='live').map(templateCard)));
   };
   pdraw();
   return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Пуши и рассылки'),el('span',{class:'mut sm'},'Каждое правило уходит человеку один раз')),pbar,pbody];

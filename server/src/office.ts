@@ -15,6 +15,7 @@ import { toVoice, toVideoNote } from './media.js';
 import { parseReviewPhoto, cleanReviewText, cleanRating } from './reviews.js';
 import { loadDepConfig, leadTierState } from './depbonus.js';
 import { RESERVED_SLUGS } from './reserved.js';
+import { REPLY_KEYS, REPLY_DEFAULTS, type ReplyKey } from './replies.js';
 import { dispatchTemplate, TEMPLATE_KEYS, DEFAULTS, CHANNEL_RE, normChannel, type TemplateKey } from './templates.js';
 import {
   type Staff,
@@ -1518,6 +1519,45 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     if (!key) return reply.code(404).send({ error: 'Шаблон не найден' });
     const d = DEFAULTS[key];
     await db.query('UPDATE push_templates SET text = $2, buttons = $3, updated_at = now() WHERE key = $1', [key, d.text, JSON.stringify(d.buttons)]);
+    return { ok: true };
+  });
+
+  // Ответы бота на кнопки воронки и /start
+  const replyKey = (k: string): ReplyKey | null => ((REPLY_KEYS as readonly string[]).includes(k) ? (k as ReplyKey) : null);
+  app.get('/bot-replies', { preHandler: need('admin') }, async () => {
+    return (await db.query(`SELECT key, text, buttons, (photo IS NOT NULL) AS has_photo, updated_at FROM bot_replies`)).rows;
+  });
+  app.get<{ Params: { key: string } }>('/bot-replies/:key/photo', { preHandler: need('admin') }, async (req, reply) => {
+    const r = (await db.query('SELECT photo, photo_type FROM bot_replies WHERE key = $1', [req.params.key])).rows[0];
+    if (!r?.photo) return reply.code(404).send({ error: 'Не найдено' });
+    return reply.type(r.photo_type).header('Cache-Control', 'no-cache').send(r.photo);
+  });
+  app.put<{ Params: { key: string } }>('/bot-replies/:key', { preHandler: need('admin'), bodyLimit: 9 * 1024 * 1024 }, async (req, reply) => {
+    const key = replyKey(req.params.key);
+    if (!key) return reply.code(404).send({ error: 'Ответ не найден' });
+    const b = (req.body ?? {}) as Record<string, unknown>;
+    const cur = (await db.query('SELECT (photo IS NOT NULL) AS has_photo FROM bot_replies WHERE key = $1', [key])).rows[0];
+    const text = str(b.text, 4000);
+    const buttons = cleanButtons(b.buttons);
+    if (typeof buttons === 'string') return reply.code(400).send({ error: buttons });
+    const ph = parseReviewPhoto(b.photo);
+    if (typeof ph === 'string') return reply.code(400).send({ error: ph.replace('Фото', 'Картинка') });
+    const hasPhoto = ph ? true : b.remove_photo ? false : Boolean(cur?.has_photo);
+    if (!text && !hasPhoto) return reply.code(400).send({ error: 'Нужен текст или картинка' });
+    await db.query(
+      `INSERT INTO bot_replies (key, text, buttons, updated_at) VALUES ($1,$2,$3,now())
+       ON CONFLICT (key) DO UPDATE SET text = EXCLUDED.text, buttons = EXCLUDED.buttons, updated_at = now()`,
+      [key, text, JSON.stringify(buttons)],
+    );
+    if (b.remove_photo) await db.query('UPDATE bot_replies SET photo = NULL, photo_type = NULL WHERE key = $1', [key]);
+    if (ph) await db.query('UPDATE bot_replies SET photo = $2, photo_type = $3 WHERE key = $1', [key, ph.data, ph.type]);
+    return { ok: true };
+  });
+  app.post<{ Params: { key: string } }>('/bot-replies/:key/reset', { preHandler: need('admin') }, async (req, reply) => {
+    const key = replyKey(req.params.key);
+    if (!key) return reply.code(404).send({ error: 'Ответ не найден' });
+    const d = REPLY_DEFAULTS[key];
+    await db.query('UPDATE bot_replies SET text = $2, buttons = $3, photo = NULL, photo_type = NULL, updated_at = now() WHERE key = $1', [key, d.text, JSON.stringify(d.buttons)]);
     return { ok: true };
   });
 

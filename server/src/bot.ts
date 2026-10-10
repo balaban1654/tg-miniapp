@@ -1,9 +1,9 @@
 import { InlineKeyboard } from 'grammy';
 import { config } from './config.js';
 import { attachLead, db } from './db.js';
-import { buildKeyboard, loadTarget, processLead, toHtml, type Button } from './push.js';
-import type { Context } from 'grammy';
+import { processLead } from './push.js';
 import { recordIncoming } from './chat.js';
+import { sendReply } from './replies.js';
 
 import { bot } from './tg.js';
 export { bot };
@@ -28,7 +28,7 @@ bot.command('start', async (ctx) => {
 
   // Кнопка «Поддержка» в Mini App ведёт сюда
   if (payload === 'support') {
-    await ctx.reply('Опиши, что случилось, одним сообщением. Можно со скриншотом. Ответим прямо здесь, в этом чате.');
+    await sendReply(from.id, 'support');
     return;
   }
 
@@ -36,7 +36,7 @@ bot.command('start', async (ctx) => {
 
   const cabinet = config.miniAppUrl ? new InlineKeyboard().webApp('Открыть кабинет', config.miniAppUrl) : undefined;
   if (lead.access) {
-    await ctx.reply('Доступ открыт. Откройте кабинет: там сделки, тренажёр и материалы команды.', cabinet ? { reply_markup: cabinet } : undefined);
+    await sendReply(from.id, 'access_open');
     return;
   }
   // Приветствие берётся из настроек пушей в Office. Если его там нет, шлём короткое
@@ -45,39 +45,13 @@ bot.command('start', async (ctx) => {
   }
 });
 
-const REGISTER: Button = { label: 'Зарегистрироваться', type: 'register', style: 'success' };
-const SUPPORT: Button = { label: 'Написать в поддержку', type: 'support' };
-
-/** Ответ с простой разметкой (жирный, курсив, ссылки) и без предпросмотра ссылок */
-async function say(ctx: Context, text: string, kb?: ReturnType<typeof buildKeyboard>): Promise<void> {
-  await ctx.reply(toHtml(text), { parse_mode: 'HTML', link_preview_options: { is_disabled: true }, ...(kb ? { reply_markup: kb } : {}) });
+// Ответы на кнопки воронки: тексты и кнопки настраиваются в Office (Пуши → Ответы бота)
+for (const key of ['acc_ready', 'acc_no', 'acc_yes'] as const) {
+  bot.callbackQuery(key, async (ctx) => {
+    await ctx.answerCallbackQuery();
+    await sendReply(ctx.from.id, key);
+  });
 }
-
-// «Всё понятно — регистрация»
-bot.callbackQuery('acc_ready', async (ctx) => {
-  await ctx.answerCallbackQuery();
-  const kb = buildKeyboard(
-    [{ label: 'Нет, создать', type: 'callback', data: 'acc_no', style: 'success', inline: true }, { label: 'Да, уже есть', type: 'callback', data: 'acc_yes' }, SUPPORT],
-    await loadTarget(ctx.from.id),
-  );
-  await say(ctx, 'Отлично! Для доступа к сигналам нужен новый аккаунт Pocket Option — по нему я открою тебе сигналы.\n\n**У тебя уже есть аккаунт Pocket Option?**', kb);
-});
-
-bot.callbackQuery('acc_no', async (ctx) => {
-  await ctx.answerCallbackQuery();
-  const kb = buildKeyboard([REGISTER, { label: 'Не получается — написать в поддержку', type: 'support' }], await loadTarget(ctx.from.id));
-  await say(
-    ctx,
-    `Регистрация займёт 2 минуты:\n\n1. Нажми кнопку ниже и создай аккаунт\n2. Пополни счёт от 50 $ (рекомендуем от 100 $)\n3. Доступ откроется сам — ничего вводить не нужно\n\n__Нажимая «Зарегистрироваться», ты подтверждаешь, что тебе 18+ и понимаешь: торговля связана с риском потери денег.__ [Условия](${config.termsUrl})`,
-    kb,
-  );
-});
-
-bot.callbackQuery('acc_yes', async (ctx) => {
-  await ctx.answerCallbackQuery();
-  const kb = buildKeyboard([REGISTER, { label: 'Написать в поддержку', type: 'support' }], await loadTarget(ctx.from.id));
-  await say(ctx, 'Отлично! Чтобы мы видели твой аккаунт и открыли доступ, регистрация должна быть по нашей ссылке. Если ты уже зарегистрирован не по ней, напиши в поддержку: подскажем, как быть.', kb);
-});
 
 /** Описание бота (видно до /start) и кнопка меню слева от поля ввода */
 export async function setupBotProfile(): Promise<void> {

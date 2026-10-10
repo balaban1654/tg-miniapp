@@ -156,6 +156,15 @@ CREATE TABLE IF NOT EXISTS push_templates (
 -- Канал самого стримера: пуш «стример в эфире» может уходить и в него. Основной канал команды задаётся в самом шаблоне
 ALTER TABLE staff ADD COLUMN IF NOT EXISTS live_channel TEXT;
 ALTER TABLE push_templates ADD COLUMN IF NOT EXISTS to_staff_channel BOOLEAN NOT NULL DEFAULT TRUE;
+-- Ответы бота на кнопки и /start (Пуши → Ответы бота)
+CREATE TABLE IF NOT EXISTS bot_replies (
+  key        TEXT PRIMARY KEY,
+  text       TEXT NOT NULL DEFAULT '',
+  buttons    JSONB NOT NULL DEFAULT '[]',
+  photo      BYTEA,
+  photo_type TEXT,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 ALTER TABLE broadcasts ADD COLUMN IF NOT EXISTS photo BYTEA;
 ALTER TABLE broadcasts ADD COLUMN IF NOT EXISTS photo_type TEXT;
 
