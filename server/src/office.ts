@@ -763,7 +763,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     const me = req.staff!;
     const tgId = Number(req.params.tgId);
     const lead = await db.query(
-      `SELECT d.tg_id, d.username, d.first_name, d.owner_id, d.status, d.trader_id, o.name AS owner_name
+      `SELECT d.tg_id, d.username, d.first_name, d.owner_id, d.status, d.trader_id, d.last_seen_at, o.name AS owner_name
          FROM leads d LEFT JOIN staff o ON o.id = d.owner_id WHERE d.tg_id = $1 AND ${chatScope(me, 'd.owner_id')}`,
       [tgId],
     );
