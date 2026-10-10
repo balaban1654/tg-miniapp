@@ -221,9 +221,10 @@ code{font-family:var(--fm);font-size:12px;color:var(--acc2)}
 .row2{display:flex;justify-content:space-between;align-items:center;gap:8px}
 .dot{width:9px;height:9px;border-radius:50%;background:var(--acc);flex:none}
 .sm{font-size:12px}
-.bt{display:grid;grid-template-columns:1.2fr 1fr 1.4fr auto;gap:8px;align-items:center}
+.bt{display:grid;grid-template-columns:1.2fr 1fr auto 1.4fr auto;gap:8px;align-items:center}
+@media(max-width:560px){.bt{grid-template-columns:1fr 1fr}.bt>input:first-child{grid-column:1/-1}}
 .pv{background:var(--card2);border-radius:12px;border-top-left-radius:3px;padding:10px 12px;max-width:340px;white-space:pre-wrap;overflow-wrap:anywhere}
-.pv .k{display:grid;gap:4px;margin-top:8px}.pv .k span{background:#ffffff14;border-radius:8px;text-align:center;padding:6px;font-weight:600;font-size:12px;color:var(--acc2)}
+.pv .k{display:grid;gap:4px;margin-top:8px}.pv .k span{background:#ffffff14;border-radius:8px;text-align:center;padding:6px;font-weight:600;font-size:12px;color:var(--acc2)}.pv .k span.st-success{background:#3e9b4f;color:#fff}.pv .k span.st-primary{background:#3d7fd6;color:#fff}.pv .k span.st-danger{background:#d64545;color:#fff}
 textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;width:100%;font:inherit;color:inherit;min-height:110px;resize:vertical}
 .ok-msg{color:var(--ok)}
 .toast{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);background:rgba(37,24,71,.96);border:1px solid var(--acc);box-shadow:0 14px 44px rgba(0,0,0,.55),0 0 24px rgba(155,92,255,.22);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);padding:9px 26px;border-radius:14px;z-index:99;width:max-content;max-width:92%;text-align:center;font-weight:600;line-height:1.35;pointer-events:none;animation:toastIn .18s ease-out,toastOut .7s ease-in 1.3s forwards}
@@ -3084,6 +3085,7 @@ const BTYPE={miniapp:'Открыть кабинет',review:'Оставить о
 const fmtDelay=m=>m===0?'сразу':m%1440===0?'через '+(m/1440)+' дн.':m%60===0?'через '+(m/60)+' ч':'через '+m+' мин';
 const sample=t=>t.replaceAll('{пара}','EUR/USD OTC').replaceAll('{направление}','вверх').replaceAll('{экспирация}','5 сек').replaceAll('{сделка}','BUY (Вверх)').replaceAll('{вход}','12:30').replaceAll('{время}','12:30:00 (Киев)').replace(/\{время:(\d{10,14})\}/g,(_m,ms)=>new Date(+ms).toLocaleTimeString('ru-RU',{timeZone:'Europe/Kyiv',hourCycle:'h23'})+' (Киев)').replaceAll('{иконка}','✅').replaceAll('{итог}','плюс со входа').replaceAll('{результат}','плюс').replaceAll('{шаг}','со входа').replaceAll('{имя}','Аня').replaceAll('{стример}','Иван').replaceAll('{промокод}','LIO669');
 
+const BCOLOR={'':'Обычная',success:'Зелёная',primary:'Синяя',danger:'Красная'};
 function buttonsEditor(initial,types){
   const TYPES=types||BTYPE;
   const box=el('div',{style:'display:grid;gap:8px'});
@@ -3093,22 +3095,23 @@ function buttonsEditor(initial,types){
     const kind=b.type==='callback'?b.data:(b.type||'miniapp');
     const type=el('select',{},Object.entries(TYPES).map(([k,v])=>el('option',{value:k,...(k===kind?{selected:''}:{})},v)));
     const url=el('input',{placeholder:'https://…',value:b.url||''});
+    const color=el('select',{title:'Цвет кнопки'},Object.entries(BCOLOR).map(([k,v])=>el('option',{value:k,...(k===(b.style||'')?{selected:''}:{})},v)));
     const del=el('button',{class:'btn o s',type:'button',onclick:()=>{rows.splice(rows.indexOf(r),1);r.node.remove()}},'Убрать');
     const sync=()=>{url.hidden=type.value!=='url'};type.addEventListener('change',sync);sync();
-    const r={node:el('div',{class:'bt'},label,type,url,del),label,type,url,orig:b};
+    const r={node:el('div',{class:'bt'},label,type,color,url,del),label,type,color,url,orig:b};
     rows.push(r);box.append(r.node);
   };
   (initial||[]).forEach(add);
   const addBtn=el('button',{class:'btn o s',type:'button',onclick:()=>{if(rows.length<4)add()}},'+ Кнопка');
   return{set:l=>{rows.splice(0).forEach(r=>r.node.remove());(l||[]).forEach(add)},node:el('div',{style:'display:grid;gap:8px'},el('span',{class:'mut sm'},'Кнопки под сообщением (до 4)'),box,addBtn),
     get:()=>rows.filter(r=>r.label.value.trim()).map(r=>{const k=r.type.value;
-      const keep={...(r.orig.style?{style:r.orig.style}:{}),...(r.orig.inline?{inline:true}:{})};
+      const keep={...(r.color.value?{style:r.color.value}:{}),...(r.orig.inline?{inline:true}:{})};
       if(k==='acc_no'||k==='acc_yes'||k==='acc_ready')return{label:r.label.value.trim(),type:'callback',data:k,...keep};
       if(k==='url')return{label:r.label.value.trim(),type:'url',url:r.url.value.trim(),...keep};
       return{label:r.label.value.trim(),type:k,...keep}})};
 }
 function preview(text,buttons){
-  return el('div',{class:'pv'},sample(text)||'Текст сообщения',buttons.length?el('div',{class:'k'},buttons.map(b=>el('span',{},b.label))):null);
+  return el('div',{class:'pv'},sample(text)||'Текст сообщения',buttons.length?el('div',{class:'k'},buttons.map(b=>el('span',{class:b.style?'st-'+b.style:''},b.label))):null);
 }
 
 const SEG_LABELS={all:'Все, кто запускал бота',new:'Не зарегистрировались',registered:'Зарегистрировались, без депозита',ftd:'С депозитом',access:'С открытым доступом',churned:'Отвалились',withdrew:'Выводили средства'};
