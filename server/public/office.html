@@ -863,13 +863,15 @@ $('#logout').addEventListener('click',async()=>{try{await api('/logout',{method:
 
 /** render({soft:true}) обновляет страницу на месте: без «Загрузка…» и с сохранением прокрутки, чтобы экран не дёргался */
 let leadsPrevTab=null;
+let renderedTab=null;
 async function render(opt){
   stopPoll();
   const wasTab=leadsPrevTab;leadsPrevTab=tab;if(tab==='leads'&&wasTab!=='leads')leadsState.staffOpen=false;
   document.querySelectorAll('.dx-ovl').forEach(x=>x.remove());
   document.querySelectorAll('body > .dx-pop').forEach(x=>x.remove());dxReg.length=0;
   pushHash();
-  const soft=!!(opt&&opt.soft===true);
+  // Обновление того же раздела (после «Сохранить» и т. п.) идёт на месте: без «Загрузка…» и без прыжка наверх
+  const soft=opt&&typeof opt.soft==='boolean'?opt.soft:tab===renderedTab;renderedTab=tab;
   const m=$('#main'),y=window.scrollY,mt=m.scrollTop;m.classList.toggle('accv',tab==='acc');
   if(!soft)m.replaceChildren(el('div',{class:'mut'},'Загрузка…'));
   try{
