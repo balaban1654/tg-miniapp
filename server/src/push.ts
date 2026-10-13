@@ -170,7 +170,10 @@ export async function deliverAnimation(chatId: string, data: Buffer, mime: strin
     else await bot.api.sendAnimation(chatId, new InputFile(data, mime === 'video/mp4' ? 'result.mp4' : 'result.gif'));
     return { ok: true };
   } catch (e) {
-    if (e instanceof GrammyError) return { ok: false, error: e.description };
+    if (e instanceof GrammyError) {
+      if (e.error_code === 429) return { ok: false, retry: true, error: 'лимит Telegram' };
+      return { ok: false, blocked: e.error_code === 403 && /blocked/i.test(e.description), error: e.description };
+    }
     return { ok: false, error: String(e) };
   }
 }
@@ -319,7 +322,12 @@ async function runBroadcasts(): Promise<boolean> {
       const p = (await db.query('SELECT photo, photo_type FROM broadcasts WHERE id = $1', [j.broadcast_id])).rows[0];
       photos.set(j.broadcast_id, p?.photo ? { data: p.photo, type: p.photo_type } : null);
     }
-    const res = await deliver(j.tg_id, renderText(j.text, j), buildKeyboard(j.buttons, j), j.has_photo ? photos.get(j.broadcast_id) : null);
+    const ph = j.has_photo ? photos.get(j.broadcast_id) : null;
+    // Гифка, видео или стикер уходят отдельным сообщением без текста (так шлётся гифка результата сигнала)
+    const anim = ph && (ph.type === 'image/gif' || !ph.type.startsWith('image/')) ? ph : null;
+    const res = anim
+      ? await deliverAnimation(String(j.tg_id), anim.data, anim.type)
+      : await deliver(j.tg_id, renderText(j.text, j), buildKeyboard(j.buttons, j), ph);
     if (!res.ok && res.retry) return false;
     await db.query(`UPDATE broadcast_jobs SET status = $3, error = $4 WHERE broadcast_id = $1 AND tg_id = $2`, [
       j.broadcast_id,

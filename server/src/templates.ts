@@ -108,6 +108,8 @@ export interface Dispatch {
   prefix?: string;
   /** Не слать клиентам в бота, только в каналы */
   channelsOnly?: boolean;
+  /** Кому в боте вместо списка из шаблона, например 'all' для всех лидов */
+  segment?: string;
   /** Картинка вместо картинки шаблона, например скрин плюса с перекрытия */
   photo?: Photo | null;
 }
@@ -128,7 +130,7 @@ export async function dispatchTemplate(key: TemplateKey, d: Dispatch): Promise<{
     } else buttons.push(b);
   }
   let users = 0;
-  const seg = t.segment;
+  const seg = d.segment ?? t.segment;
   if (!d.channelsOnly && seg !== 'none' && (seg === 'own' ? d.ownerId : seg in SEGMENTS)) {
     const r = await createBroadcast({ text, buttons, segment: seg === 'own' ? 'all' : seg, ownerId: seg === 'own' ? d.ownerId : null, createdBy: d.createdBy, photo: t.photo });
     users = r.total;

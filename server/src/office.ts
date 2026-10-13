@@ -1588,6 +1588,8 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
         },
         createdBy: o.by,
         channelsOnly: !o.push,
+        // Галочка «Отправить пуш»: всем лидам, кто запускал бота, независимо от статуса
+        segment: 'all',
       });
       pushed = r.users + r.channels;
       chErrors = r.chErrors ?? [];
@@ -1648,6 +1650,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
         },
         createdBy: req.staff!.id,
         channelsOnly: b.push === false,
+        segment: 'all',
         photo: shot,
       });
       pushed = r.users + r.channels;
@@ -1707,7 +1710,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     if (!g) return reply.code(400).send({ error: `Гифка «${kind === 'win' ? 'плюс' : 'минус'}» не загружена: вкладка «Гифка»` });
     const channels: string[] = (await db.query(`SELECT channels FROM push_templates WHERE key IN ('result','result_win','result_step')`)).rows.flatMap((x) => x.channels as string[]);
     channels.splice(0, channels.length, ...new Set(channels));
-    if (!channels.length) return reply.code(400).send({ error: 'Канал не указан в шаблоне «Результат сигнала»' });
+    if (!channels.length && b.push !== true) return reply.code(400).send({ error: 'Канал не указан в шаблоне «Результат сигнала»' });
     let sent = 0;
     const errors: string[] = [];
     for (const ch of channels) {
@@ -1716,8 +1719,11 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
       if (r.ok) sent++;
       else errors.push(`${ch}: ${r.error}`);
     }
-    if (sent) await db.query('UPDATE signals SET gif_kind = $2, gif_sent_at = now() WHERE id = $1', [sg.id, kind]);
-    return { ok: sent > 0, sent, errors };
+    // Галочка «и всем лидам в бот»: гифка уходит всем, кто запускал бота
+    let users = 0;
+    if (b.push === true) users = (await createBroadcast({ text: '', buttons: [], segment: 'all', createdBy: req.staff!.id, photo: { data: g.data, type: g.mime } })).total;
+    if (sent || users) await db.query('UPDATE signals SET gif_kind = $2, gif_sent_at = now() WHERE id = $1', [sg.id, kind]);
+    return { ok: sent > 0 || users > 0, sent, users, errors };
   });
 
   // Итоги общих сигналов (только ручные, не тестовые и не по запросу клиента): плюсы по шагам, минусы, винрейт
