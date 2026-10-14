@@ -1743,13 +1743,14 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // Кто вошёл в сигнал и как оценил: Telegram ID, Pocket ID, оценка
-  app.get<{ Params: { id: string } }>('/signals/:id/takers', { preHandler: need('admin', 'analyst', 'streamer') }, async (req) => {
-    // Стример видит только своих клиентов
+  app.get<{ Params: { id: string }; Querystring: { ids?: string } }>('/signals/:id/takers', { preHandler: need('admin', 'analyst', 'streamer') }, async (req) => {
+    // Стример видит только своих клиентов. ids: все сигналы склеенной строки истории
     const mine = req.staff!.role === 'streamer';
+    const ids = String(req.query.ids ?? req.params.id).split(',').map(Number).filter((n) => Number.isInteger(n) && n > 0).slice(0, 500);
     return (await db.query(
       `SELECT d.tg_id, l.username, l.first_name, l.trader_id, d.result, d.step, d.created_at
-         FROM deals d JOIN leads l ON l.tg_id = d.tg_id WHERE d.signal_id = $1 AND ($2::int IS NULL OR l.owner_id = $2) ORDER BY d.id`,
-      [Number(req.params.id), mine ? req.staff!.id : null],
+         FROM deals d JOIN leads l ON l.tg_id = d.tg_id WHERE d.signal_id = ANY($1::int[]) AND ($2::int IS NULL OR l.owner_id = $2) ORDER BY d.id`,
+      [ids.length ? ids : [Number(req.params.id)], mine ? req.staff!.id : null],
     )).rows;
   });
   // Фрод: клиенты, поставившие подряд минус более трёх сигналам
@@ -1806,23 +1807,40 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     return { total: tot.total, requested: tot.requested, rated: win + loss, wins, win, loss, rate: win + loss ? Math.round((win / (win + loss)) * 1000) / 10 : null };
   });
   // История постранично: по 50 последних, дальше можно листать
+  // История: сигналы по запросу с одной парой, направлением, экспирацией и временем входа склеиваются в одну строку,
+  // и в ней видны оценки всех клиентов, получивших этот вход. Ручные сигналы идут по одному
+  const GROUP_KEY = `CASE WHEN s.requested_by IS NOT NULL
+      THEN concat_ws(':', 'r', s.pair, s.direction, coalesce(s.expiry_sec, s.expiry_min * 60), extract(epoch FROM s.entry_at)::bigint, s.is_test)
+      ELSE 'id:' || s.id END`;
   app.get<{ Querystring: { page?: string } }>('/signals/history', { preHandler: need('admin', 'analyst', 'streamer') }, async (req) => {
     const PER = 50;
-    const total = Number((await db.query('SELECT count(*)::int AS n FROM signals')).rows[0].n);
+    const total = Number((await db.query(`SELECT count(DISTINCT ${GROUP_KEY})::int AS n FROM signals s`)).rows[0].n);
     const pages = Math.max(1, Math.ceil(total / PER));
     const page = Math.min(pages, Math.max(1, Math.trunc(Number(req.query.page)) || 1));
     const r = await db.query(
-      `WITH o AS (${OUTCOME_CTE})
-       SELECT s.id, s.pair, s.direction, s.expiry_min, s.expiry_sec, s.requested_by IS NOT NULL AS requested, s.entry_at, s.note, s.source, s.is_test, s.created_at,
-              o.res, o.stp, st.name AS author,
-              CASE WHEN s.requested_by IS NOT NULL THEN coalesce(l.lead_role, 'lead')
-                   ELSE CASE st.role WHEN 'teamlead' THEN 'moder' WHEN 'admin' THEN 'admin' WHEN 'streamer' THEN 'streamer' WHEN 'buyer' THEN 'buyer' ELSE 'analyst' END END AS source_role,
-              (SELECT count(*)::int FROM deals x WHERE x.signal_id = s.id) AS taken,
-              (SELECT count(*)::int FROM deals x WHERE x.signal_id = s.id AND x.result = 'win') AS wins,
-              (SELECT count(*)::int FROM deals x WHERE x.signal_id = s.id AND x.result = 'loss') AS losses,
-              (SELECT coalesce(json_object_agg(t.step + 1, t.c), '{}'::json) FROM (SELECT step, count(*)::int AS c FROM deals x WHERE x.signal_id = s.id AND x.result = 'win' AND x.step IS NOT NULL GROUP BY step) t) AS win_steps
-         FROM signals s JOIN o ON o.id = s.id LEFT JOIN staff st ON st.id = s.created_by LEFT JOIN leads l ON l.tg_id = s.requested_by
-        ORDER BY s.id DESC LIMIT ${PER} OFFSET ${(page - 1) * PER}`,
+      `WITH o AS (${OUTCOME_CTE}),
+       b AS (
+         SELECT ${GROUP_KEY} AS gk, s.id, s.pair, s.direction, s.expiry_min, s.expiry_sec, s.requested_by IS NOT NULL AS requested, s.entry_at, s.note, s.source, s.is_test, s.created_at,
+                o.res, o.stp, st.name AS author,
+                CASE WHEN s.requested_by IS NOT NULL THEN coalesce(l.lead_role, 'lead')
+                     ELSE CASE st.role WHEN 'teamlead' THEN 'moder' WHEN 'admin' THEN 'admin' WHEN 'streamer' THEN 'streamer' WHEN 'buyer' THEN 'buyer' ELSE 'analyst' END END AS source_role
+           FROM signals s JOIN o ON o.id = s.id LEFT JOIN staff st ON st.id = s.created_by LEFT JOIN leads l ON l.tg_id = s.requested_by
+       ),
+       g AS (
+         SELECT gk, max(id) AS id, array_agg(id ORDER BY id) AS ids, count(*)::int AS n, min(created_at) AS created_at,
+                CASE WHEN bool_or(res = 'win') THEN 'win' WHEN bool_or(res = 'loss') THEN 'loss' END AS res,
+                min(stp) FILTER (WHERE res = 'win') AS stp,
+                CASE WHEN count(DISTINCT source_role) = 1 THEN min(source_role) ELSE 'lead' END AS source_role
+           FROM b GROUP BY gk
+       )
+       SELECT g.id, g.ids, g.n, g.created_at, g.res, g.stp, g.source_role,
+              x.pair, x.direction, x.expiry_min, x.expiry_sec, x.requested, x.entry_at, x.note, x.source, x.is_test, x.author,
+              (SELECT count(*)::int FROM deals d WHERE d.signal_id = ANY(g.ids)) AS taken,
+              (SELECT count(*)::int FROM deals d WHERE d.signal_id = ANY(g.ids) AND d.result = 'win') AS wins,
+              (SELECT count(*)::int FROM deals d WHERE d.signal_id = ANY(g.ids) AND d.result = 'loss') AS losses,
+              (SELECT coalesce(json_object_agg(t.step + 1, t.c), '{}'::json) FROM (SELECT step, count(*)::int AS c FROM deals d WHERE d.signal_id = ANY(g.ids) AND d.result = 'win' AND d.step IS NOT NULL GROUP BY step) t) AS win_steps
+         FROM g JOIN b x ON x.id = g.id
+        ORDER BY g.id DESC LIMIT ${PER} OFFSET ${(page - 1) * PER}`,
     );
     return { rows: r.rows, total, page, pages, per: PER };
   });
