@@ -445,10 +445,6 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
         [String(req.body?.pair ?? ''), String(set.direction_ttl_min)],
       )
     ).rows[0];
-    // Авто: направление случайное от текущей минуты, у всех в одну минуту одинаковое. Сигнал всегда тестовый и в статистику не идёт
-    if (p?.auto) {
-      p.direction = createHash('sha256').update(`${p.pair}:${Math.floor(Date.now() / 60_000)}`).digest()[0] % 2 ? 'up' : 'down';
-    }
     if (!p) return reply.code(409).send({ error: 'По этой паре сейчас нет подходящего входа. Попробуйте другую пару или чуть позже.' });
     const expirySec = Math.trunc(Number(req.body?.expiry_sec));
     const okExp = await db.query('SELECT 1 FROM signal_expiries WHERE sec = $1', [expirySec]);
@@ -456,6 +452,11 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
     // Вход: ближайший момент не раньше «через enter_in_sec», когда секундная стрелка стоит на entry_second (например 23:42:15)
     const es = set.entry_second * 1000;
     const entryMs = Math.ceil((Date.now() + set.enter_in_sec * 1000 - es) / 60_000) * 60_000 + es;
+    // Авто: направление случайное, но одно на пару и минуту входа: у всех, кто получил вход в 16:38:15 по одной паре, оно одинаковое
+    // (раньше считалось от минуты запроса, и запросы в 16:36:50 и 16:37:20 с одним входом получали разное). Сигнал тестовый, в статистику не идёт
+    if (p.auto) {
+      p.direction = createHash('sha256').update(`${p.pair}:${Math.floor(entryMs / 60_000)}`).digest()[0] % 2 ? 'up' : 'down';
+    }
     const ins = await db.query(
       `INSERT INTO signals (pair, direction, expiry_min, expiry_sec, entry_at, note, source, is_test, created_by, requested_by)
        VALUES ($1,$2,$3,$4,$5,NULL,CASE WHEN $6 THEN 'test' ELSE 'analyst' END,$6,$7,$8) RETURNING id, pair, direction, expiry_min, expiry_sec, entry_at, is_test, source, requested_by`,
