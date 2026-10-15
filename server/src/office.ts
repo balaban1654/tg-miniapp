@@ -83,7 +83,7 @@ function ownerScope(me: Staff, col: string): string {
 /**
  * Чаты видят: админ все. Стример видит своих и неразобранных (без владельца, кто первым ответил, тот забирает).
  * Новые лиды другого стримера (ещё без регистрации) закрыты, пока у него идёт смена и ещё 15 минут после её конца.
- * Когда это время прошло и клиенту никто не ответил, чат открывается всем стримерам (владелец при этом не меняется).
+ * Когда это время прошло и клиенту никто не ответил, чат открывается всем стримерам; кто из них ответит, тому клиент и переходит.
  */
 function chatScope(me: Staff, col: string): string {
   if (me.role === 'admin') return 'TRUE';
@@ -843,6 +843,14 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
         const o = await db.query('SELECT o.id, o.name FROM leads d JOIN staff o ON o.id = d.owner_id WHERE d.tg_id = $1', [tgId]);
         if (o.rows[0]?.id !== me.id) return `Этого клиента уже взял ${o.rows[0]?.name ?? 'другой стример'}`;
       }
+    } else if (ownerId !== null && ownerId !== me.id && me.role === 'streamer') {
+      // Чужой новый клиент, открытый всем, пока владелец не на смене: кто ответил, тот его и забирает (ссылка, по которой он пришёл, остаётся)
+      await db.query(
+        `UPDATE leads d SET owner_id = $2 WHERE d.tg_id = $1 AND d.owner_id = $3 AND d.status = 'new' AND coalesce(d.lead_role, 'lead') = 'lead'
+           AND NOT EXISTS (SELECT 1 FROM shift_reports r WHERE r.staff_id = d.owner_id
+             AND (r.status = 'live' OR (r.ended_at IS NOT NULL AND r.ended_at > now() - interval '15 minutes')))`,
+        [tgId, me.id, ownerId],
+      );
     }
     return null;
   }
