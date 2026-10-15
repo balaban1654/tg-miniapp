@@ -1086,15 +1086,17 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     return out;
   });
 
-  app.post('/push/broadcast', { preHandler: need('admin') }, async (req, reply) => {
+  app.post('/push/broadcast', { preHandler: need('admin'), bodyLimit: 9 * 1024 * 1024 }, async (req, reply) => {
     const b = (req.body ?? {}) as Record<string, unknown>;
     const text = str(b.text, 4000);
     const segment = str(b.segment, 20);
     const buttons = cleanButtons(b.buttons);
-    if (!text) return reply.code(400).send({ error: 'Введите текст' });
+    const ph = b.photo ? parseReviewPhoto(b.photo) : null;
+    if (typeof ph === 'string') return reply.code(400).send({ error: ph.replace('Фото', 'Картинка') });
+    if (!text && !ph) return reply.code(400).send({ error: 'Введите текст или прикрепите картинку' });
     if (!(segment in SEGMENTS)) return reply.code(400).send({ error: 'Неизвестный сегмент' });
     if (typeof buttons === 'string') return reply.code(400).send({ error: buttons });
-    const res = await createBroadcast({ text, buttons, segment, ownerId: b.owner_id ? Number(b.owner_id) : null, createdBy: req.staff!.id });
+    const res = await createBroadcast({ text, buttons, segment, ownerId: b.owner_id ? Number(b.owner_id) : null, createdBy: req.staff!.id, photo: ph });
     if (!res.total) return reply.code(400).send({ error: 'В этом сегменте нет получателей' });
     return res;
   });

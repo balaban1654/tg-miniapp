@@ -3265,28 +3265,31 @@ async function viewPush(){
   const sendBtn=el('button',{class:'btn',type:'button'},'Отправить');
   let photo=null;
   const fileIn=el('input',{type:'file',accept:'image/jpeg,image/png,image/webp',style:'display:none'});
-  const attachBtn=el('button',{class:'btn o',type:'button',title:'Прикрепить скриншот (или вставьте Ctrl+V)','aria-label':'Прикрепить скриншот'},'📎');
-  const prev=el('div',{style:'display:none;padding:8px 12px 0;gap:8px;align-items:center'});
+  const attachBtn=el('button',{class:'btn o s',type:'button',title:'Прикрепить картинку (или вставьте Ctrl+V в поле текста)','aria-label':'Прикрепить картинку'},'📎 Прикрепить картинку');
+  const prev=el('div',{style:'display:none;gap:8px;align-items:center'});
   function setPhoto(f){
     if(!f)return;
-    if(!/^image\/(jpeg|png|webp)$/.test(f.type)){err.textContent='Прикрепите картинку JPG, PNG или WebP';return}
-    if(f.size>6*1024*1024){err.textContent='Картинка больше 6 МБ';return}
-    err.textContent='';photo=f;
+    if(!/^image\/(jpeg|png|webp)$/.test(f.type)){berr.textContent='Прикрепите картинку JPG, PNG или WebP';return}
+    if(f.size>5*1024*1024){berr.textContent='Картинка больше 5 МБ';return}
+    berr.textContent='';photo=f;
     prev.style.display='flex';
     prev.replaceChildren(el('img',{src:URL.createObjectURL(f),alt:'Скриншот к отправке',style:'height:56px;border-radius:8px'}),el('button',{class:'btn o',type:'button',onclick:clearPhoto},'Убрать'));
   }
   function clearPhoto(){photo=null;fileIn.value='';prev.style.display='none';prev.replaceChildren()}
   attachBtn.addEventListener('click',()=>fileIn.click());
   fileIn.addEventListener('change',()=>setPhoto(fileIn.files[0]));
+  // Картинку можно вставить из буфера прямо в поле текста (Ctrl+V или «Вставить» на телефоне)
+  bt.addEventListener('paste',e=>{const it=[...(e.clipboardData&&e.clipboardData.items||[])].find(i=>i.kind==='file'&&/^image\//.test(i.type));if(it){e.preventDefault();setPhoto(it.getAsFile())}});
   sendBtn.addEventListener('click',async()=>{
     berr.className='err';berr.textContent='';
     if(!sendBtn.dataset.s){const n=(sel.selectedOptions[0].textContent.match(/\((\d+)\)/)||[])[1];sendBtn.dataset.s='1';sendBtn.textContent='Подтвердить отправку '+n+' получателям';return}
-    try{const r=await api('/push/broadcast',{method:'POST',body:{segment:sel.value,owner_id:owner.value||undefined,text:bt.value,buttons:bbe.get()}});berr.className='ok-msg';berr.textContent='Рассылка поставлена в очередь: '+r.total+' получателей';setTimeout(render,1200)}
+    try{const r=await api('/push/broadcast',{method:'POST',body:{segment:sel.value,owner_id:owner.value||undefined,text:bt.value,buttons:bbe.get(),photo:photo?await fileToDataUrl(photo):undefined}});berr.className='ok-msg';berr.textContent='Рассылка поставлена в очередь: '+r.total+' получателей';clearPhoto();setTimeout(render,1200)}
     catch(x){berr.textContent=x.message;delete sendBtn.dataset.s;sendBtn.textContent='Отправить'}});
   const bform=el('div',{class:'card',style:'display:grid;gap:12px'},el('h3',{style:'font-size:14px'},'Рассылка вручную'),
     el('div',{class:'form'},el('label',{},'Кому',sel),el('label',{},'Стример',owner)),
     el('div',{},el('button',{class:'btn o s',type:'button',onclick:()=>{bt.value='{имя}, у нас к вам просьба. Если вам нравится работа с командой, оставьте короткий отзыв: оценка и пара слов, можно с фото. Это займёт меньше минуты и поможет тем, кто только присматривается.';bt.dispatchEvent(new Event('input'));bbe.set([{label:'Оставить отзыв',type:'review',style:'success'}]);bbe.node.dispatchEvent(new Event('input',{bubbles:true}));sel.value='withdrew'}},'Шаблон: просьба об отзыве')),
-    el('label',{},'Текст. Подстановки: {имя} {стример} {промокод}',bt),bbe.node,el('div',{},el('div',{class:'mut sm',style:'margin-bottom:6px'},'Так увидит клиент'),bpv),
+    el('label',{},'Текст. Подстановки: {имя} {стример} {промокод}',bt),
+    el('div',{style:'display:grid;gap:6px'},el('span',{class:'mut sm'},'Картинка (необязательно): прикрепите файл или вставьте из буфера прямо в поле текста'),el('div',{style:'display:flex;gap:10px;align-items:center;flex-wrap:wrap'},attachBtn,prev),fileIn),bbe.node,el('div',{},el('div',{class:'mut sm',style:'margin-bottom:6px'},'Так увидит клиент'),bpv),
     el('div',{class:'mut sm'},'Получают только те, кто нажал /start у бота и не заблокировал его. Отправка идёт очередью, примерно 20 сообщений в секунду.'),
     el('div',{},sendBtn),berr);
   const castT=table(['Когда','Кому','Текст','Всего','Отправлено','Ошибок','В очереди'],casts.map(c=>[td(new Date(c.created_at).toLocaleString('ru-RU',{timeZone:'Europe/Kyiv',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})),td(SEGL[c.segment]||c.segment),el('td',{style:'max-width:320px;white-space:normal'},c.text.replace(/\{время:(\d{10,14})\}/g,(_m,ms)=>new Date(+ms).toLocaleTimeString('ru-RU',{timeZone:'Europe/Kyiv',hourCycle:'h23'})+' (Киев)').slice(0,110)),td(c.total,'n'),td(c.sent,'n'),td(c.failed,'n'),td(c.pending,'n')]),'Рассылок пока не было.');
