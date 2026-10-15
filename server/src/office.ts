@@ -749,11 +749,12 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
   app.get('/chats', { preHandler: auth }, async (req) => {
     const me = req.staff!;
     const r = await db.query(
-      `SELECT d.tg_id, d.username, d.first_name, d.owner_id, o.name AS owner_name,
+      `SELECT d.tg_id, d.username, d.first_name, d.owner_id, o.name AS owner_name, tf.name AS taken_from_name,
               m.direction AS last_dir, m.kind AS last_kind, m.text AS last_text, m.created_at AS last_at
          FROM leads d
          JOIN LATERAL (SELECT direction, kind, text, created_at FROM messages WHERE tg_id = d.tg_id ORDER BY id DESC LIMIT 1) m ON TRUE
          LEFT JOIN staff o ON o.id = d.owner_id
+         LEFT JOIN staff tf ON tf.id = d.taken_from
         WHERE d.removed_at IS NULL AND ${chatScope(me, 'd.owner_id')}${me.role === 'admin' ? '' : " AND coalesce(d.lead_role, 'lead') = 'lead'"} AND (d.chat_closed_at IS NULL OR m.created_at > d.chat_closed_at)
         ORDER BY (m.direction = 'in') DESC, m.created_at DESC LIMIT 200`,
     );
@@ -764,8 +765,8 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     const me = req.staff!;
     const tgId = Number(req.params.tgId);
     const lead = await db.query(
-      `SELECT d.tg_id, d.username, d.first_name, d.owner_id, d.status, d.trader_id, d.last_seen_at, o.name AS owner_name
-         FROM leads d LEFT JOIN staff o ON o.id = d.owner_id WHERE d.tg_id = $1 AND ${chatScope(me, 'd.owner_id')}`,
+      `SELECT d.tg_id, d.username, d.first_name, d.owner_id, d.status, d.trader_id, d.last_seen_at, o.name AS owner_name, tf.name AS taken_from_name
+         FROM leads d LEFT JOIN staff o ON o.id = d.owner_id LEFT JOIN staff tf ON tf.id = d.taken_from WHERE d.tg_id = $1 AND ${chatScope(me, 'd.owner_id')}`,
       [tgId],
     );
     if (!lead.rowCount) return reply.code(404).send({ error: 'Чат не найден' });
@@ -846,7 +847,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     } else if (ownerId !== null && ownerId !== me.id && me.role === 'streamer') {
       // Чужой новый клиент, открытый всем, пока владелец не на смене: кто ответил, тот его и забирает (ссылка, по которой он пришёл, остаётся)
       await db.query(
-        `UPDATE leads d SET owner_id = $2 WHERE d.tg_id = $1 AND d.owner_id = $3 AND d.status = 'new' AND coalesce(d.lead_role, 'lead') = 'lead'
+        `UPDATE leads d SET owner_id = $2, taken_from = d.owner_id WHERE d.tg_id = $1 AND d.owner_id = $3 AND d.status = 'new' AND coalesce(d.lead_role, 'lead') = 'lead'
            AND NOT EXISTS (SELECT 1 FROM shift_reports r WHERE r.staff_id = d.owner_id
              AND (r.status = 'live' OR (r.ended_at IS NOT NULL AND r.ended_at > now() - interval '15 minutes')))`,
         [tgId, me.id, ownerId],
@@ -1307,7 +1308,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     const raw = (req.body as any)?.owner_id;
     const owner = raw === null || raw === '' || raw === undefined ? null : Number(raw);
     if (owner !== null && !(await db.query(`SELECT 1 FROM staff WHERE id = $1 AND active`, [owner])).rowCount) return reply.code(404).send({ error: 'Сотрудник не найден' });
-    const r = await db.query('UPDATE leads SET owner_id = $2, link_id = coalesce(link_id, (SELECT id FROM links WHERE owner_id = $2 ORDER BY id LIMIT 1)) WHERE tg_id = $1 RETURNING tg_id', [Number(req.params.tgId), owner]);
+    const r = await db.query('UPDATE leads SET owner_id = $2, taken_from = NULL, link_id = coalesce(link_id, (SELECT id FROM links WHERE owner_id = $2 ORDER BY id LIMIT 1)) WHERE tg_id = $1 RETURNING tg_id', [Number(req.params.tgId), owner]);
     if (!r.rowCount) return reply.code(404).send({ error: 'Лид не найден' });
     return { ok: true };
   });
