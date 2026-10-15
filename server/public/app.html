@@ -786,8 +786,8 @@ async function pastSignals(){
   const sigOf=r=>r.wins+'/'+r.losses+(r.positive?'+':'');
   const inner=r=>{
     const n=r.wins+r.losses,up=r.direction==='up';
-    const cls=r.positive?'w':n===0||r.wins===r.losses?'n':r.wins>r.losses?'w':'l';
-    const lab=cls==='w'?'Плюс':cls==='l'?'Минус':(n===0?'Нет итогов':'Поровну');
+    const cls=n===0?'n':r.positive||r.wins>=r.losses?'w':'l';
+    const lab=cls==='w'?'Плюс':cls==='l'?'Минус':'Нет итогов';
     const t=new Date(r.entry_at).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
     return el('div',{class:'ps-in'},
       el('div',{class:'row'},el('div',{},el('b',{},r.pair+' · '+(up?'ВВЕРХ (BUY)':'ВНИЗ (SELL)')),el('div',{class:'sm'},t+' · '+(n+' '+plural(n,'отметка','отметки','отметок')))),el('span',{class:'pbadge '+cls},lab)));

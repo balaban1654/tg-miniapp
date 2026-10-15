@@ -364,7 +364,9 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
          SELECT s.id::text AS id, s.pair, s.direction, s.entry_at, s.is_test,
                 (SELECT count(*)::int FROM deals x WHERE x.signal_id = s.id AND x.result = 'win') + coalesce((s.demo_result = 'win')::int, 0) AS wins,
                 (SELECT count(*)::int FROM deals x WHERE x.signal_id = s.id AND x.result = 'loss') + coalesce((s.demo_result = 'loss')::int, 0) AS losses,
-                FALSE AS positive
+                -- Разные исходы (есть и плюс, и минус): как и у клиентских сигналов, показываем плюс
+                (EXISTS (SELECT 1 FROM deals x WHERE x.signal_id = s.id AND x.result = 'win') OR s.demo_result = 'win')
+                  AND (EXISTS (SELECT 1 FROM deals x WHERE x.signal_id = s.id AND x.result = 'loss') OR s.demo_result = 'loss') AS positive
            FROM signals s
           WHERE NOT s.is_test AND s.requested_by IS NULL
             AND s.entry_at + make_interval(secs => coalesce(s.expiry_sec, s.expiry_min * 60)) < now()
