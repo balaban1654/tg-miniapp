@@ -125,6 +125,8 @@ type Delivery = { ok: true } | { ok: false; retry?: boolean; blocked?: boolean; 
 export interface Photo {
   data: Buffer;
   type: string;
+  /** file_id в Telegram после первой отправки: дальше картинка не загружается заново, а пересылается по нему */
+  fileId?: string;
 }
 /** Сообщение в личку или канал. Картинка может идти без текста: тогда это просто фото с кнопками */
 export async function deliver(tgId: string, text: string, kb?: InlineKeyboard, photo?: Photo | null): Promise<Delivery> {
@@ -136,15 +138,15 @@ export async function deliver(tgId: string, text: string, kb?: InlineKeyboard, p
   try {
     const opts = { parse_mode: 'HTML' as const, ...(kb ? { reply_markup: kb } : {}) };
     if (photo) {
-      const file = new InputFile(photo.data, 'photo.' + (photo.type === 'image/png' ? 'png' : photo.type === 'image/webp' ? 'webp' : 'jpg'));
+      const file = photo.fileId ?? new InputFile(photo.data, 'photo.' + (photo.type === 'image/png' ? 'png' : photo.type === 'image/webp' ? 'webp' : 'jpg'));
       const html = text.trim() ? toHtml(text) : '';
       // Подпись к фото до 1024 знаков. Длиннее: фото отдельно, текст с кнопками следом
-      if (html.length > 0 && html.length <= 1000) await bot.api.sendPhoto(tgId, file, { caption: html, ...opts });
-      else if (html.length === 0) await bot.api.sendPhoto(tgId, file, opts);
-      else {
-        await bot.api.sendPhoto(tgId, file);
-        await bot.api.sendMessage(tgId, html, { ...opts, link_preview_options: { is_disabled: true } });
-      }
+      const m =
+        html.length > 0 && html.length <= 1000 ? await bot.api.sendPhoto(tgId, file, { caption: html, ...opts })
+        : html.length === 0 ? await bot.api.sendPhoto(tgId, file, opts)
+        : await bot.api.sendPhoto(tgId, file);
+      if (!photo.fileId) photo.fileId = m.photo?.[m.photo.length - 1]?.file_id;
+      if (html.length > 1000) await bot.api.sendMessage(tgId, html, { ...opts, link_preview_options: { is_disabled: true } });
     } else {
       await bot.api.sendMessage(tgId, toHtml(text), { parse_mode: 'HTML', link_preview_options: { is_disabled: true }, ...(kb ? { reply_markup: kb } : {}) });
     }
@@ -159,15 +161,21 @@ export async function deliver(tgId: string, text: string, kb?: InlineKeyboard, p
 }
 
 /** Гифка или короткое видео (GIF/MP4) в чат или канал */
-export async function deliverAnimation(chatId: string, data: Buffer, mime: string): Promise<Delivery> {
+export async function deliverAnimation(chatId: string, data: Buffer, mime: string, ref?: { fileId?: string }): Promise<Delivery> {
   if (config.disableBot) {
     outbox.push({ tgId: chatId, text: '', photo: mime, buttons: null } as (typeof outbox)[number]);
     return { ok: true };
   }
   try {
     // Видеостикер (WEBM) Telegram принимает только как стикер
-    if (mime === 'video/webm') await bot.api.sendSticker(chatId, new InputFile(data, 'sticker.webm'));
-    else await bot.api.sendAnimation(chatId, new InputFile(data, mime === 'video/mp4' ? 'result.mp4' : 'result.gif'));
+    // Повторные отправки той же гифки идут по file_id, без новой загрузки
+    if (mime === 'video/webm') {
+      const m = await bot.api.sendSticker(chatId, ref?.fileId ?? new InputFile(data, 'sticker.webm'));
+      if (ref && !ref.fileId) ref.fileId = m.sticker?.file_id;
+    } else {
+      const m = await bot.api.sendAnimation(chatId, ref?.fileId ?? new InputFile(data, mime === 'video/mp4' ? 'result.mp4' : 'result.gif'));
+      if (ref && !ref.fileId) ref.fileId = m.animation?.file_id ?? m.document?.file_id;
+    }
     return { ok: true };
   } catch (e) {
     if (e instanceof GrammyError) {
@@ -303,10 +311,24 @@ export async function createBroadcast(b: { text: string; buttons: Button[]; segm
     w.params,
   );
   await db.query('UPDATE broadcasts SET total = $2 WHERE id = $1', [id, jobs.rowCount ?? 0]);
+  // Не ждём планировщика: рассылка начинается сразу
+  if (jobs.rowCount) setImmediate(() => void tick());
   return { id, total: jobs.rowCount ?? 0 };
 }
 
+// Картинки рассылок с их file_id: загружаются в Telegram один раз на рассылку, а не на каждого получателя
+const bcPhotos = new Map<number, Photo | null>();
+
 async function runBroadcasts(): Promise<boolean> {
+  // Отправляем пачками, пока очередь не опустеет: сигнал не должен ждать следующего прохода планировщика
+  for (let round = 0; round < 40; round++) {
+    const r = await runBroadcastBatch();
+    if (r !== 'more') return r === 'done';
+  }
+  return true;
+}
+
+async function runBroadcastBatch(): Promise<'done' | 'more' | 'retry'> {
   const jobs = await db.query(
     `SELECT j.broadcast_id, j.tg_id, b.text, b.buttons, (b.photo IS NOT NULL) AS has_photo, d.first_name, d.username, d.region, d.tz,
             o.name AS owner_name, o.po_promo, o.po_link, o.po_link_ru
@@ -316,19 +338,20 @@ async function runBroadcasts(): Promise<boolean> {
        LEFT JOIN staff o ON o.id = d.owner_id
       WHERE j.status = 'pending' ORDER BY j.broadcast_id, j.tg_id LIMIT 250`,
   );
-  const photos = new Map<number, Photo | null>();
+  if (!jobs.rowCount) return 'done';
+  if (bcPhotos.size > 50) bcPhotos.clear();
   for (const j of jobs.rows) {
-    if (j.has_photo && !photos.has(j.broadcast_id)) {
+    if (j.has_photo && !bcPhotos.has(j.broadcast_id)) {
       const p = (await db.query('SELECT photo, photo_type FROM broadcasts WHERE id = $1', [j.broadcast_id])).rows[0];
-      photos.set(j.broadcast_id, p?.photo ? { data: p.photo, type: p.photo_type } : null);
+      bcPhotos.set(j.broadcast_id, p?.photo ? { data: p.photo, type: p.photo_type } : null);
     }
-    const ph = j.has_photo ? photos.get(j.broadcast_id) : null;
+    const ph = j.has_photo ? bcPhotos.get(j.broadcast_id) : null;
     // Гифка, видео или стикер уходят отдельным сообщением без текста (так шлётся гифка результата сигнала)
     const anim = ph && (ph.type === 'image/gif' || !ph.type.startsWith('image/')) ? ph : null;
     const res = anim
-      ? await deliverAnimation(String(j.tg_id), anim.data, anim.type)
+      ? await deliverAnimation(String(j.tg_id), anim.data, anim.type, anim)
       : await deliver(j.tg_id, renderText(j.text, j), buildKeyboard(j.buttons, j), ph);
-    if (!res.ok && res.retry) return false;
+    if (!res.ok && res.retry) return 'retry';
     await db.query(`UPDATE broadcast_jobs SET status = $3, error = $4 WHERE broadcast_id = $1 AND tg_id = $2`, [
       j.broadcast_id,
       j.tg_id,
@@ -336,23 +359,32 @@ async function runBroadcasts(): Promise<boolean> {
       res.ok ? null : res.error.slice(0, 200),
     ]);
     if (!res.ok && res.blocked) await markBlocked(j.tg_id);
-    await sleep(config.disableBot ? 0 : 45);
+    await sleep(config.disableBot ? 0 : 40);
   }
-  return true;
+  return jobs.rowCount === 250 ? 'more' : 'done';
 }
 
 // ---------- Планировщик ----------
 
 let running = false;
+let again = false;
 export async function tick(): Promise<void> {
-  if (running) return;
+  if (running) {
+    again = true;
+    return;
+  }
   running = true;
   try {
-    if (await runRules()) await runBroadcasts();
+    // Сначала рассылки (сигналы и результаты срочные), потом пуши по правилам
+    if (await runBroadcasts()) await runRules();
   } catch (e) {
     console.error('Ошибка планировщика пушей:', e);
   } finally {
     running = false;
+  }
+  if (again) {
+    again = false;
+    void tick();
   }
 }
 
