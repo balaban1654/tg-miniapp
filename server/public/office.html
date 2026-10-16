@@ -236,7 +236,9 @@ textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10
 .bub{max-width:78%;padding:8px 12px;border-radius:12px;white-space:pre-wrap;overflow-wrap:anywhere}
 .bub.in{background:var(--card2);border-top-left-radius:3px}
 .bub.out{background:var(--acc3);justify-self:end;border-top-right-radius:3px}
-.bub small{display:block;color:#ffffffa0;font-size:11px;margin-top:2px}.bub .ed-btn{font-size:11px;margin-left:8px;color:#ffffffb0;text-decoration:underline;padding:0}.bub .ed-btn:hover{color:#fff}
+.bub small{display:block;color:#ffffffa0;font-size:11px;margin-top:2px}.bub .ed-btn{background:none;border:0;padding:2px 3px;margin-left:6px;color:#ffffffa0;cursor:pointer;vertical-align:middle;opacity:0;transition:opacity .15s}.bub:hover .ed-btn,.bub .ed-btn:focus-visible{opacity:1}.bub .ed-btn:hover{color:#fff}
+@media(hover:none){.bub .ed-btn{display:none}.bub.out{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}.bub.out textarea{-webkit-user-select:text;user-select:text}}
+.msg-menu{position:fixed;z-index:90;display:grid;min-width:180px;background:var(--card2);border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:0 18px 44px rgba(0,0,0,.55)}.msg-menu button{background:none;border:0;border-bottom:1px solid var(--line);color:var(--fg);text-align:left;padding:13px 16px;font:inherit;font-size:15px}.msg-menu button:last-child{border-bottom:0;color:#ffffffa0}.msg-menu button.bad{color:var(--bad)}
 .bub img{max-width:240px;border-radius:8px;display:block;margin-bottom:4px}
 .reply{display:flex;gap:8px;padding:10px;border-top:1px solid var(--line);align-items:flex-end}
 .rbtn{width:46px;height:46px;flex:none;padding:0;display:grid;place-items:center}.rbtn.rec{background:#ff3b4e;border-color:#ff3b4e;color:#fff}
@@ -3031,14 +3033,41 @@ async function viewChats(){
       const rd=m.direction==='out'&&d.messages.slice(mi+1).some(x=>x.direction==='in');
       body.push(el('small',{},(m.direction==='out'?(m.staff_name||'Команда')+' · ':'')+new Date(m.created_at).toLocaleString('ru-RU',{timeZone:'Europe/Kyiv',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}),m.direction==='out'?el('span',{class:'tk'+(rd?' rd':''),title:rd?'Клиент ответил после этого сообщения':'Отправлено клиенту'},rd?'✓✓':'✓'):null,
         m.edited_at?el('span',{style:'margin-left:6px'},'· изменено'):null,
-        canEdit(m)?el('button',{type:'button',class:'own-btn ed-btn',title:'Исправить сообщение (у клиента тоже изменится)',onclick:()=>startEdit(m,bub,tx)},'изменить'):null));
+        canEdit(m)?el('button',{type:'button',class:'ed-btn',title:'Изменить (у клиента тоже изменится)','aria-label':'Изменить сообщение',onclick:()=>startEdit(m,bub,tx)},svgIcon(PEN,13)):null,
+        canDel(m)?el('button',{type:'button',class:'ed-btn',title:'Удалить (у клиента тоже удалится)','aria-label':'Удалить сообщение',onclick:()=>delMsg(m)},svgIcon(TRASH,13)):null));
       const bub=el('div',{class:'bub '+m.direction},body);
+      // Телефон: долгое нажатие на своё сообщение открывает меню «Изменить / Удалить»
+      if(canEdit(m)||canDel(m))holdMenu(bub,()=>[canEdit(m)?['Изменить',()=>startEdit(m,bub,tx)]:null,canDel(m)?['Удалить',()=>delMsg(m),true]:null].filter(Boolean));
       return bub;
     }));
     if(near||!msgs.dataset.init){msgs.scrollTop=msgs.scrollHeight;msgs.dataset.init='1'}
   }
   // Исправление своего сообщения: правка уходит и клиенту в Telegram. Пока идёт правка, чат не перерисовывается
   const canEdit=m=>m.direction==='out'&&m.editable&&(m.kind==='text'||m.kind==='photo')&&(me.role==='admin'||m.staff_id===me.id);
+  const canDel=m=>m.direction==='out'&&(me.role==='admin'||m.staff_id===me.id);
+  const PEN='<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/>',TRASH='<path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/>';
+  async function delMsg(m){
+    if(!await askC('Удалить сообщение? Оно пропадёт и у клиента в Telegram.'))return;
+    try{await api('/chats/'+active+'/messages/'+m.id,{method:'DELETE'});toast('Сообщение удалено');editing=false;await loadThread()}catch(x){toast(x.message)}
+  }
+  function holdMenu(node,items){
+    let t=null,sx=0,sy=0;
+    const cancel=()=>{clearTimeout(t);t=null};
+    node.addEventListener('touchstart',e=>{if(editing)return;const p=e.touches[0];sx=p.clientX;sy=p.clientY;t=setTimeout(()=>{t=null;try{navigator.vibrate&&navigator.vibrate(15)}catch{}
+      document.querySelectorAll('.msg-menu').forEach(x=>x.remove());
+      const r=node.getBoundingClientRect();
+      const close=()=>{menu.remove();document.removeEventListener('touchstart',outside,true)};
+      const outside=ev=>{if(!menu.contains(ev.target))close()};
+      const menu=el('div',{class:'msg-menu',role:'menu'},...items().map(([l,fn,bad])=>el('button',{type:'button',role:'menuitem',class:bad?'bad':'',onclick:()=>{close();fn()}},l)),el('button',{type:'button',onclick:()=>close()},'Отмена'));
+      document.body.append(menu);
+      const top=Math.min(window.innerHeight-menu.offsetHeight-12,Math.max(12,r.bottom+6));
+      menu.style.top=top+'px';menu.style.left=Math.max(12,Math.min(window.innerWidth-menu.offsetWidth-12,r.right-menu.offsetWidth))+'px';
+      setTimeout(()=>document.addEventListener('touchstart',outside,true),0);
+    },500)},{passive:true});
+    node.addEventListener('touchmove',e=>{const p=e.touches[0];if(Math.abs(p.clientX-sx)>10||Math.abs(p.clientY-sy)>10)cancel()},{passive:true});
+    node.addEventListener('touchend',cancel);node.addEventListener('touchcancel',cancel);
+    node.addEventListener('contextmenu',e=>{if(matchMedia('(hover:none)').matches)e.preventDefault()});
+  }
   function startEdit(m,bub,tx){
     if(editing)return;editing=true;
     const ta=el('textarea',{class:'big',rows:'3',maxlength:'4000',style:'width:100%;min-width:min(420px,60vw);min-height:70px'});ta.value=m.text||'';

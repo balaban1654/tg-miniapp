@@ -1003,6 +1003,30 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     return { ok: true };
   });
 
+  // Удалить своё сообщение: пропадает и у клиента в Telegram, и из переписки в Office. Админ может удалить любое сообщение команды
+  app.delete<{ Params: { tgId: string; id: string } }>('/chats/:tgId/messages/:id', { preHandler: auth }, async (req, reply) => {
+    const me = req.staff!;
+    const tgId = Number(req.params.tgId);
+    const m = (await db.query(
+      `SELECT m.id, m.staff_id, m.tg_message_id FROM messages m JOIN leads d ON d.tg_id = m.tg_id
+        WHERE m.id = $1 AND m.tg_id = $2 AND m.direction = 'out' AND ${chatScope(me, 'd.owner_id')}`,
+      [Number(req.params.id), tgId],
+    )).rows[0];
+    if (!m) return reply.code(404).send({ error: 'Сообщение не найдено' });
+    if (me.role !== 'admin' && m.staff_id !== me.id) return reply.code(403).send({ error: 'Можно удалять только свои сообщения' });
+    if (!config.disableBot && m.tg_message_id) {
+      try {
+        await bot.api.deleteMessage(tgId, m.tg_message_id);
+      } catch (e) {
+        const d = e instanceof GrammyError ? e.description : String(e);
+        // Уже удалено у клиента: просто убираем из Office. Слишком старое (Telegram даёт удалять 48 часов): говорим об этом
+        if (!/not found/i.test(d)) return reply.code(502).send({ error: /can't be deleted/i.test(d) ? 'Telegram больше не даёт удалить это сообщение (старше 48 часов)' : 'Telegram не удалил сообщение: ' + d });
+      }
+    }
+    await db.query('DELETE FROM messages WHERE id = $1', [m.id]);
+    return { ok: true };
+  });
+
   // Пуши и рассылки (только админ)
   const TRIGGERS = ['start', 'no_reg', 'no_deposit', 'ftd', 'inactive', 'withdrawal'];
   function cleanButtons(v: unknown): Button[] | string {
