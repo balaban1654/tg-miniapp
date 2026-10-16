@@ -116,7 +116,12 @@ async function tgInfo(handle: string): Promise<{ title: string | null; members: 
   return out;
 }
 
-const photoCache = new Map<string, { until: number; data: Buffer | null; type: string }>();
+const photoCache = new Map<string, { until: number; data: Buffer | null; type: string; ver?: string }>();
+// Версия аватарки для адреса картинки: меняется вместе с самой картинкой, поэтому Telegram у клиента не держит старую
+function photoVer(id: number, handle: string): string {
+  const hit = photoCache.get(`${id}:${handle}`);
+  return hit?.ver ?? 't' + Math.floor(Date.now() / 900_000);
+}
 /** Фото профиля, если бот его не видит (личные аккаунты): берём картинку со страницы t.me/имя */
 async function scrapeTgPhoto(handle: string): Promise<{ data: Buffer; type: string } | null> {
   const page = await fetch(`https://t.me/${handle}`, { signal: AbortSignal.timeout(5000) });
@@ -538,7 +543,7 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
         const info = handle ? await Promise.race([tgInfo(handle), new Promise<null>((ok) => setTimeout(() => ok(null), 3000))]) : null;
         const contact = x.contact_url ? tgHandle(x.contact_url) : null;
         // Аватарка трейдера: его личный аккаунт, если ссылка указана, иначе канал
-        return { ...x, contact_url: undefined, live_url: undefined, live: /^https?:\/\//i.test(x.live_url ?? '') ? x.live_url : null, contact: contact ? { handle: contact, url: x.contact_url } : null, photo: handle || contact ? `/api/app/media/${x.id}/photo?v=${contact ?? handle}` : null, channelTitle: info?.title ?? null, members: info?.members ?? null };
+        return { ...x, contact_url: undefined, live_url: undefined, live: /^https?:\/\//i.test(x.live_url ?? '') ? x.live_url : null, contact: contact ? { handle: contact, url: x.contact_url } : null, photo: handle || contact ? `/api/app/media/${x.id}/photo?v=${photoVer(x.id, (contact ?? handle)!)}` : null, channelTitle: info?.title ?? null, members: info?.members ?? null };
       }),
     );
     return { traders: rows.filter((x) => x.kind === 'trader'), channels: rows.filter((x) => x.kind === 'channel') };
@@ -634,7 +639,8 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
     const key = `${id}:${handle}`;
     let hit = photoCache.get(key);
     if (!hit || hit.until < Date.now()) {
-      hit = { until: Date.now() + 3600_000, data: null, type: 'image/jpeg' };
+      // Аватарку перечитываем из Telegram раз в 15 минут: сменили фото, и через 15 минут оно уже в Mini App
+      hit = { until: Date.now() + 900_000, data: null, type: 'image/jpeg' };
       try {
         if (handle && !config.disableBot) {
           const chat = await bot.api.getChat('@' + handle).catch(() => null);
@@ -661,9 +667,10 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
         req.log.warn({ err: String(e) }, 'avatar: ошибка запроса к Telegram');
         hit.until = Date.now() + 300_000;
       }
+      if (hit.data) hit.ver = createHash('md5').update(hit.data).digest('hex').slice(0, 10);
       photoCache.set(key, hit);
     }
     if (!hit.data) return reply.code(404).send();
-    return reply.header('Cache-Control', 'public, max-age=3600').header('X-Content-Type-Options', 'nosniff').type(hit.type).send(hit.data);
+    return reply.header('Cache-Control', 'public, max-age=900').header('X-Content-Type-Options', 'nosniff').type(hit.type).send(hit.data);
   });
 }
