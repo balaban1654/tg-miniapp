@@ -236,7 +236,7 @@ textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10
 .bub{max-width:78%;padding:8px 12px;border-radius:12px;white-space:pre-wrap;overflow-wrap:anywhere}
 .bub.in{background:var(--card2);border-top-left-radius:3px}
 .bub.out{background:var(--acc3);justify-self:end;border-top-right-radius:3px}
-.bub small{display:block;color:#ffffffa0;font-size:11px;margin-top:2px}
+.bub small{display:block;color:#ffffffa0;font-size:11px;margin-top:2px}.bub .ed-btn{font-size:11px;margin-left:8px;color:#ffffffb0;text-decoration:underline;padding:0}.bub .ed-btn:hover{color:#fff}
 .bub img{max-width:240px;border-radius:8px;display:block;margin-bottom:4px}
 .reply{display:flex;gap:8px;padding:10px;border-top:1px solid var(--line);align-items:flex-end}
 .rbtn{width:46px;height:46px;flex:none;padding:0;display:grid;place-items:center}.rbtn.rec{background:#ff3b4e;border-color:#ff3b4e;color:#fff}
@@ -2913,7 +2913,7 @@ async function accForm(){
 
 let pendingChat=null;
 async function viewChats(){
-  let active=null;
+  let active=null,editing=false;
   const list=el('div',{class:'chat-list'});
   const head=el('div',{class:'thread-head'});
   const msgs=el('div',{class:'msgs'});
@@ -3001,7 +3001,7 @@ async function viewChats(){
     updateBadge();
   }
   async function loadThread(){
-    if(!active)return;
+    if(!active||editing)return;
     const d=await api('/chats/'+active);
     const near=msgs.scrollHeight-msgs.scrollTop-msgs.clientHeight<80;
     const L={href:profileUrl(d.lead),target:'_blank',rel:'noopener',title:'Открыть профиль в Telegram',style:'color:#6cb4ff;text-decoration:none'};
@@ -3026,13 +3026,30 @@ async function viewChats(){
         if((m.kind==='audio'||m.kind==='document')&&m.file_name&&m.kind!=='document')body.push(el('div',{},m.file_name));
       }
       else if(!m.text)body.push(el('span',{class:'mut'},'['+m.kind+']'));
-      if(m.text)body.push(m.text);
+      const tx=m.text?el('span',{},m.text):null;if(tx)body.push(tx);
       // Галочки у наших сообщений: ✓ отправлено клиенту, ✓✓ клиент написал после этого сообщения (Telegram не отдаёт боту настоящие отметки о прочтении)
       const rd=m.direction==='out'&&d.messages.slice(mi+1).some(x=>x.direction==='in');
-      body.push(el('small',{},(m.direction==='out'?(m.staff_name||'Команда')+' · ':'')+new Date(m.created_at).toLocaleString('ru-RU',{timeZone:'Europe/Kyiv',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}),m.direction==='out'?el('span',{class:'tk'+(rd?' rd':''),title:rd?'Клиент ответил после этого сообщения':'Отправлено клиенту'},rd?'✓✓':'✓'):null));
-      return el('div',{class:'bub '+m.direction},body);
+      body.push(el('small',{},(m.direction==='out'?(m.staff_name||'Команда')+' · ':'')+new Date(m.created_at).toLocaleString('ru-RU',{timeZone:'Europe/Kyiv',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}),m.direction==='out'?el('span',{class:'tk'+(rd?' rd':''),title:rd?'Клиент ответил после этого сообщения':'Отправлено клиенту'},rd?'✓✓':'✓'):null,
+        m.edited_at?el('span',{style:'margin-left:6px'},'· изменено'):null,
+        canEdit(m)?el('button',{type:'button',class:'own-btn ed-btn',title:'Исправить сообщение (у клиента тоже изменится)',onclick:()=>startEdit(m,bub,tx)},'изменить'):null));
+      const bub=el('div',{class:'bub '+m.direction},body);
+      return bub;
     }));
     if(near||!msgs.dataset.init){msgs.scrollTop=msgs.scrollHeight;msgs.dataset.init='1'}
+  }
+  // Исправление своего сообщения: правка уходит и клиенту в Telegram. Пока идёт правка, чат не перерисовывается
+  const canEdit=m=>m.direction==='out'&&m.editable&&(m.kind==='text'||m.kind==='photo')&&(me.role==='admin'||m.staff_id===me.id);
+  function startEdit(m,bub,tx){
+    if(editing)return;editing=true;
+    const ta=el('textarea',{class:'big',rows:'3',maxlength:'4000',style:'width:100%;min-width:min(420px,60vw);min-height:70px'});ta.value=m.text||'';
+    const e2=el('div',{class:'err',role:'alert'});
+    const done=()=>{editing=false;loadThread().catch(()=>{})};
+    const save=async()=>{e2.textContent='';sv.disabled=true;try{await api('/chats/'+active+'/messages/'+m.id,{method:'PATCH',body:{text:ta.value}});toast('Сообщение исправлено');done()}catch(x){e2.textContent=x.message;sv.disabled=false}};
+    const sv=el('button',{class:'btn s',type:'button',onclick:save},'Сохранить');
+    const box=el('div',{style:'display:grid;gap:6px;margin-top:4px'},ta,el('div',{style:'display:flex;gap:6px;justify-content:flex-end;align-items:center'},e2,el('button',{class:'btn o s',type:'button',onclick:done},'Отмена'),sv));
+    ta.addEventListener('keydown',e=>{if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)){e.preventDefault();save()}if(e.key==='Escape')done()});
+    if(tx)tx.replaceWith(box);else bub.insertBefore(box,bub.querySelector('small'));
+    ta.focus();ta.setSelectionRange(ta.value.length,ta.value.length);
   }
   // Закрыть чат (уходит из списка до нового сообщения клиента, история остаётся); очистить переписку может только админ
   async function chatDone(id,how){

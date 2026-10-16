@@ -158,6 +158,8 @@ ALTER TABLE staff ADD COLUMN IF NOT EXISTS live_channel TEXT;
 ALTER TABLE push_templates ADD COLUMN IF NOT EXISTS to_staff_channel BOOLEAN NOT NULL DEFAULT TRUE;
 -- Клиента забрал другой стример, ответив в чате, пока владелец был не на смене: у кого забрали
 ALTER TABLE leads ADD COLUMN IF NOT EXISTS taken_from INT REFERENCES staff(id) ON DELETE SET NULL;
+-- Сообщение команды исправлено после отправки (у клиента в Telegram тоже)
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS edited_at TIMESTAMPTZ;
 -- Ответы бота на кнопки и /start (Пуши → Ответы бота)
 CREATE TABLE IF NOT EXISTS bot_replies (
   key        TEXT PRIMARY KEY,

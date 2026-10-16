@@ -1,7 +1,7 @@
 import QRCode from 'qrcode';
 import { newSecret, otpUri, verifyTotp, newRecoveryCodes } from './totp.js';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { InputFile } from 'grammy';
+import { GrammyError, InputFile } from 'grammy';
 import { db } from './db.js';
 import { bot } from './bot.js';
 import { config } from './config.js';
@@ -771,7 +771,8 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     );
     if (!lead.rowCount) return reply.code(404).send({ error: 'Чат не найден' });
     const msgs = await db.query(
-      `SELECT m.id, m.direction, m.kind, m.text, m.created_at, (m.file_id IS NOT NULL) AS has_file, m.file_name, s.name AS staff_name
+      `SELECT m.id, m.direction, m.kind, m.text, m.created_at, (m.file_id IS NOT NULL) AS has_file, m.file_name, s.name AS staff_name,
+              m.staff_id, m.edited_at, (m.tg_message_id IS NOT NULL) AS editable
          FROM messages m LEFT JOIN staff s ON s.id = m.staff_id WHERE m.tg_id = $1 ORDER BY m.id DESC LIMIT 200`,
       [tgId],
     );
@@ -970,6 +971,35 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
       }
     }
     await db.query(`INSERT INTO messages (tg_id, direction, staff_id, kind, text, file_id, tg_message_id) VALUES ($1,'out',$2,$3,$4,$5,$6)`, [tgId, me.id, photo ? 'photo' : 'text', text || null, fileId, tgMessageId]);
+    return { ok: true };
+  });
+
+  // Исправить своё сообщение: текст меняется и в Office, и у клиента в Telegram (у фото меняется подпись). Админ может править любое
+  app.patch<{ Params: { tgId: string; id: string } }>('/chats/:tgId/messages/:id', { preHandler: auth }, async (req, reply) => {
+    const me = req.staff!;
+    const tgId = Number(req.params.tgId);
+    const text = str((req.body as any)?.text, 4000);
+    const m = (await db.query(
+      `SELECT m.id, m.kind, m.text, m.staff_id, m.tg_message_id FROM messages m JOIN leads d ON d.tg_id = m.tg_id
+        WHERE m.id = $1 AND m.tg_id = $2 AND m.direction = 'out' AND ${chatScope(me, 'd.owner_id')}`,
+      [Number(req.params.id), tgId],
+    )).rows[0];
+    if (!m) return reply.code(404).send({ error: 'Сообщение не найдено' });
+    if (me.role !== 'admin' && m.staff_id !== me.id) return reply.code(403).send({ error: 'Можно исправлять только свои сообщения' });
+    if (!['text', 'photo'].includes(m.kind)) return reply.code(400).send({ error: 'Такое сообщение исправить нельзя' });
+    if (m.kind === 'text' && !text) return reply.code(400).send({ error: 'Текст не может быть пустым' });
+    if (text === (m.text ?? '')) return { ok: true };
+    if (!config.disableBot) {
+      if (!m.tg_message_id) return reply.code(400).send({ error: 'Это сообщение не связано с Telegram, исправить его нельзя' });
+      try {
+        if (m.kind === 'photo') await bot.api.editMessageCaption(tgId, m.tg_message_id, { caption: text });
+        else await bot.api.editMessageText(tgId, m.tg_message_id, text);
+      } catch (e) {
+        const d = e instanceof GrammyError ? e.description : String(e);
+        if (!/not modified/i.test(d)) return reply.code(502).send({ error: /can't be edited|not found/i.test(d) ? 'Telegram больше не даёт исправить это сообщение (слишком старое или удалено)' : 'Telegram не принял правку: ' + d });
+      }
+    }
+    await db.query('UPDATE messages SET text = $2, edited_at = now() WHERE id = $1', [m.id, text || null]);
     return { ok: true };
   });
 
