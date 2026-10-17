@@ -2974,12 +2974,20 @@ async function viewTeamShift(){
   if(!d.live){
     const url=el('input',{type:'text',inputmode:'url',autocapitalize:'off',autocomplete:'off',placeholder:'https://… (необязательно)',maxlength:'500'});
     card=el('div',{class:'card',style:'display:grid;gap:10px;max-width:560px'},el('h3',{style:'font-size:15px'},'Смена не начата'),
-      el('label',{},'Ссылка на эфир (необязательно)',url),err,
+      el('label',{},'Ссылка на эфир (необязательно)',url),el('div',{class:'mut sm'},'Со ссылкой в конце смены заполните отчёт как после эфира (время, показатели, скриншот). Без ссылки достаточно написать, что сделали.'),err,
       el('div',{},el('button',{class:'btn',type:'button',onclick:async e=>{const b=e.currentTarget;err.textContent='';b.disabled=true;try{await api('/team-shift/start',{method:'POST',body:{stream_url:url.value}});toast('Смена началась');render({soft:true})}catch(x){err.textContent=x.message;b.disabled=false}}},'Начать смену')));
   }else{
     const timer=el('div',{class:'mono',style:'font-size:30px'});
     const tick=()=>{const sec=Math.max(0,Math.floor((Date.now()+skew-Date.parse(d.live.started_at))/1000));timer.textContent=[Math.floor(sec/3600),Math.floor(sec%3600/60),sec%60].map(x=>String(x).padStart(2,'0')).join(':')};
     tick();poll=setInterval(tick,1000);
+    // Смена со ссылкой на эфир: в конце такой же отчёт, как у стримеров (время, поля, скриншот). Без ссылки только комментарий
+    if(d.live.stream_url){
+      card=el('div',{class:'card',style:'display:grid;gap:10px;max-width:640px'},el('div',{class:'head'},el('h3',{style:'font-size:15px'},'Эфир идёт'),el('span',{class:'pill p-ok'},'с '+new Date(d.live.started_at).toLocaleTimeString('ru-RU',{timeZone:'Europe/Kyiv',hour:'2-digit',minute:'2-digit'}))),
+        timer,el('a',{href:d.live.stream_url,target:'_blank',rel:'noopener',class:'mut sm'},d.live.stream_url),
+        el('div',{},el('button',{class:'btn',type:'button',onclick:()=>openFinishModal(d.live,skew)},'Закончить смену и заполнить отчёт')),
+        el('div',{class:'mut sm'},'Отчёт как после эфира: время, показатели и скриншот статистики. Уйдёт руководителю на проверку.'));
+      return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Моя смена'),el('span',{class:'mut sm'},me.name)),card,el('h3',{style:'font-size:15px'},'Мои смены'),hist];
+    }
     const ta=el('textarea',{class:'big',rows:'4',maxlength:'2000',placeholder:'Что сделали за смену: задачи, результаты, ссылки'});
     card=el('div',{class:'card',style:'display:grid;gap:10px;max-width:640px'},el('div',{class:'head'},el('h3',{style:'font-size:15px'},'Смена идёт'),el('span',{class:'pill p-ok'},'с '+new Date(d.live.started_at).toLocaleTimeString('ru-RU',{timeZone:'Europe/Kyiv',hour:'2-digit',minute:'2-digit'}))),
       timer,d.live.stream_url?el('a',{href:d.live.stream_url,target:'_blank',rel:'noopener',class:'mut sm'},d.live.stream_url):null,

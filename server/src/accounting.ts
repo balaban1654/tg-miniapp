@@ -522,7 +522,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
   });
 
   // Отчёт отправляет стример; админ может заполнить его за стримера (смена идёт или ждёт отчёта)
-  app.post<{ Params: { id: string } }>('/shifts/:id/finish', { preHandler: need('streamer', 'admin'), bodyLimit: 9 * 1024 * 1024 }, async (req, reply) => {
+  app.post<{ Params: { id: string } }>('/shifts/:id/finish', { preHandler: need('streamer', 'admin', 'teamlead', 'analyst', 'buyer'), bodyLimit: 9 * 1024 * 1024 }, async (req, reply) => {
     const me = req.staff!;
     const b = (req.body ?? {}) as Record<string, any>;
     const row = (await db.query(`SELECT id, started_at FROM shift_reports WHERE id = $1 AND ($2 OR staff_id = $3) AND status IN ('live','await')`, [Number(req.params.id), me.role === 'admin', me.id])).rows[0];
