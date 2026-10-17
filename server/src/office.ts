@@ -1498,6 +1498,11 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     if (!r.rowCount) return reply.code(404).send({ error: 'Запись не найдена' });
     return { ok: true };
   });
+  // Глазик: показывать в Mini App или скрыть (запись остаётся, её можно вернуть)
+  app.patch<{ Params: { id: string } }>('/media/:id/visible', { preHandler: need('admin') }, async (req) => {
+    await db.query('UPDATE media_items SET active = $2 WHERE id = $1', [Number(req.params.id), Boolean((req.body as any)?.visible)]);
+    return { ok: true };
+  });
   app.delete<{ Params: { id: string } }>('/media/:id', { preHandler: need('admin') }, async (req) => {
     await db.query('DELETE FROM media_items WHERE id = $1', [Number(req.params.id)]);
     return { ok: true };
