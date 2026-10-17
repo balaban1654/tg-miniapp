@@ -197,12 +197,13 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     return { ok: true };
   });
 
+  const NAV_ROLES: Role[] = ['streamer', 'teamlead', 'analyst', 'buyer'];
   app.get('/me', { preHandler: auth }, async (req) => {
     const me = req.staff!;
-    // Стримеры видят меню, которое настроил для них админ
-    if (me.role === 'streamer') {
-      const d = (await db.query(`SELECT layout FROM nav_defaults WHERE role = 'streamer'`)).rows[0];
-      return { ...me, nav_layout: d?.layout ?? null };
+    // Стримеры, тимлидеры, аналитики и медиабайеры видят меню, которое для их роли настроил админ
+    if (NAV_ROLES.includes(me.role)) {
+      const d = (await db.query(`SELECT layout FROM nav_defaults WHERE role = $1`, [me.role])).rows[0];
+      if (d || me.role === 'streamer') return { ...me, nav_layout: d?.layout ?? null };
     }
     // Админы видят одно общее меню: его настраивает любой из админов
     if (me.role === 'admin') {
@@ -263,17 +264,22 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     else await db.query('UPDATE staff SET nav_layout = $2::jsonb WHERE id = $1', [req.staff!.id, JSON.stringify(c.layout)]);
     return { ok: true };
   });
-  // Меню стримеров настраивает админ: одна раскладка для всех стримеров
-  app.get('/nav/streamer', { preHandler: need('admin') }, async () => ({ layout: (await db.query(`SELECT layout FROM nav_defaults WHERE role = 'streamer'`)).rows[0]?.layout ?? null }));
-  app.put('/nav/streamer', { preHandler: need('admin') }, async (req, reply) => {
+  // Меню ролей настраивает админ: одна раскладка на роль (стримеры, тимлидеры, аналитики, медиабайеры)
+  app.get<{ Params: { role: string } }>('/nav/:role', { preHandler: need('admin') }, async (req, reply) => {
+    if (!NAV_ROLES.includes(req.params.role as Role)) return reply.code(404).send({ error: 'Нет такой роли' });
+    return { layout: (await db.query(`SELECT layout FROM nav_defaults WHERE role = $1`, [req.params.role])).rows[0]?.layout ?? null };
+  });
+  app.put<{ Params: { role: string } }>('/nav/:role', { preHandler: need('admin') }, async (req, reply) => {
+    const role = req.params.role;
+    if (!NAV_ROLES.includes(role as Role)) return reply.code(404).send({ error: 'Нет такой роли' });
     const lay = ((req.body ?? {}) as Record<string, unknown>).layout;
     if (lay === null) {
-      await db.query(`DELETE FROM nav_defaults WHERE role = 'streamer'`);
+      await db.query(`DELETE FROM nav_defaults WHERE role = $1`, [role]);
       return { ok: true };
     }
     const c = cleanNav(lay);
     if ('error' in c) return reply.code(400).send({ error: c.error });
-    await db.query(`INSERT INTO nav_defaults (role, layout) VALUES ('streamer', $1::jsonb) ON CONFLICT (role) DO UPDATE SET layout = EXCLUDED.layout`, [JSON.stringify(c.layout)]);
+    await db.query(`INSERT INTO nav_defaults (role, layout) VALUES ($1, $2::jsonb) ON CONFLICT (role) DO UPDATE SET layout = EXCLUDED.layout`, [role, JSON.stringify(c.layout)]);
     return { ok: true };
   });
 

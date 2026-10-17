@@ -594,18 +594,8 @@ function showApp(){
   $('#meName').replaceChildren(me.name,el('span',{class:'mrole'},' · '+ROLE[me.role]));
   const gb=$('#meGear');if(gb&&!gb.firstChild){gb.append(svgIcon(GEAR,16));gb.onclick=()=>openStaffCard(null)}
   const nb=$('#meNav');if(nb){if(!nb.firstChild){nb.append(svgIcon('<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><path d="M14 17.5h7M17.5 14v7"/>',16));nb.onclick=openNavEditor}nb.hidden=me.role!=='admin'}
-  const items=[['home','Дашборд'],['leads','Лиды'],];
-  if(me.role==='admin'||me.role==='teamlead')items.push(['staff',me.role==='admin'?'Сотрудники':'Моя команда']);
-  if(['admin','teamlead','streamer'].includes(me.role))items.splice(1,0,['chats','Чаты']);
-  if(me.role==='admin')items.splice(1,0,['signals','Сигналы']);
-  if(me.role==='analyst'){items.length=0;items.push(['newsig','Новый сигнал'],['signals','Сигналы']);if(!['signals','newsig','tshift'].includes(tab))tab='signals'}
-  if(me.role==='admin')items.push(['push','Пуши'],['media','Медиа'],['pb','Постбеки']);
-  if(me.role==='streamer')items.splice(items.length,0,['signals','Сигналы'],['shifts','Смены и отчёты'],['mytasks','Мои задачи']);
-  if(me.role==='admin'){items.splice(items.findIndex(x=>x[0]==='push'),0,['acc','Бухгалтерия']);items.splice(1,0,['plans','Планы и задачи'])}
-  if(me.role==='admin')items.splice(items.findIndex(x=>x[0]==='leads')+1,0,['connect','Подключение']);
-  if(me.role==='admin')items.splice(items.findIndex(x=>x[0]==='connect')+1,0,['newsig','Новый сигнал']);
-  // Смена команды: админ, тимлидер, аналитик, медиабайер начинают смену и в конце пишут, что сделали
-  if(['admin','teamlead','analyst','buyer'].includes(me.role))items.push(['tshift','Моя смена']);
+  const items=navItemsFor(me.role);
+  if(me.role==='analyst'&&!['signals','newsig','tshift'].includes(tab))tab='signals';
   if(tab==='links'&&me.role==='admin'){tab='staff';staffState.tab='links'}
   if(!items.some(x=>x[0]===tab)){tab=items[0][0];history.replaceState(null,'','#'+hashPath())}
   navItems=items;
@@ -642,6 +632,22 @@ function defaultLayout(items,role){
   if(role==='admin'){const G=['signals','staff','push','media'];
     return{v:1,nodes:[...keys.filter(k=>!G.includes(k)).map(k=>({t:'i',k})),{t:'f',id:'settings',title:'Настройки',icon:'settings',items:G.filter(k=>keys.includes(k)).map(k=>({k}))}]}}
   return{v:1,nodes:keys.map(k=>({t:'i',k}))};
+}
+/** Разделы меню для роли (то же, что видит сотрудник этой роли) */
+function navItemsFor(role){
+  const items=[['home','Дашборд'],['leads','Лиды'],];
+  if(role==='admin'||role==='teamlead')items.push(['staff',role==='admin'?'Сотрудники':'Моя команда']);
+  if(['admin','teamlead','streamer'].includes(role))items.splice(1,0,['chats','Чаты']);
+  if(role==='admin')items.splice(1,0,['signals','Сигналы']);
+  if(role==='analyst'){items.length=0;items.push(['newsig','Новый сигнал'],['signals','Сигналы'])}
+  if(role==='admin')items.push(['push','Пуши'],['media','Медиа'],['pb','Постбеки']);
+  if(role==='streamer')items.splice(items.length,0,['signals','Сигналы'],['shifts','Смены и отчёты'],['mytasks','Мои задачи']);
+  if(role==='admin'){items.splice(items.findIndex(x=>x[0]==='push'),0,['acc','Бухгалтерия']);items.splice(1,0,['plans','Планы и задачи'])}
+  if(role==='admin')items.splice(items.findIndex(x=>x[0]==='leads')+1,0,['connect','Подключение']);
+  if(role==='admin')items.splice(items.findIndex(x=>x[0]==='connect')+1,0,['newsig','Новый сигнал']);
+  // Смена команды: админ, тимлидер, аналитик, медиабайер начинают смену и в конце пишут, что сделали
+  if(['admin','teamlead','analyst','buyer'].includes(role))items.push(['tshift','Моя смена']);
+  return items;
 }
 /** Сохранённая раскладка, приведённая к доступным разделам: лишние убираем, новые добавляем в конец */
 function reconcileLayout(lay,items,role){
@@ -681,13 +687,15 @@ async function openNavEditor(){
   const onKey=e=>{if(e.key==='Escape')close()};document.addEventListener('keydown',onKey);
   ov.addEventListener('mousedown',e=>{if(e.target===ov)close()});
   const box=el('div',{class:'lc',style:'width:min(640px,100%)'});ov.append(box);document.body.append(ov);
-  const STREAMER_ITEMS=[['home','Дашборд'],['chats','Чаты'],['leads','Лиды'],['signals','Сигналы'],['shifts','Смены и отчёты'],['mytasks','Мои задачи']];
-  let target='me',streamerLay;
-  try{streamerLay=(await api('/nav/streamer')).layout}catch{streamerLay=null}
+  // Вкладки ролей: меню, которое админ настраивает для всех сотрудников этой роли
+  const ROLE_TABS=[['streamer','Стримеры'],['teamlead','Тимлидеры'],['analyst','Аналитики'],['buyer','Медиабайеры']];
+  const roleName=r=>(ROLE_TABS.find(x=>x[0]===r)||[,r])[1];
+  let target='me';const roleLay={};
+  if(me.role==='admin')await Promise.all(ROLE_TABS.map(async([r])=>{try{roleLay[r]=(await api('/nav/'+r)).layout}catch{roleLay[r]=null}}));
   let nodes,avail,pick=null,drag=null;
   const load=()=>{
     if(target==='me'){avail=navItems;nodes=reconcileLayout(me.nav_layout,navItems,me.role).nodes}
-    else{avail=STREAMER_ITEMS;nodes=reconcileLayout(streamerLay,STREAMER_ITEMS,'streamer').nodes}
+    else{avail=navItemsFor(target);nodes=reconcileLayout(roleLay[target],avail,target).nodes}
     pick=null;
   };
   const lbl=k=>(avail.find(x=>x[0]===k)||[])[1]||k;
@@ -761,20 +769,20 @@ async function openNavEditor(){
     const layout={v:1,nodes:cloneJ(nodes)};
     try{
       if(target==='me'){await api('/profile/nav',{method:'PUT',body:{layout}});me.nav_layout=layout;drawNav();updateBadge()}
-      else{await api('/nav/streamer',{method:'PUT',body:{layout}});streamerLay=layout}
-      toast(target==='me'?'Меню сохранено':'Меню стримеров сохранено');if(target==='me')close();
+      else{await api('/nav/'+target,{method:'PUT',body:{layout}});roleLay[target]=layout}
+      toast(target==='me'?'Меню сохранено':'Меню сохранено: '+roleName(target));if(target==='me')close();
     }catch(x){err.textContent=x.message}
   };
   const reset=async()=>{
     if(!await askC(target==='me'?'Вернуть стандартное меню?':'Вернуть стримерам стандартное меню?'))return;
     try{
       if(target==='me'){await api('/profile/nav',{method:'PUT',body:{layout:null}});me.nav_layout=null;drawNav();updateBadge();close();toast('Меню сброшено')}
-      else{await api('/nav/streamer',{method:'PUT',body:{layout:null}});streamerLay=null;load();draw();toast('Меню стримеров сброшено')}
+      else{await api('/nav/'+target,{method:'PUT',body:{layout:null}});roleLay[target]=null;load();draw();toast('Меню сброшено: '+roleName(target))}
     }catch(x){err.textContent=x.message}
   };
   const addFolder=()=>{nodes.push({t:'f',id:'f'+Date.now().toString(36),title:'Новая папка',icon:'folder',items:[]});draw();const ins=list.querySelectorAll('.ne-name');if(ins.length){const l=ins[ins.length-1];l.focus();l.select()}};
   const tabs=el('div',{class:'lc-tabs',role:'tablist'});
-  const drawTabs=()=>tabs.replaceChildren(...[['me','Моё меню'],['streamer','Стримеры']].map(([k,t])=>el('button',{type:'button',role:'tab','aria-selected':String(k===target),class:'lc-tab'+(k===target?' on':''),onclick:()=>{target=k;load();drawTabs();draw();hint.textContent=k==='me'?'Перетащите разделы мышью или двигайте стрелками. Папки можно создавать и переименовывать, значок выбирается по нажатию на него.':'Это меню увидят все стримеры. Настройте порядок, папки и значки так же. Сами стримеры меню изменить не могут.'}},t)));
+  const drawTabs=()=>tabs.replaceChildren(...[['me','Моё меню'],...ROLE_TABS].map(([k,t])=>el('button',{type:'button',role:'tab','aria-selected':String(k===target),class:'lc-tab'+(k===target?' on':''),onclick:()=>{target=k;load();drawTabs();draw();hint.textContent=k==='me'?'Перетащите разделы мышью или двигайте стрелками. Папки можно создавать и переименовывать, значок выбирается по нажатию на него.':'Это меню увидят все '+roleName(k).toLowerCase()+'. Настройте порядок, папки и значки так же. Сами они меню изменить не могут.'}},t)));
   const hint=el('div',{class:'mut sm'},'Перетащите разделы мышью или двигайте стрелками. Папки можно создавать и переименовывать, значок выбирается по нажатию на него.');
   load();drawTabs();draw();
   box.replaceChildren(el('div',{class:'lc-head'},el('h3',{style:'font-size:18px'},'Настроить меню'),el('button',{class:'btn o s',type:'button','aria-label':'Закрыть',onclick:close},'✕')),
