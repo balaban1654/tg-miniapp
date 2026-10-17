@@ -534,7 +534,7 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
     // live: ссылка на эфир, пока у привязанного стримера идёт смена
     const r = await db.query(
       `SELECT m.id, m.kind, m.title, m.subtitle, m.url, m.country, m.contact_url,
-              (SELECT s.stream_url FROM shift_reports s WHERE s.staff_id = m.staff_id AND s.status = 'live' ORDER BY s.id DESC LIMIT 1) AS live_url
+              (SELECT s.stream_url FROM shift_reports s WHERE s.staff_id = m.staff_id AND s.status = 'live' AND NOT s.team ORDER BY s.id DESC LIMIT 1) AS live_url
          FROM media_items m WHERE m.active ORDER BY m.sort, m.id`,
     );
     const rows = await Promise.all(

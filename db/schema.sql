@@ -590,6 +590,16 @@ END $$;
 
 -- Невыполненные дни: админ принимает причину или выписывает штраф (комментарий штрафа видит стример)
 ALTER TABLE staff_adjustments ADD COLUMN IF NOT EXISTS visible BOOLEAN NOT NULL DEFAULT FALSE;
+-- Смены команды (админы, тимлидеры, аналитики, медиабайеры): без обязательной ссылки на эфир, в отчёте комментарий «что сделал».
+-- В KPI стримеров и в «эфире» на дашборде не участвуют
+ALTER TABLE shift_reports ADD COLUMN IF NOT EXISTS team BOOLEAN NOT NULL DEFAULT FALSE;
+-- Ставка члена команды: фикс за месяц или за каждую принятую смену
+CREATE TABLE IF NOT EXISTS team_pay (
+  staff_id   INT PRIMARY KEY REFERENCES staff(id) ON DELETE CASCADE,
+  mode       TEXT NOT NULL DEFAULT 'month' CHECK (mode IN ('month','shift')),
+  amount     NUMERIC(12,2) NOT NULL DEFAULT 0,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 -- Бонус на день рождения начислен (раз в год): если админ удалит его из «Бонусов и штрафов», повторно он не появится
 CREATE TABLE IF NOT EXISTS birthday_bonuses (
   staff_id INT NOT NULL REFERENCES staff(id) ON DELETE CASCADE,
