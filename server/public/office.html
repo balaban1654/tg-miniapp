@@ -1867,9 +1867,22 @@ async function staffTeam(){
     el('label',{style:'grid-column:1/-1'},'Ссылка регистрации (WW)',po.l),el('label',{style:'grid-column:1/-1'},'Ссылка регистрации (RU)',po.r),el('label',{style:'grid-column:1/-1'},'Личный Telegram-канал (куда уходит пуш «в эфире», бот должен быть админом)',po.ch),
     el('button',{class:'btn',type:'submit'},'Сохранить'),perr):el('span');
   return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},isAdmin?'Сотрудники':'Моя команда')),form,poForm,
-    ctrT(table(['Имя','Логин',...(isAdmin?['Пароль','2FA']:[]),'Роль','Тимлидер','Кампания PO','Промокод','Статус',''],rows.map(r=>[el('td',{},el('span',{class:'cp'},r.name,isAdmin?el('button',{type:'button',title:'Карточка сотрудника','aria-label':'Карточка сотрудника',onclick:()=>openStaffCard(r.id)},svgIcon(PERSON)):null)),td(r.login),...(isAdmin?[pwCell(r),tfaCell(r)]:[]),el('td',{},el('span',{class:'pill p-pur'},ROLE[r.role])),parentCell(r),td(r.po_campaign||'—'),td(r.po_promo||'—'),el('td',{},el('span',{class:'pill '+(r.active?'p-ok':'p-bad')},r.active?'активен':'отключён')),el('td',{},toggle(r))]),'Пока никого нет.'))];
+    ctrT(table(['Имя','Логин',...(isAdmin?['Пароль','2FA']:[]),'Роль','Тимлидер','Кампания PO','Промокод','Статус',''],rows.map(r=>[el('td',{},el('span',{class:'cp'},isAdmin?el('button',{type:'button',class:'own-btn',title:'Изменить имя',onclick:e=>renameStaff(r,e.currentTarget)},r.name):r.name,isAdmin?el('button',{type:'button',title:'Карточка сотрудника','aria-label':'Карточка сотрудника',onclick:()=>openStaffCard(r.id)},svgIcon(PERSON)):null)),td(r.login),...(isAdmin?[pwCell(r),tfaCell(r)]:[]),el('td',{},el('span',{class:'pill p-pur'},ROLE[r.role])),parentCell(r),td(r.po_campaign||'—'),td(r.po_promo||'—'),el('td',{},el('span',{class:'pill '+(r.active?'p-ok':'p-bad')},r.active?'активен':'отключён')),el('td',{style:'white-space:nowrap'},toggle(r),isAdmin&&r.id!==me.id?el('button',{class:'btn o s',type:'button',style:'margin-left:6px;color:var(--bad);padding:0 9px',title:'Удалить сотрудника','aria-label':'Удалить сотрудника',onclick:()=>delStaff(r)},svgIcon('<path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/>',14)):null)]),'Пока никого нет.'))];
 }
 
+// Сотрудники: смена имени по клику на имя и удаление (в истории сотрудник остаётся, из списков пропадает, войти больше не сможет)
+function renameStaff(r,btn){
+  const inp=el('input',{value:r.name,maxlength:'80','aria-label':'Имя',style:'width:140px;padding:6px 8px'});
+  const save=async()=>{const v=inp.value.trim();if(!v||v===r.name){inp.replaceWith(btn);return}
+    try{await api('/staff/'+r.id,{method:'PATCH',body:{name:v}});toast('Имя изменено');render({soft:true})}catch(x){toast(x.message);inp.replaceWith(btn)}};
+  inp.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();save()}if(e.key==='Escape')inp.replaceWith(btn)});
+  inp.addEventListener('blur',save);
+  btn.replaceWith(inp);inp.focus();inp.select();
+}
+async function delStaff(r){
+  if(!await askC('Удалить сотрудника «'+r.name+'»? Он больше не сможет войти и пропадёт из списков. Его лиды, выплаты и сообщения останутся в истории.'))return;
+  try{await api('/staff/'+r.id,{method:'DELETE'});toast('Сотрудник удалён');render({soft:true})}catch(x){toast(x.message)}
+}
 const ctrT=t=>{t.classList.add('ctr');return t};
 let poll=null;
 function stopPoll(){if(poll){clearInterval(poll);poll=null}}

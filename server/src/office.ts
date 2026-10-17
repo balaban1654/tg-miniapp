@@ -404,7 +404,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     const r = await db.query(
       `SELECT id, login, name, role, parent_id, rate_ftd, rate_percent, active, created_at,
               po_campaign, po_promo, po_link, po_link_ru, tg_username, live_channel, streams, (totp_secret IS NOT NULL) AS totp
-         FROM staff WHERE ${scope} ORDER BY id`,
+         FROM staff WHERE ${scope} AND deleted_at IS NULL ORDER BY id`,
     );
     return r.rows;
   });
@@ -445,6 +445,21 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     }
   });
 
+  // Удаление сотрудника: в истории он остаётся (его лиды, выплаты, сообщения), но пропадает из списков и больше не войдёт.
+  // Логин освобождается, его можно отдать новому сотруднику
+  app.delete<{ Params: { id: string } }>('/staff/:id', { preHandler: need('admin') }, async (req, reply) => {
+    const id = Number(req.params.id);
+    if (id === req.staff!.id) return reply.code(400).send({ error: 'Себя удалить нельзя' });
+    const r = await db.query(
+      `UPDATE staff SET active = FALSE, deleted_at = now(), login = login || '~удалён' || id, totp_secret = NULL WHERE id = $1 AND deleted_at IS NULL RETURNING id`,
+      [id],
+    );
+    if (!r.rowCount) return reply.code(404).send({ error: 'Сотрудник не найден' });
+    await db.query('UPDATE staff SET parent_id = NULL WHERE parent_id = $1', [id]);
+    await db.query('DELETE FROM sessions WHERE staff_id = $1', [id]).catch(() => {});
+    return { ok: true };
+  });
+
   app.patch<{ Params: { id: string } }>('/staff/:id', { preHandler: need('admin') }, async (req, reply) => {
     const id = Number(req.params.id);
     const b = (req.body ?? {}) as Record<string, unknown>;
@@ -454,7 +469,11 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
       vals.push(v);
       sets.push(`${col} = $${vals.length}`);
     };
-    if (b.name !== undefined) add('name', str(b.name, 80));
+    if (b.name !== undefined) {
+      const nm = str(b.name, 80);
+      if (!nm) return reply.code(400).send({ error: 'Имя не может быть пустым' });
+      add('name', nm);
+    }
     if (b.active !== undefined) add('active', Boolean(b.active));
     if (b.rate_ftd !== undefined) add('rate_ftd', num(b.rate_ftd));
     if (b.rate_percent !== undefined) add('rate_percent', num(b.rate_percent));
