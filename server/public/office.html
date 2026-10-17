@@ -4143,7 +4143,7 @@ async function viewPostbacks(){
       rows.length?'Ничего не найдено. Измените фильтры.':'Постбеков пока нет. Когда партнёрка отправит первый, он появится здесь.'));
     // Итого по показанным записям: по каждому событию отдельно, а строка «Итого» внизу таблицы, когда выбрано одно событие
     const by2={};list.forEach(r=>{const o=by2[r.event]||(by2[r.event]={n:0,s:0});o.n++;o.s+=amt(r)});
-    const ORDER=['reg','ftd','dep','comm','wd'];
+    const ORDER=['reg','ftd','dep','wd','comm'];
     const types=ORDER.filter(k=>by2[k]&&k!=='reg');
     const usd=v=>'$'+v.toLocaleString('ru-RU',{minimumFractionDigits:2,maximumFractionDigits:2});
     totBox.replaceChildren(...ORDER.filter(k=>by2[k]).map(k=>el('span',{class:'pb-tot'},el('span',{class:'pill ev-'+k},k),k==='reg'?el('b',{},by2[k].n+' шт'):el('b',{},usd(by2[k].s)),k==='reg'?null:el('span',{class:'mut sm'},by2[k].n+' шт'))));
