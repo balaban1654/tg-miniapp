@@ -1027,7 +1027,10 @@ function dxOffText(s,today){
 }
 function dxLive(d,skew){
   const pace=d.plan.paceMin;
-  const cards=d.streamers.filter(s=>s.active||s.live).map(s=>{
+  // Порядок: сначала те, кто сейчас в эфире, дальше по FTD за месяц (больше выше); админы (Николай, Богдан) всегда в конце
+  const ord=s=>[s.role==='admin'?1:0,s.live?0:1,-(s.month.ftd||0)];
+  const cmp=(a,b)=>{const x=ord(a),y=ord(b);for(let i=0;i<x.length;i++)if(x[i]!==y[i])return x[i]-y[i];return 0};
+  const cards=d.streamers.filter(s=>s.active||s.live).slice().sort(cmp).map(s=>{
     const lvl=dxLvl(s.month.hoursMin,pace);
     const name=el('button',{type:'button',class:'dx-nm','aria-haspopup':'dialog'},s.name);
     dxAttachCard(name,s,d,skew);
