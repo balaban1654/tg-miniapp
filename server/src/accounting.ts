@@ -22,6 +22,8 @@ export interface KpiPlan {
   shiftTol: number; // допуск по дневной смене: недобор в пределах этой доли нормы не считается невыполненным днём
   advance: number; // максимальный аванс
   birthday: number; // бонус на день рождения сотрудника, $ (0 — не начислять)
+  leadShift: number; // тимлиду за каждого члена команды, выполнившего план смен за месяц, $
+  leadLeads: number; // тимлиду за каждого члена команды, выполнившего план лидов за месяц, $
   depTiers: DepTier[]; // градации додепов лида и бонус стримеру за каждую
   depStart: string | null; // с какой даты действуют бонусы за додепы
   goals: Goals; // цели месяца для дашборда админа
@@ -59,6 +61,8 @@ export const DEFAULT_PLAN: KpiPlan = {
   shiftTol: 0.15,
   advance: 200,
   birthday: 0,
+  leadShift: 50,
+  leadLeads: 50,
   depTiers: DEFAULT_DEP_TIERS,
   depStart: null,
   goals: { ftd: 50, ftdSum: 4500, deposits: 9500, commission: 6000, net: 3900 },
@@ -105,6 +109,23 @@ export interface KpiResult {
   tiers: { over: number; bonus: number; n: number; tol: number }[];
   belowTier: number;
   dayRows: { d: string; n: number; all: number; hit: boolean }[];
+}
+
+/** Зарплата тимлида за месяц: его ставка (за месяц или за принятые смены) + бонус за каждого члена команды,
+ *  выполнившего план смен (plan.leadShift) и план лидов (plan.leadLeads) */
+export async function teamleadPay(leadId: number, period: string, plan: KpiPlan) {
+  const p = (await db.query('SELECT mode, amount::float AS amount FROM team_pay WHERE staff_id = $1', [leadId])).rows[0] ?? { mode: 'month', amount: 0 };
+  const shifts = Number((await db.query(`SELECT count(*)::int AS n FROM shift_reports WHERE staff_id = $1 AND team AND status = 'approved' AND to_char(day, 'YYYY-MM') = $2`, [leadId, period])).rows[0].n);
+  const rate = r2(p.mode === 'shift' ? shifts * p.amount : p.amount);
+  const team = (await db.query(`SELECT id, name FROM staff WHERE parent_id = $1 AND (role = 'streamer' OR streams) AND deleted_at IS NULL AND active ORDER BY name`, [leadId])).rows as { id: number; name: string }[];
+  const members = [];
+  for (const m of team) {
+    const k = await kpiFor(m.id, period, plan);
+    const bonus = (k.shiftsDone ? plan.leadShift : 0) + (k.leadsDone ? plan.leadLeads : 0);
+    members.push({ id: m.id, name: m.name, hoursMin: k.hoursMin, planMin: k.planMin, ftd: k.ftdCount, planLeads: plan.leads, shiftsDone: k.shiftsDone, leadsDone: k.leadsDone, bonus });
+  }
+  const bonus = members.reduce((a, x) => a + x.bonus, 0);
+  return { period, mode: p.mode as 'month' | 'shift', amount: p.amount as number, shifts, rate, members, bonus, perShift: plan.leadShift, perLeads: plan.leadLeads, total: r2(rate + bonus) };
 }
 
 /** Бонус на день рождения: в месяц рождения, начиная с самого дня (по Киеву), один раз попадает в «Бонусы и штрафы».
@@ -348,6 +369,8 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
       shiftTol: n(b.shiftTol, cur.shiftTol, 0, 0.5),
       advance: n(b.advance, cur.advance),
       birthday: n(b.birthday, cur.birthday),
+      leadShift: n(b.leadShift, cur.leadShift),
+      leadLeads: n(b.leadLeads, cur.leadLeads),
       depTiers: cur.depTiers,
       depStart: cur.depStart,
       goals: {
@@ -656,7 +679,13 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
         ORDER BY s.active DESC, array_position(ARRAY['admin','teamlead','analyst','buyer'], s.role), s.name`,
       [period],
     )).rows;
-    const out = rows.map((r: any) => ({ ...r, accrued: r2(r.mode === 'shift' ? r.shifts * r.amount : r.amount) }));
+    const plan = await planFor(period);
+    const out = [];
+    for (const r of rows as any[]) {
+      const base = r2(r.mode === 'shift' ? r.shifts * r.amount : r.amount);
+      const lead = r.role === 'teamlead' ? await teamleadPay(r.id, period, plan) : null;
+      out.push({ ...r, base, teamBonus: lead?.bonus ?? 0, accrued: r2(base + (lead?.bonus ?? 0)) });
+    }
     return { period, rows: out, total: r2(out.reduce((a: number, r: any) => a + r.accrued, 0)) };
   });
   app.put<{ Params: { id: string } }>('/team-pay/:id', { preHandler: admin }, async (req, reply) => {
@@ -1129,8 +1158,10 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     return m;
   };
 
-  app.get<{ Querystring: { from?: string; to?: string; all?: string } }>('/dashboard', { preHandler: admin }, async (req) => {
+  app.get<{ Querystring: { from?: string; to?: string; all?: string } }>('/dashboard', { preHandler: need('admin', 'teamlead') }, async (req) => {
     const plan = await getPlan();
+    // Тимлид видит только свою команду, без расходов и прибыли компании; вместо прибыли его зарплата
+    const lead = req.staff!.role === 'teamlead' ? req.staff!.id : null;
     const today = (await db.query(`SELECT to_char((now() AT TIME ZONE '${TZ}')::date, 'YYYY-MM-DD') AS d`)).rows[0].d as string;
     const allTime = req.query.all === '1';
     let from: string;
@@ -1169,11 +1200,11 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     }
     const goalFactor = allTime ? null : months.reduce((a, x) => a + x.w, 0);
     const g = plan.goals;
-    const goals = goalFactor === null ? null : { ftd: g.ftd * goalFactor, ftdSum: g.ftdSum * goalFactor, deposits: g.deposits * goalFactor, commission: g.commission * goalFactor, net: g.net * goalFactor };
+    const goals = goalFactor === null || lead ? null : { ftd: g.ftd * goalFactor, ftdSum: g.ftdSum * goalFactor, deposits: g.deposits * goalFactor, commission: g.commission * goalFactor, net: g.net * goalFactor };
     // Где должны быть сегодня: доля прошедших дней периода
     const pace = ref >= to ? 1 : Math.max(0, Math.min(1, (daysBetween(from, ref) + 1) / rangeDays));
 
-    const staffRows = (await db.query(`SELECT id, name, login, tg_username, active, role FROM staff WHERE (role = 'streamer' OR streams) ORDER BY id`)).rows as { id: number; name: string; login: string; tg_username: string | null; active: boolean; role: string }[];
+    const staffRows = (await db.query(`SELECT id, name, login, tg_username, active, role FROM staff WHERE (role = 'streamer' OR streams) AND ($1::int IS NULL OR parent_id = $1) AND deleted_at IS NULL ORDER BY id`, [lead])).rows as { id: number; name: string; login: string; tg_username: string | null; active: boolean; role: string }[];
     const ids = staffRows.map((s) => s.id);
 
     const evRange = await aggEvents(from, to);
@@ -1211,7 +1242,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     const shortBy = new Map(
       ((await db.query(`SELECT staff_id, count(*)::int AS n FROM shift_shortfalls WHERE reason IS NULL AND accepted_at IS NULL AND penalty_id IS NULL AND staff_id IN (SELECT id FROM staff WHERE role <> 'admin') AND to_char(day, 'YYYY-MM') = $1 GROUP BY staff_id`, [refMonth])).rows as { staff_id: number; n: number }[]).map((r) => [r.staff_id, r.n]),
     );
-    const advances = (await db.query(`SELECT r.id, r.staff_id, s.name AS staff_name, r.amount::float AS amount FROM advance_requests r JOIN staff s ON s.id = r.staff_id WHERE r.status = 'pending' ORDER BY r.id`)).rows as { id: number; staff_id: number; staff_name: string; amount: number }[];
+    const advances = lead ? [] : (await db.query(`SELECT r.id, r.staff_id, s.name AS staff_name, r.amount::float AS amount FROM advance_requests r JOIN staff s ON s.id = r.staff_id WHERE r.status = 'pending' ORDER BY r.id`)).rows as { id: number; staff_id: number; staff_name: string; amount: number }[];
 
     // KPI: по месяцам периода (зарплата за период) и за «текущий» месяц (карточка стримера)
     const kpiCache = new Map<string, KpiResult>();
@@ -1288,7 +1319,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     const sum = (f: (x: any) => number) => out.reduce((acc, x) => acc + f(x), 0);
     const commission = sum((x) => x.range.commission);
     const expRows = (
-      await db.query(`SELECT id, to_char(day, 'YYYY-MM-DD') AS day, amount::float AS amount, comment FROM expenses WHERE day BETWEEN $1::date AND $2::date ORDER BY day DESC, id DESC`, [from, to])
+      lead ? { rows: [] } : await db.query(`SELECT id, to_char(day, 'YYYY-MM-DD') AS day, amount::float AS amount, comment FROM expenses WHERE day BETWEEN $1::date AND $2::date ORDER BY day DESC, id DESC`, [from, to])
     ).rows as { id: number; day: string; amount: number; comment: string }[];
     const expenses = r2(expRows.reduce((acc, x) => acc + x.amount, 0));
     const net = r2(commission - salaries - expenses);
@@ -1299,6 +1330,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
       .sort((a, b) => a.hoursMin - b.hoursMin);
 
     return {
+      leadPay: lead ? await teamleadPay(lead, refMonth, await planFor(refMonth)) : null,
       now: nowIso,
       today,
       range: { from, to, days: rangeDays, all: allTime, ref, refMonth, whole: months.length === 1 && months[0].w === 1 },
