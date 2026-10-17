@@ -1417,7 +1417,9 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // Сколько новых постбеков с прошлого просмотра страницы (без комиссий, импорта и ручных добавлений): цифра у «Постбеки» в меню
-  app.get('/postbacks/count', { preHandler: need('admin') }, async (req) => {
+  // Тимлид видит постбеки лидов своей команды, без правки и удаления
+  const pbScope = (me: Staff) => (me.role === 'teamlead' ? `AND tg_id IN (SELECT d.tg_id FROM leads d JOIN staff o ON o.id = d.owner_id WHERE o.id = ${me.id} OR o.parent_id = ${me.id})` : '');
+  app.get('/postbacks/count', { preHandler: need('admin', 'teamlead') }, async (req) => {
     const seen = (await db.query('SELECT pb_seen_at FROM staff WHERE id = $1', [req.staff!.id])).rows[0]?.pb_seen_at as Date | null;
     if (!seen) {
       await db.query('UPDATE staff SET pb_seen_at = now() WHERE id = $1', [req.staff!.id]);
@@ -1425,24 +1427,24 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     }
     const r = await db.query(
       `SELECT count(*)::int AS n FROM postback_log
-        WHERE created_at > $1 AND event <> 'comm' AND coalesce(query->>'imported', '') <> '1' AND coalesce(query->>'manual', '') <> '1'`,
+        WHERE created_at > $1 AND event <> 'comm' AND coalesce(query->>'imported', '') <> '1' AND coalesce(query->>'manual', '') <> '1' ${pbScope(req.staff!)}`,
       [seen],
     );
     return { n: r.rows[0].n };
   });
-  app.post('/postbacks/seen', { preHandler: need('admin') }, async (req) => {
+  app.post('/postbacks/seen', { preHandler: need('admin', 'teamlead') }, async (req) => {
     await db.query('UPDATE staff SET pb_seen_at = now() WHERE id = $1', [req.staff!.id]);
     return { ok: true };
   });
 
   // Журнал постбеков для админа
-  app.get<{ Querystring: { from?: string; to?: string } }>('/postbacks', { preHandler: need('admin') }, async (req) => {
+  app.get<{ Querystring: { from?: string; to?: string } }>('/postbacks', { preHandler: need('admin', 'teamlead') }, async (req) => {
     const ok = (v?: string) => (v && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null);
     const from = ok(req.query.from), to = ok(req.query.to);
     const r = await db.query(
       `SELECT id, event, query, tg_id, result, created_at, event_id FROM postback_log
         WHERE ($1::date IS NULL OR (created_at AT TIME ZONE 'Europe/Kyiv')::date >= $1::date)
-          AND ($2::date IS NULL OR (created_at AT TIME ZONE 'Europe/Kyiv')::date <= $2::date)
+          AND ($2::date IS NULL OR (created_at AT TIME ZONE 'Europe/Kyiv')::date <= $2::date) ${pbScope(req.staff!)}
         ORDER BY created_at DESC, id DESC LIMIT 5000`,
       [from, to],
     );
@@ -2211,7 +2213,10 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     }
     // Подключение: сколько нужно внести, действующая акция, прошлые отправки (админу, а стримеру только у его лидов)
     // Стример видит блок только у своих лидов и без суммы внесённых депозитов
-    const connectOk = me.role === 'admin' || (me.role === 'streamer' && r.rows[0].owner_id === me.id);
+    const ownerId = r.rows[0].owner_id as number | null;
+    // Скидку предлагают: админ любому; стример своим лидам; тимлид своим и лидам своей команды
+    const connectOk = me.role === 'admin' || (me.role === 'streamer' && ownerId === me.id)
+      || (me.role === 'teamlead' && ownerId !== null && (ownerId === me.id || (await db.query('SELECT 1 FROM staff WHERE id = $1 AND parent_id = $2', [ownerId, me.id])).rowCount! > 0));
     const connect = connectOk && (!r.rows[0].lead_role || r.rows[0].lead_role === 'lead') ? await connectInfo(tgId, me.role !== 'admin') : null;
     return {
       fin,

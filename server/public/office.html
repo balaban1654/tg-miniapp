@@ -649,6 +649,7 @@ function navItemsFor(role){
   // Смена команды: админ, тимлидер, аналитик, медиабайер начинают смену и в конце пишут, что сделали
   if(['admin','teamlead','analyst','buyer'].includes(role))items.push(['tshift','Моя смена']);
   if(role==='teamlead')items.splice(1,0,['treview','Отчёты команды']);
+  if(role==='teamlead')items.push(['pb','Постбеки']);
   return items;
 }
 /** Сохранённая раскладка, приведённая к доступным разделам: лишние убираем, новые добавляем в конец */
@@ -1987,6 +1988,7 @@ let noticeN=0; // новые события клиентов стримера (�
 let pbNew=0; // новые постбеки с прошлого просмотра (цифра у «Постбеки»)
 async function updateBadge(){
   if(!me)return;
+  if(me.role==='teamlead'){try{const p=tab==='pb'?{n:0}:await api('/postbacks/count');if(p.n!==pbNew){pbNew=p.n;drawNav()}}catch{}}
   if(me.role==='admin'){try{const c=await api('/reviews/count');const p=tab==='pb'?{n:0}:await api('/postbacks/count');if(c.pending!==mediaPend||p.n!==pbNew){mediaPend=c.pending;pbNew=p.n;drawNav()}}catch{}}
   if(['admin','streamer'].includes(me.role)){try{const f=await api('/fraud/count');if(f.n!==fraudNew){fraudNew=f.n;drawNav()}}catch{}}
   if(['admin','teamlead','streamer'].includes(me.role)){
@@ -4114,7 +4116,7 @@ async function viewPostbacks(){
       if(sp&&sp.firstChild)sp.firstChild.replaceWith(el('button',{type:'button',class:'own-btn',title:'Открыть карточку клиента',onclick:()=>openLeadCard(Number(v))},String(v)));
       return c;
     }
-    if(!trader)return copyCell(v);
+    if(!trader||me.role!=='admin')return copyCell(v);
     const c=el('td',{});
     const show=()=>c.replaceChildren(el('button',{class:'btn o s',type:'button',title:'Привязать Telegram ID к этому Pocket ID',onclick:edit},'Указать'));
     const edit=()=>{
@@ -4136,7 +4138,7 @@ async function viewPostbacks(){
       &&(!qq||[r.tg_id,(r.query||{}).trader_id,(r.query||{}).click_id].some(v=>v!=null&&String(v).toLowerCase().includes(qq))));
     const by={new:(a,b)=>new Date(b.created_at)-new Date(a.created_at),old:(a,b)=>new Date(a.created_at)-new Date(b.created_at),sum:(a,b)=>amt(b)-amt(a),sumAsc:(a,b)=>amt(a)-amt(b)};
     list=[...list].sort(by[F.sort]||by.new);
-    holder.replaceChildren(table(['Время','Событие','Telegram ID','Pocket ID',['Сумма','n'],'Результат',''],list.map(r=>{const qq2=r.query||{};return[td(time(r.created_at)),el('td',{},el('span',{class:'pill ev-'+r.event},r.event)),tgCell(r),copyCell(qq2.trader_id),td(qq2.commission||qq2.sumdep||qq2.wdr_sum||qq2.amount||qq2.sum||'—','n'),el('td',{},el('span',{class:'pill '+(r.result==='ok'?'p-ok':(r.result.startsWith('дубль')||r.result.startsWith('пропущен'))?'p-warn':'p-bad')},r.result)),el('td',{},el('button',{class:'btn o s',type:'button',title:'Удалить постбек','aria-label':'Удалить постбек',onclick:()=>pbDeleteDialog(r,()=>render({soft:true}))},svgIcon(TRASH,15)))]}),
+    holder.replaceChildren(table(['Время','Событие','Telegram ID','Pocket ID',['Сумма','n'],'Результат',''],list.map(r=>{const qq2=r.query||{};return[td(time(r.created_at)),el('td',{},el('span',{class:'pill ev-'+r.event},r.event)),tgCell(r),copyCell(qq2.trader_id),td(qq2.commission||qq2.sumdep||qq2.wdr_sum||qq2.amount||qq2.sum||'—','n'),el('td',{},el('span',{class:'pill '+(r.result==='ok'?'p-ok':(r.result.startsWith('дубль')||r.result.startsWith('пропущен'))?'p-warn':'p-bad')},r.result)),me.role==='admin'?el('td',{},el('button',{class:'btn o s',type:'button',title:'Удалить постбек','aria-label':'Удалить постбек',onclick:()=>pbDeleteDialog(r,()=>render({soft:true}))},svgIcon(TRASH,15))):td('')]}),
       rows.length?'Ничего не найдено. Измените фильтры.':'Постбеков пока нет. Когда партнёрка отправит первый, он появится здесь.'));
     // Итого по показанным записям: по каждому событию отдельно, а строка «Итого» внизу таблицы, когда выбрано одно событие
     const by2={};list.forEach(r=>{const o=by2[r.event]||(by2[r.event]={n:0,s:0});o.n++;o.s+=amt(r)});
@@ -4152,7 +4154,7 @@ async function viewPostbacks(){
     cnt.textContent=list.length===rows.length?rows.length+' всего':list.length+' из '+rows.length;
   };
   draw();
-  return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Постбеки'),rangeBar(()=>render({soft:true}))),el('div',{style:'display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end;margin:-4px 0 10px'},el('button',{class:'btn s',type:'button',style:'margin-right:auto;display:inline-flex;align-items:center;gap:6px',onclick:()=>pbManualDialog(()=>render({soft:true}))},svgIcon('<path d="M12 5v14M5 12h14"/>',16),'Добавить'),cnt,upBtn,upFile,clearBox,el('button',{class:'btn o s',type:'button',onclick:()=>render({soft:true})},'Обновить')),bar,totBox,holder];
+  return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Постбеки'),rangeBar(()=>render({soft:true}))),el('div',{style:'display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end;margin:-4px 0 10px'},me.role==='admin'?el('button',{class:'btn s',type:'button',style:'margin-right:auto;display:inline-flex;align-items:center;gap:6px',onclick:()=>pbManualDialog(()=>render({soft:true}))},svgIcon('<path d="M12 5v14M5 12h14"/>',16),'Добавить'):null,cnt,...(me.role==='admin'?[upBtn,upFile,clearBox]:[]),el('button',{class:'btn o s',type:'button',onclick:()=>render({soft:true})},'Обновить')),bar,totBox,holder];
 }
 
 (async()=>{try{me=await api('/me');readHash();showApp()}catch{showLogin()}})();

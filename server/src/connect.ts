@@ -191,10 +191,11 @@ export async function connectRoutes(app: FastifyInstance, h: { need: Need; str: 
 
   // Отправка акции: одному лиду (tg_id), себе для проверки (test) или всем «не подключившимся» (по желанию одного стримера)
   // Стример предлагает скидку только своим лидам и только по одному, из карточки лида. Тест и массовая рассылка у админа
-  app.post<{ Params: { id: string } }>('/connect/offers/:id/send', { preHandler: h.need('admin', 'streamer') }, async (req, reply) => {
+  app.post<{ Params: { id: string } }>('/connect/offers/:id/send', { preHandler: h.need('admin', 'streamer', 'teamlead') }, async (req, reply) => {
     const me = (req as any).staff as { id: number; role: string; tg_username?: string | null };
     const b = (req.body ?? {}) as Record<string, unknown>;
-    const mine = me.role === 'streamer';
+    // Стример и тимлид предлагают скидку только из карточки лида: стример своим, тимлид своим и лидам своей команды
+    const mine = me.role === 'streamer' || me.role === 'teamlead';
     if (mine && (b.test === true || b.tg_id === undefined || b.tg_id === null || b.tg_id === '')) return reply.code(403).send({ error: 'Стример предлагает скидку из карточки своего лида' });
     const o = (await db.query(`SELECT id, name, discount_pct, days, text FROM connect_offers WHERE id = $1 AND active`, [Number(req.params.id)])).rows[0] as Offer | undefined;
     if (!o) return reply.code(404).send({ error: 'Акция не найдена' });
@@ -221,7 +222,7 @@ export async function connectRoutes(app: FastifyInstance, h: { need: Need; str: 
 
     if (b.tg_id !== undefined && b.tg_id !== null && b.tg_id !== '') {
       const tgId = Number(b.tg_id);
-      const d = (await db.query(`SELECT d.tg_id, d.bot_started, d.bot_blocked FROM leads d WHERE d.tg_id = $1 AND ${NOT_CONNECTED} AND ($2::int IS NULL OR d.owner_id = $2)`, [tgId, mine ? me.id : null])).rows[0];
+      const d = (await db.query(`SELECT d.tg_id, d.bot_started, d.bot_blocked FROM leads d WHERE d.tg_id = $1 AND ${NOT_CONNECTED} AND ($2::int IS NULL OR d.owner_id = $2 OR ($3 AND d.owner_id IN (SELECT id FROM staff WHERE parent_id = $2)))`, [tgId, mine ? me.id : null, me.role === 'teamlead'])).rows[0];
       if (!d) return reply.code(409).send({ error: mine ? 'Лид не найден среди ваших или уже подключён: скидка ему не нужна' : 'Лид уже подключён или не найден: скидка ему не нужна' });
       if (!d.bot_started || d.bot_blocked) return reply.code(409).send({ error: 'Лид не запускал бота или заблокировал его: пуш не дойдёт' });
       const gap = (await db.query(`SELECT 1 FROM connect_sends s WHERE s.tg_id = $1 AND s.delivery <> 'failed' AND s.reverted_at IS NULL AND s.sent_at > now() - interval '${OFFER_GAP_DAYS} days' LIMIT 1`, [tgId])).rowCount;
