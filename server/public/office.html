@@ -1269,8 +1269,10 @@ function dxPlanFact(d){
   const title=d.range.whole&&!d.range.all?'План / факт за месяц':'План / факт';
   const icons=[];
   if(g)icons.push(dxPopBtn('Кольца выполнения плана',IC_RINGS,dxRings(d),'pl'));
+  // Тимлиду: кольца общего результата компании
+  else if(d.company)icons.push(dxPopBtn('Кольца: общий результат компании',IC_RINGS,el('div',{style:'display:grid;gap:8px'},el('div',{class:'dx-lbl'},'Общий результат компании'),dxRings(d.company)),'pl'));
   icons.push(dxPopBtn('Воронка',IC_FUNNEL,dxFunnel(d),'pl wide'));
-  if(!d.leadPay)icons.push(dxPopBtn('Просмотры, подписчики, комментарии и лайки',IC_HEART,dxSocial(d),'pl wide'));
+  icons.push(dxPopBtn(d.leadPay?'Охваты вашей команды: просмотры, подписчики, комментарии и лайки':'Просмотры, подписчики, комментарии и лайки',IC_HEART,dxSocial(d),'pl wide'));
   const avg=t.ftd?t.ftdSum/t.ftd:0,dShare=t.deposits?t.depSum/t.deposits*100:0,cShare=t.deposits?t.commission/t.deposits*100:0;
   const rows=[['FTD — первый депозит',t.ftd,g&&g.ftd,n0,showMark?'по графику '+Math.round(pace*100)+'%':''],
     ['Пополнения по FTD',t.ftdSum,g&&g.ftdSum,usd0,'средний FTD '+usd0(avg)],

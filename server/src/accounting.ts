@@ -713,14 +713,14 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
   });
 
   // Суммы числовых полей отчётов (просмотры, подписчики…) по зачтённым отчётам: за даты или за месяц
-  const fieldSums = async (r: { from: string; to: string } | null, period: string) => {
+  const fieldSums = async (r: { from: string; to: string } | null, period: string, lead: number | null = null) => {
     const defs = (await fieldsDef(true)).filter((d: any) => d.on_dashboard);
     const rows = (
       await db.query(
         r
-          ? `SELECT s.staff_id, st.name, s.fields, s.approved_min FROM shift_reports s JOIN staff st ON st.id = s.staff_id WHERE s.status = 'approved' AND NOT s.team AND s.day BETWEEN $1::date AND $2::date`
-          : `SELECT s.staff_id, st.name, s.fields, s.approved_min FROM shift_reports s JOIN staff st ON st.id = s.staff_id WHERE s.status = 'approved' AND NOT s.team AND to_char(s.day, 'YYYY-MM') = $1`,
-        r ? [r.from, r.to] : [period],
+          ? `SELECT s.staff_id, st.name, s.fields, s.approved_min FROM shift_reports s JOIN staff st ON st.id = s.staff_id WHERE s.status = 'approved' AND NOT s.team AND s.day BETWEEN $1::date AND $2::date AND ($3::int IS NULL OR st.parent_id = $3)`
+          : `SELECT s.staff_id, st.name, s.fields, s.approved_min FROM shift_reports s JOIN staff st ON st.id = s.staff_id WHERE s.status = 'approved' AND NOT s.team AND to_char(s.day, 'YYYY-MM') = $1 AND ($2::int IS NULL OR st.parent_id = $2)`,
+        r ? [r.from, r.to, lead] : [period, lead],
       )
     ).rows;
     type Agg = { staff_id: number; name: string; reports: number; minutes: number; sums: Record<string, number> };
@@ -736,10 +736,11 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
   };
 
   // Сводка по полям формы для общего дашборда: суммы числовых полей по зачтённым отчётам
-  app.get<{ Querystring: { period?: string; from?: string; to?: string } }>('/shifts/fieldstats', { preHandler: admin }, async (req) => {
+  // Тимлид видит охваты только своей команды
+  app.get<{ Querystring: { period?: string; from?: string; to?: string } }>('/shifts/fieldstats', { preHandler: need('admin', 'teamlead') }, async (req) => {
     const period = PERIOD.test(String(req.query.period)) ? String(req.query.period) : await currentPeriod();
     const r = DATE.test(String(req.query.from)) && DATE.test(String(req.query.to)) ? { from: String(req.query.from), to: String(req.query.to) } : null;
-    const fs = await fieldSums(r, period);
+    const fs = await fieldSums(r, period, req.staff!.role === 'teamlead' ? req.staff!.id : null);
     return { period, from: r?.from ?? null, to: r?.to ?? null, fields: fs.fields, rows: fs.rows };
   });
 
@@ -1210,6 +1211,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     }
     const goalFactor = allTime ? null : months.reduce((a, x) => a + x.w, 0);
     const g = plan.goals;
+    const goalsAll = goalFactor === null ? null : { ftd: g.ftd * goalFactor, ftdSum: g.ftdSum * goalFactor, deposits: g.deposits * goalFactor, commission: g.commission * goalFactor, net: g.net * goalFactor };
     const goals = goalFactor === null || lead ? null : { ftd: g.ftd * goalFactor, ftdSum: g.ftdSum * goalFactor, deposits: g.deposits * goalFactor, commission: g.commission * goalFactor, net: g.net * goalFactor };
     // Где должны быть сегодня: доля прошедших дней периода
     const pace = ref >= to ? 1 : Math.max(0, Math.min(1, (daysBetween(from, ref) + 1) / rangeDays));
@@ -1339,7 +1341,17 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
       .map((x) => ({ id: x.id, name: x.name, hoursMin: x.month.hoursMin, level: x.month.hoursMin < paceMin * 0.85 ? 'bad' : 'warn' }))
       .sort((a, b) => a.hoursMin - b.hoursMin);
 
+    // Тимлиду: кольца общего результата компании (все стримеры) против плана месяца
+    let company = null;
+    if (lead && goalsAll) {
+      const all = new Set(((await db.query(`SELECT id FROM staff WHERE role = 'streamer' OR streams`)).rows as { id: number }[]).map((r) => r.id));
+      let ftd = 0;
+      let deposits = 0;
+      for (const [id, a] of evRange) if (all.has(id)) { ftd += a.ftd; deposits += a.ftdSum + a.depSum; }
+      company = { goals: goalsAll, totals: { ftd, deposits: r2(deposits) }, pace };
+    }
     return {
+      company,
       leadPay: lead ? await teamleadPay(lead, refMonth, await planFor(refMonth)) : null,
       now: nowIso,
       today,
