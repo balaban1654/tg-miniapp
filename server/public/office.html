@@ -2561,7 +2561,8 @@ async function viewAcc(){
   const drawBar=()=>{
     monthBar.replaceChildren(el('button',{type:'button','aria-label':'Предыдущий месяц',onclick:()=>{accState.period=perShift(accState.period,-1);accState.sel=null;drawBar();drawBody();drawStatus()}},'‹'),el('b',{},perLabel(accState.period)),el('button',{type:'button','aria-label':'Следующий месяц',onclick:()=>{accState.period=perShift(accState.period,1);accState.sel=null;drawBar();drawBody();drawStatus()}},'›'));
     tabBar.replaceChildren(...TABS.map(([k,t])=>el('button',{type:'button',role:'tab','aria-selected':k===accState.tab?'true':'false',class:'lc-tab'+(k===accState.tab?' on':''),onclick:()=>{accState.tab=k;drawBar();drawBody();pushHash()}},t,(accPend[k]>0)?el('span',{class:'nbadge tb',title:'Ждёт вашего решения'},String(accPend[k])):null)));
-    requestAnimationFrame(()=>{const on=tabBar.querySelector('.on');if(on&&on.scrollIntoView)on.scrollIntoView({inline:'center',block:'nearest'})});
+    // Активную вкладку двигаем в центр только внутри полосы вкладок: scrollIntoView прокручивал и всю страницу наверх при каждом обновлении счётчиков
+    requestAnimationFrame(()=>{const on=tabBar.querySelector('.on');if(on&&tabBar.scrollWidth>tabBar.clientWidth)tabBar.scrollLeft=on.offsetLeft-tabBar.offsetLeft-(tabBar.clientWidth-on.offsetWidth)/2});
   };
   const stat=el('div',{class:'card',style:'display:flex;gap:12px;align-items:center;flex-wrap:wrap;justify-content:space-between;padding:12px 16px'});
   const fmtClose=v=>new Date(v).toLocaleString('ru-RU',{timeZone:'Europe/Kyiv',day:'numeric',month:'long',hour:'2-digit',minute:'2-digit'});
