@@ -1115,7 +1115,7 @@ function dxModal(btn,s,d,skew,mode){
         el('div',{class:'dx-scol'},el('div',{class:'dx-sh'},'Удержания'),row('Штрафы',hv(m.penalty?sgn0(-m.penalty):'$0',m.penalty?'dx-neg':'')),row('Выплачено (аванс)',hv(m.paid?sgn0(-m.paid):'$0'))),
         el('div',{class:'dx-scol'},el('div',{class:'dx-sh'},'Бонусы'),row('FTD (суммы больше)',hv(m.ftdBonus?sgn0(m.ftdBonus):'$0')),row('Дневной ('+(d.plan.dayCount||4)+' FTD)',hv(m.dayBonus?sgn0(m.dayBonus):'$0')),row('Додепы (градации)',hv(m.depBonus?sgn0(m.depBonus):'$0')),row('Премии',hv(m.bonus?sgn0(m.bonus):'$0'))),
         el('div',{class:'dx-topay'},el('span',{},'К выплате'),el('b',{},el('span',{class:'dx-dm'},usd0(pay[0])),el('span',{class:'dx-sl'},'/'),el('span',{},usd0(pay[1])))))),
-    el('div',{class:'dx-prof'},el('div',{class:'dx-sec'},'Выгоден ли сотрудник'),row('Комиссия с лидов',hv(usd0(m.commission))),row('Зарплата по полным ставкам',hv('−'+usd0(cost),'dx-neg')),
+    el('div',{class:'dx-prof',hidden:me.role==='admin'?null:''},el('div',{class:'dx-sec'},'Выгоден ли сотрудник'),row('Комиссия с лидов',hv(usd0(m.commission))),row('Зарплата по полным ставкам',hv('−'+usd0(cost),'dx-neg')),
       el('div',{class:'dx-row res'},el('span',{},'Прибыль с сотрудника'),el('b',{style:'color:'+(profit<0?'var(--bad)':'var(--fg)')},sgn0(profit))),
       el('div',{class:'dx-vd '+vcls},el('b',{},vt+'. '),vx+'.')),
     el('div',{class:'dx-hd'},el('span',{class:'mut sm'},'Данные за '+perLabel(m.period)),el('a',{href:'#/acc/sum',style:'color:var(--acc2);font-weight:700;font-size:12px',onclick:e=>{e.preventDefault();dxCloseModal();dxGo('acc','sum')}},'Открыть в Бухгалтерии →')));
@@ -1278,7 +1278,7 @@ function dxPlanFact(d){
   const rows=[['FTD — первый депозит',t.ftd,g&&g.ftd,n0,showMark?'по графику '+Math.round(pace*100)+'%':''],
     ['Пополнения по FTD',t.ftdSum,g&&g.ftdSum,usd0,'средний FTD '+usd0(avg)],
     ['Все депозиты (FTD + додепы)',t.deposits,g&&g.deposits,usd0,'додепы '+usd0(t.depSum)+' · '+Math.round(dShare)+'%'],
-    ['Комиссия получена',t.commission,g&&g.commission,usd0,cShare.toFixed(1).replace('.',',')+'% от депозитов']];
+    ...(d.leadPay?[]:[['Комиссия получена',t.commission,g&&g.commission,usd0,cShare.toFixed(1).replace('.',',')+'% от депозитов']])];
   const flipBtn=()=>{const b=el('button',{type:'button',class:'dx-ib sm2',title:'Показатели стримеров','aria-label':'Показатели стримеров'});b.append(svgIcon(IC_FLIP,18));return b};
   const wrap=el('div',{class:'dx-flip'});
   const fb=flipBtn(),fbm=flipBtn();fb.classList.add('only-d');fbm.classList.add('only-m');icons.push(fbm);
@@ -2104,7 +2104,8 @@ async function openLeadCard(tgId){
     cnt.addEventListener('mouseleave',()=>{if(matchMedia('(hover:hover)').matches)setTimeout(()=>{const p=document.querySelector('.fc-pop');if(p&&!p.matches(':hover'))p.remove()},150)});
     cnt.addEventListener('click',()=>pop(cnt,f.dates));
     return el('div',{class:'fc-row'},el('span',{class:'pill ev-'+t},t),f.sum===null?el('span',{class:'mut'},'—'):el('b',{class:'fc-sum'},money(f.sum)),cnt)};
-  const finTile=el('div',{class:'fc'},frow('ftd'),frow('dep'),frow('wd'),el('div',{class:'fc-sep'}),frow('comm'));
+  // Комиссию в карточке видит только админ (тимлиду и стримеру она не показывается)
+  const finTile=el('div',{class:'fc'},frow('ftd'),frow('dep'),frow('wd'),...(me.role==='admin'?[el('div',{class:'fc-sep'}),frow('comm')]:[]));
   // Градации додепов (суммы не показываем)
   const T=d.tier;
   const TI=['🥉','🥈','🥇','💎'];

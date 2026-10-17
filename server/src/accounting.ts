@@ -1222,6 +1222,8 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     const evRange = await aggEvents(from, to);
     const refStart = `${refMonth}-01`;
     const evMonth = refStart === from && lastOfMonth(refMonth) === to ? evRange : await aggEvents(refStart, lastOfMonth(refMonth));
+    // Тимлид комиссию не видит
+    if (lead) for (const m of [evRange, evMonth]) for (const a of m.values()) a.comm = 0;
 
     const clicksRows = (
       allTime
