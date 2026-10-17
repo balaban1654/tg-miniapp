@@ -21,6 +21,7 @@ export interface KpiPlan {
   tol: number; // запас на курс брокера
   shiftTol: number; // допуск по дневной смене: недобор в пределах этой доли нормы не считается невыполненным днём
   advance: number; // максимальный аванс
+  birthday: number; // бонус на день рождения сотрудника, $ (0 — не начислять)
   depTiers: DepTier[]; // градации додепов лида и бонус стримеру за каждую
   depStart: string | null; // с какой даты действуют бонусы за додепы
   goals: Goals; // цели месяца для дашборда админа
@@ -57,6 +58,7 @@ export const DEFAULT_PLAN: KpiPlan = {
   tol: 0.1,
   shiftTol: 0.15,
   advance: 200,
+  birthday: 0,
   depTiers: DEFAULT_DEP_TIERS,
   depStart: null,
   goals: { ftd: 50, ftdSum: 4500, deposits: 9500, commission: 6000, net: 3900 },
@@ -105,6 +107,25 @@ export interface KpiResult {
   dayRows: { d: string; n: number; all: number; hit: boolean }[];
 }
 
+/** Бонус на день рождения: в месяц рождения, начиная с самого дня (по Киеву), один раз попадает в «Бонусы и штрафы».
+ *  Сумма из KPI-плана. Удалённый админом бонус заново не создаётся */
+async function birthdayBonus(staffId: number, period: string, plan: KpiPlan): Promise<void> {
+  if (!(plan.birthday > 0)) return;
+  const due = (await db.query(
+    `SELECT 1 FROM staff s
+      WHERE s.id = $1 AND s.deleted_at IS NULL AND s.role <> 'admin' AND s.birth_date IS NOT NULL
+        AND to_char(s.birth_date, 'MM') = substr($2, 6, 2)
+        AND (now() AT TIME ZONE '${TZ}')::date >= make_date(substr($2, 1, 4)::int, extract(month FROM s.birth_date)::int,
+              LEAST(extract(day FROM s.birth_date)::int, extract(day FROM (date_trunc('month', make_date(substr($2, 1, 4)::int, extract(month FROM s.birth_date)::int, 1)) + interval '1 month - 1 day'))::int))`,
+    [staffId, period],
+  )).rowCount;
+  if (!due) return;
+  const fresh = await db.query('INSERT INTO birthday_bonuses (staff_id, period) VALUES ($1,$2) ON CONFLICT DO NOTHING RETURNING staff_id', [staffId, period]);
+  if (fresh.rowCount) {
+    await db.query(`INSERT INTO staff_adjustments (staff_id, period, kind, amount, comment, visible) VALUES ($1,$2,'bonus',$3,'🎂 Бонус на день рождения',TRUE)`, [staffId, period, plan.birthday]);
+  }
+}
+
 /** Расчёт за месяц по правилам KPI. Часы берутся только из зачтённых отчётов, лиды это FTD по ссылкам стримера. */
 async function kpiCompute(staffId: number, period: string, plan: KpiPlan): Promise<KpiResult> {
   const hoursMin = Number(
@@ -119,6 +140,7 @@ async function kpiCompute(staffId: number, period: string, plan: KpiPlan): Promi
       [staffId, period, String(plan.day.cutoffH)],
     )
   ).rows as { amount: number; dkey: string }[];
+  await birthdayBonus(staffId, period, plan);
   const adj = (await db.query(`SELECT kind, coalesce(sum(amount), 0)::float AS s FROM staff_adjustments WHERE staff_id = $1 AND period = $2 GROUP BY kind`, [staffId, period])).rows;
   const adjBonus = Number(adj.find((x) => x.kind === 'bonus')?.s ?? 0);
   const adjPenalty = Number(adj.find((x) => x.kind === 'penalty')?.s ?? 0);
@@ -325,6 +347,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
       tol: n(b.tol, cur.tol, 0, 0.5),
       shiftTol: n(b.shiftTol, cur.shiftTol, 0, 0.5),
       advance: n(b.advance, cur.advance),
+      birthday: n(b.birthday, cur.birthday),
       depTiers: cur.depTiers,
       depStart: cur.depStart,
       goals: {

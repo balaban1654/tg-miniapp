@@ -590,6 +590,12 @@ END $$;
 
 -- Невыполненные дни: админ принимает причину или выписывает штраф (комментарий штрафа видит стример)
 ALTER TABLE staff_adjustments ADD COLUMN IF NOT EXISTS visible BOOLEAN NOT NULL DEFAULT FALSE;
+-- Бонус на день рождения начислен (раз в год): если админ удалит его из «Бонусов и штрафов», повторно он не появится
+CREATE TABLE IF NOT EXISTS birthday_bonuses (
+  staff_id INT NOT NULL REFERENCES staff(id) ON DELETE CASCADE,
+  period   TEXT NOT NULL,
+  PRIMARY KEY (staff_id, period)
+);
 ALTER TABLE shift_shortfalls ADD COLUMN IF NOT EXISTS accepted_at TIMESTAMPTZ;
 ALTER TABLE shift_shortfalls ADD COLUMN IF NOT EXISTS penalty_id INT REFERENCES staff_adjustments(id) ON DELETE SET NULL;
 
