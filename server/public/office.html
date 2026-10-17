@@ -569,6 +569,7 @@ function toast(t){document.querySelectorAll('.toast').forEach(x=>x.remove());con
   for(let i=0;i<26;i++){const c=document.createElement('i');c.style.cssText='left:'+Math.random()*100+'%;height:'+(14+Math.random()*34)+'px;background:'+(Math.random()<.5?'#43b82f':'#ff3b1d')+';opacity:'+(.15+Math.random()*.3)+';animation-duration:'+(14+Math.random()*18)+'s;animation-delay:-'+Math.random()*30+'s';r.appendChild(c)}})();
 function showLogin(){me=null;$('#app').hidden=true;$('#login').hidden=false;$('#lPass').value=''}
 const ICONS={
+  treview:'<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>',
   tshift:'<circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3 2"/>',
   home:'<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>',
   settings:'<path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/>',
@@ -647,6 +648,7 @@ function navItemsFor(role){
   if(role==='admin')items.splice(items.findIndex(x=>x[0]==='connect')+1,0,['newsig','Новый сигнал']);
   // Смена команды: админ, тимлидер, аналитик, медиабайер начинают смену и в конце пишут, что сделали
   if(['admin','teamlead','analyst','buyer'].includes(role))items.push(['tshift','Моя смена']);
+  if(role==='teamlead')items.splice(1,0,['treview','Отчёты команды']);
   return items;
 }
 /** Сохранённая раскладка, приведённая к доступным разделам: лишние убираем, новые добавляем в конец */
@@ -902,6 +904,7 @@ async function render(opt){
     else if(tab==='pb'){m.replaceChildren(...await viewPostbacks());api('/postbacks/seen',{method:'POST'}).then(()=>{if(pbNew){pbNew=0;drawNav()}}).catch(()=>{})}
     else if(tab==='shifts')m.replaceChildren(...await viewShifts());
     else if(tab==='tshift')m.replaceChildren(...await viewTeamShift());
+    else if(tab==='treview')m.replaceChildren(...await viewLeadReview());
     else if(tab==='acc')m.replaceChildren(...await viewAcc());
     else if(tab==='plans')m.replaceChildren(...await viewPlans());
     else if(tab==='mytasks')m.replaceChildren(...await viewMyTasks());
@@ -2411,6 +2414,8 @@ const planPill=ok=>el('span',{class:'pill '+(ok?'p-ok':'p-bad')},ok?'выпол�
 const bar=(pct,done)=>el('div',{class:'pbar2'},el('i',{class:done?'done':'',style:'width:'+Math.max(0,Math.min(100,pct))+'%'}));
 const pbRow=(label,val,pct,done,note)=>el('div',{class:'pl2'},el('div',{class:'lab2'},el('span',{},label),el('b',{class:'mono'},val)),bar(pct,done),note?el('span',{class:'sm warnt'},note):null);
 const fileDataUrl=f=>new Promise((ok,no)=>{const r=new FileReader();r.onload=()=>ok(r.result);r.onerror=()=>no(new Error('Не удалось прочитать файл'));r.readAsDataURL(f)});
+/** «принял Имя» / «отклонил Имя» под статусом отчёта */
+const revBy=r=>r.reviewed_by_name&&(r.status==='approved'||r.status==='rejected')?el('div',{class:'mut sm',style:'margin-top:3px'},(r.status==='approved'?'принял ':'отклонил ')+r.reviewed_by_name):null;
 const REPSTATUS={await:['ждёт отчёта','p-warn'],pending:['на проверке','p-warn'],approved:['зачтён','p-ok'],rejected:['отклонён','p-bad']};
 
 /** Карточка «Мой KPI» на дашборде стримера */
@@ -2590,7 +2595,7 @@ async function reportsTab(){
   const trs=rows.map(r=>[td(new Date(r.day+'T12:00:00').toLocaleDateString('ru-RU',{day:'numeric',month:'short'})),
     td(r.declared_min?hmin(r.declared_min)+(r.approved_min&&r.approved_min!==r.declared_min?' → '+hmin(r.approved_min):''):'—'),
     el('td',{style:'white-space:normal;min-width:200px'},fmtF(r),r.comment?el('div',{class:'mut sm'},r.comment):null,r.reject_reason?el('div',{class:'sm',style:'color:var(--bad)'},'Причина отказа: '+r.reject_reason):null),
-    el('td',{},el('span',{class:'pill '+REPSTATUS[r.status][1]},REPSTATUS[r.status][0])),
+    el('td',{},el('span',{class:'pill '+REPSTATUS[r.status][1]},REPSTATUS[r.status][0]),revBy(r)),
     el('td',{},r.has_screenshot?shotThumb('/api/office/shifts/'+r.id+'/screenshot',{style:'color:var(--acc2)'}).appendChild(document.createTextNode('скриншот')).parentNode:'—'),
     el('td',{},del(r))]);
   return[tiles,ctrT(table(['Дата','Время','Показатели','Статус','Скрин',''],trs,'Отчётов пока нет. После смены он появится здесь.')),
@@ -2809,15 +2814,15 @@ async function accReview(){
     const list=done.filter(r=>(!HF.who||r.staff_name===HF.who)&&(!HF.st||r.status===HF.st));
     const by={new:(a,b)=>b.day.localeCompare(a.day)||b.id-a.id,old:(a,b)=>a.day.localeCompare(b.day)||a.id-b.id,long:(a,b)=>min(b)-min(a),short:(a,b)=>min(a)-min(b),who:(a,b)=>a.staff_name.localeCompare(b.staff_name,'ru')||b.day.localeCompare(a.day)}[HF.sort];
     list.sort(by);
-    const rows=list.map(r=>[td(r.staff_name),td(new Date(r.day+'T12:00:00').toLocaleDateString('ru-RU',{day:'numeric',month:'short'})),td(r.status==='await'?'—':hmin(r.declared_min)+(r.approved_min&&r.approved_min!==r.declared_min?' → '+hmin(r.approved_min):'')),el('td',{},el('span',{class:'pill '+REPSTATUS[r.status][1]},REPSTATUS[r.status][0])),
+    const rows=list.map(r=>[td(r.staff_name),td(new Date(r.day+'T12:00:00').toLocaleDateString('ru-RU',{day:'numeric',month:'short'})),td(r.status==='await'?'—':hmin(r.declared_min)+(r.approved_min&&r.approved_min!==r.declared_min?' → '+hmin(r.approved_min):'')),el('td',{},el('span',{class:'pill '+REPSTATUS[r.status][1]},REPSTATUS[r.status][0]),revBy(r)),
       el('td',{},r.has_screenshot?shotThumb('/api/office/shifts/'+r.id+'/screenshot',{style:'color:var(--acc2)'}).appendChild(document.createTextNode('скриншот')).parentNode:'—'),
-      el('td',{},el('button',{class:'btn o s',type:'button',style:'color:var(--bad)',onclick:async()=>{if(!await askC('Удалить отчёт '+r.staff_name+' за '+new Date(r.day+'T12:00:00').toLocaleDateString('ru-RU',{day:'numeric',month:'long'})+' из системы?'+(r.status==='approved'?' Его время пропадёт из расчёта часов и зарплаты.':'')))return;try{await api('/shifts/'+r.id,{method:'DELETE'});toast('Отчёт удалён');accRefresh()}catch(x){toast(x.message)}}},'Удалить'))]);
+      me.role!=='admin'?td(''):el('td',{},el('button',{class:'btn o s',type:'button',style:'color:var(--bad)',onclick:async()=>{if(!await askC('Удалить отчёт '+r.staff_name+' за '+new Date(r.day+'T12:00:00').toLocaleDateString('ru-RU',{day:'numeric',month:'long'})+' из системы?'+(r.status==='approved'?' Его время пропадёт из расчёта часов и зарплаты.':'')))return;try{await api('/shifts/'+r.id,{method:'DELETE'});toast('Отчёт удалён');accRefresh()}catch(x){toast(x.message)}}},'Удалить'))]);
     histHold.replaceChildren(ctrT(table(['Сотрудник','Дата','Время','Статус','Скрин',''],rows,done.length?'Ничего не найдено. Измените фильтры.':'За этот месяц проверенных отчётов нет.')));
   };
   drawHist();
   return[el('div',{class:'head'},el('h3',{style:'font-size:15px'},'На проверке: '+pend.length),el('span',{class:'mut sm'},'после зачёта время идёт в расчёт и в дашборд стримера')),
     pend.length?el('div',{style:'display:grid;gap:10px'},pend.map(card)):el('div',{class:'card empty'},'Нет отчётов на проверку.'),
-    el('div',{class:'head',style:'margin-top:6px'},el('h3',{style:'font-size:15px'},'Проверенные за '+perLabel(accState.period)),el('button',{class:'btn s',type:'button',onclick:openAddReportModal},'Добавить отчёт')),histBar,histHold];
+    el('div',{class:'head',style:'margin-top:6px'},el('h3',{style:'font-size:15px'},'Проверенные за '+perLabel(accState.period)),me.role==='admin'?el('button',{class:'btn s',type:'button',onclick:openAddReportModal},'Добавить отчёт'):null),histBar,histHold];
 }
 
 async function allStaffList(){return(await api('/staff')).filter(s=>s.active)}
@@ -2946,6 +2951,14 @@ async function accTeam(){
     el('div',{class:'mut sm'},'«За месяц»: фиксированная сумма за месяц. «За смену»: ставка × принятые смены за месяц. Смены сотрудники начинают в разделе «Моя смена» (ссылка на эфир необязательна), в конце пишут, что сделали; отчёт приходит во вкладку «Отчёты на проверке».')];
 }
 
+/** Отчёты команды (тимлид): отчёты своих стримеров на проверке и проверенные за месяц */
+async function viewLeadReview(){
+  if(!accState.period)accState.period=kyivToday().slice(0,7);
+  accRefresh=()=>render({soft:true});
+  const nav=el('div',{class:'mon2'},el('button',{type:'button','aria-label':'Предыдущий месяц',onclick:()=>{accState.period=perShift(accState.period,-1);render({soft:true})}},'‹'),el('b',{},perLabel(accState.period)),el('button',{type:'button','aria-label':'Следующий месяц',onclick:()=>{accState.period=perShift(accState.period,1);render({soft:true})}},'›'));
+  return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Отчёты команды'),nav),...await accReview()];
+}
+
 /** Моя смена (админ, тимлидер, аналитик, медиабайер): начать, закончить с комментарием, история отчётов */
 async function viewTeamShift(){
   const d=await api('/team-shift');
@@ -2953,7 +2966,7 @@ async function viewTeamShift(){
   const err=el('div',{class:'err',role:'alert'});
   const ST={pending:['на проверке','p-pur'],approved:['принят','p-ok'],rejected:['отклонён','p-bad']};
   const hist=ctrT(table(['Дата','Время','Статус','Что сделал'],d.recent.map(r=>[td(new Date(r.day+'T12:00:00').toLocaleDateString('ru-RU',{day:'numeric',month:'short'})),td(hmin(r.approved_min??r.declared_min??0)),
-    el('td',{},el('span',{class:'pill '+(ST[r.status]||['','p-pur'])[1]},(ST[r.status]||[r.status])[0])),el('td',{style:'white-space:pre-wrap;text-align:left;max-width:420px'},(r.comment||'—')+(r.status==='rejected'&&r.reject_reason?'\nПричина отказа: '+r.reject_reason:''))]),'Смен пока не было.'));
+    el('td',{},el('span',{class:'pill '+(ST[r.status]||['','p-pur'])[1]},(ST[r.status]||[r.status])[0]),revBy(r)),el('td',{style:'white-space:pre-wrap;text-align:left;max-width:420px'},(r.comment||'—')+(r.status==='rejected'&&r.reject_reason?'\nПричина отказа: '+r.reject_reason:''))]),'Смен пока не было.'));
   let card;
   if(!d.live){
     const url=el('input',{type:'text',inputmode:'url',autocapitalize:'off',autocomplete:'off',placeholder:'https://… (необязательно)',maxlength:'500'});

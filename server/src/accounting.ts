@@ -573,9 +573,12 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     reject_reason: r.reject_reason,
     has_screenshot: r.has_screenshot,
     team: r.team,
+    reviewed_by_name: r.reviewed_by_name,
+    reviewed_at: r.reviewed_at,
   });
   const REPORT_COLS = `s.id, s.staff_id, st.name AS staff_name, s.status, s.stream_url, s.started_at, s.declared_start, s.ended_at, to_char(s.day, 'YYYY-MM-DD') AS day, s.declared_min, s.approved_min,
-         s.fields, s.comment, s.reject_reason, (s.screenshot IS NOT NULL) AS has_screenshot, s.team`;
+         s.fields, s.comment, s.reject_reason, (s.screenshot IS NOT NULL) AS has_screenshot, s.team,
+         (SELECT name FROM staff WHERE id = s.reviewed_by) AS reviewed_by_name, s.reviewed_at`;
 
   // История отчётов стримера
   app.get('/shifts/mine', { preHandler: stream }, async (req) => {
@@ -602,28 +605,35 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
 
   app.get<{ Params: { id: string } }>('/shifts/:id/screenshot', { preHandler: anyStaff }, async (req, reply) => {
     const me = req.staff!;
-    const r = (await db.query('SELECT screenshot, screenshot_type, staff_id FROM shift_reports WHERE id = $1', [Number(req.params.id)])).rows[0];
-    if (!r || !r.screenshot || (me.role !== 'admin' && r.staff_id !== me.id)) return reply.code(404).send({ error: 'Не найдено' });
+    const r = (await db.query('SELECT s.screenshot, s.screenshot_type, s.staff_id, st.parent_id FROM shift_reports s JOIN staff st ON st.id = s.staff_id WHERE s.id = $1', [Number(req.params.id)])).rows[0];
+    if (!r || !r.screenshot || (me.role !== 'admin' && r.staff_id !== me.id && !(me.role === 'teamlead' && r.parent_id === me.id))) return reply.code(404).send({ error: 'Не найдено' });
     return reply.type(r.screenshot_type).header('Cache-Control', 'private, max-age=3600').send(r.screenshot);
   });
 
   // ----- Проверка отчётов (админ) -----
-  app.get('/shifts/pending', { preHandler: admin }, async () => {
-    const rows = (await db.query(`SELECT ${REPORT_COLS} FROM shift_reports s JOIN staff st ON st.id = s.staff_id WHERE s.status = 'pending' ORDER BY s.ended_at`)).rows;
+  // Тимлид проверяет отчёты своей команды (стримеры, у которых он тимлид); админ видит все
+  const reviewer = need('admin', 'teamlead');
+  const teamScope = (req: FastifyRequest) => (req.staff!.role === 'teamlead' ? req.staff!.id : null);
+  app.get('/shifts/pending', { preHandler: reviewer }, async (req) => {
+    const rows = (await db.query(`SELECT ${REPORT_COLS} FROM shift_reports s JOIN staff st ON st.id = s.staff_id WHERE s.status = 'pending' AND ($1::int IS NULL OR (st.parent_id = $1 AND NOT s.team)) ORDER BY s.ended_at`, [teamScope(req)])).rows;
     return rows.map(reportRow);
   });
-  app.get<{ Querystring: { period?: string; staff?: string } }>('/shifts/all', { preHandler: admin }, async (req) => {
+  app.get<{ Querystring: { period?: string; staff?: string } }>('/shifts/all', { preHandler: reviewer }, async (req) => {
     const period = PERIOD.test(String(req.query.period)) ? String(req.query.period) : await currentPeriod();
     const sid = Number(req.query.staff) || null;
     const rows = (
-      await db.query(`SELECT ${REPORT_COLS} FROM shift_reports s JOIN staff st ON st.id = s.staff_id WHERE s.status <> 'live' AND to_char(s.day, 'YYYY-MM') = $1 AND ($2::int IS NULL OR s.staff_id = $2) ORDER BY s.day DESC, s.id DESC LIMIT 500`, [period, sid])
+      await db.query(`SELECT ${REPORT_COLS} FROM shift_reports s JOIN staff st ON st.id = s.staff_id WHERE s.status <> 'live' AND to_char(s.day, 'YYYY-MM') = $1 AND ($2::int IS NULL OR s.staff_id = $2) AND ($3::int IS NULL OR (st.parent_id = $3 AND NOT s.team)) ORDER BY s.day DESC, s.id DESC LIMIT 500`, [period, sid, teamScope(req)])
     ).rows;
     return rows.map(reportRow);
   });
-  app.post<{ Params: { id: string } }>('/shifts/:id/review', { preHandler: admin }, async (req, reply) => {
+  app.post<{ Params: { id: string } }>('/shifts/:id/review', { preHandler: reviewer }, async (req, reply) => {
     const me = req.staff!;
     const b = (req.body ?? {}) as Record<string, any>;
-    const cur = (await db.query(`SELECT id, declared_min, to_char(day, 'YYYY-MM') AS pm FROM shift_reports WHERE id = $1 AND status = 'pending'`, [Number(req.params.id)])).rows[0];
+    const cur = (await db.query(
+      `SELECT s.id, s.declared_min, to_char(s.day, 'YYYY-MM') AS pm FROM shift_reports s JOIN staff st ON st.id = s.staff_id
+        WHERE s.id = $1 AND s.status = 'pending' AND ($2::int IS NULL OR (st.parent_id = $2 AND NOT s.team))`,
+      [Number(req.params.id), teamScope(req)],
+    )).rows[0];
     if (!cur) return reply.code(404).send({ error: 'Отчёт не найден или уже проверен' });
     if (await isClosed(cur.pm)) return reply.code(409).send({ error: 'Месяц отчёта закрыт. Откройте месяц заново в Бухгалтерии, проверьте отчёт и закройте месяц снова.' });
     if (b.action === 'approve') {
@@ -640,7 +650,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
   // Ссылка на эфир необязательна, в конце смены пишут, что сделали. Отчёт уходит на проверку вместе с отчётами стримеров
   const TEAM_ROLES: Role[] = ['admin', 'teamlead', 'analyst', 'buyer'];
   const team = need(...TEAM_ROLES);
-  const TEAM_COLS = `id, status, stream_url, started_at, ended_at, to_char(day, 'YYYY-MM-DD') AS day, declared_min, approved_min, comment, reject_reason`;
+  const TEAM_COLS = `id, status, stream_url, started_at, ended_at, to_char(day, 'YYYY-MM-DD') AS day, declared_min, approved_min, comment, reject_reason, reviewed_by, (SELECT name FROM staff x WHERE x.id = reviewed_by) AS reviewed_by_name`;
   app.get('/team-shift', { preHandler: team }, async (req) => {
     const me = req.staff!;
     const live = (await db.query(`SELECT ${TEAM_COLS} FROM shift_reports WHERE staff_id = $1 AND status = 'live' AND team ORDER BY id DESC LIMIT 1`, [me.id])).rows[0] ?? null;
