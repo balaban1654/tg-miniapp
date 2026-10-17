@@ -1332,6 +1332,25 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
 
     const sum = (f: (x: any) => number) => out.reduce((acc, x) => acc + f(x), 0);
     const commission = sum((x) => x.range.commission);
+    // ЗП команды (админы, тимлиды, аналитики, медиабайеры) из «ЗП (команда)»: тоже расход компании. Тимлиду не показываем
+    const teamSal: { id: number; name: string; role: string; salary: number; paid: number }[] = [];
+    if (!lead) {
+      const tm = (await db.query(`SELECT s.id, s.name, s.role FROM staff s JOIN team_pay p ON p.staff_id = s.id WHERE s.role IN ('admin','teamlead','analyst','buyer') AND s.deleted_at IS NULL AND (p.amount > 0 OR s.role = 'teamlead') ORDER BY s.id`)).rows as { id: number; name: string; role: string }[];
+      for (const t of tm) {
+        let salary = 0;
+        let paid = 0;
+        for (const mm of months) {
+          const p = (await db.query('SELECT mode, amount::float AS amount FROM team_pay WHERE staff_id = $1', [t.id])).rows[0];
+          const n = Number((await db.query(`SELECT count(*)::int AS n FROM shift_reports WHERE staff_id = $1 AND team AND status = 'approved' AND to_char(day, 'YYYY-MM') = $2`, [t.id, mm.m])).rows[0].n);
+          const base = p.mode === 'shift' ? n * p.amount : p.amount;
+          const bonus = t.role === 'teamlead' ? (await teamleadPay(t.id, mm.m, await planFor(mm.m))).bonus : 0;
+          salary += (base + bonus) * mm.w;
+          paid += Number((await db.query(`SELECT coalesce(sum(amount), 0)::float AS s FROM staff_payouts WHERE staff_id = $1 AND period = $2`, [t.id, mm.m])).rows[0].s) * mm.w;
+        }
+        if (salary > 0 || paid > 0) teamSal.push({ ...t, salary: r2(salary), paid: r2(paid) });
+      }
+      salaries += teamSal.reduce((a, x) => a + x.salary, 0);
+    }
     const expRows = (
       lead ? { rows: [] } : await db.query(`SELECT id, to_char(day, 'YYYY-MM-DD') AS day, amount::float AS amount, comment FROM expenses WHERE day BETWEEN $1::date AND $2::date ORDER BY day DESC, id DESC`, [from, to])
     ).rows as { id: number; day: string; amount: number; comment: string }[];
@@ -1378,6 +1397,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
         net,
         netPlanToDate: goals ? r2(goals.net * pace) : null,
       },
+      teamSalaries: teamSal,
       expenses: expRows,
       tasks: {
         pending: out.filter((x) => x.pending).map((x) => ({ id: x.id, name: x.name, n: x.pending })),

@@ -1321,7 +1321,9 @@ function dxTeamBack(d){
 }
 function dxNet(d){
   const t=d.totals;
+  const RLS={admin:'админ',teamlead:'тимлид',analyst:'аналитик',buyer:'медиабайер'};
   const sal=el('div',{class:'dx-list'},...d.streamers.filter(s=>s.range.salary||s.range.paid).map(s=>el('div',{class:'r'},el('span',{},s.name,el('em',{},'начислено · выплачено '+usd0(s.range.paid))),el('b',{},usd0(s.range.salary)))),
+    ...(d.teamSalaries||[]).map(s=>el('div',{class:'r'},el('span',{},s.name,el('em',{},(RLS[s.role]||s.role)+' · ставка из «ЗП (команда)» · выплачено '+usd0(s.paid))),el('b',{},usd0(s.salary)))),
     el('div',{class:'r'},el('span',{},'Итого начислено'),el('b',{},usd0(t.salaries))));
   const salPop=el('div',{style:'display:grid;gap:8px'},el('div',{class:'dx-hd'},el('span',{class:'dx-lbl'},'Зарплаты за период'),el('a',{href:'#/acc/sum',style:'color:var(--acc2);font-weight:700;font-size:12px',onclick:e=>{e.preventDefault();dxGo('acc','sum')}},'Бухгалтерия →')),sal,
     d.range.whole?null:el('div',{class:'mut sm'},'Неполный месяц: зарплата считается пропорционально дням.'));
