@@ -3173,8 +3173,10 @@ async function viewChats(){
     if(near||!msgs.dataset.init){msgs.scrollTop=msgs.scrollHeight;msgs.dataset.init='1'}
   }
   // Исправление своего сообщения: правка уходит и клиенту в Telegram. Пока идёт правка, чат не перерисовывается
-  const canEdit=m=>m.direction==='out'&&m.editable&&(m.kind==='text'||m.kind==='photo')&&(me.role==='admin'||m.staff_id===me.id);
-  const canDel=m=>m.direction==='out'&&(me.role==='admin'||m.staff_id===me.id);
+  // Свои сообщения; тимлид ещё и сообщения своей команды; админ любые
+  const mine=m=>me.role==='admin'||m.staff_id===me.id||(me.role==='teamlead'&&m.staff_parent===me.id);
+  const canEdit=m=>m.direction==='out'&&m.editable&&(m.kind==='text'||m.kind==='photo')&&mine(m);
+  const canDel=m=>m.direction==='out'&&mine(m);
   const PEN='<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/>',TRASH='<path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/>';
   async function delMsg(m){
     if(!await askC('Удалить сообщение? Оно пропадёт и у клиента в Telegram.'))return;

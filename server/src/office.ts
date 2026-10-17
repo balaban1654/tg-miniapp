@@ -797,7 +797,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     if (!lead.rowCount) return reply.code(404).send({ error: 'Чат не найден' });
     const msgs = await db.query(
       `SELECT m.id, m.direction, m.kind, m.text, m.created_at, (m.file_id IS NOT NULL) AS has_file, m.file_name, s.name AS staff_name,
-              m.staff_id, m.edited_at, (m.tg_message_id IS NOT NULL) AS editable
+              m.staff_id, s.parent_id AS staff_parent, m.edited_at, (m.tg_message_id IS NOT NULL) AS editable
          FROM messages m LEFT JOIN staff s ON s.id = m.staff_id WHERE m.tg_id = $1 ORDER BY m.id DESC LIMIT 200`,
       [tgId],
     );
@@ -999,6 +999,12 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     return { ok: true };
   });
 
+  // Править и удалять сообщения: свои; тимлид ещё и своей команды; админ любые сообщения команды
+  const canTouchMsg = async (me: Staff, authorId: number | null): Promise<boolean> => {
+    if (me.role === 'admin' || authorId === me.id) return true;
+    if (me.role !== 'teamlead' || !authorId) return false;
+    return (await db.query('SELECT 1 FROM staff WHERE id = $1 AND parent_id = $2', [authorId, me.id])).rowCount! > 0;
+  };
   // Исправить своё сообщение: текст меняется и в Office, и у клиента в Telegram (у фото меняется подпись). Админ может править любое
   app.patch<{ Params: { tgId: string; id: string } }>('/chats/:tgId/messages/:id', { preHandler: auth }, async (req, reply) => {
     const me = req.staff!;
@@ -1010,7 +1016,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
       [Number(req.params.id), tgId],
     )).rows[0];
     if (!m) return reply.code(404).send({ error: 'Сообщение не найдено' });
-    if (me.role !== 'admin' && m.staff_id !== me.id) return reply.code(403).send({ error: 'Можно исправлять только свои сообщения' });
+    if (!(await canTouchMsg(me, m.staff_id))) return reply.code(403).send({ error: 'Можно исправлять только свои сообщения и сообщения своей команды' });
     if (!['text', 'photo'].includes(m.kind)) return reply.code(400).send({ error: 'Такое сообщение исправить нельзя' });
     if (m.kind === 'text' && !text) return reply.code(400).send({ error: 'Текст не может быть пустым' });
     if (text === (m.text ?? '')) return { ok: true };
@@ -1038,7 +1044,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
       [Number(req.params.id), tgId],
     )).rows[0];
     if (!m) return reply.code(404).send({ error: 'Сообщение не найдено' });
-    if (me.role !== 'admin' && m.staff_id !== me.id) return reply.code(403).send({ error: 'Можно удалять только свои сообщения' });
+    if (!(await canTouchMsg(me, m.staff_id))) return reply.code(403).send({ error: 'Можно удалять только свои сообщения и сообщения своей команды' });
     if (!config.disableBot && m.tg_message_id) {
       try {
         await bot.api.deleteMessage(tgId, m.tg_message_id);
