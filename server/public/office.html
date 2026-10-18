@@ -507,7 +507,7 @@ const ROLE={admin:'Админ',teamlead:'Тимлидер',streamer:'Стрим�
 const STATUS={new:['Новый','p-pur'],registered:['Регистрация','ev-reg'],ftd:['FTD','ev-ftd'],active:['Активный','ev-dep'],churned:['Отвал','p-bad']};
 let me=null,tab='home';
 /* Адрес страницы: у каждого раздела своя ссылка (#/leads, #/acc/review), при обновлении остаёмся на месте */
-const STAFF_TABS=['team','links'];
+const STAFF_TABS=['team','links','review','why'];
 const ACC_TABS=['sum','review','bonus','depb','pay','exp','why','plan','team','form'];
 function hashPath(){return '/'+tab+(tab==='acc'?'/'+accState.tab:tab==='plans'?'/'+plansState.tab:tab==='staff'?'/'+staffState.tab:'')}
 function pushHash(){const h='#'+hashPath();if(location.hash!==h)history.pushState(null,'',h)}
@@ -598,6 +598,7 @@ function showApp(){
   const items=navItemsFor(me.role);
   if(me.role==='analyst'&&!['signals','newsig','tshift'].includes(tab))tab='signals';
   if(tab==='links'&&me.role==='admin'){tab='staff';staffState.tab='links'}
+  if(tab==='treview'&&me.role==='teamlead'){tab='staff';staffState.tab='review'}
   if(!items.some(x=>x[0]===tab)){tab=items[0][0];history.replaceState(null,'','#'+hashPath())}
   navItems=items;
   drawNav();
@@ -648,7 +649,6 @@ function navItemsFor(role){
   if(role==='admin')items.splice(items.findIndex(x=>x[0]==='connect')+1,0,['newsig','Новый сигнал']);
   // Смена команды: админ, тимлидер, аналитик, медиабайер начинают смену и в конце пишут, что сделали
   if(['admin','teamlead','analyst','buyer'].includes(role))items.push(['tshift','Моя смена']);
-  if(role==='teamlead')items.splice(1,0,['treview','Отчёты команды']);
   if(role==='teamlead')items.push(['pb','Постбеки']);
   return items;
 }
@@ -905,7 +905,6 @@ async function render(opt){
     else if(tab==='pb'){m.replaceChildren(...await viewPostbacks());api('/postbacks/seen',{method:'POST'}).then(()=>{if(pbNew){pbNew=0;drawNav()}}).catch(()=>{})}
     else if(tab==='shifts')m.replaceChildren(...await viewShifts());
     else if(tab==='tshift')m.replaceChildren(...await viewTeamShift());
-    else if(tab==='treview')m.replaceChildren(...await viewLeadReview());
     else if(tab==='acc')m.replaceChildren(...await viewAcc());
     else if(tab==='plans')m.replaceChildren(...await viewPlans());
     else if(tab==='mytasks')m.replaceChildren(...await viewMyTasks());
@@ -1874,10 +1873,16 @@ async function viewStaff(){
   const isAdmin=me.role==='admin';
   const root=el('div',{style:'display:grid;gap:14px'}),body=el('div',{style:'display:grid;gap:14px'}),bar=el('div',{class:'lc-tabs',role:'tablist'});
   const canLinks=isAdmin||me.role==='teamlead';
-  if(!canLinks)staffState.tab='team';
-  const TABS=[['team',isAdmin?'Сотрудники':'Моя команда'],...(canLinks?[['links','Ссылки']]:[])];
-  const drawBar=()=>bar.replaceChildren(...TABS.map(([k,t])=>el('button',{type:'button',role:'tab','aria-selected':String(k===staffState.tab),class:'lc-tab'+(k===staffState.tab?' on':''),onclick:()=>{staffState.tab=k;drawBar();drawBody();pushHash()}},t)));
-  const drawBody=async()=>{body.replaceChildren(el('div',{class:'mut'},'Загрузка…'));try{body.replaceChildren(...(staffState.tab==='links'?(await viewLinks()).slice(1):(await staffTeam()).slice(1)).filter(Boolean))}catch(x){if(x.message!=='auth')body.replaceChildren(el('div',{class:'err'},x.message))}};
+  const lead=me.role==='teamlead';
+  if(!canLinks||(!lead&&['review','why'].includes(staffState.tab)))staffState.tab='team';
+  // Тимлид: после ссылок отчёты своей команды и причины по сменам (с числом причин без решения)
+  let whyOpen=0;
+  const countWhy=async()=>{if(!lead)return;if(!accState.period)accState.period=kyivToday().slice(0,7);try{whyOpen=(await api('/shortfalls?period='+accState.period)).filter(r=>r.reason&&!r.accepted_at&&!r.penalty_id).length}catch{}};
+  await countWhy();
+  const tabsList=()=>[['team',isAdmin?'Сотрудники':'Моя команда'],...(canLinks?[['links','Ссылки']]:[]),...(lead?[['review','Отчёты'],['why','Причины по сменам'+(whyOpen?' ('+whyOpen+')':'')]]:[])];
+  let TABS=tabsList();
+  const drawBar=()=>(TABS=tabsList(),bar).replaceChildren(...TABS.map(([k,t])=>el('button',{type:'button',role:'tab','aria-selected':String(k===staffState.tab),class:'lc-tab'+(k===staffState.tab?' on':''),onclick:()=>{staffState.tab=k;drawBar();drawBody();pushHash()}},t)));
+  const drawBody=async soft=>{if(!soft)body.replaceChildren(el('div',{class:'mut'},'Загрузка…'));try{const t=staffState.tab;body.replaceChildren(...(t==='links'?(await viewLinks()).slice(1):['review','why'].includes(t)?await leadReviewBody(t,async()=>{await countWhy();drawBar();await drawBody(true)}):(await staffTeam()).slice(1)).filter(Boolean))}catch(x){if(x.message!=='auth')body.replaceChildren(el('div',{class:'err'},x.message))}};
   drawBar();root.append(...(canLinks?[bar]:[]),body);await drawBody();
   return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},isAdmin?'Сотрудники':'Моя команда')),root];
 }
@@ -2965,18 +2970,14 @@ async function accTeam(){
     el('div',{class:'mut sm'},'«За месяц»: фиксированная сумма за месяц. «За смену»: ставка × принятые смены за месяц. Смены сотрудники начинают в разделе «Моя смена» (ссылка на эфир необязательна), в конце пишут, что сделали; отчёт приходит во вкладку «Отчёты на проверке».')];
 }
 
-/** Отчёты команды (тимлид): отчёты своих стримеров на проверке и проверенные за месяц */
-async function viewLeadReview(){
+/** Отчёты команды (тимлид, вкладки в «Моя команда»): отчёты своих стримеров и причины по сменам за месяц */
+async function leadReviewBody(kind,refresh){
   if(!accState.period)accState.period=kyivToday().slice(0,7);
-  accRefresh=()=>render({soft:true});
-  const nav=el('div',{class:'mon2'},el('button',{type:'button','aria-label':'Предыдущий месяц',onclick:()=>{accState.period=perShift(accState.period,-1);render({soft:true})}},'‹'),el('b',{},perLabel(accState.period)),el('button',{type:'button','aria-label':'Следующий месяц',onclick:()=>{accState.period=perShift(accState.period,1);render({soft:true})}},'›'));
-  const why=await api('/shortfalls?period='+accState.period);
-  const open=why.filter(r=>r.reason&&!r.accepted_at&&!r.penalty_id).length;
-  const TABS=[['review','Отчёты'],['why','Причины по сменам'+(open?' ('+open+')':'')]];
-  const bar=el('div',{class:'lc-tabs',role:'tablist'},...TABS.map(([k,t])=>el('button',{type:'button',role:'tab','aria-selected':String(k===leadRevTab),class:'lc-tab'+(k===leadRevTab?' on':''),onclick:()=>{leadRevTab=k;render({soft:true})}},t)));
-  return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Отчёты команды'),nav),bar,...(leadRevTab==='why'?await accWhy(why):await accReview())];
+  accRefresh=refresh;
+  const go=d=>()=>{accState.period=perShift(accState.period,d);refresh()};
+  const nav=el('div',{class:'mon2'},el('button',{type:'button','aria-label':'Предыдущий месяц',onclick:go(-1)},'‹'),el('b',{},perLabel(accState.period)),el('button',{type:'button','aria-label':'Следующий месяц',onclick:go(1)},'›'));
+  return[el('div',{style:'display:flex;justify-content:flex-end'},nav),...(kind==='why'?await accWhy():await accReview())];
 }
-let leadRevTab='review';
 
 /** Моя смена (админ, тимлидер, аналитик, медиабайер): начать, закончить с комментарием, история отчётов */
 async function viewTeamShift(){
