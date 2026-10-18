@@ -1474,38 +1474,44 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
   });
 
   // ----- Задачи сотрудникам -----
-  const taskRow = (r: any) => ({ id: r.id, staff_id: r.staff_id, staff_name: r.staff_name, title: r.title, details: r.details, due: r.due, status: r.status, created_at: r.created_at, done_at: r.done_at, accepted_at: r.accepted_at });
-  const TASK_COLS = `t.id, t.staff_id, s.name AS staff_name, t.title, t.details, to_char(t.due, 'YYYY-MM-DD') AS due, t.status, t.created_at, t.done_at, t.accepted_at`;
+  // Тимлид ставит задачи своей команде и видит только их (teamScope); админ видит все
+  const taskRow = (r: any) => ({ id: r.id, staff_id: r.staff_id, staff_name: r.staff_name, title: r.title, details: r.details, due: r.due, status: r.status, created_at: r.created_at, done_at: r.done_at, accepted_at: r.accepted_at, created_by: r.created_by, created_by_name: r.created_by_name });
+  const TASK_COLS = `t.id, t.staff_id, s.name AS staff_name, t.title, t.details, to_char(t.due, 'YYYY-MM-DD') AS due, t.status, t.created_at, t.done_at, t.accepted_at,
+    t.created_by, (SELECT name FROM staff WHERE id = t.created_by) AS created_by_name`;
+  const taskOk = async (req: FastifyRequest, id: number) =>
+    (await db.query(`SELECT t.created_by FROM staff_tasks t JOIN staff s ON s.id = t.staff_id WHERE t.id = $1 AND ($2::int IS NULL OR s.parent_id = $2)`, [id, teamScope(req)])).rows[0] as { created_by: number | null } | undefined;
 
-  app.get<{ Querystring: { status?: string } }>('/tasks', { preHandler: admin }, async (req) => {
+  app.get<{ Querystring: { status?: string } }>('/tasks', { preHandler: reviewer }, async (req) => {
     const st = ['open', 'done', 'accepted'].includes(String(req.query.status)) ? String(req.query.status) : null;
     const rows = (
       await db.query(
-        `SELECT ${TASK_COLS} FROM staff_tasks t JOIN staff s ON s.id = t.staff_id WHERE ($1::text IS NULL OR t.status = $1)
+        `SELECT ${TASK_COLS} FROM staff_tasks t JOIN staff s ON s.id = t.staff_id WHERE ($1::text IS NULL OR t.status = $1) AND ($2::int IS NULL OR s.parent_id = $2)
           ORDER BY (t.status = 'done') DESC, (t.status = 'open') DESC, t.due NULLS LAST, t.id DESC LIMIT 500`,
-        [st],
+        [st, teamScope(req)],
       )
     ).rows;
     return rows.map(taskRow);
   });
-  app.post('/tasks', { preHandler: admin }, async (req, reply) => {
+  app.post('/tasks', { preHandler: reviewer }, async (req, reply) => {
     const b = (req.body ?? {}) as Record<string, any>;
     const title = str(b.title, 200);
     if (!title) return reply.code(400).send({ error: 'Напишите, что нужно сделать' });
     const details = str(b.details, 2000) || null;
     const due = DATE.test(String(b.due)) ? String(b.due) : null;
     let ids: number[] = [];
-    if (b.all_streamers) ids = (await db.query(`SELECT id FROM staff WHERE (role = 'streamer' OR streams) AND active`)).rows.map((r: any) => r.id);
+    const lead = teamScope(req);
+    if (b.all_streamers) ids = (await db.query(`SELECT id FROM staff WHERE (role = 'streamer' OR streams) AND active AND deleted_at IS NULL AND ($1::int IS NULL OR parent_id = $1)`, [lead])).rows.map((r: any) => r.id);
     else if (Array.isArray(b.staff_ids)) ids = b.staff_ids.map(Number).filter((n: number) => Number.isInteger(n) && n > 0);
     if (!ids.length) return reply.code(400).send({ error: 'Выберите, кому поставить задачу' });
-    const ok = (await db.query(`SELECT id FROM staff WHERE id = ANY($1::int[]) AND active AND role <> 'admin'`, [ids])).rows.map((r: any) => r.id);
+    const ok = (await db.query(`SELECT id FROM staff WHERE id = ANY($1::int[]) AND active AND role <> 'admin' AND ($2::int IS NULL OR parent_id = $2)`, [ids, lead])).rows.map((r: any) => r.id);
     if (!ok.length) return reply.code(404).send({ error: 'Сотрудники не найдены' });
     for (const id of ok) await db.query('INSERT INTO staff_tasks (staff_id, title, details, due, created_by) VALUES ($1,$2,$3,$4::date,$5)', [id, title, details, due, req.staff!.id]);
     return { ok: true, count: ok.length };
   });
-  app.patch<{ Params: { id: string } }>('/tasks/:id', { preHandler: admin }, async (req, reply) => {
+  app.patch<{ Params: { id: string } }>('/tasks/:id', { preHandler: reviewer }, async (req, reply) => {
     const b = (req.body ?? {}) as Record<string, any>;
     const id = Number(req.params.id);
+    if (!(await taskOk(req, id))) return reply.code(404).send({ error: 'Задача не найдена' });
     if (b.action === 'accept') {
       const r = await db.query(`UPDATE staff_tasks SET status = 'accepted', accepted_at = now(), done_at = coalesce(done_at, now()) WHERE id = $1 RETURNING id`, [id]);
       if (!r.rowCount) return reply.code(404).send({ error: 'Задача не найдена' });
@@ -1515,7 +1521,11 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     } else return reply.code(400).send({ error: 'Неизвестное действие' });
     return { ok: true };
   });
-  app.delete<{ Params: { id: string } }>('/tasks/:id', { preHandler: admin }, async (req) => {
+  app.delete<{ Params: { id: string } }>('/tasks/:id', { preHandler: reviewer }, async (req, reply) => {
+    const t = await taskOk(req, Number(req.params.id));
+    if (!t) return reply.code(404).send({ error: 'Задача не найдена' });
+    // Задачу, которую поставил админ, тимлид не удаляет
+    if (teamScope(req) && t.created_by !== req.staff!.id) return reply.code(403).send({ error: 'Эту задачу поставил руководитель, удалить её может только он' });
     await db.query('DELETE FROM staff_tasks WHERE id = $1', [Number(req.params.id)]);
     return { ok: true };
   });

@@ -508,7 +508,7 @@ const ROLE={admin:'Админ',teamlead:'Тимлидер',streamer:'Стрим�
 const STATUS={new:['Новый','p-pur'],registered:['Регистрация','ev-reg'],ftd:['FTD','ev-ftd'],active:['Активный','ev-dep'],churned:['Отвал','p-bad']};
 let me=null,tab='home';
 /* Адрес страницы: у каждого раздела своя ссылка (#/leads, #/acc/review), при обновлении остаёмся на месте */
-const STAFF_TABS=['team','links','review','why'];
+const STAFF_TABS=['team','links','tasks','review','why'];
 const ACC_TABS=['sum','review','bonus','depb','pay','exp','why','plan','team','form'];
 function hashPath(){return '/'+tab+(tab==='acc'?'/'+accState.tab:tab==='plans'?'/'+plansState.tab:tab==='staff'?'/'+staffState.tab:'')}
 function pushHash(){const h='#'+hashPath();if(location.hash!==h)history.pushState(null,'',h)}
@@ -1409,9 +1409,9 @@ async function viewPlans(){
 const TASKST={open:['в работе','p-pur'],done:['ждёт принятия','p-warn'],accepted:['принята','p-ok']};
 async function plansTasks(){
   const [staffAll,tasks]=await Promise.all([api('/staff'),api('/tasks')]);
-  const staff=staffAll.filter(s=>s.active&&s.role!=='admin');
+  const staff=staffAll.filter(s=>s.active&&s.role!=='admin'&&s.id!==me.id);
   const today=kyivToday();
-  const who=el('select',{},el('option',{value:'all'},'Все стримеры'),...staff.map(s=>el('option',{value:s.id},s.name+' · '+ROLE[s.role])));
+  const who=el('select',{},el('option',{value:'all'},me.role==='admin'?'Все стримеры':'Вся команда'),...staff.map(s=>el('option',{value:s.id},s.name+' · '+ROLE[s.role])));
   const title=el('input',{placeholder:'Что нужно сделать',maxlength:'200'});
   const details=el('input',{placeholder:'Подробности (необязательно)',maxlength:'2000'});
   const due=dateWheel({optional:true,placeholder:'Без срока',min:kyivToday().slice(0,4)+'-01-01',max:(+kyivToday().slice(0,4)+2)+'-12-31'});
@@ -1429,16 +1429,16 @@ async function plansTasks(){
   const act=(id,action)=>async()=>{try{await api('/tasks/'+id,{method:'PATCH',body:{action}});toast(action==='accept'?'Задача принята':'Задача возвращена в работу');plansRefresh()}catch(x){toast(x.message)}};
   const rows=list.map(t=>{
     const over=t.status==='open'&&t.due&&t.due<today;
-    return[td(t.staff_name),el('td',{style:'white-space:normal;text-align:left;min-width:240px'},el('b',{},t.title),t.details?el('div',{class:'mut sm'},t.details):null),
+    return[td(t.staff_name),el('td',{style:'white-space:normal;text-align:left;min-width:240px'},el('b',{},t.title),t.details?el('div',{class:'mut sm'},t.details):null,t.created_by&&t.created_by!==me.id&&t.created_by_name?el('div',{class:'mut sm'},'поставил '+t.created_by_name):null),
       el('td',{},t.due?el('span',{class:'pill '+(over?'p-bad':'p-pur')},dmy(t.due).slice(0,5)):'—'),
       el('td',{},el('span',{class:'pill '+TASKST[t.status][1]},TASKST[t.status][0])),
       el('td',{},el('div',{class:'inl',style:'justify-content:center'},
         t.status==='done'?el('button',{class:'btn s',type:'button',onclick:act(t.id,'accept')},'Принять'):null,
         t.status==='done'||t.status==='accepted'?el('button',{class:'btn o s',type:'button',onclick:act(t.id,'reopen')},'Вернуть'):null,
-        el('button',{class:'btn o s',type:'button',onclick:async()=>{try{await api('/tasks/'+t.id,{method:'DELETE'});plansRefresh()}catch(x){toast(x.message)}}},'Удалить')))];
+        me.role==='admin'||t.created_by===me.id?el('button',{class:'btn o s',type:'button',onclick:async()=>{try{await api('/tasks/'+t.id,{method:'DELETE'});plansRefresh()}catch(x){toast(x.message)}}},'Удалить'):null))];
   });
   return[form,el('div',{class:'head'},el('h3',{style:'font-size:15px'},'Задачи'),chips),ctrT(table(['Сотрудник','Задача','Срок','Статус',''],rows,plansState.filter==='done'?'Выполненных задач, которые ждут принятия, нет.':'Задач нет.')),
-    el('div',{class:'mut sm'},'Сотрудник отмечает задачу выполненной, она попадает к вам в «Требует внимания» на дашборде. Принятая задача уходит из его списка.')];
+    el('div',{class:'mut sm'},me.role==='admin'?'Сотрудник отмечает задачу выполненной, она попадает к вам в «Требует внимания» на дашборде. Принятая задача уходит из его списка.':'Стример отмечает задачу выполненной, она появляется здесь в «Ждут принятия» (цифра на вкладке). Принятая задача уходит из его списка. Задачи от руководителя удалить нельзя, только принять или вернуть.')];
 }
 async function plansGoals(){
   const p=await api('/kpi/settings');
@@ -1605,7 +1605,7 @@ async function viewMyTasks(){
       el('span',{class:'dx-ic '+(t.status==='open'?'a':'ok')},svgIcon(IC_CHECK,18)),
       el('div',{style:'flex:1;min-width:200px;display:grid;gap:2px'},el('b',{style:t.status==='accepted'?'text-decoration:line-through;color:var(--mut)':''},t.title),
         t.details?el('div',{class:'mut sm'},t.details):null,
-        el('div',{class:'sm',style:'color:'+(over?'var(--bad)':'var(--mut)')},t.due?'Срок: '+dmy(t.due).slice(0,5)+(over?' · просрочено':''):'Без срока')),
+        el('div',{class:'sm',style:'color:'+(over?'var(--bad)':'var(--mut)')},(t.due?'Срок: '+dmy(t.due).slice(0,5)+(over?' · просрочено':''):'Без срока')+(t.created_by_name?' · от '+t.created_by_name:''))),
       t.status==='open'?el('button',{class:'btn s',type:'button',onclick:act(t,'/done')},'Выполнено'):
       t.status==='done'?el('div',{class:'inl'},el('span',{class:'pill p-warn'},'на проверке'),el('button',{class:'btn o s',type:'button',onclick:act(t,'/undo')},'Вернуть в работу')):
       el('span',{class:'pill p-ok'},'принята'));
@@ -1893,15 +1893,17 @@ async function viewStaff(){
   const root=el('div',{style:'display:grid;gap:14px'}),body=el('div',{style:'display:grid;gap:14px'}),bar=el('div',{class:'lc-tabs',role:'tablist'});
   const canLinks=isAdmin||me.role==='teamlead';
   const lead=me.role==='teamlead';
-  if(!canLinks||(!lead&&['review','why'].includes(staffState.tab)))staffState.tab='team';
+  if(!canLinks||(!lead&&['tasks','review','why'].includes(staffState.tab)))staffState.tab='team';
   // Тимлид: после ссылок отчёты своей команды и причины по сменам (с числом причин без решения)
-  let whyOpen=0;
+  let whyOpen=0,tasksN=0;
   const countWhy=async()=>{if(!lead)return;if(!accState.period)accState.period=kyivToday().slice(0,7);try{whyOpen=(await api('/shortfalls?period='+accState.period)).filter(r=>r.reason&&!r.accepted_at&&!r.penalty_id).length}catch{}};
-  await countWhy();
-  const tabsList=()=>[['team',isAdmin?'Сотрудники':'Моя команда'],...(canLinks?[['links','Ссылки']]:[]),...(lead?[['review','Отчёты'],['why','Причины по сменам'+(whyOpen?' ('+whyOpen+')':'')]]:[])];
+  // Цифра у «Задач»: свои открытые плюс выполненные командой, которые ждут принятия
+  const countTasks=async()=>{if(!lead)return;try{const[m,t]=await Promise.all([api('/tasks/mine'),api('/tasks?status=done')]);tasksN=m.filter(x=>x.status==='open').length+t.length}catch{}};
+  await Promise.all([countWhy(),countTasks()]);
+  const tabsList=()=>[['team',isAdmin?'Сотрудники':'Моя команда'],...(canLinks?[['links','Ссылки']]:[]),...(lead?[['tasks','Задачи'+(tasksN?' ('+tasksN+')':'')],['review','Отчёты'],['why','Причины по сменам'+(whyOpen?' ('+whyOpen+')':'')]]:[])];
   let TABS=tabsList();
   const drawBar=()=>(TABS=tabsList(),bar).replaceChildren(...TABS.map(([k,t])=>el('button',{type:'button',role:'tab','aria-selected':String(k===staffState.tab),class:'lc-tab'+(k===staffState.tab?' on':''),onclick:()=>{staffState.tab=k;drawBar();drawBody();pushHash()}},t)));
-  const drawBody=async soft=>{if(!soft)body.replaceChildren(el('div',{class:'mut'},'Загрузка…'));try{const t=staffState.tab;body.replaceChildren(...(t==='links'?(await viewLinks()).slice(1):['review','why'].includes(t)?await leadReviewBody(t,async()=>{await countWhy();drawBar();await drawBody(true)}):(await staffTeam()).slice(1)).filter(Boolean))}catch(x){if(x.message!=='auth')body.replaceChildren(el('div',{class:'err'},x.message))}};
+  const drawBody=async soft=>{if(!soft)body.replaceChildren(el('div',{class:'mut'},'Загрузка…'));try{const t=staffState.tab;body.replaceChildren(...(t==='links'?(await viewLinks()).slice(1):t==='tasks'?await leadTasksBody(async()=>{await countTasks();drawBar();await drawBody(true)}):['review','why'].includes(t)?await leadReviewBody(t,async()=>{await countWhy();drawBar();await drawBody(true)}):(await staffTeam()).slice(1)).filter(Boolean))}catch(x){if(x.message!=='auth')body.replaceChildren(el('div',{class:'err'},x.message))}};
   drawBar();root.append(...(canLinks?[bar]:[]),body);await drawBody();
   return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},isAdmin?'Сотрудники':'Моя команда')),root];
 }
@@ -3012,6 +3014,12 @@ async function accTeam(){
     el('div',{class:'mut sm'},'«За месяц»: фиксированная сумма за месяц. «За смену»: ставка × принятые смены за месяц. Смены сотрудники начинают в разделе «Моя смена» (ссылка на эфир необязательна), в конце пишут, что сделали; отчёт приходит во вкладку «Отчёты на проверке».')];
 }
 
+/** Задачи тимлида (вкладка в «Моя команда»): свои задачи от руководителя и задачи, которые он ставит команде */
+async function leadTasksBody(refresh){
+  plansRefresh=refresh;
+  const mine=(await viewMyTasks()).slice(1);
+  return[el('h3',{style:'font-size:16px'},'Мои задачи от руководителя'),...mine,el('h3',{style:'font-size:16px;margin-top:10px'},'Задачи команде'),...await plansTasks()];
+}
 /** Отчёты команды (тимлид, вкладки в «Моя команда»): отчёты своих стримеров и причины по сменам за месяц */
 async function leadReviewBody(kind,refresh){
   if(!accState.period)accState.period=kyivToday().slice(0,7);
