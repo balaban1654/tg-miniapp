@@ -757,7 +757,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     const k = await kpiFor(me.id, period, plan);
     const t = await todayInfo(me.id);
     const live = (await db.query(`SELECT id, stream_url, started_at FROM shift_reports WHERE staff_id = $1 AND status = 'live' AND NOT team LIMIT 1`, [me.id])).rows[0] ?? null;
-    const unpaidShort = (await db.query(`SELECT to_char(day, 'YYYY-MM-DD') AS day, minutes FROM shift_shortfalls WHERE staff_id = $1 AND reason IS NULL ORDER BY day`, [me.id])).rows;
+    const unpaidShort = (await db.query(`SELECT to_char(day, 'YYYY-MM-DD') AS day, minutes FROM shift_shortfalls WHERE staff_id = $1 AND reason IS NULL AND dismissed_at IS NULL ORDER BY day`, [me.id])).rows;
     // Стримеру показываем суммы бонусов и штрафов без комментариев
     const awaiting = (await db.query(`SELECT id, started_at, ended_at, to_char(day, 'YYYY-MM-DD') AS day FROM shift_reports WHERE staff_id = $1 AND status = 'await' ORDER BY id`, [me.id])).rows;
     return { plan, kpi: k, ...t, live, awaiting, now: new Date().toISOString(), advance: await advState(me.id, period, k.minTotal, plan), shortfalls: unpaidShort };
@@ -983,7 +983,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     const id = req.staff!.id;
     const n = async (sql: string) => (await db.query(sql, [id])).rows[0].n as number;
     const review = await n(`SELECT count(*)::int AS n FROM shift_reports s JOIN staff st ON st.id = s.staff_id WHERE s.status = 'pending' AND NOT s.team AND st.parent_id = $1`);
-    const why = await n(`SELECT count(*)::int AS n FROM shift_shortfalls f JOIN staff s ON s.id = f.staff_id WHERE s.parent_id = $1 AND f.reason IS NOT NULL AND f.accepted_at IS NULL AND f.penalty_id IS NULL`);
+    const why = await n(`SELECT count(*)::int AS n FROM shift_shortfalls f JOIN staff s ON s.id = f.staff_id WHERE s.parent_id = $1 AND f.dismissed_at IS NULL AND f.reason IS NOT NULL AND f.accepted_at IS NULL AND f.penalty_id IS NULL`);
     const tasks = await n(
       `SELECT ((SELECT count(*) FROM staff_tasks t JOIN staff s ON s.id = t.staff_id WHERE s.parent_id = $1 AND t.status = 'done')
              + (SELECT count(*) FROM staff_tasks WHERE staff_id = $1 AND status = 'open'))::int AS n`,
@@ -994,7 +994,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
   app.get('/accounting/pending', { preHandler: admin }, async () => {
     const n = async (sql: string) => (await db.query(sql)).rows[0].n as number;
     const review = await n(`SELECT count(*)::int AS n FROM shift_reports WHERE status = 'pending'`);
-    const why = await n(`SELECT count(*)::int AS n FROM shift_shortfalls f JOIN staff s ON s.id = f.staff_id WHERE s.role <> 'admin' AND f.reason IS NOT NULL AND f.accepted_at IS NULL AND f.penalty_id IS NULL`);
+    const why = await n(`SELECT count(*)::int AS n FROM shift_shortfalls f JOIN staff s ON s.id = f.staff_id WHERE s.role <> 'admin' AND f.dismissed_at IS NULL AND f.reason IS NOT NULL AND f.accepted_at IS NULL AND f.penalty_id IS NULL`);
     const pay = await n(`SELECT count(*)::int AS n FROM advance_requests WHERE status = 'pending'`);
     const depb = await n(`SELECT count(*)::int AS n FROM dep_bonus_requests WHERE status = 'pending'`);
     return { review, why, pay, depb, total: review + why + pay + depb };
@@ -1058,13 +1058,13 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     const b = (req.body ?? {}) as Record<string, any>;
     const reason = str(b.reason, 1000);
     if (reason.length < 3) return reply.code(400).send({ error: 'Напишите причину' });
-    const r = await db.query(`UPDATE shift_shortfalls SET reason = $3, reason_at = now() WHERE staff_id = $1 AND day = $2::date AND reason IS NULL RETURNING id`, [me.id, String(b.day), reason]);
+    const r = await db.query(`UPDATE shift_shortfalls SET reason = $3, reason_at = now() WHERE staff_id = $1 AND day = $2::date AND reason IS NULL AND dismissed_at IS NULL RETURNING id`, [me.id, String(b.day), reason]);
     if (!r.rowCount) return reply.code(404).send({ error: 'День не найден или причина уже указана' });
     return { ok: true };
   });
   // Тимлид видит и решает только дни своей команды
   const shortOk = async (req: FastifyRequest, id: number) =>
-    (await db.query(`SELECT 1 FROM shift_shortfalls f JOIN staff s ON s.id = f.staff_id WHERE f.id = $1 AND ($2::int IS NULL OR s.parent_id = $2)`, [id, teamScope(req)])).rowCount;
+    (await db.query(`SELECT 1 FROM shift_shortfalls f JOIN staff s ON s.id = f.staff_id WHERE f.id = $1 AND f.dismissed_at IS NULL AND ($2::int IS NULL OR s.parent_id = $2)`, [id, teamScope(req)])).rowCount;
   app.get<{ Querystring: { period?: string } }>('/shortfalls', { preHandler: reviewer }, async (req) => {
     const period = PERIOD.test(String(req.query.period)) ? String(req.query.period) : await currentPeriod();
     return (
@@ -1073,10 +1073,25 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
                 f.accepted_at, f.penalty_id, a.amount::float AS penalty_amount, a.comment AS penalty_comment,
                 (SELECT name FROM staff WHERE id = f.accepted_by) AS accepted_by_name, (SELECT name FROM staff WHERE id = a.created_by) AS penalty_by_name
            FROM shift_shortfalls f JOIN staff s ON s.id = f.staff_id LEFT JOIN staff_adjustments a ON a.id = f.penalty_id
-          WHERE to_char(f.day, 'YYYY-MM') = $1 AND s.role <> 'admin' AND ($2::int IS NULL OR s.parent_id = $2) ORDER BY f.day DESC, s.name`,
+          WHERE to_char(f.day, 'YYYY-MM') = $1 AND f.dismissed_at IS NULL AND s.role <> 'admin' AND ($2::int IS NULL OR s.parent_id = $2) ORDER BY f.day DESC, s.name`,
         [period, teamScope(req)],
       )
     ).rows;
+  });
+  // Админ удаляет день из списка (один или все за месяц). Штраф, если был выписан, остаётся в «Бонусах и штрафах»
+  app.delete<{ Params: { id: string } }>('/shortfalls/:id', { preHandler: admin }, async (req, reply) => {
+    const r = await db.query('UPDATE shift_shortfalls SET dismissed_at = now() WHERE id = $1 AND dismissed_at IS NULL RETURNING id', [Number(req.params.id)]);
+    if (!r.rowCount) return reply.code(404).send({ error: 'Запись не найдена' });
+    return { ok: true };
+  });
+  app.post('/shortfalls/clear', { preHandler: admin }, async (req, reply) => {
+    const period = String(((req.body ?? {}) as Record<string, unknown>).period ?? '');
+    if (!PERIOD.test(period)) return reply.code(400).send({ error: 'Укажите месяц' });
+    const r = await db.query(
+      `UPDATE shift_shortfalls f SET dismissed_at = now() FROM staff s WHERE s.id = f.staff_id AND s.role <> 'admin' AND f.dismissed_at IS NULL AND to_char(f.day, 'YYYY-MM') = $1`,
+      [period],
+    );
+    return { ok: true, count: r.rowCount };
   });
   // Принять причину (галочка): день больше не требует внимания
   app.post<{ Params: { id: string } }>('/shortfalls/:id/accept', { preHandler: reviewer }, async (req, reply) => {
@@ -1322,7 +1337,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
       ((await db.query(`SELECT staff_id, count(*)::int AS n FROM shift_reports WHERE status = 'pending' AND NOT team GROUP BY staff_id`)).rows as { staff_id: number; n: number }[]).map((r) => [r.staff_id, r.n]),
     );
     const shortBy = new Map(
-      ((await db.query(`SELECT staff_id, count(*)::int AS n FROM shift_shortfalls WHERE reason IS NULL AND accepted_at IS NULL AND penalty_id IS NULL AND staff_id IN (SELECT id FROM staff WHERE role <> 'admin') AND to_char(day, 'YYYY-MM') = $1 GROUP BY staff_id`, [refMonth])).rows as { staff_id: number; n: number }[]).map((r) => [r.staff_id, r.n]),
+      ((await db.query(`SELECT staff_id, count(*)::int AS n FROM shift_shortfalls WHERE reason IS NULL AND dismissed_at IS NULL AND accepted_at IS NULL AND penalty_id IS NULL AND staff_id IN (SELECT id FROM staff WHERE role <> 'admin') AND to_char(day, 'YYYY-MM') = $1 GROUP BY staff_id`, [refMonth])).rows as { staff_id: number; n: number }[]).map((r) => [r.staff_id, r.n]),
     );
     const advances = lead ? [] : (await db.query(`SELECT r.id, r.staff_id, s.name AS staff_name, r.amount::float AS amount FROM advance_requests r JOIN staff s ON s.id = r.staff_id WHERE r.status = 'pending' ORDER BY r.id`)).rows as { id: number; staff_id: number; staff_name: string; amount: number }[];
 
@@ -1628,7 +1643,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     // Задачи: от админа и то, что требует внимания по смене
     const tasks = (await db.query(`SELECT ${TASK_COLS} FROM staff_tasks t JOIN staff s ON s.id = t.staff_id WHERE t.staff_id = $1 AND t.status <> 'accepted' ORDER BY (t.status = 'open') DESC, t.due NULLS LAST, t.id DESC`, [me.id])).rows.map(taskRow);
     const rejected = (await db.query(`SELECT id, to_char(day, 'YYYY-MM-DD') AS day, reject_reason FROM shift_reports WHERE staff_id = $1 AND NOT team AND status = 'rejected' AND day >= (now() AT TIME ZONE '${TZ}')::date - 14 ORDER BY day DESC`, [me.id])).rows;
-    const short = (await db.query(`SELECT to_char(day, 'YYYY-MM-DD') AS day, minutes FROM shift_shortfalls WHERE staff_id = $1 AND reason IS NULL ORDER BY day`, [me.id])).rows;
+    const short = (await db.query(`SELECT to_char(day, 'YYYY-MM-DD') AS day, minutes FROM shift_shortfalls WHERE staff_id = $1 AND reason IS NULL AND dismissed_at IS NULL ORDER BY day`, [me.id])).rows;
 
     const socialFs = await fieldSums({ from, to }, refMonth);
     const defs = ((await fieldsDef(true)) as any[]).filter((d) => d.on_dashboard);

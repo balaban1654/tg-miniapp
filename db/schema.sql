@@ -613,6 +613,8 @@ CREATE TABLE IF NOT EXISTS birthday_bonuses (
 ALTER TABLE shift_shortfalls ADD COLUMN IF NOT EXISTS accepted_at TIMESTAMPTZ;
 ALTER TABLE shift_shortfalls ADD COLUMN IF NOT EXISTS penalty_id INT REFERENCES staff_adjustments(id) ON DELETE SET NULL;
 ALTER TABLE shift_shortfalls ADD COLUMN IF NOT EXISTS accepted_by INT REFERENCES staff(id) ON DELETE SET NULL;
+-- Удалённые админом дни: строка остаётся (чтобы ежедневная сверка не создала её снова), но нигде не показывается и не считается
+ALTER TABLE shift_shortfalls ADD COLUMN IF NOT EXISTS dismissed_at TIMESTAMPTZ;
 
 -- Тестовые сигналы и демо-история больше не используются: убираем те, по которым нет сделок клиентов
 DELETE FROM signals s WHERE s.requested_by IS NULL AND (s.is_test OR s.demo_result IS NOT NULL OR s.source = 'test') AND NOT EXISTS (SELECT 1 FROM deals x WHERE x.signal_id = s.id);

@@ -3007,8 +3007,12 @@ async function accWhy(pre){
     const fine=el('button',{class:'btn o s',type:'button',onclick:()=>penaltyDialog(r,accRefresh)},'Штраф');
     return el('td',{},el('span',{style:'display:inline-flex;gap:6px;align-items:center'},ok,fine));
   };
-  return[el('div',{class:'head'},el('h3',{style:'font-size:15px'},'Невыполненные дни за '+perLabel(accState.period))),
-    ctrT(table(['Сотрудник','День','Зачтено','Причина',''],rows.map(r=>[td(r.staff_name),td(new Date(r.day+'T12:00:00').toLocaleDateString('ru-RU',{day:'numeric',month:'short'})),td(hmin(r.minutes)),el('td',{style:'white-space:normal;text-align:center;min-width:240px'},r.reason?r.reason:el('span',{class:'mut'},'ещё не написал')),act(r)]),'Невыполненных дней нет.')),
+  // Админ: удалить день из списка (корзина) и «Очистить всё» за месяц
+  const adm=me.role==='admin';
+  const delBtn=r=>adm?el('button',{class:'btn o s',type:'button',title:'Удалить из списка','aria-label':'Удалить из списка',style:'color:var(--bad);padding:0 9px',onclick:async()=>{if(!await askC('Удалить день '+r.staff_name+' за '+new Date(r.day+'T12:00:00').toLocaleDateString('ru-RU',{day:'numeric',month:'long'})+' из списка?'+(r.penalty_id?' Штраф останется, его можно удалить в «Бонусах и штрафах».':'')))return;try{await api('/shortfalls/'+r.id,{method:'DELETE'});toast('Удалено');accRefresh()}catch(x){toast(x.message)}}},svgIcon('<path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/>',14)):null;
+  const clearAll=adm&&rows.length?el('button',{class:'btn o s',type:'button',style:'color:var(--bad)',onclick:async()=>{if(!await askC('Очистить все невыполненные дни за '+perLabel(accState.period)+'? Они пропадут из списка у вас, у тимлидеров и у стримеров. Выписанные штрафы останутся.'))return;try{const r=await api('/shortfalls/clear',{method:'POST',body:{period:accState.period}});toast('Очищено: '+r.count);accRefresh()}catch(x){toast(x.message)}}},'Очистить всё'):null;
+  return[el('div',{class:'head'},el('h3',{style:'font-size:15px'},'Невыполненные дни за '+perLabel(accState.period)),clearAll),
+    ctrT(table(['Сотрудник','День','Зачтено','Причина','',...(adm?['']:[])],rows.map(r=>[td(r.staff_name),td(new Date(r.day+'T12:00:00').toLocaleDateString('ru-RU',{day:'numeric',month:'short'})),td(hmin(r.minutes)),el('td',{style:'white-space:normal;text-align:center;min-width:240px'},r.reason?r.reason:el('span',{class:'mut'},'ещё не написал')),act(r),...(adm?[el('td',{},delBtn(r))]:[])]),'Невыполненных дней нет.')),
     el('div',{class:'mut sm'},'Если за день не набралось 3 часов, стример должен написать причину. Главное: 66 часов за месяц. '+(me.role==='admin'?'Штраф можно удалить во вкладке «Бонусы и штрафы».':'Причину можно принять или выписать штраф: его сумму и причину увидит стример. Отменить штраф может админ.'))];
 }
 
