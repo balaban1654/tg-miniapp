@@ -1963,13 +1963,19 @@ async function staffLeadTeam(rows){
     dxAttachCard(b,s,d,skew);return el('td',{},b);
   };
   const tgCell=r=>{const u=String(r.tg_username||'').replace(/^@/,'');return u?el('td',{},el('a',{href:'https://t.me/'+encodeURIComponent(u),target:'_blank',rel:'noopener',style:'color:var(--acc2)'},'@'+u)):td('—')};
+  // Личный канал стримера (поле «Личный Telegram-канал» в кампании PO): @имя, t.me-ссылка или числовой id
+  const chCell=r=>{
+    const v=String(r.live_channel||'').trim();if(!v)return td('—');
+    const m=v.match(/^(?:https?:\/\/)?(?:t\.me|telegram\.me)\/(.+)$/i),u=m?m[1]:/^@?[A-Za-z][\w]{3,}$/.test(v)?v.replace(/^@/,''):null;
+    return u?el('td',{},el('a',{href:'https://t.me/'+u.replace(/^@/,''),target:'_blank',rel:'noopener',style:'color:var(--acc2)'},m?'t.me/'+u:'@'+u)):td(v);
+  };
   const bdCell=r=>{
     if(!r.birth_date)return td('—');
     const [,m,dd]=r.birth_date.split('-');const now=m+'-'+dd===today;
     return el('td',{},el('span',{class:now?'pill p-pur bd-now':'',title:now?'Сегодня день рождения!':''},(now?'🎂 ':'')+(+dd)+' '+MON_GEN[+m-1]));
   };
   return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Моя команда')),
-    ctrT(table(['Имя','Логин','Роль','Telegram','День рождения','Город','Кампания PO','Промокод','Статус'],rows.map(r=>[nameCell(r),td(r.login),el('td',{},el('span',{class:'pill p-pur'},ROLE[r.role])),tgCell(r),bdCell(r),td(r.city||'—'),td(r.po_campaign||'—'),td(r.po_promo||'—'),el('td',{},el('span',{class:'pill '+(r.active?'p-ok':'p-bad')},r.active?'активен':'отключён'))]),'В вашей команде пока никого нет.'))];
+    ctrT(table(['Имя','Логин','Роль','Telegram','Канал','День рождения','Город','Кампания PO','Промокод','Статус'],rows.map(r=>[nameCell(r),td(r.login),el('td',{},el('span',{class:'pill p-pur'},ROLE[r.role])),tgCell(r),chCell(r),bdCell(r),td(r.city||'—'),td(r.po_campaign||'—'),td(r.po_promo||'—'),el('td',{},el('span',{class:'pill '+(r.active?'p-ok':'p-bad')},r.active?'активен':'отключён'))]),'В вашей команде пока никого нет.'))];
 }
 
 // Сотрудники: смена имени по клику на имя и удаление (в истории сотрудник остаётся, из списков пропадает, войти больше не сможет)
