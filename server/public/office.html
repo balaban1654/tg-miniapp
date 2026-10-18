@@ -1369,13 +1369,14 @@ async function leadDash(){
   dxReg.length=0;dxCloseModal();
   const d=await api('/dashboard'+dxQuery());
   const skew=Date.parse(d.now)-Date.now();
+  const fs=await fieldStatsBlock('?from='+d.range.from+'&to='+d.range.to).catch(()=>null);
   stopPoll();
   poll=setInterval(()=>{
     document.querySelectorAll('[data-live]').forEach(n=>{n.textContent=hm(Math.max(0,Math.floor((Date.now()+skew-Date.parse(n.dataset.live))/60000)))});
     if(!document.querySelector('.dx-ovl')&&dxReg.every(([,p])=>p.hidden)&&Date.now()+skew-Date.parse(d.now)>90000)render({soft:true});
   },20000);
   return[el('div',{class:'dx'},dxHead(dxRangeLabel({from:d.range.from,to:d.range.to},d.today),()=>render({soft:true})),dxLive(d,skew),
-    el('div',{class:'dx-cols'},el('div',{class:'dx-col'},dxPlanFact(d)),el('div',{class:'dx-col'},dxLeadPay(d))))];
+    el('div',{class:'dx-cols'},el('div',{class:'dx-col'},dxPlanFact(d)),el('div',{class:'dx-col'},dxLeadPay(d))),fs)];
 }
 function dxLeadPay(d){
   const p=d.leadPay;if(!p)return null;
@@ -2461,7 +2462,7 @@ async function kpiCardBlock(){
     advNode);
 }
 
-/** Для админа на дашборде: суммы полей отчётов за период (qs: ?from=&to=, без него текущий месяц) */
+/** Для админа и тимлида (только его команда) на дашборде: суммы полей отчётов за период (qs: ?from=&to=, без него текущий месяц) */
 async function fieldStatsBlock(qs=''){
   const d=await api('/shifts/fieldstats'+qs);
   if(!d.fields.length&&!d.rows.length)return null;
