@@ -821,6 +821,20 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     return { ok: true, deleted: r.rowCount };
   });
 
+  // Кэш файлов чатов в памяти: плеер просит видео кусками (Range), без кэша каждый кусок заново качался из Telegram
+  const fileCache = new Map<string, { buf: Buffer; ext: string }>();
+  let fileCacheBytes = 0;
+  const FILE_CACHE_MAX = 150 * 1024 * 1024;
+  const cacheFile = (key: string, v: { buf: Buffer; ext: string }) => {
+    if (v.buf.length > 25 * 1024 * 1024) return;
+    fileCache.set(key, v);
+    fileCacheBytes += v.buf.length;
+    for (const [k, x] of fileCache) {
+      if (fileCacheBytes <= FILE_CACHE_MAX) break;
+      fileCache.delete(k);
+      fileCacheBytes -= x.buf.length;
+    }
+  };
   app.get<{ Params: { tgId: string; msgId: string } }>('/chats/:tgId/file/:msgId', { preHandler: auth }, async (req, reply) => {
     const me = req.staff!;
     const r = await db.query(
@@ -830,17 +844,26 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     );
     if (!r.rowCount) return reply.code(404).send({ error: 'Файл не найден' });
     try {
-      const f = await bot.api.getFile(r.rows[0].file_id);
-      const resp = await fetch(`https://api.telegram.org/file/bot${config.botToken}/${f.file_path}`);
-      if (!resp.ok) throw new Error('telegram');
-      const ext = (f.file_path ?? '').split('.').pop()?.toLowerCase() ?? '';
+      const key = String(r.rows[0].file_id);
+      let hit = fileCache.get(key);
+      if (hit) {
+        fileCache.delete(key);
+        fileCache.set(key, hit);
+      } else {
+        const f = await bot.api.getFile(r.rows[0].file_id);
+        const resp = await fetch(`https://api.telegram.org/file/bot${config.botToken}/${f.file_path}`);
+        if (!resp.ok) throw new Error('telegram');
+        hit = { buf: Buffer.from(await resp.arrayBuffer()), ext: (f.file_path ?? '').split('.').pop()?.toLowerCase() ?? '' };
+        cacheFile(key, hit);
+      }
+      const ext = hit.ext;
       const types: Record<string, string> = {
         jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', gif: 'image/gif',
         mp4: 'video/mp4', mov: 'video/quicktime', webm: 'video/webm',
         ogg: 'audio/ogg', oga: 'audio/ogg', opus: 'audio/ogg', mp3: 'audio/mpeg', m4a: 'audio/mp4', wav: 'audio/wav', flac: 'audio/flac',
         pdf: 'application/pdf',
       };
-      const buf = Buffer.from(await resp.arrayBuffer());
+      const buf = hit.buf;
       const type = types[ext] ?? 'application/octet-stream';
       const inline = type !== 'application/octet-stream';
       reply

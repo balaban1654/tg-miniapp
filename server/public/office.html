@@ -3215,14 +3215,12 @@ async function viewChats(){
       if(m.has_file){
         let n;
         if(m.kind==='photo'){n=el('img',{src:url,alt:'Фото',loading:'lazy',onclick:()=>openShot(url)})}
-        else if(m.kind==='video'){n=el('video',{src:url,controls:'',preload:'metadata',playsinline:''})}
-        else if(m.kind==='video_note'){n=el('video',{src:url,class:'vnote',controls:'',preload:'metadata',playsinline:''})}
+        // Видео, кружки, голосовые и аудио ссылкой: открываются в новой вкладке (в чате плеер перезагружался при обновлении)
+        else if(['video','video_note','voice','audio'].includes(m.kind)){n=el('a',{class:'fl',href:url,target:'_blank',rel:'noopener'},({video:'🎬 Видео',video_note:'⭕ Кружок',voice:'🎤 Голосовое',audio:'🎵 '+(m.file_name||'Аудио')})[m.kind]+' · открыть')}
         else if(m.kind==='animation'){n=el('video',{src:url,autoplay:'',loop:'',muted:'',playsinline:'',controls:''})}
-        else if(m.kind==='voice'||m.kind==='audio'){n=el('audio',{src:url,controls:'',preload:'metadata'})}
         else{n=el('a',{class:'fl',href:url,target:'_blank',rel:'noopener',download:m.file_name||''},'📄 '+(m.file_name||'Файл'))}
         if(n.tagName!=='A')lost(n);
         body.push(n);
-        if((m.kind==='audio'||m.kind==='document')&&m.file_name&&m.kind!=='document')body.push(el('div',{},m.file_name));
       }
       else if(!m.text)body.push(el('span',{class:'mut'},'['+m.kind+']'));
       const tx=m.text?el('span',{},m.text):null;if(tx)body.push(tx);
