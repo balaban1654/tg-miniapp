@@ -409,7 +409,8 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
       me.role === 'admin' ? 'TRUE' : me.role === 'teamlead' ? `(id = ${me.id} OR parent_id = ${me.id})` : `id = ${me.id}`;
     const r = await db.query(
       `SELECT id, login, name, role, parent_id, rate_ftd, rate_percent, active, created_at,
-              po_campaign, po_promo, po_link, po_link_ru, tg_username, live_channel, streams, (totp_secret IS NOT NULL) AS totp
+              po_campaign, po_promo, po_link, po_link_ru, tg_username, live_channel, streams, (totp_secret IS NOT NULL) AS totp,
+              to_char(birth_date, 'YYYY-MM-DD') AS birth_date, city
          FROM staff WHERE ${scope} AND deleted_at IS NULL ORDER BY id`,
     );
     return r.rows;
