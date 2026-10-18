@@ -519,7 +519,7 @@ async function api(path,opts={}){
   const r=await fetch('/api/office'+path,{credentials:'same-origin',headers:{'content-type':'application/json'},...opts,body:opts.body?JSON.stringify(opts.body):(opts.method&&opts.method!=='GET'?'{}':undefined)});
   const data=await r.json().catch(()=>({}));
   if(r.status===401&&!path.startsWith('/login')){showLogin();throw new Error('auth')}
-  if(r.status===403&&data.code==='totp_setup'&&me){me.totp=false;showApp();throw new Error(data.error)}
+  if(r.status===403&&data.code==='totp_setup'&&me){me.totp=false;if(!document.querySelector('.tf-overlay'))showApp();throw new Error(data.error)}
   if(!r.ok){const e=new Error(data.error||'Ошибка '+r.status);e.restart=data.restart;throw e}
   return data;
 }
@@ -2038,7 +2038,7 @@ let fraudNew=0; // новые подозрения на фрод (кружок �
 let noticeN=0; // новые события клиентов стримера (цифра у «Дашборда»)
 let pbNew=0; // новые постбеки с прошлого просмотра (цифра у «Постбеки»)
 async function updateBadge(){
-  if(!me)return;
+  if(!me||me.totp===false&&['admin','teamlead'].includes(me.role))return;
   if(me.role==='teamlead'){try{const p=tab==='pb'?{n:0}:await api('/postbacks/count');if(p.n!==pbNew){pbNew=p.n;drawNav()}}catch{}}
   if(me.role==='admin'){try{const c=await api('/reviews/count');const p=tab==='pb'?{n:0}:await api('/postbacks/count');if(c.pending!==mediaPend||p.n!==pbNew){mediaPend=c.pending;pbNew=p.n;drawNav();if(tab==='media'&&window.__mediaTabsRedraw)window.__mediaTabsRedraw()}}catch{}}
   if(['admin','streamer'].includes(me.role)){try{const f=await api('/fraud/count');if(f.n!==fraudNew){fraudNew=f.n;drawNav()}}catch{}}
@@ -2226,6 +2226,7 @@ function depBonusDialog(L,elig,done){
 }
 /** Настройка 2FA: QR и первый код, затем резервные коды. forced=true: без закрытия, пока не включена */
 async function twofaDialog(forced,done){
+  if(forced&&document.querySelector('.tf-overlay'))return;
   document.querySelectorAll('.tf-overlay').forEach(x=>x.remove());
   const ov=el('div',{class:'lc-overlay tf-overlay',role:'dialog','aria-modal':'true'});
   const box=el('div',{class:'lc',style:'width:min(460px,100%)'});ov.append(box);document.body.append(ov);

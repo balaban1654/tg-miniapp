@@ -301,8 +301,10 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
   });
   app.post('/profile/2fa/setup', { preHandler: auth }, async (req, reply) => {
     if (req.staff!.totp) return reply.code(400).send({ error: 'Двухфакторная защита уже включена' });
-    const secret = newSecret();
-    await db.query('UPDATE staff SET totp_pending = $2 WHERE id = $1', [req.staff!.id, secret]);
+    // Повторный вызов (обновили страницу) отдаёт тот же секрет: уже отсканированный QR остаётся рабочим
+    const prev = (await db.query('SELECT totp_pending FROM staff WHERE id = $1', [req.staff!.id])).rows[0]?.totp_pending as string | null;
+    const secret = prev || newSecret();
+    if (!prev) await db.query('UPDATE staff SET totp_pending = $2 WHERE id = $1', [req.staff!.id, secret]);
     const uri = otpUri(secret, req.staff!.login);
     return { secret, uri, qr: await QRCode.toString(uri, { type: 'svg', margin: 1, width: 200 }) };
   });
