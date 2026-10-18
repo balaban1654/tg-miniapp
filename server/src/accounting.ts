@@ -1221,12 +1221,21 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     const goalFactor = allTime ? null : months.reduce((a, x) => a + x.w, 0);
     const g = plan.goals;
     const goalsAll = goalFactor === null ? null : { ftd: g.ftd * goalFactor, ftdSum: g.ftdSum * goalFactor, deposits: g.deposits * goalFactor, commission: g.commission * goalFactor, net: g.net * goalFactor };
-    const goals = goalFactor === null || lead ? null : { ftd: g.ftd * goalFactor, ftdSum: g.ftdSum * goalFactor, deposits: g.deposits * goalFactor, commission: g.commission * goalFactor, net: g.net * goalFactor };
+    let goals = goalFactor === null || lead ? null : { ftd: g.ftd * goalFactor, ftdSum: g.ftdSum * goalFactor, deposits: g.deposits * goalFactor, commission: g.commission * goalFactor, net: g.net * goalFactor };
     // Где должны быть сегодня: доля прошедших дней периода
     const pace = ref >= to ? 1 : Math.max(0, Math.min(1, (daysBetween(from, ref) + 1) / rangeDays));
 
     const staffRows = (await db.query(`SELECT id, name, login, tg_username, active, role FROM staff WHERE (role = 'streamer' OR streams) AND ($1::int IS NULL OR parent_id = $1) AND deleted_at IS NULL ORDER BY id`, [lead])).rows as { id: number; name: string; login: string; tg_username: string | null; active: boolean; role: string }[];
     const ids = staffRows.map((s) => s.id);
+    // План команды тимлида: FTD = план по лидам × активные стримеры команды; суммы пополнений и депозитов
+    // берутся из плана компании в той же доле, что FTD команды от FTD компании (без плана FTD: по доле стримеров)
+    if (lead && goalFactor !== null) {
+      const teamN = staffRows.filter((s) => s.active && s.role === 'streamer').length;
+      const allN = Number((await db.query(`SELECT count(*)::int AS n FROM staff WHERE role = 'streamer' AND active AND deleted_at IS NULL`)).rows[0].n);
+      const ftdGoal = plan.leads * teamN * goalFactor;
+      const share = g.ftd > 0 ? (plan.leads * teamN) / g.ftd : allN ? teamN / allN : 0;
+      goals = { ftd: ftdGoal, ftdSum: g.ftdSum * goalFactor * share, deposits: g.deposits * goalFactor * share, commission: 0, net: 0 };
+    }
 
     const evRange = await aggEvents(from, to);
     const refStart = `${refMonth}-01`;
@@ -1404,7 +1413,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
         salaries: r2(salaries),
         expenses,
         net,
-        netPlanToDate: goals ? r2(goals.net * pace) : null,
+        netPlanToDate: goals && !lead ? r2(goals.net * pace) : null,
       },
       teamSalaries: teamSal,
       expenses: expRows,

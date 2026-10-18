@@ -1268,8 +1268,9 @@ function dxPlanFact(d){
   const g=d.goals,t=d.totals,pace=d.pace,showMark=g&&pace<0.995;
   const title=d.range.whole&&!d.range.all?'План / факт за месяц':'План / факт';
   const icons=[];
-  if(g)icons.push(dxPopBtn('Кольца выполнения плана',IC_RINGS,dxRings(d),'pl'));
-  // Тимлиду: кольца общего результата компании
+  // Тимлиду: кольца плана его команды и рядом общий результат компании
+  if(g&&d.company)icons.push(dxPopBtn('Кольца: ваша команда и общий результат компании',IC_RINGS,el('div',{style:'display:grid;gap:14px'},el('div',{class:'dx-lbl'},'Ваша команда'),dxRings(d),el('div',{class:'dx-lbl'},'Общий результат компании'),dxRings(d.company)),'pl'));
+  else if(g)icons.push(dxPopBtn('Кольца выполнения плана',IC_RINGS,dxRings(d),'pl'));
   else if(d.company)icons.push(dxPopBtn('Кольца: общий результат компании',IC_RINGS,el('div',{style:'display:grid;gap:8px'},el('div',{class:'dx-lbl'},'Общий результат компании'),dxRings(d.company)),'pl'));
   icons.push(dxPopBtn('Воронка',IC_FUNNEL,dxFunnel(d),'pl wide'));
   icons.push(dxPopBtn(d.leadPay?'Охваты вашей команды: просмотры, подписчики, комментарии и лайки':'Просмотры, подписчики, комментарии и лайки',IC_HEART,dxSocial(d),'pl wide'));
