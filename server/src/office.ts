@@ -560,9 +560,9 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
                  AND EXISTS (SELECT 1 FROM events e WHERE e.tg_id = d.tg_id AND e.type = 'reg')) AS regs,
               (SELECT count(*)::int FROM leads d WHERE d.link_id = l.id AND d.lead_role = 'lead' AND d.created_at >= coalesce(l.reset_at, '-infinity') AND d.status IN ('ftd','active')) AS ftds,
               coalesce((SELECT sum(e.amount) FROM events e JOIN leads d ON d.tg_id = e.tg_id
-                 WHERE d.link_id = l.id AND d.lead_role = 'lead' AND e.created_at >= coalesce(l.reset_at, '-infinity') AND e.type IN ${DT}),0)::float AS deposits,
+                 WHERE d.link_id = l.id AND d.lead_role = 'lead' AND d.created_at >= coalesce(l.reset_at, '-infinity') AND e.created_at >= coalesce(l.reset_at, '-infinity') AND e.type IN ${DT}),0)::float AS deposits,
               coalesce((SELECT sum(e.amount) FROM events e JOIN leads d ON d.tg_id = e.tg_id
-                 WHERE d.link_id = l.id AND d.lead_role = 'lead' AND e.created_at >= coalesce(l.reset_at, '-infinity') AND e.type = 'comm' AND ${me.role === 'streamer' || me.role === 'teamlead' ? 'false' : 'true'}),0)::float AS commission
+                 WHERE d.link_id = l.id AND d.lead_role = 'lead' AND d.created_at >= coalesce(l.reset_at, '-infinity') AND e.created_at >= coalesce(l.reset_at, '-infinity') AND e.type = 'comm' AND ${me.role === 'streamer' || me.role === 'teamlead' ? 'false' : 'true'}),0)::float AS commission
          FROM links l JOIN staff s ON s.id = l.owner_id
         WHERE ${ownerScope(me, 'l.owner_id')} ORDER BY coalesce(l.parent_id, l.id) DESC, (l.parent_id IS NOT NULL), l.id DESC`,
     );
