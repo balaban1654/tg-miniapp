@@ -978,6 +978,18 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     return { ok: true };
   });
 
+  // Тимлиду: что ждёт его в «Моей команде» (цифры у пункта меню и вкладок)
+  app.get('/team/pending', { preHandler: need('teamlead') }, async (req) => {
+    const id = req.staff!.id;
+    const n = async (sql: string) => (await db.query(sql, [id])).rows[0].n as number;
+    const review = await n(`SELECT count(*)::int AS n FROM shift_reports s JOIN staff st ON st.id = s.staff_id WHERE s.status = 'pending' AND NOT s.team AND st.parent_id = $1`);
+    const why = await n(`SELECT count(*)::int AS n FROM shift_shortfalls f JOIN staff s ON s.id = f.staff_id WHERE s.parent_id = $1 AND f.reason IS NOT NULL AND f.accepted_at IS NULL AND f.penalty_id IS NULL`);
+    const tasks = await n(
+      `SELECT ((SELECT count(*) FROM staff_tasks t JOIN staff s ON s.id = t.staff_id WHERE s.parent_id = $1 AND t.status = 'done')
+             + (SELECT count(*) FROM staff_tasks WHERE staff_id = $1 AND status = 'open'))::int AS n`,
+    );
+    return { review, why, tasks, total: review + why + tasks };
+  });
   // Сколько всего ждёт решения админа: отчёты на проверке, причины по сменам без решения, запросы авансов
   app.get('/accounting/pending', { preHandler: admin }, async () => {
     const n = async (sql: string) => (await db.query(sql)).rows[0].n as number;

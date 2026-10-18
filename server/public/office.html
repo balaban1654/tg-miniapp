@@ -670,7 +670,7 @@ function drawNav(){
   const nav=$('#nav');if(!nav||!me)return;
   const lay=reconcileLayout(me.nav_layout,navItems,me.role);
   const label=k=>(navItems.find(x=>x[0]===k)||[])[1]||k;
-  const mkBtn=(k,ic,sub)=>el('button',{type:'button','data-t':k,class:(k===tab?'on':'')+(sub?' sub':''),onclick:()=>{tab=k;showApp();render()}},ic?iconNamed(ic):icon(k),el('span',{class:'lbl'},...(k==='chats'||k==='leads'?navLblNodes(k):[label(k)])),k==='mytasks'?el('span',{class:'nbadge',id:'tasksBadge',hidden:''}):null,k==='signals'&&['admin','streamer'].includes(me.role)&&fraudNew?el('span',{class:'nbadge vio pulse',id:'fraudBadge',title:'Новые подозрения на фрод'},String(fraudNew)):null,k==='home'&&me.role==='streamer'&&noticeN?el('span',{class:'nbadge vio pulse',id:'noticeBadge',title:'Новые события ваших клиентов'},noticeN>99?'99+':String(noticeN)):null,k==='acc'&&me.role==='admin'?el('span',{class:'nbadge',id:'accBadge',hidden:''}):null,k==='pb'&&me.role==='admin'&&pbNew?el('span',{class:'nbadge vio pulse',id:'pbBadge',title:'Новые постбеки'},pbNew>99?'99+':String(pbNew)):null,k==='media'&&me.role==='admin'?el('span',{class:'nbadge vio pulse',id:'mediaBadge',hidden:mediaPend?null:'',title:'Новые отзывы ждут проверки'},String(mediaPend||'')):null);
+  const mkBtn=(k,ic,sub)=>el('button',{type:'button','data-t':k,class:(k===tab?'on':'')+(sub?' sub':''),onclick:()=>{tab=k;showApp();render()}},ic?iconNamed(ic):icon(k),el('span',{class:'lbl'},...(k==='chats'||k==='leads'?navLblNodes(k):[label(k)])),k==='mytasks'?el('span',{class:'nbadge',id:'tasksBadge',hidden:''}):null,k==='signals'&&['admin','streamer'].includes(me.role)&&fraudNew?el('span',{class:'nbadge vio pulse',id:'fraudBadge',title:'Новые подозрения на фрод'},String(fraudNew)):null,k==='home'&&me.role==='streamer'&&noticeN?el('span',{class:'nbadge vio pulse',id:'noticeBadge',title:'Новые события ваших клиентов'},noticeN>99?'99+':String(noticeN)):null,k==='acc'&&me.role==='admin'?el('span',{class:'nbadge',id:'accBadge',hidden:''}):null,k==='staff'&&me.role==='teamlead'?el('span',{class:'nbadge pulse',id:'leadBadge',hidden:leadPend.total?null:'',title:'Ждут вашего решения: отчёты, причины по сменам, задачи'},String(leadPend.total||'')):null,k==='pb'&&me.role==='admin'&&pbNew?el('span',{class:'nbadge vio pulse',id:'pbBadge',title:'Новые постбеки'},pbNew>99?'99+':String(pbNew)):null,k==='media'&&me.role==='admin'?el('span',{class:'nbadge vio pulse',id:'mediaBadge',hidden:mediaPend?null:'',title:'Новые отзывы ждут проверки'},String(mediaPend||'')):null);
   const out=[];
   for(const n of lay.nodes){
     if(n.t==='i'){out.push(mkBtn(n.k,n.icon,false));continue}
@@ -1895,14 +1895,13 @@ async function viewStaff(){
   const lead=me.role==='teamlead';
   if(!canLinks||(!lead&&['tasks','review','why'].includes(staffState.tab)))staffState.tab='team';
   // Тимлид: после ссылок отчёты своей команды и причины по сменам (с числом причин без решения)
-  let whyOpen=0,tasksN=0;
-  const countWhy=async()=>{if(!lead)return;if(!accState.period)accState.period=kyivToday().slice(0,7);try{whyOpen=(await api('/shortfalls?period='+accState.period)).filter(r=>r.reason&&!r.accepted_at&&!r.penalty_id).length}catch{}};
-  // Цифра у «Задач»: свои открытые плюс выполненные командой, которые ждут принятия
-  const countTasks=async()=>{if(!lead)return;try{const[m,t]=await Promise.all([api('/tasks/mine'),api('/tasks?status=done')]);tasksN=m.filter(x=>x.status==='open').length+t.length}catch{}};
-  await Promise.all([countWhy(),countTasks()]);
-  const tabsList=()=>[['team',isAdmin?'Сотрудники':'Моя команда'],...(canLinks?[['links','Ссылки']]:[]),...(lead?[['tasks','Задачи'+(tasksN?' ('+tasksN+')':'')],['review','Отчёты'],['why','Причины по сменам'+(whyOpen?' ('+whyOpen+')':'')]]:[])];
+  // Цифры у вкладок тимлида: задачи (свои открытые + выполненные командой), отчёты на проверке, причины без решения
+  const countWhy=refreshLeadPending,countTasks=refreshLeadPending;
+  await refreshLeadPending();
+  const tabsList=()=>[['team',isAdmin?'Сотрудники':'Моя команда'],...(canLinks?[['links','Ссылки']]:[]),...(lead?[['tasks','Задачи'],['review','Отчёты'],['why','Причины по сменам']]:[])];
   let TABS=tabsList();
-  const drawBar=()=>(TABS=tabsList(),bar).replaceChildren(...TABS.map(([k,t])=>el('button',{type:'button',role:'tab','aria-selected':String(k===staffState.tab),class:'lc-tab'+(k===staffState.tab?' on':''),onclick:()=>{staffState.tab=k;drawBar();drawBody();pushHash()}},t)));
+  const drawBar=()=>(TABS=tabsList(),bar).replaceChildren(...TABS.map(([k,t])=>el('button',{type:'button',role:'tab','aria-selected':String(k===staffState.tab),class:'lc-tab'+(k===staffState.tab?' on':''),onclick:()=>{staffState.tab=k;drawBar();drawBody();pushHash()}},t,lead&&leadPend[k]>0?el('span',{class:'nbadge pulse tb',title:'Ждут вашего решения'},String(leadPend[k])):null)));
+  window.__staffTabsRedraw=()=>{if(bar.isConnected)drawBar()};
   const drawBody=async soft=>{if(!soft)body.replaceChildren(el('div',{class:'mut'},'Загрузка…'));try{const t=staffState.tab;body.replaceChildren(...(t==='links'?(await viewLinks()).slice(1):t==='tasks'?await leadTasksBody(async()=>{await countTasks();drawBar();await drawBody(true)}):['review','why'].includes(t)?await leadReviewBody(t,async()=>{await countWhy();drawBar();await drawBody(true)}):(await staffTeam()).slice(1)).filter(Boolean))}catch(x){if(x.message!=='auth')body.replaceChildren(el('div',{class:'err'},x.message))}};
   drawBar();root.append(...(canLinks?[bar]:[]),body);await drawBody();
   return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},isAdmin?'Сотрудники':'Моя команда')),root];
@@ -2025,6 +2024,16 @@ function navLblSet(k,c){
 }
 /** Что в Бухгалтерии ждёт решения админа: цифры у вкладок и общая у пункта меню */
 let accPend={review:0,why:0,pay:0,total:0};
+/** Тимлид: цифры у «Моей команды» и её вкладок (отчёты на проверке, причины по сменам, задачи) */
+let leadPend={review:0,why:0,tasks:0,total:0};
+async function refreshLeadPending(){
+  if(!me||me.role!=='teamlead')return;
+  try{
+    leadPend=await api('/team/pending');
+    const b=document.getElementById('leadBadge');if(b){b.textContent=String(leadPend.total);b.hidden=!leadPend.total}
+    if(window.__staffTabsRedraw)window.__staffTabsRedraw();
+  }catch{}
+}
 async function refreshAccPending(){
   if(!me||me.role!=='admin')return;
   try{
@@ -2049,6 +2058,7 @@ async function updateBadge(){
   if(me.role==='streamer'){await setTasksBadge();try{const c=await api('/lead-notices/count');if(c.n!==noticeN){noticeN=c.n;drawNav()}}catch{}}
 
   await refreshAccPending();
+  await refreshLeadPending();
 }
 /** Цифра у пункта «Мои задачи»: сколько задач ещё не закрыто */
 async function setTasksBadge(){
