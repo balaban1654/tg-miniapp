@@ -1050,26 +1050,35 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     if (!r.rowCount) return reply.code(404).send({ error: 'День не найден или причина уже указана' });
     return { ok: true };
   });
-  app.get<{ Querystring: { period?: string } }>('/shortfalls', { preHandler: admin }, async (req) => {
+  // Тимлид видит и решает только дни своей команды
+  const shortOk = async (req: FastifyRequest, id: number) =>
+    (await db.query(`SELECT 1 FROM shift_shortfalls f JOIN staff s ON s.id = f.staff_id WHERE f.id = $1 AND ($2::int IS NULL OR s.parent_id = $2)`, [id, teamScope(req)])).rowCount;
+  app.get<{ Querystring: { period?: string } }>('/shortfalls', { preHandler: reviewer }, async (req) => {
     const period = PERIOD.test(String(req.query.period)) ? String(req.query.period) : await currentPeriod();
     return (
       await db.query(
         `SELECT f.id, f.staff_id, s.name AS staff_name, to_char(f.day, 'YYYY-MM-DD') AS day, f.minutes, f.reason, f.reason_at,
-                f.accepted_at, f.penalty_id, a.amount::float AS penalty_amount, a.comment AS penalty_comment
+                f.accepted_at, f.penalty_id, a.amount::float AS penalty_amount, a.comment AS penalty_comment,
+                (SELECT name FROM staff WHERE id = f.accepted_by) AS accepted_by_name, (SELECT name FROM staff WHERE id = a.created_by) AS penalty_by_name
            FROM shift_shortfalls f JOIN staff s ON s.id = f.staff_id LEFT JOIN staff_adjustments a ON a.id = f.penalty_id
-          WHERE to_char(f.day, 'YYYY-MM') = $1 AND s.role <> 'admin' ORDER BY f.day DESC, s.name`,
-        [period],
+          WHERE to_char(f.day, 'YYYY-MM') = $1 AND s.role <> 'admin' AND ($2::int IS NULL OR s.parent_id = $2) ORDER BY f.day DESC, s.name`,
+        [period, teamScope(req)],
       )
     ).rows;
   });
   // Принять причину (галочка): день больше не требует внимания
-  app.post<{ Params: { id: string } }>('/shortfalls/:id/accept', { preHandler: admin }, async (req, reply) => {
-    const r = await db.query(`UPDATE shift_shortfalls SET accepted_at = CASE WHEN accepted_at IS NULL THEN now() END WHERE id = $1 RETURNING id`, [Number(req.params.id)]);
+  app.post<{ Params: { id: string } }>('/shortfalls/:id/accept', { preHandler: reviewer }, async (req, reply) => {
+    if (!(await shortOk(req, Number(req.params.id)))) return reply.code(404).send({ error: 'Запись не найдена' });
+    const r = await db.query(
+      `UPDATE shift_shortfalls SET accepted_at = CASE WHEN accepted_at IS NULL THEN now() END, accepted_by = CASE WHEN accepted_at IS NULL THEN $2::int END WHERE id = $1 RETURNING id`,
+      [Number(req.params.id), req.staff!.id],
+    );
     if (!r.rowCount) return reply.code(404).send({ error: 'Запись не найдена' });
     return { ok: true };
   });
   // Штраф за невыполненный день: сумма и причина. Причина видна стримеру во вкладке «Штрафы». Удаляется в «Бонусах и штрафах»
-  app.post<{ Params: { id: string } }>('/shortfalls/:id/penalty', { preHandler: admin }, async (req, reply) => {
+  app.post<{ Params: { id: string } }>('/shortfalls/:id/penalty', { preHandler: reviewer }, async (req, reply) => {
+    if (!(await shortOk(req, Number(req.params.id)))) return reply.code(404).send({ error: 'Запись не найдена' });
     const b = (req.body ?? {}) as Record<string, any>;
     const amount = Math.abs(Number(b.amount));
     if (!Number.isFinite(amount) || amount <= 0 || amount > 100000) return reply.code(400).send({ error: 'Укажите сумму штрафа' });

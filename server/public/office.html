@@ -2915,18 +2915,19 @@ function penaltyDialog(r,done){
     err,el('div',{class:'lc-actions'},send)));
   document.body.append(ov);amount.focus();
 }
-async function accWhy(){
-  const rows=await api('/shortfalls?period='+accState.period);
+async function accWhy(pre){
+  const rows=pre||await api('/shortfalls?period='+accState.period);
+  const by=n=>n?el('div',{class:'mut sm'},n):null;
   const act=r=>{
-    if(r.penalty_id)return el('td',{},el('span',{class:'pill p-bad',title:r.penalty_comment||''},'штраф −'+usd2(r.penalty_amount)));
-    if(r.accepted_at)return el('td',{},el('span',{class:'pill p-ok'},'принято'));
+    if(r.penalty_id)return el('td',{},el('span',{class:'pill p-bad',title:r.penalty_comment||''},'штраф −'+usd2(r.penalty_amount)),by(r.penalty_by_name));
+    if(r.accepted_at)return el('td',{},el('span',{class:'pill p-ok'},'принято'),by(r.accepted_by_name));
     const ok=el('button',{class:'btn s',type:'button',title:'Принять причину','aria-label':'Принять причину',onclick:async()=>{try{await api('/shortfalls/'+r.id+'/accept',{method:'POST'});accRefresh()}catch(x){toast(x.message)}}},svgIcon('<path d="M5 12.5l4.5 4.5L19 7.5"/>',16));
     const fine=el('button',{class:'btn o s',type:'button',onclick:()=>penaltyDialog(r,accRefresh)},'Штраф');
     return el('td',{},el('span',{style:'display:inline-flex;gap:6px;align-items:center'},ok,fine));
   };
   return[el('div',{class:'head'},el('h3',{style:'font-size:15px'},'Невыполненные дни за '+perLabel(accState.period))),
     ctrT(table(['Сотрудник','День','Зачтено','Причина',''],rows.map(r=>[td(r.staff_name),td(new Date(r.day+'T12:00:00').toLocaleDateString('ru-RU',{day:'numeric',month:'short'})),td(hmin(r.minutes)),el('td',{style:'white-space:normal;text-align:center;min-width:240px'},r.reason?r.reason:el('span',{class:'mut'},'ещё не написал')),act(r)]),'Невыполненных дней нет.')),
-    el('div',{class:'mut sm'},'Если за день не набралось 3 часов, стример должен написать причину. Главное: 66 часов за месяц. Штраф можно удалить во вкладке «Бонусы и штрафы».')];
+    el('div',{class:'mut sm'},'Если за день не набралось 3 часов, стример должен написать причину. Главное: 66 часов за месяц. '+(me.role==='admin'?'Штраф можно удалить во вкладке «Бонусы и штрафы».':'Причину можно принять или выписать штраф: его сумму и причину увидит стример. Отменить штраф может админ.'))];
 }
 
 async function accDepBonus(){
@@ -2969,8 +2970,13 @@ async function viewLeadReview(){
   if(!accState.period)accState.period=kyivToday().slice(0,7);
   accRefresh=()=>render({soft:true});
   const nav=el('div',{class:'mon2'},el('button',{type:'button','aria-label':'Предыдущий месяц',onclick:()=>{accState.period=perShift(accState.period,-1);render({soft:true})}},'‹'),el('b',{},perLabel(accState.period)),el('button',{type:'button','aria-label':'Следующий месяц',onclick:()=>{accState.period=perShift(accState.period,1);render({soft:true})}},'›'));
-  return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Отчёты команды'),nav),...await accReview()];
+  const why=await api('/shortfalls?period='+accState.period);
+  const open=why.filter(r=>r.reason&&!r.accepted_at&&!r.penalty_id).length;
+  const TABS=[['review','Отчёты'],['why','Причины по сменам'+(open?' ('+open+')':'')]];
+  const bar=el('div',{class:'lc-tabs',role:'tablist'},...TABS.map(([k,t])=>el('button',{type:'button',role:'tab','aria-selected':String(k===leadRevTab),class:'lc-tab'+(k===leadRevTab?' on':''),onclick:()=>{leadRevTab=k;render({soft:true})}},t)));
+  return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Отчёты команды'),nav),bar,...(leadRevTab==='why'?await accWhy(why):await accReview())];
 }
+let leadRevTab='review';
 
 /** Моя смена (админ, тимлидер, аналитик, медиабайер): начать, закончить с комментарием, история отчётов */
 async function viewTeamShift(){
