@@ -151,6 +151,9 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
     req.tg = user;
     // Если человек открыл приложение, не нажимая /start, всё равно заводим лида
     await attachLead(user.id, user.username, user.first_name, null);
+    // Заблокированный админом лид в Mini App не попадает: показываем причину и поддержку
+    const ban = (await db.query('SELECT ban_reason FROM leads WHERE tg_id = $1 AND banned_at IS NOT NULL', [user.id])).rows[0];
+    if (ban) return reply.code(403).send({ error: 'Доступ заблокирован', banned: true, reason: ban.ban_reason ?? null, botUsername: config.botUsername });
     // Часовой пояс устройства клиента: по нему показываем время сигналов в пушах
     const tzHeader = String(req.headers['x-tz'] ?? '');
     if (tzHeader && tzHeader.length < 60) {

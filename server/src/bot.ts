@@ -8,6 +8,11 @@ import { sendReply } from './replies.js';
 import { bot } from './tg.js';
 export { bot };
 
+const BANNED_TEXT = 'Ваш доступ к Hunter AI заблокирован. Если это ошибка, напишите сюда сообщение — поддержка ответит.';
+async function isBanned(tgId: number): Promise<boolean> {
+  return ((await db.query('SELECT 1 FROM leads WHERE tg_id = $1 AND banned_at IS NOT NULL', [tgId])).rowCount ?? 0) > 0;
+}
+
 /** Из параметра /start вида "s_ivan" берём slug "ivan". */
 export function parseStartPayload(payload: string): string | null {
   const m = /^[sb]_([a-zA-Z0-9_-]{1,64})$/.exec(payload.trim());
@@ -26,6 +31,11 @@ bot.command('start', async (ctx) => {
   const slug = parseStartPayload(payload);
   const { lead } = await attachLead(from.id, from.username, from.first_name, slug);
 
+  // Заблокированный лид: воронки нет, только сообщение (написать в поддержку он может)
+  if (await isBanned(from.id) && payload !== 'support') {
+    await ctx.reply(BANNED_TEXT);
+    return;
+  }
   // Кнопка «Поддержка» в Mini App ведёт сюда
   if (payload === 'support') {
     await sendReply(from.id, 'support');
@@ -49,6 +59,10 @@ bot.command('start', async (ctx) => {
 for (const key of ['acc_ready', 'acc_no', 'acc_yes'] as const) {
   bot.callbackQuery(key, async (ctx) => {
     await ctx.answerCallbackQuery();
+    if (await isBanned(ctx.from.id)) {
+      await ctx.reply(BANNED_TEXT);
+      return;
+    }
     await sendReply(ctx.from.id, key);
   });
 }

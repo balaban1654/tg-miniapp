@@ -276,8 +276,19 @@ async function api(path,opts={}){
   const r=await fetch('/api/app'+path,{method:opts.method||'GET',headers:{'content-type':'application/json',authorization:'tma '+(tg?tg.initData:''),'x-tz':(()=>{try{return Intl.DateTimeFormat().resolvedOptions().timeZone||''}catch{return ''}})()},body:opts.body?JSON.stringify(opts.body):(opts.method&&opts.method!=='GET'?'{}':undefined)});
   const data=await r.json().catch(()=>({}));
   syncClock(data&&data.now,t0,Date.now());
+  if(r.status===403&&data.banned){showBanned(data);throw new Error(data.error)}
   if(!r.ok)throw new Error(data.error||'Ошибка '+r.status);
   return data;
+}
+/** Лид заблокирован: вместо приложения экран с причиной и поддержкой */
+function showBanned(d){
+  if(document.getElementById('banned'))return;
+  const sup=()=>{const u='https://t.me/'+d.botUsername+'?start=support';try{if(tg&&tg.openTelegramLink){tg.openTelegramLink(u);return}}catch{}location.href=u};
+  root.replaceChildren(el('main',{id:'banned',style:'padding:48px 20px;text-align:center;display:grid;gap:14px;max-width:420px;margin:auto'},
+    el('div',{style:'font-size:44px'},'⛔'),el('h2',{style:'margin:0'},'Доступ заблокирован'),
+    d.reason?el('div',{class:'sm',style:'opacity:.85'},'Причина: '+d.reason):null,
+    el('div',{class:'sm',style:'opacity:.7'},'Если это ошибка, напишите в поддержку.'),
+    d.botUsername?el('button',{class:'btn',type:'button',onclick:sup},'Написать в поддержку'):null));
 }
 function toast(t){document.querySelectorAll('.toast').forEach(x=>x.remove());const n=el('div',{class:'toast',role:'status'},t);document.body.append(n);setTimeout(()=>n.remove(),2050)}
 function openLink(u){

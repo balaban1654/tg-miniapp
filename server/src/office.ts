@@ -2157,6 +2157,19 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     return r.rows[0];
   });
 
+  // Блокировка лида (только админ): за поведение или второй аккаунт. Причина видна в карточке и самому лиду в Mini App
+  app.post<{ Params: { tgId: string } }>('/leads/:tgId/ban', { preHandler: need('admin') }, async (req, reply) => {
+    const reason = str((req.body as any)?.reason, 300);
+    if (!reason) return reply.code(400).send({ error: 'Укажите причину блокировки' });
+    const r = await db.query('UPDATE leads SET banned_at = now(), ban_reason = $2, banned_by = $3 WHERE tg_id = $1 RETURNING tg_id', [Number(req.params.tgId), reason, req.staff!.id]);
+    if (!r.rowCount) return reply.code(404).send({ error: 'Лид не найден' });
+    return { ok: true };
+  });
+  app.delete<{ Params: { tgId: string } }>('/leads/:tgId/ban', { preHandler: need('admin') }, async (req) => {
+    await db.query('UPDATE leads SET banned_at = NULL, ban_reason = NULL, banned_by = NULL WHERE tg_id = $1', [Number(req.params.tgId)]);
+    return { ok: true };
+  });
+
   // Карточка лида: откуда пришёл, путь (старт, регистрация, депозиты) и суммы
   app.get<{ Params: { tgId: string } }>('/leads/:tgId', { preHandler: auth }, async (req, reply) => {
     const me = req.staff!;
@@ -2164,7 +2177,8 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     if (!Number.isSafeInteger(tgId)) return reply.code(400).send({ error: 'Неверный ID' });
     const r = await db.query(
       `SELECT d.tg_id, d.username, d.first_name, d.status, d.access, d.trader_id, d.is_tester, d.lead_role, d.region, d.tz,
-              d.created_at, d.last_seen_at, d.bot_started, d.bot_blocked, d.owner_id,
+              d.created_at, d.last_seen_at, d.bot_started, d.bot_blocked, d.owner_id, d.banned_at, d.ban_reason,
+              (SELECT name FROM staff WHERE id = d.banned_by) AS banned_by_name,
               o.name AS owner_name, l.slug AS link_slug, l.source AS link_source, l.campaign AS link_campaign
          FROM leads d LEFT JOIN staff o ON o.id = d.owner_id LEFT JOIN links l ON l.id = d.link_id
         WHERE d.tg_id = $1 AND (${ownerScope(me, 'd.owner_id')} OR ${chatScope(me, 'd.owner_id')})`,
@@ -2260,7 +2274,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     }
     const DT = depTypes(me);
     const r = await db.query(
-      `SELECT d.tg_id, d.trader_id, d.is_tester, d.lead_role, d.username, d.first_name, d.status, d.access, d.created_at, d.owner_id, ${leadListDate('d')} AS status_at,
+      `SELECT d.tg_id, d.trader_id, d.is_tester, d.lead_role, d.username, d.first_name, d.status, d.access, d.created_at, d.owner_id, (d.banned_at IS NOT NULL) AS banned, ${leadListDate('d')} AS status_at,
               s.name AS owner_name, coalesce(l.slug, (SELECT slug FROM links WHERE owner_id = d.owner_id ORDER BY id LIMIT 1)) AS link_slug,
               (SELECT amount FROM events e WHERE e.tg_id = d.tg_id AND e.type = 'ftd' ORDER BY e.created_at, e.id LIMIT 1) AS ftd_amount,
               coalesce((SELECT sum(amount) FROM events e WHERE e.tg_id = d.tg_id AND e.type IN ${DT}),0) AS deposits,

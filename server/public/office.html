@@ -1728,7 +1728,7 @@ async function viewLeads(){
     const staffRows=flat?[]:list.filter(isStaff).sort((a,b)=>(isOwner(b)-isOwner(a))||(ORDER[a.lead_role]??9)-(ORDER[b.lead_role]??9));
     const leadRows=flat?list:list.filter(r=>!isStaff(r));
     const sorted=[...(F.staffOpen?staffRows:[]),...leadRows];
-    const tbl=table(cols,sorted.map(r=>[td(date(r.status_at||r.created_at)),td(r.first_name||'—'),td(r.username?'@'+r.username:'—'),el('td',{class:'n'},el('button',{type:'button',class:'own-btn',title:'Открыть карточку лида','aria-label':'Открыть карточку лида',onclick:()=>openLeadCard(r.tg_id)},String(r.tg_id))),pocketCell(r),el('td',{},isStaff(r)?el('span',{class:'pill p-pur'},({admin:'Админ',moder:'Модер',streamer:'Стример',analyst:'Аналитик',buyer:'Медиабайер',teamlead:'Тимлидер'})[r.lead_role]||r.lead_role):pill(r.status)),...(me.role==='admin'?[accessCell(r)]:[]),...(showOwner?[me.role==='admin'&&!isStaff(r)?ownerCell(r):td(r.owner_name||'не закреплён')]:[]),td(r.link_slug||'—'),...(me.role==='streamer'?[]:[td(r.ftd_amount!=null&&!isStaff(r)?money(r.ftd_amount):'—','n')]),td(money(r.deposits),'n'),...(showComm?[td(money(r.commission),'n')]:[]),...(me.role==='admin'?[delLeadCell(r)]:[])]),
+    const tbl=table(cols,sorted.map(r=>[td(date(r.status_at||r.created_at)),td(r.first_name||'—'),td(r.username?'@'+r.username:'—'),el('td',{class:'n'},el('button',{type:'button',class:'own-btn',title:'Открыть карточку лида','aria-label':'Открыть карточку лида',onclick:()=>openLeadCard(r.tg_id)},String(r.tg_id))),pocketCell(r),el('td',{},isStaff(r)?el('span',{class:'pill p-pur'},({admin:'Админ',moder:'Модер',streamer:'Стример',analyst:'Аналитик',buyer:'Медиабайер',teamlead:'Тимлидер'})[r.lead_role]||r.lead_role):[pill(r.status),r.banned?el('span',{class:'pill p-bad',style:'margin-left:4px',title:'Лид заблокирован'},'⛔'):null]),...(me.role==='admin'?[accessCell(r)]:[]),...(showOwner?[me.role==='admin'&&!isStaff(r)?ownerCell(r):td(r.owner_name||'не закреплён')]:[]),td(r.link_slug||'—'),...(me.role==='streamer'?[]:[td(r.ftd_amount!=null&&!isStaff(r)?money(r.ftd_amount):'—','n')]),td(money(r.deposits),'n'),...(showComm?[td(money(r.commission),'n')]:[]),...(me.role==='admin'?[delLeadCell(r)]:[])]),
       src().length?'Ничего не найдено. Измените фильтры.':'Лидов пока нет. Они появятся, когда люди перейдут по вашим ссылкам и нажмут «Старт» в боте.');
     tbl.classList.add('ctr');
     const body=tbl.querySelector('tbody');
@@ -2124,7 +2124,7 @@ async function openLeadCard(tgId){
     el('div',{},el('button',{class:'btn',type:'button',disabled:C.gapDays?'':null,title:C.gapDays?'Акцию уже отправляли за последние '+C.gapDays+' дня':'',onclick:()=>connectDialog(L,C,()=>{close();openLeadCard(tgId)})},'Предложить скидку'))):null;
   box.replaceChildren(...[
     el('div',{class:'lc-head'},el('div',{style:'min-width:0'},el('h3',{style:'font-size:21px;line-height:1.2;overflow:hidden;text-overflow:ellipsis'},fname),L.first_name&&L.username?el('div',{class:'mut',style:'font-size:13px;margin-top:2px'},'@'+L.username):null),
-      el('div',{class:'lc-hr'},el('div',{class:'lc-pills'},pill(L.status),L.access?el('span',{class:'pill p-ok'},'доступ открыт'):el('span',{class:'pill p-pur'},'доступ закрыт')),
+      el('div',{class:'lc-hr'},el('div',{class:'lc-pills'},pill(L.status),L.banned_at?el('span',{class:'pill p-bad'},'заблокирован'):L.access?el('span',{class:'pill p-ok'},'доступ открыт'):el('span',{class:'pill p-pur'},'доступ закрыт')),
         el('button',{class:'btn o s',type:'button','aria-label':'Закрыть',onclick:close},'✕'))),
     el('div',{class:'lc-grid'},
       kvc('Telegram ID',L.tg_id),kvc('Pocket ID',L.trader_id),...(L.pockets||[]).map((x,i)=>kvc('Pocket ID '+(i+2),x)),kv('Откуда пришёл',origin),
@@ -2137,9 +2137,14 @@ async function openLeadCard(tgId){
       el('div',{},el('h4',{class:'lc-h'},'Финансы по постбекам'),finTile)),
     tierBox,
     connBox,
+    L.banned_at?el('div',{class:'card',style:'border-color:var(--bad);display:grid;gap:4px;padding:12px 14px'},el('b',{style:'color:var(--bad)'},'Лид заблокирован'),
+      el('div',{class:'sm'},'Причина: '+(L.ban_reason||'—')),el('div',{class:'mut sm'},fmtDT(L.banned_at)+(L.banned_by_name?' · '+L.banned_by_name:'')+'. Mini App, пуши и сигналы ему недоступны; написать в поддержку он может.')):null,
     el('div',{class:'lc-actions'},
       ['admin','teamlead','streamer'].includes(me.role)?el('button',{class:'btn',type:'button',onclick:()=>{close();pendingChat=L.tg_id;tab='chats';showApp()}},'Открыть чат'):null,
-      el('a',{class:'btn o',href:profileUrl(L),target:'_blank',rel:'noopener',style:'text-decoration:none;display:inline-flex;align-items:center'},'Профиль в Telegram'))].flat().filter(Boolean));
+      el('a',{class:'btn o',href:profileUrl(L),target:'_blank',rel:'noopener',style:'text-decoration:none;display:inline-flex;align-items:center'},'Профиль в Telegram'),
+      me.role==='admin'?(L.banned_at
+        ?el('button',{class:'btn o',type:'button',onclick:async()=>{if(!await askC('Разблокировать лида? Ему снова станут доступны Mini App, пуши и сигналы.'))return;try{await api('/leads/'+L.tg_id+'/ban',{method:'DELETE'});toast('Лид разблокирован');close();openLeadCard(L.tg_id)}catch(x){toast(x.message)}}},'Разблокировать')
+        :el('button',{class:'btn o',type:'button',style:'color:var(--bad);border-color:var(--bad)',onclick:()=>banDialog(L,()=>{close();openLeadCard(L.tg_id)})},'Заблокировать')):null)].flat().filter(Boolean));
   box.classList.add('wide');
 }
 /** Запрос бонуса за градацию додепов: сообщение и скриншот, что с лидом шла работа. Уходит админу на проверку */
@@ -4060,6 +4065,24 @@ async function cnSn(d){
     return[el('td',{},el('a',{href:'#',onclick:e=>{e.preventDefault();openLeadCard(r.tg_id)},style:'color:var(--acc2)'},r.lead_name)),td(r.offer_name+' (−'+r.discount_pct+'%)'),td(r.by_name||'—'),td(fmtDT(r.sent_at)),td(fmtDT(r.expires_at)),td(cnMoney(r.required),'n'),
       el('td',{},el('span',{class:'pill '+st[1],title:r.error||''},st[0]),r.state==='connected'?el('span',{class:'mut sm'},' '+cnMoney(r.connected_amount)):null)]}),'Акции ещё не отправляли'))];
 }
+/** Окно блокировки лида: причина обязательна (быстрый выбор или свой текст) */
+function banDialog(L,done){
+  document.querySelectorAll('.ban-ov').forEach(x=>x.remove());
+  const ov=el('div',{class:'lc-overlay ban-ov',role:'dialog','aria-modal':'true'});
+  const close=()=>ov.remove();
+  ov.addEventListener('mousedown',e=>{if(e.target===ov)close()});
+  const reason=el('textarea',{class:'big',rows:'3',maxlength:'300',placeholder:'Причина блокировки (её увидит лид)'});
+  const quick=['Второй аккаунт','Неадекватное поведение','Мошенничество / фрод'].map(t=>el('button',{type:'button',class:'btn o s',onclick:()=>{reason.value=t;reason.focus()}},t));
+  const err=el('div',{class:'err',role:'alert'});
+  const go=el('button',{class:'btn',type:'button',style:'background:var(--bad)',onclick:async()=>{err.textContent='';go.disabled=true;try{await api('/leads/'+L.tg_id+'/ban',{method:'POST',body:{reason:reason.value}});toast('Лид заблокирован');close();done()}catch(x){err.textContent=x.message;go.disabled=false}}},'Заблокировать');
+  ov.append(el('div',{class:'lc',style:'width:min(460px,100%);display:grid;gap:12px'},
+    el('div',{class:'lc-head'},el('h3',{style:'font-size:17px'},'Заблокировать лида'),el('button',{class:'btn o s',type:'button','aria-label':'Закрыть',onclick:close},'✕')),
+    el('div',{class:'mut sm'},(L.first_name||L.username||L.tg_id)+': не сможет открыть Mini App, не будет получать пуши, сигналы и акции, бот не поведёт его по воронке. Написать в поддержку он сможет.'),
+    el('div',{style:'display:flex;gap:6px;flex-wrap:wrap'},...quick),reason,err,
+    el('div',{style:'display:flex;gap:8px'},go,el('button',{class:'btn o',type:'button',onclick:close},'Отмена'))));
+  document.body.append(ov);reason.focus();
+}
+
 /** Окно «Предложить скидку» в карточке лида */
 function connectDialog(L,C,done){
   document.querySelectorAll('.cn-ov').forEach(x=>x.remove());

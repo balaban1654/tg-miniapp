@@ -162,6 +162,10 @@ ALTER TABLE leads ADD COLUMN IF NOT EXISTS taken_from INT REFERENCES staff(id) O
 ALTER TABLE messages ADD COLUMN IF NOT EXISTS edited_at TIMESTAMPTZ;
 -- Удалённый сотрудник: скрыт из списков и не может войти, но остаётся в истории (лиды, зарплата, сообщения)
 ALTER TABLE staff ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+-- Блокировка лида админом (за поведение, второй аккаунт): без Mini App, пушей и воронки бота; в поддержку писать может
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS banned_at TIMESTAMPTZ;
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS ban_reason TEXT;
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS banned_by INT REFERENCES staff(id) ON DELETE SET NULL;
 -- Ответы бота на кнопки и /start (Пуши → Ответы бота)
 CREATE TABLE IF NOT EXISTS bot_replies (
   key        TEXT PRIMARY KEY,
