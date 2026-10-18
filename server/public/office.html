@@ -1991,7 +1991,7 @@ let pbNew=0; // новые постбеки с прошлого просмотр
 async function updateBadge(){
   if(!me)return;
   if(me.role==='teamlead'){try{const p=tab==='pb'?{n:0}:await api('/postbacks/count');if(p.n!==pbNew){pbNew=p.n;drawNav()}}catch{}}
-  if(me.role==='admin'){try{const c=await api('/reviews/count');const p=tab==='pb'?{n:0}:await api('/postbacks/count');if(c.pending!==mediaPend||p.n!==pbNew){mediaPend=c.pending;pbNew=p.n;drawNav()}}catch{}}
+  if(me.role==='admin'){try{const c=await api('/reviews/count');const p=tab==='pb'?{n:0}:await api('/postbacks/count');if(c.pending!==mediaPend||p.n!==pbNew){mediaPend=c.pending;pbNew=p.n;drawNav();if(tab==='media'&&window.__mediaTabsRedraw)window.__mediaTabsRedraw()}}catch{}}
   if(['admin','streamer'].includes(me.role)){try{const f=await api('/fraud/count');if(f.n!==fraudNew){fraudNew=f.n;drawNav()}}catch{}}
   if(['admin','teamlead','streamer'].includes(me.role)){
     try{const c=await api('/chats');navLblSet('chats',{total:c.length,reg:0,fresh:c.filter(x=>x.waiting).length})}catch{}
@@ -3808,7 +3808,9 @@ async function viewMedia(){
   const MT=[['ch','Каналы и трейдеры'],['news','Новости'],['rev','Отзывы']];
   const mBar=el('div',{class:'lc-tabs',role:'tablist'}),mBody=el('div',{style:'display:grid;gap:14px'});
   const drawM=async()=>{
-    mBar.replaceChildren(...MT.map(([k,t])=>el('button',{type:'button',role:'tab','aria-selected':String(k===mediaTab),class:'lc-tab'+(k===mediaTab?' on':''),onclick:()=>{mediaTab=k;drawM()}},t)));
+    // На «Отзывах» мигает число отзывов, ждущих проверки (как у пункта «Медиа» в меню)
+    const drawTabs=()=>mBar.replaceChildren(...MT.map(([k,t])=>el('button',{type:'button',role:'tab','aria-selected':String(k===mediaTab),class:'lc-tab'+(k===mediaTab?' on':''),onclick:()=>{mediaTab=k;drawM()}},t,k==='rev'&&mediaPend>0?el('span',{class:'nbadge vio pulse tb',title:'Ждут проверки'},String(mediaPend)):null)));
+    window.__mediaTabsRedraw=drawTabs;drawTabs();
     if(mediaTab==='ch'){mBody.replaceChildren(form,
     table(['Тип','Имя, страна','Подпись','Ссылка',''],rows.map(r=>r.id===mediaEdit?editRow(r):viewRow(r)),'Пока пусто. Добавьте трейдеров и каналы, они появятся во вкладке «Медиа» в Mini App.'),rowErr);return}
     mBody.replaceChildren(el('div',{class:'mut'},'Загрузка…'));
@@ -3869,7 +3871,7 @@ async function reviewsAdmin(){
   const rowErr=el('div',{class:'err',role:'alert'});
   const BS='display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;height:30px;vertical-align:middle;margin-left:6px';
   const tb=(t,fn,extra)=>el('button',{class:'btn o s',type:'button',style:BS+';padding:0 12px'+(extra||''),onclick:fn},t);
-  const act=fn=>async()=>{rowErr.textContent='';try{await fn();render({soft:true})}catch(x){rowErr.textContent=x.message}};
+  const act=fn=>async()=>{rowErr.textContent='';try{await fn();await updateBadge();render({soft:true})}catch(x){rowErr.textContent=x.message}};
   const delBtn=r=>{const b=tb('Удалить',()=>{});let armed=false;b.onclick=()=>{if(!armed){armed=true;b.textContent='Точно?';setTimeout(()=>{armed=false;b.textContent='Удалить'},3000);return}act(()=>api('/reviews/'+r.id,{method:'DELETE'}))()};return b};
   const photoCell=r=>r.has_photo?el('a',{href:'/api/office/reviews/'+r.id+'/photo',target:'_blank',rel:'noopener',class:'shotc',style:'width:64px;height:64px',title:'Открыть фото'},el('img',{src:'/api/office/reviews/'+r.id+'/photo',alt:''})):'—';
   const statusPill=r=>el('span',{class:'pill '+(r.status==='published'?'p-ok':r.status==='pending'?'p-warn':'p-bad')},RV_STATUS[r.status]||r.status);
