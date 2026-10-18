@@ -550,26 +550,36 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // Ссылки с результатами по каждой
-  app.get('/links', { preHandler: auth }, async (req) => {
-    const me = req.staff!;
-    const DT = depTypes(me);
+  // Статистика ссылок за период (даты по Киеву; без периода за всё время). Всё считается после сброса ссылки (reset_at):
+  // клики по журналу кликов, старты по дате прихода лида, регистрации, FTD, депозиты и комиссия по дате события.
+  // «По источникам» складывается из тех же строк, поэтому суммы в двух таблицах всегда совпадают
+  const linkStats = async (me: Staff, q: { from?: string; to?: string }) => {
+    const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+    const from = DATE_RE.test(String(q.from)) ? String(q.from) : null;
+    const to = DATE_RE.test(String(q.to)) ? String(q.to) : null;
+    const KY = "'Europe/Kyiv'";
+    const inR = (col: string) => `($1::date IS NULL OR (${col} AT TIME ZONE ${KY})::date >= $1::date) AND ($2::date IS NULL OR (${col} AT TIME ZONE ${KY})::date <= $2::date)`;
+    const after = (col: string) => `${col} >= coalesce(l.reset_at, '-infinity')`;
+    const lead = `d.link_id = l.id AND d.lead_role = 'lead' AND ${after('d.created_at')}`;
+    const ev = (types: string) => `FROM events e JOIN leads d ON d.tg_id = e.tg_id WHERE ${lead} AND ${after('e.created_at')} AND ${inR('e.created_at')} AND e.type IN ${types}`;
+    const showComm = me.role !== 'streamer' && me.role !== 'teamlead';
     const r = await db.query(
-      `SELECT l.id, l.slug, l.source, l.campaign, l.clicks, l.created_at, l.parent_id, l.token, s.name AS owner_name, l.owner_id,
-              (SELECT count(*)::int FROM leads d WHERE d.link_id = l.id AND d.lead_role = 'lead' AND d.created_at >= coalesce(l.reset_at, '-infinity')) AS starts,
-              (SELECT count(*)::int FROM leads d WHERE d.link_id = l.id AND d.lead_role = 'lead' AND d.created_at >= coalesce(l.reset_at, '-infinity')
-                 AND EXISTS (SELECT 1 FROM events e WHERE e.tg_id = d.tg_id AND e.type = 'reg')) AS regs,
-              (SELECT count(*)::int FROM leads d WHERE d.link_id = l.id AND d.lead_role = 'lead' AND d.created_at >= coalesce(l.reset_at, '-infinity') AND d.status IN ('ftd','active')) AS ftds,
-              coalesce((SELECT sum(e.amount) FROM events e JOIN leads d ON d.tg_id = e.tg_id
-                 WHERE d.link_id = l.id AND d.lead_role = 'lead' AND d.created_at >= coalesce(l.reset_at, '-infinity') AND e.created_at >= coalesce(l.reset_at, '-infinity') AND e.type IN ${DT}),0)::float AS deposits,
-              coalesce((SELECT sum(e.amount) FROM events e JOIN leads d ON d.tg_id = e.tg_id
-                 WHERE d.link_id = l.id AND d.lead_role = 'lead' AND d.created_at >= coalesce(l.reset_at, '-infinity') AND e.created_at >= coalesce(l.reset_at, '-infinity') AND e.type = 'comm' AND ${me.role === 'streamer' || me.role === 'teamlead' ? 'false' : 'true'}),0)::float AS commission
+      `SELECT l.id, l.slug, l.source, l.campaign, l.created_at, l.parent_id, l.token, s.name AS owner_name, l.owner_id,
+              ${from || to ? `(SELECT count(*)::int FROM link_clicks c WHERE c.link_id = l.id AND ${after('c.at')} AND ${inR('c.at')})` : 'l.clicks'} AS clicks,
+              (SELECT count(*)::int FROM leads d WHERE ${lead} AND ${inR('d.created_at')}) AS starts,
+              (SELECT count(DISTINCT e.tg_id)::int ${ev("('reg')")}) AS regs,
+              (SELECT count(DISTINCT e.tg_id)::int ${ev("('ftd')")}) AS ftds,
+              coalesce((SELECT sum(e.amount) ${ev(depTypes(me))}), 0)::float AS deposits,
+              ${showComm ? `coalesce((SELECT sum(e.amount) ${ev("('comm')")}), 0)::float` : '0::float'} AS commission
          FROM links l JOIN staff s ON s.id = l.owner_id
         WHERE ${ownerScope(me, 'l.owner_id')} ORDER BY coalesce(l.parent_id, l.id) DESC, (l.parent_id IS NOT NULL), l.id DESC`,
+      [from, to],
     );
     // Комиссия партнёрки видна только админу
     if (me.role !== 'admin') for (const x of r.rows) x.commission = null;
-    return r.rows;
-  });
+    return r.rows as any[];
+  };
+  app.get<{ Querystring: { from?: string; to?: string } }>('/links', { preHandler: auth }, async (req) => linkStats(req.staff!, req.query));
 
   // Аналитика одной ссылки: клики по дням, платформы, источники переходов, устройства, браузеры, страны, города и последние клики
   app.get<{ Params: { id: string }; Querystring: { days?: string } }>('/links/:id/analytics', { preHandler: auth }, async (req, reply) => {
@@ -632,34 +642,18 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // Итоги по источникам: все ссылки с одним и тем же источником складываются вместе
-  app.get('/sources', { preHandler: auth }, async (req) => {
+  app.get<{ Querystring: { from?: string; to?: string } }>('/sources', { preHandler: auth }, async (req) => {
     const me = req.staff!;
-    const DT = depTypes(me);
-    const r = await db.query(
-      `SELECT coalesce(nullif(l.source,''), 'Без источника') AS source,
-              count(DISTINCT l.id)::int AS links,
-              coalesce(sum(l.clicks),0)::int AS clicks
-         FROM links l WHERE ${ownerScope(me, 'l.owner_id')} GROUP BY 1`,
-    );
-    const res = await db.query(
-      `SELECT coalesce(nullif(l.source,''), 'Без источника') AS source,
-              count(d.tg_id)::int AS starts,
-              count(d.tg_id) FILTER (WHERE EXISTS (SELECT 1 FROM events e WHERE e.tg_id = d.tg_id AND e.type = 'reg'))::int AS regs,
-              count(d.tg_id) FILTER (WHERE d.status IN ('ftd','active'))::int AS ftds,
-              coalesce(sum((SELECT sum(e.amount) FROM events e WHERE e.tg_id = d.tg_id AND e.created_at >= coalesce(l.reset_at, '-infinity') AND e.type IN ${DT})),0)::float AS deposits,
-              coalesce(sum((SELECT sum(e.amount) FROM events e WHERE e.tg_id = d.tg_id AND e.created_at >= coalesce(l.reset_at, '-infinity') AND e.type = 'comm' AND ${me.role === 'streamer' || me.role === 'teamlead' ? 'false' : 'true'})),0)::float AS commission
-         FROM links l JOIN leads d ON d.link_id = l.id
-        WHERE d.lead_role = 'lead' AND d.created_at >= coalesce(l.reset_at, '-infinity') AND ${ownerScope(me, 'l.owner_id')} GROUP BY 1`,
-    );
-    const byS = new Map(res.rows.map((x) => [x.source, x]));
-    const out = r.rows.map((x) => ({
-      ...x,
-      starts: byS.get(x.source)?.starts ?? 0,
-      regs: byS.get(x.source)?.regs ?? 0,
-      ftds: byS.get(x.source)?.ftds ?? 0,
-      deposits: byS.get(x.source)?.deposits ?? 0,
-      commission: me.role === 'admin' ? (byS.get(x.source)?.commission ?? 0) : null,
-    }));
+    const by = new Map<string, any>();
+    for (const l of await linkStats(me, req.query)) {
+      const k = (l.source ?? '').trim() || 'Без источника';
+      const x = by.get(k) ?? { source: k, links: 0, clicks: 0, starts: 0, regs: 0, ftds: 0, deposits: 0, commission: me.role === 'admin' ? 0 : null };
+      x.links++;
+      for (const f of ['clicks', 'starts', 'regs', 'ftds', 'deposits'] as const) x[f] += Number(l[f]) || 0;
+      if (x.commission !== null) x.commission += Number(l.commission) || 0;
+      by.set(k, x);
+    }
+    const out = [...by.values()].map((x) => ({ ...x, deposits: Math.round(x.deposits * 100) / 100, commission: x.commission === null ? null : Math.round(x.commission * 100) / 100 }));
     return out.sort((a, b) => b.deposits - a.deposits || b.clicks - a.clicks);
   });
 
