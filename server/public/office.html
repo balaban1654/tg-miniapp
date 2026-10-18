@@ -1402,8 +1402,8 @@ async function viewPlans(){
   const root=el('div',{style:'display:grid;gap:14px'}),body=el('div',{style:'display:grid;gap:14px'}),bar=el('div',{class:'lc-tabs',role:'tablist'});
   const TABS=[['tasks','Задачи'],['goals','Планы']];
   const drawBar=()=>bar.replaceChildren(...TABS.map(([k,t])=>el('button',{type:'button',role:'tab','aria-selected':String(k===plansState.tab),class:'lc-tab'+(k===plansState.tab?' on':''),onclick:()=>{plansState.tab=k;drawBar();drawBody();pushHash()}},t)));
-  const drawBody=async()=>{body.replaceChildren(el('div',{class:'mut'},'Загрузка…'));try{body.replaceChildren(...(await (plansState.tab==='goals'?plansGoals:plansTasks)()).filter(Boolean))}catch(x){if(x.message!=='auth')body.replaceChildren(el('div',{class:'err'},x.message))}};
-  drawBar();root.append(bar,body);plansRefresh=drawBody;await drawBody();
+  const drawBody=async soft=>{if(!soft)body.replaceChildren(el('div',{class:'mut'},'Загрузка…'));try{body.replaceChildren(...(await (plansState.tab==='goals'?plansGoals:plansTasks)()).filter(Boolean))}catch(x){if(x.message!=='auth')body.replaceChildren(el('div',{class:'err'},x.message))}};
+  drawBar();root.append(bar,body);plansRefresh=()=>drawBody(true);await drawBody();
   return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Планы и задачи')),root];
 }
 const TASKST={open:['в работе','p-pur'],done:['ждёт принятия','p-warn'],accepted:['принята','p-ok']};
@@ -1455,7 +1455,24 @@ async function plansGoals(){
     el('div',{class:'card',style:'display:grid;gap:12px'},el('h4',{},'Цели компании на месяц (план/факт на дашборде)'),
       el('div',{class:'lc-two'},lab('FTD, штук',f.gf),lab('Пополнения по FTD, $',f.gs),lab('Все депозиты (FTD и додепы), $',f.gd),lab('Комиссия, $',f.gc),lab('Чистая прибыль, $',f.gn)),err2,
       el('div',{},el('button',{class:'btn',type:'button',onclick:()=>save({goals:{ftd:+f.gf.value,ftdSum:+f.gs.value,deposits:+f.gd.value,commission:+f.gc.value,net:+f.gn.value}},err2,'Цели сохранены')},'Сохранить')),
-      el('div',{class:'mut sm'},'Для периода меньше месяца цели пересчитываются пропорционально дням. Метка на полоске показывает, где вы должны быть сегодня.'))];
+      el('div',{class:'mut sm'},'Для периода меньше месяца цели пересчитываются пропорционально дням. Метка на полоске показывает, где вы должны быть сегодня.')),
+    await teamGoalsCard()];
+}
+/** Планы команд тимлидеров (план/факт на дашборде тимлида). Пустое поле: считается автоматически */
+async function teamGoalsCard(){
+  const list=await api('/team-goals');
+  const card=el('div',{class:'card',style:'display:grid;gap:12px'},el('h4',{},'План команды тимлидера на месяц (план/факт на его дашборде)'));
+  if(!list.length){card.append(el('div',{class:'mut sm'},'Тимлидеров пока нет.'));return card}
+  const err=el('div',{class:'err',role:'alert'});
+  const rows=list.map(t=>{
+    const inp=(k,lbl)=>el('input',{type:'number',min:'0',step:'any',value:t.set[k]===null?'':String(t.set[k]),placeholder:'авто: '+(k==='ftd'?n0(t.auto[k]):usd0(t.auto[k])),'aria-label':lbl+', '+t.name,style:'width:140px;text-align:center'});
+    const f=inp('ftd','FTD'),s2=inp('ftdSum','Пополнения по FTD'),d2=inp('deposits','Все депозиты');
+    const save=el('button',{class:'btn s',type:'button',onclick:async()=>{err.textContent='';save.disabled=true;try{await api('/team-goals/'+t.id,{method:'PUT',body:{ftd:f.value,ftdSum:s2.value,deposits:d2.value}});toast('План команды сохранён: '+t.name);plansRefresh()}catch(x){err.textContent=x.message;save.disabled=false}}},'Сохранить');
+    return[td(t.name+(t.active?'':' (отключён)')),td(t.teamN,'n'),el('td',{},f),el('td',{},s2),el('td',{},d2),el('td',{},save)];
+  });
+  card.append(ctrT(table(['Тимлидер','Стримеров','FTD, штук','Пополнения по FTD, $','Все депозиты, $',''],rows,'')),err,
+    el('div',{class:'mut sm'},'Пустое поле считается автоматически: FTD = минимум лидов × активные стримеры команды, суммы — доля целей компании. Чтобы вернуть авто, очистите поле и сохраните.'));
+  return card;
 }
 
 /* ---------- Дашборд стримера ---------- */

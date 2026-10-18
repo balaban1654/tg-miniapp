@@ -783,3 +783,12 @@ CREATE TABLE IF NOT EXISTS fraud_alerts (
 
 -- Фрод: у каждого сотрудника своя отметка «просмотрено» (у стримера свой кружок, у админа свой)
 ALTER TABLE staff ADD COLUMN IF NOT EXISTS fraud_seen_at TIMESTAMPTZ;
+
+-- План команды тимлида на месяц (дашборд тимлида). Пустое поле: считается автоматически из плана компании
+CREATE TABLE IF NOT EXISTS team_goals (
+  staff_id   INT PRIMARY KEY REFERENCES staff(id) ON DELETE CASCADE,
+  ftd        NUMERIC,
+  ftd_sum    NUMERIC,
+  deposits   NUMERIC,
+  updated_at TIMESTAMPTZ DEFAULT now()
+);

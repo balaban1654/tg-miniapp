@@ -1178,6 +1178,46 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     return m;
   };
 
+  // План команды тимлида на месяц: заданный админом или автоматический (план по лидам × активные стримеры, суммы долей плана компании)
+  const teamGoals = async (leadId: number, plan: KpiPlan) => {
+    const g = plan.goals;
+    const teamN = Number((await db.query(`SELECT count(*)::int AS n FROM staff WHERE role = 'streamer' AND active AND deleted_at IS NULL AND parent_id = $1`, [leadId])).rows[0].n);
+    const allN = Number((await db.query(`SELECT count(*)::int AS n FROM staff WHERE role = 'streamer' AND active AND deleted_at IS NULL`)).rows[0].n);
+    const share = g.ftd > 0 ? (plan.leads * teamN) / g.ftd : allN ? teamN / allN : 0;
+    const auto = { ftd: plan.leads * teamN, ftdSum: r2(g.ftdSum * share), deposits: r2(g.deposits * share) };
+    const set = (await db.query('SELECT ftd::float AS ftd, ftd_sum::float AS ftd_sum, deposits::float AS deposits FROM team_goals WHERE staff_id = $1', [leadId])).rows[0] ?? {};
+    return {
+      teamN,
+      auto,
+      set: { ftd: set.ftd ?? null, ftdSum: set.ftd_sum ?? null, deposits: set.deposits ?? null },
+      ftd: set.ftd ?? auto.ftd,
+      ftdSum: set.ftd_sum ?? auto.ftdSum,
+      deposits: set.deposits ?? auto.deposits,
+    };
+  };
+  app.get('/team-goals', { preHandler: admin }, async () => {
+    const plan = await getPlan();
+    const leads = (await db.query(`SELECT id, name, active FROM staff WHERE role = 'teamlead' AND deleted_at IS NULL ORDER BY active DESC, name`)).rows as { id: number; name: string; active: boolean }[];
+    const out = [];
+    for (const l of leads) out.push({ ...l, ...(await teamGoals(l.id, plan)) });
+    return out;
+  });
+  app.put<{ Params: { id: string } }>('/team-goals/:id', { preHandler: admin }, async (req, reply) => {
+    const id = Number(req.params.id);
+    if (!(await db.query(`SELECT 1 FROM staff WHERE id = $1 AND role = 'teamlead'`, [id])).rowCount) return reply.code(404).send({ error: 'Тимлидер не найден' });
+    const b = (req.body ?? {}) as Record<string, unknown>;
+    const v = (x: unknown) => (x === null || x === undefined || x === '' ? null : Number.isFinite(Number(x)) && Number(x) >= 0 && Number(x) <= 1e9 ? Number(x) : NaN);
+    const [ftd, ftdSum, deposits] = [v(b.ftd), v(b.ftdSum), v(b.deposits)];
+    if ([ftd, ftdSum, deposits].some((x) => Number.isNaN(x))) return reply.code(400).send({ error: 'Проверьте числа: от 0 и больше' });
+    if (ftd === null && ftdSum === null && deposits === null) await db.query('DELETE FROM team_goals WHERE staff_id = $1', [id]);
+    else
+      await db.query(
+        `INSERT INTO team_goals (staff_id, ftd, ftd_sum, deposits, updated_at) VALUES ($1,$2,$3,$4,now())
+         ON CONFLICT (staff_id) DO UPDATE SET ftd = $2, ftd_sum = $3, deposits = $4, updated_at = now()`,
+        [id, ftd, ftdSum, deposits],
+      );
+    return { ok: true };
+  });
   app.get<{ Querystring: { from?: string; to?: string; all?: string } }>('/dashboard', { preHandler: need('admin', 'teamlead') }, async (req) => {
     const plan = await getPlan();
     // Тимлид видит только свою команду, без расходов и прибыли компании; вместо прибыли его зарплата
@@ -1229,12 +1269,10 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     const ids = staffRows.map((s) => s.id);
     // План команды тимлида: FTD = план по лидам × активные стримеры команды; суммы пополнений и депозитов
     // берутся из плана компании в той же доле, что FTD команды от FTD компании (без плана FTD: по доле стримеров)
+    // Если админ прописал план команды в «Планах», берём его
     if (lead && goalFactor !== null) {
-      const teamN = staffRows.filter((s) => s.active && s.role === 'streamer').length;
-      const allN = Number((await db.query(`SELECT count(*)::int AS n FROM staff WHERE role = 'streamer' AND active AND deleted_at IS NULL`)).rows[0].n);
-      const ftdGoal = plan.leads * teamN * goalFactor;
-      const share = g.ftd > 0 ? (plan.leads * teamN) / g.ftd : allN ? teamN / allN : 0;
-      goals = { ftd: ftdGoal, ftdSum: g.ftdSum * goalFactor * share, deposits: g.deposits * goalFactor * share, commission: 0, net: 0 };
+      const tg = (await teamGoals(lead, plan))!;
+      goals = { ftd: tg.ftd * goalFactor, ftdSum: tg.ftdSum * goalFactor, deposits: tg.deposits * goalFactor, commission: 0, net: 0 };
     }
 
     const evRange = await aggEvents(from, to);
