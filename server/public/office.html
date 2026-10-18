@@ -2365,6 +2365,19 @@ function dateWheel({value='',min='1990-01-01',max='2100-12-31',optional=false,pl
   return btn;
 }
 /** Скриншот: по наведению увеличенный просмотр рядом (на компьютере), по клику открывается окном, не на весь экран */
+/** Видео и голосовые из чата на телефоне: плеер поверх страницы (новая вкладка из приложения на экране «Домой» открывается без входа в кабинет) */
+function openMedia(url,kind){
+  document.querySelectorAll('.shot-ov').forEach(x=>x.remove());
+  const ov=el('div',{class:'lc-overlay shot-ov',role:'dialog','aria-modal':'true'});
+  const close=()=>{ov.remove();document.removeEventListener('keydown',onKey)};
+  const onKey=e=>{if(e.key==='Escape')close()};document.addEventListener('keydown',onKey);
+  ov.addEventListener('click',e=>{if(e.target===ov)close()});
+  const audio=kind==='voice'||kind==='audio';
+  const p=el(audio?'audio':'video',{src:url,controls:'',autoplay:'',playsinline:'',preload:'auto',style:audio?'width:min(420px,80vw)':'max-width:100%;max-height:75vh;border-radius:12px;background:#000'});
+  p.addEventListener('error',()=>p.replaceWith(el('div',{class:'mut'},'Файл не открылся (Telegram отдаёт боту файлы до 20 МБ)')),{once:true});
+  ov.append(el('div',{class:'shot-box'},el('button',{class:'btn o s shot-x',type:'button','aria-label':'Закрыть',onclick:close},'✕'),p));
+  document.body.append(ov);
+}
 function openShot(url){
   document.querySelectorAll('.shot-hover').forEach(x=>x.remove());
   document.querySelectorAll('.shot-ov').forEach(x=>x.remove());
@@ -3216,7 +3229,7 @@ async function viewChats(){
         let n;
         if(m.kind==='photo'){n=el('img',{src:url,alt:'Фото',loading:'lazy',onclick:()=>openShot(url)})}
         // Видео, кружки, голосовые и аудио ссылкой: открываются в новой вкладке (в чате плеер перезагружался при обновлении)
-        else if(['video','video_note','voice','audio'].includes(m.kind)){n=el('a',{class:'fl',href:url,target:'_blank',rel:'noopener'},({video:'🎬 Видео',video_note:'⭕ Кружок',voice:'🎤 Голосовое',audio:'🎵 '+(m.file_name||'Аудио')})[m.kind]+' · открыть')}
+        else if(['video','video_note','voice','audio'].includes(m.kind)){n=el('a',{class:'fl',href:url,target:'_blank',rel:'noopener',onclick:e=>{if(matchMedia('(pointer:coarse)').matches||matchMedia('(display-mode: standalone)').matches){e.preventDefault();openMedia(url,m.kind)}}},({video:'🎬 Видео',video_note:'⭕ Кружок',voice:'🎤 Голосовое',audio:'🎵 '+(m.file_name||'Аудио')})[m.kind]+' · открыть')}
         else if(m.kind==='animation'){n=el('video',{src:url,autoplay:'',loop:'',muted:'',playsinline:'',controls:''})}
         else{n=el('a',{class:'fl',href:url,target:'_blank',rel:'noopener',download:m.file_name||''},'📄 '+(m.file_name||'Файл'))}
         if(n.tagName!=='A')lost(n);
