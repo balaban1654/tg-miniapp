@@ -95,7 +95,7 @@ export const LESSONS = [
 ];
 
 
-/** Название канала и число подписчиков берём из Telegram по ссылке. Кэш на 30 минут, при ошибке пробуем снова через 5 */
+/** Название канала и число подписчиков берём из Telegram по ссылке. Кэш на 5 минут (сменили название: в Mini App через 5 минут или сразу по «Обновить из Telegram» в кабинете) */
 const tgInfoCache = new Map<string, { until: number; title: string | null; members: number | null }>();
 async function tgInfo(handle: string): Promise<{ title: string | null; members: number | null }> {
   const hit = tgInfoCache.get(handle);
@@ -111,7 +111,7 @@ async function tgInfo(handle: string): Promise<{ title: string | null; members: 
       /* бот не видит чат: оставим то, что успели получить */
     }
   }
-  const out = { until: Date.now() + (title && members !== null ? 1800_000 : 300_000), title, members };
+  const out = { until: Date.now() + (title && members !== null ? 300_000 : 120_000), title, members };
   tgInfoCache.set(handle, out);
   return out;
 }
@@ -120,7 +120,13 @@ const photoCache = new Map<string, { until: number; data: Buffer | null; type: s
 // Версия аватарки для адреса картинки: меняется вместе с самой картинкой, поэтому Telegram у клиента не держит старую
 function photoVer(id: number, handle: string): string {
   const hit = photoCache.get(`${id}:${handle}`);
-  return hit?.ver ?? 't' + Math.floor(Date.now() / 900_000);
+  // Кэш устарел: новый адрес, чтобы Mini App не показывала старую картинку из своего кэша
+  return hit && hit.until > Date.now() && hit.ver ? hit.ver : 't' + Math.floor(Date.now() / 300_000);
+}
+/** «Обновить из Telegram» в кабинете: сбросить кэш названий, подписчиков и аватарок */
+export function clearTgCaches(): void {
+  tgInfoCache.clear();
+  photoCache.clear();
 }
 /** Фото профиля, если бот его не видит (личные аккаунты): берём картинку со страницы t.me/имя */
 async function scrapeTgPhoto(handle: string): Promise<{ data: Buffer; type: string } | null> {
@@ -642,8 +648,8 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
     const key = `${id}:${handle}`;
     let hit = photoCache.get(key);
     if (!hit || hit.until < Date.now()) {
-      // Аватарку перечитываем из Telegram раз в 15 минут: сменили фото, и через 15 минут оно уже в Mini App
-      hit = { until: Date.now() + 900_000, data: null, type: 'image/jpeg' };
+      // Аватарку перечитываем из Telegram раз в 5 минут: сменили фото, и через 5 минут оно уже в Mini App
+      hit = { until: Date.now() + 300_000, data: null, type: 'image/jpeg' };
       try {
         if (handle && !config.disableBot) {
           const chat = await bot.api.getChat('@' + handle).catch(() => null);
@@ -674,6 +680,6 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
       photoCache.set(key, hit);
     }
     if (!hit.data) return reply.code(404).send();
-    return reply.header('Cache-Control', 'public, max-age=900').header('X-Content-Type-Options', 'nosniff').type(hit.type).send(hit.data);
+    return reply.header('Cache-Control', 'public, max-age=300').header('X-Content-Type-Options', 'nosniff').type(hit.type).send(hit.data);
   });
 }

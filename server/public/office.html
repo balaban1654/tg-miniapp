@@ -3910,7 +3910,8 @@ async function viewMedia(){
     // На «Отзывах» мигает число отзывов, ждущих проверки (как у пункта «Медиа» в меню)
     const drawTabs=()=>mBar.replaceChildren(...MT.map(([k,t])=>el('button',{type:'button',role:'tab','aria-selected':String(k===mediaTab),class:'lc-tab'+(k===mediaTab?' on':''),onclick:()=>{mediaTab=k;drawM()}},t,k==='rev'&&mediaPend>0?el('span',{class:'nbadge vio pulse tb',title:'Ждут проверки'},String(mediaPend)):null)));
     window.__mediaTabsRedraw=drawTabs;drawTabs();
-    if(mediaTab==='ch'){mBody.replaceChildren(form,
+    const refreshTg=el('div',{style:'display:flex;align-items:center;gap:12px;flex-wrap:wrap'},el('button',{class:'btn o s',type:'button',onclick:async e=>{const b=e.currentTarget;b.disabled=true;try{await api('/media/refresh',{method:'POST'});toast('Готово: Mini App возьмёт свежие названия и аватарки из Telegram')}catch(x){toast(x.message)}b.disabled=false}},'Обновить из Telegram'),el('span',{class:'mut sm'},'Названия, подписчики и аватарки каналов и трейдеров обновляются сами раз в 5 минут. Кнопка обновит сразу.'));
+    if(mediaTab==='ch'){mBody.replaceChildren(form,refreshTg,
     table(['Тип','Имя, страна','Подпись','Ссылка',''],rows.map(r=>r.id===mediaEdit?editRow(r):viewRow(r)),'Пока пусто. Добавьте трейдеров и каналы, они появятся во вкладке «Медиа» в Mini App.'),rowErr);return}
     mBody.replaceChildren(el('div',{class:'mut'},'Загрузка…'));
     try{mBody.replaceChildren(...(mediaTab==='news'?await newsAdmin():await reviewsAdmin()))}catch(x){mBody.replaceChildren(el('div',{class:'err'},x.message))}

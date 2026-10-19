@@ -1,3 +1,4 @@
+import { clearTgCaches } from './app.js';
 import QRCode from 'qrcode';
 import { newSecret, otpUri, verifyTotp, newRecoveryCodes } from './totp.js';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
@@ -1513,6 +1514,11 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     const staffId = Number(b.staff_id);
     return { kind, title, url, subtitle: str(b.subtitle, 80) || null, country: country || null, contact_url: contact || null, staff_id: Number.isInteger(staffId) && staffId > 0 ? staffId : null, sort: Math.trunc(num(b.sort)) };
   }
+  // Сразу перечитать из Telegram названия каналов, подписчиков и аватарки (иначе обновятся сами через 5 минут)
+  app.post('/media/refresh', { preHandler: need('admin') }, async () => {
+    clearTgCaches();
+    return { ok: true };
+  });
   app.post('/media', { preHandler: need('admin') }, async (req, reply) => {
     const m = cleanMedia((req.body ?? {}) as Record<string, unknown>);
     if (typeof m === 'string') return reply.code(400).send({ error: m });
