@@ -1514,6 +1514,20 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     const staffId = Number(b.staff_id);
     return { kind, title, url, subtitle: str(b.subtitle, 80) || null, country: country || null, contact_url: contact || null, staff_id: Number.isInteger(staffId) && staffId > 0 ? staffId : null, sort: Math.trunc(num(b.sort)) };
   }
+  // Ссылка кнопки «Попробовать демо» в Тренажёре Mini App
+  app.get('/app-settings/demo', { preHandler: need('admin') }, async () => {
+    const r = (await db.query(`SELECT value FROM app_settings WHERE key = 'demo_url'`)).rows[0];
+    return { url: r?.value ?? '' };
+  });
+  app.put('/app-settings/demo', { preHandler: need('admin') }, async (req, reply) => {
+    const url = str(((req.body ?? {}) as Record<string, unknown>).url, 500);
+    if (url && !/^https:\/\/\S+$/i.test(url)) return reply.code(400).send({ error: 'Ссылка должна начинаться с https://' });
+    await db.query(
+      `INSERT INTO app_settings (key, value, updated_at) VALUES ('demo_url', $1, now()) ON CONFLICT (key) DO UPDATE SET value = $1, updated_at = now()`,
+      [url || null],
+    );
+    return { ok: true };
+  });
   // Сразу перечитать из Telegram названия каналов, подписчиков и аватарки (иначе обновятся сами через 5 минут)
   app.post('/media/refresh', { preHandler: need('admin') }, async () => {
     clearTgCaches();

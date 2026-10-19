@@ -794,3 +794,10 @@ CREATE TABLE IF NOT EXISTS team_goals (
   deposits   NUMERIC,
   updated_at TIMESTAMPTZ DEFAULT now()
 );
+
+-- Настройки Mini App, которые админ меняет в кабинете (например, ссылка кнопки «Попробовать демо» в Тренажёре)
+CREATE TABLE IF NOT EXISTS app_settings (
+  key        TEXT PRIMARY KEY,
+  value      TEXT,
+  updated_at TIMESTAMPTZ DEFAULT now()
+);

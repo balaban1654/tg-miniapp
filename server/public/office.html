@@ -3911,7 +3911,13 @@ async function viewMedia(){
     const drawTabs=()=>mBar.replaceChildren(...MT.map(([k,t])=>el('button',{type:'button',role:'tab','aria-selected':String(k===mediaTab),class:'lc-tab'+(k===mediaTab?' on':''),onclick:()=>{mediaTab=k;drawM()}},t,k==='rev'&&mediaPend>0?el('span',{class:'nbadge vio pulse tb',title:'Ждут проверки'},String(mediaPend)):null)));
     window.__mediaTabsRedraw=drawTabs;drawTabs();
     const refreshTg=el('div',{style:'display:flex;align-items:center;gap:12px;flex-wrap:wrap'},el('button',{class:'btn o s',type:'button',onclick:async e=>{const b=e.currentTarget;b.disabled=true;try{await api('/media/refresh',{method:'POST'});toast('Готово: Mini App возьмёт свежие названия и аватарки из Telegram')}catch(x){toast(x.message)}b.disabled=false}},'Обновить из Telegram'),el('span',{class:'mut sm'},'Названия, подписчики и аватарки каналов и трейдеров обновляются сами раз в 5 минут. Кнопка обновит сразу.'));
-    if(mediaTab==='ch'){mBody.replaceChildren(form,refreshTg,
+    // Ссылка кнопки «Попробовать демо» в Тренажёре Mini App
+    const demoIn=el('input',{type:'text',inputmode:'url',autocapitalize:'off',autocomplete:'off',placeholder:'https://… (пусто: кнопки нет)',maxlength:'500',style:'flex:1;min-width:220px'});
+    api('/app-settings/demo').then(d=>{demoIn.value=d.url||''}).catch(()=>{});
+    const demoCard=el('div',{class:'card',style:'display:grid;gap:10px'},el('h3',{style:'font-size:14px'},'Кнопка «Попробовать демо» в Тренажёре'),
+      el('div',{style:'display:flex;gap:10px;flex-wrap:wrap;align-items:center'},demoIn,el('button',{class:'btn s',type:'button',onclick:async e=>{const b=e.currentTarget;b.disabled=true;try{await api('/app-settings/demo',{method:'PUT',body:{url:demoIn.value.trim()}});toast(demoIn.value.trim()?'Ссылка сохранена: кнопка появилась в Тренажёре':'Ссылка очищена: кнопки в Тренажёре нет')}catch(x){toast(x.message)}b.disabled=false}},'Сохранить')),
+      el('div',{class:'mut sm'},'Клиент нажимает «Попробовать демо» во вкладке «Тренажёр» и попадает по этой ссылке. Ссылка на t.me откроется внутри Telegram, остальные в браузере.'));
+    if(mediaTab==='ch'){mBody.replaceChildren(form,refreshTg,demoCard,
     table(['Тип','Имя, страна','Подпись','Ссылка',''],rows.map(r=>r.id===mediaEdit?editRow(r):viewRow(r)),'Пока пусто. Добавьте трейдеров и каналы, они появятся во вкладке «Медиа» в Mini App.'),rowErr);return}
     mBody.replaceChildren(el('div',{class:'mut'},'Загрузка…'));
     try{mBody.replaceChildren(...(mediaTab==='news'?await newsAdmin():await reviewsAdmin()))}catch(x){mBody.replaceChildren(el('div',{class:'err'},x.message))}

@@ -336,6 +336,11 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
     return { ok: true };
   });
 
+  // Ссылка кнопки «Попробовать демо» в Тренажёре (админ задаёт в кабинете, «Медиа»). Пусто: кнопки нет
+  app.get('/trainer/demo', { preHandler: auth }, async () => {
+    const r = (await db.query(`SELECT value FROM app_settings WHERE key = 'demo_url'`)).rows[0];
+    return { url: r?.value || null };
+  });
   app.get('/trainer', { preHandler: auth }, async (req) => {
     const done = new Set((await db.query('SELECT lesson FROM lesson_progress WHERE tg_id = $1', [req.tg!.id])).rows.map((x) => x.lesson));
     return LESSONS.map((l) => ({ ...l, done: done.has(l.id) }));
