@@ -348,6 +348,7 @@ textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10
 /* Полосы прокрутки везде в стиле кабинета: тонкие, в цвет рамок, ярче при наведении */
 *{scrollbar-width:thin;scrollbar-color:#ffffff26 transparent}
 ::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:#ffffff26;border-radius:99px}::-webkit-scrollbar-thumb:hover{background:var(--acc)}::-webkit-scrollbar-button{display:none;width:0;height:0}::-webkit-scrollbar-corner{background:transparent}
+.lc-tabs.dd-hide{display:none!important}.tab-dd{position:relative;z-index:30}.tab-dd-r{display:flex;gap:8px;align-items:center}.tab-dd-t{flex:1;min-width:0;display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--card);border:1px solid var(--line);border-radius:12px;color:var(--fg);font:inherit;font-weight:700;font-size:15px;padding:12px 14px;cursor:pointer;text-align:left}.tab-dd-t svg{flex:none;color:var(--mut);transition:transform .2s}.tab-dd.open .tab-dd-t{border-color:var(--acc)}.tab-dd.open .tab-dd-t svg{transform:rotate(180deg)}.tab-dd-l{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-flex;align-items:center;gap:6px}.tab-dd-x{flex:none;width:44px;height:44px;display:grid;place-items:center;background:var(--card);border:1px solid var(--line);border-radius:12px;color:var(--mut);cursor:pointer}.tab-dd-m{display:none;position:absolute;left:0;right:0;top:calc(100% + 6px);background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:6px;box-shadow:0 16px 40px rgba(0,0,0,.55);max-height:60vh;overflow:auto}.tab-dd.open .tab-dd-m{display:grid;gap:2px}.tab-dd-o{display:flex;align-items:center;background:none;border:0;color:var(--fg);font:inherit;font-size:15px;text-align:left;padding:12px;border-radius:8px;cursor:pointer}.tab-dd-o.on{background:var(--card);color:var(--acc2);font-weight:700}.tab-dd-o:active{background:var(--card)}
 .fx-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.card.fx-t{padding:12px 16px;display:grid;gap:6px}.fx-h{display:flex;justify-content:space-between;align-items:center;gap:8px}.fx-v{display:flex;align-items:baseline;gap:8px;font-size:22px;font-weight:800;font-variant-numeric:tabular-nums}.fx-buy{color:var(--ok)}.fx-sell{color:var(--bad)}.fx-sep{color:var(--mut);font-weight:400;font-size:16px}@media(max-width:700px){.fx-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.card.fx-t{padding:10px 12px}.fx-v{font-size:17px;gap:5px}.fx-sep{font-size:13px}}
 .mono-bal{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:20px}.mono-bal>:only-child{grid-column:1/-1}@media(max-width:860px){.mono-bal{grid-template-columns:1fr}}.mono-watch{display:grid;gap:8px;border-left:1px solid var(--line);padding-left:20px;min-width:0}@media(max-width:860px){.mono-watch{border-left:0;padding-left:0;border-top:1px solid var(--line);padding-top:14px}}.mono-feed{display:grid;gap:2px;max-height:240px;overflow-y:auto;overflow-x:hidden;grid-template-columns:minmax(0,1fr)}.mono-fi{min-width:0;display:flex;gap:10px;align-items:center;padding:6px 8px;border-radius:8px;font-size:13px}.mono-fi.new{animation:monoNew 2.5s ease-out}@keyframes monoNew{0%{background:#3ddc9740}100%{background:transparent}}.mono-add{width:34px;height:34px;display:inline-grid;place-items:center;border-radius:10px;border:1px solid var(--line);background:var(--card2);color:var(--acc2);cursor:pointer;flex:none}.mono-add:hover,.mono-add:focus-visible{border-color:var(--acc);color:#fff;outline:none}.mono-ov .mono-feed{max-height:min(46vh,420px)}.mono-dot{width:8px;height:8px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 0 #3ddc9788;animation:livep 1.6s infinite}.mono-balbtn{background:none;border:0;color:inherit;font:inherit;font-weight:700;cursor:pointer;padding:4px 8px;border-radius:8px;border-bottom:1px dashed var(--mut);display:inline-flex;align-items:center;gap:6px}.mono-balbtn:hover,.mono-balbtn.on{color:var(--acc2);background:var(--card2)}.mono-live{font:800 9px var(--fm);letter-spacing:.12em;color:var(--ok)}
 .del-ib{width:32px;height:32px;display:inline-grid;place-items:center;margin:0 auto;padding:0;border-radius:8px;border:0;background:none;color:var(--mut);cursor:pointer;vertical-align:middle;transition:color .15s,background .15s,transform .15s}.del-ib svg{display:block}.del-ib:hover,.del-ib:focus-visible{color:var(--bad);background:#ff6b8a14;outline:none;transform:scale(1.08)}.del-ib:active{transform:none}.del-ib.sm{width:26px;height:26px;border-radius:8px;margin:0 0 0 4px}
@@ -2220,6 +2221,35 @@ async function setTasksBadge(){
   try{const t=await api('/tasks/mine');const n=t.filter(x=>x.status==='open').length;const b=document.getElementById('tasksBadge');if(b){b.textContent=String(n);b.hidden=!n}}catch{}
 }
 setInterval(updateBadge,20000);
+/* На телефоне каждая строка вкладок (.lc-tabs) показывается раскрывающимся списком: сверху выбранная вкладка, по нажатию весь список.
+   Вкладки остаются в странице (скрыты), список просто нажимает нужную, поэтому логика разделов не меняется */
+const TAB_DD_MQ=matchMedia('(max-width:700px)');
+function syncTabDD(){
+  const narrow=TAB_DD_MQ.matches;
+  document.querySelectorAll('.lc-tabs').forEach(bar=>{
+    let dd=bar.previousElementSibling;if(dd&&!dd.classList.contains('tab-dd'))dd=null;
+    const btns=[...bar.querySelectorAll('.lc-tab')];
+    // Вкладку переименовывают прямо в строке (поле ввода): на это время показываем саму строку
+    const editing=!!bar.querySelector('input');
+    if(!narrow||btns.length<2||editing){if(dd)dd.remove();bar.classList.remove('dd-hide');return}
+    const on=btns.find(b=>b.classList.contains('on')||b.getAttribute('aria-selected')==='true')||btns[0];
+    const extras=[...bar.querySelectorAll('button')].filter(b=>!b.classList.contains('lc-tab'));
+    const sig=btns.map(b=>b.textContent+(b===on?'*':'')).join('|')+'#'+extras.map(b=>b.getAttribute('aria-label')).join(',');
+    bar.classList.add('dd-hide');
+    if(dd&&dd.dataset.sig===sig)return;
+    const open=dd&&dd.classList.contains('open');
+    const label=b=>{const sp=el('span',{class:'tab-dd-l'});b.childNodes.forEach(n=>sp.append(n.cloneNode(true)));return sp};
+    const menu=el('div',{class:'tab-dd-m',role:'listbox'},...btns.map(b=>el('button',{type:'button',role:'option','aria-selected':String(b===on),class:'tab-dd-o'+(b===on?' on':''),onclick:e=>{e.stopPropagation();nd.classList.remove('open');if(b!==on)b.click()}},label(b))));
+    const trig=el('button',{type:'button',class:'tab-dd-t','aria-haspopup':'listbox',onclick:e=>{e.stopPropagation();document.querySelectorAll('.tab-dd.open').forEach(x=>{if(x!==nd)x.classList.remove('open')});nd.classList.toggle('open')}},label(on),svgIcon('<path d="M6 9l6 6 6-6"/>',18));
+    const nd=el('div',{class:'tab-dd'+(open?' open':'')},el('div',{class:'tab-dd-r'},trig,...extras.map(x=>el('button',{type:'button',class:'tab-dd-x',title:x.title||'','aria-label':x.getAttribute('aria-label')||'',onclick:e=>{e.stopPropagation();x.click()}},...[...x.childNodes].map(n=>n.cloneNode(true))))),menu);
+    nd.dataset.sig=sig;
+    if(dd)dd.replaceWith(nd);else bar.before(nd);
+  });
+}
+let tabDDT=null;
+new MutationObserver(()=>{clearTimeout(tabDDT);tabDDT=setTimeout(syncTabDD,20)}).observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['class','aria-selected']});
+TAB_DD_MQ.addEventListener('change',syncTabDD);
+document.addEventListener('click',()=>document.querySelectorAll('.tab-dd.open').forEach(x=>x.classList.remove('open')));
 /* Свайп вниз для обновления (на телефоне и планшете): страница тянется вместе с пальцем, над ней крутится значок.
    Отпустили ниже порога: страница возвращается, отпустили дальше порога: она держится, пока обновляются данные */
 (function(){
