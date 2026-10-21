@@ -823,9 +823,10 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
   // Кэш файлов чатов в памяти: плеер просит видео кусками (Range), без кэша каждый кусок заново качался из Telegram
   const fileCache = new Map<string, { buf: Buffer; ext: string }>();
   let fileCacheBytes = 0;
-  const FILE_CACHE_MAX = 150 * 1024 * 1024;
+  // Держим немного: на небольшом сервере большой кэш в памяти может привести к перезапуску из-за нехватки памяти
+  const FILE_CACHE_MAX = 40 * 1024 * 1024;
   const cacheFile = (key: string, v: { buf: Buffer; ext: string }) => {
-    if (v.buf.length > 25 * 1024 * 1024) return;
+    if (v.buf.length > 12 * 1024 * 1024) return;
     fileCache.set(key, v);
     fileCacheBytes += v.buf.length;
     for (const [k, x] of fileCache) {

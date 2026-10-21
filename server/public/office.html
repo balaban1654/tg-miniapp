@@ -527,7 +527,7 @@ async function api(path,opts={}){
   const data=await r.json().catch(()=>({}));
   if(r.status===401&&!path.startsWith('/login')){showLogin();throw new Error('auth')}
   if(r.status===403&&data.code==='totp_setup'&&me){me.totp=false;if(!document.querySelector('.tf-overlay'))showApp();throw new Error(data.error)}
-  if(!r.ok){const e=new Error(data.error||'Ошибка '+r.status);e.restart=data.restart;throw e}
+  if(!r.ok){const e=new Error(data.error||(r.status>=500?'Сервер не ответил ('+r.status+'): он перезапускается. Подождите минуту и попробуйте снова, текст сообщения сохранён':'Ошибка '+r.status));e.restart=data.restart;throw e}
   return data;
 }
 /* null, undefined и false в списке детей не превращаются в текст «null» (replaceChildren/append/prepend) */
