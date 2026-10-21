@@ -216,7 +216,7 @@ export async function connectRoutes(app: FastifyInstance, h: { need: Need; str: 
       const until = new Date(Date.now() + o.days * 86_400_000);
       const t = await loadTarget(lead.tg_id);
       const res = await deliver(String(lead.tg_id), renderText(fillText(o.text, { pct: o.discount_pct, required, until }), t), buildKeyboard(OFFER_BUTTONS, t));
-      if (!res.ok) return reply.code(502).send({ error: 'Не удалось отправить: ' + res.error });
+      if (!res.ok) return reply.code(422).send({ error: 'Не удалось отправить: ' + res.error });
       return { ok: true, test: true };
     }
 
@@ -228,7 +228,7 @@ export async function connectRoutes(app: FastifyInstance, h: { need: Need; str: 
       const gap = (await db.query(`SELECT 1 FROM connect_sends s WHERE s.tg_id = $1 AND s.delivery <> 'failed' AND s.reverted_at IS NULL AND s.sent_at > now() - interval '${OFFER_GAP_DAYS} days' LIMIT 1`, [tgId])).rowCount;
       if (gap) return reply.code(409).send({ error: `Этому лиду акцию уже отправляли за последние ${OFFER_GAP_DAYS} дня. Подождите` });
       const res = await sendOffer(o, String(tgId), me.id);
-      if (!res.ok) return reply.code(502).send({ error: 'Не удалось отправить: ' + (res.error ?? 'ошибка Telegram') });
+      if (!res.ok) return reply.code(422).send({ error: 'Не удалось отправить: ' + (res.error ?? 'ошибка Telegram') });
       return { ok: true, total: 1 };
     }
 

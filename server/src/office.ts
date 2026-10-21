@@ -119,6 +119,18 @@ async function syncAdminStreams(): Promise<void> {
   await db.query(`UPDATE staff SET streams = TRUE WHERE role = 'admin' AND NOT streams`);
 }
 
+
+/** Ответ, когда Telegram не принял сообщение клиенту. Код 422, а не 502: 502 Cloudflare подменяет своей страницей и текст ошибки теряется.
+ *  Если клиент заблокировал или удалил бота, отмечаем это у лида */
+async function tgSendFail(reply: FastifyReply, tgId: number, e: unknown, what: string) {
+  const d = (e as { description?: string }).description ?? String(e);
+  if (/blocked by the user|user is deactivated|chat not found/i.test(d)) {
+    await db.query('UPDATE leads SET bot_blocked = TRUE WHERE tg_id = $1', [tgId]).catch(() => {});
+    return reply.code(422).send({ error: 'Клиент заблокировал или удалил бота: ' + what + ' не дойдёт, пока он снова не запустит бота' });
+  }
+  return reply.code(422).send({ error: 'Telegram не принял ' + what + ': ' + d });
+}
+
 export async function officeRoutes(app: FastifyInstance): Promise<void> {
   const need = (...roles: Role[]) => async (req: FastifyRequest, reply: FastifyReply) => {
     const me = await staffFromRequest(req);
@@ -882,7 +894,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
       }
       return reply.send(buf);
     } catch {
-      return reply.code(502).send({ error: 'Не удалось получить файл из Telegram' });
+      return reply.code(422).send({ error: 'Не удалось получить файл из Telegram' });
     }
   });
 
@@ -969,8 +981,8 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
           const r = await plan.send();
           tgMessageId = r.id;
           fileId = r.fileId;
-        } catch {
-          return reply.code(502).send({ error: 'Telegram не принял файл. Возможно, клиент заблокировал бота или формат не подходит.' });
+        } catch (e) {
+          return tgSendFail(reply, tgId, e, 'файл');
         }
       }
       await db.query(
@@ -1015,8 +1027,8 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
         } else {
           tgMessageId = (await bot.api.sendMessage(tgId, text)).message_id;
         }
-      } catch {
-        return reply.code(502).send({ error: 'Telegram не принял сообщение. Возможно, клиент заблокировал бота.' });
+      } catch (e) {
+        return tgSendFail(reply, tgId, e, 'сообщение');
       }
     }
     await db.query(`INSERT INTO messages (tg_id, direction, staff_id, kind, text, file_id, tg_message_id) VALUES ($1,'out',$2,$3,$4,$5,$6)`, [tgId, me.id, photo ? 'photo' : 'text', text || null, fileId, tgMessageId]);
@@ -1051,7 +1063,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
         else await bot.api.editMessageText(tgId, m.tg_message_id, text);
       } catch (e) {
         const d = e instanceof GrammyError ? e.description : String(e);
-        if (!/not modified/i.test(d)) return reply.code(502).send({ error: /can't be edited|not found/i.test(d) ? 'Telegram больше не даёт исправить это сообщение (слишком старое или удалено)' : 'Telegram не принял правку: ' + d });
+        if (!/not modified/i.test(d)) return reply.code(422).send({ error: /can't be edited|not found/i.test(d) ? 'Telegram больше не даёт исправить это сообщение (слишком старое или удалено)' : 'Telegram не принял правку: ' + d });
       }
     }
     await db.query('UPDATE messages SET text = $2, edited_at = now() WHERE id = $1', [m.id, text || null]);
@@ -1075,7 +1087,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
       } catch (e) {
         const d = e instanceof GrammyError ? e.description : String(e);
         // Уже удалено у клиента: просто убираем из Office. Слишком старое (Telegram даёт удалять 48 часов): говорим об этом
-        if (!/not found/i.test(d)) return reply.code(502).send({ error: /can't be deleted/i.test(d) ? 'Telegram больше не даёт удалить это сообщение (старше 48 часов)' : 'Telegram не удалил сообщение: ' + d });
+        if (!/not found/i.test(d)) return reply.code(422).send({ error: /can't be deleted/i.test(d) ? 'Telegram больше не даёт удалить это сообщение (старше 48 часов)' : 'Telegram не удалил сообщение: ' + d });
       }
     }
     await db.query('DELETE FROM messages WHERE id = $1', [m.id]);

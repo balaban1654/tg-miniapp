@@ -754,7 +754,7 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
     } catch (e) {
       const why = (e as { description?: string }).description ?? String(e);
       req.log.warn({ err: why, channel: ch }, 'giveaway poster: не удалось отправить в канал');
-      return reply.code(502).send({
+      return reply.code(422).send({
         error: /chat not found|not enough rights|not a member|have no rights|CHAT_ADMIN_REQUIRED/i.test(why)
           ? 'Бот не может публиковать в канале: добавьте бота в канал админом с правом «Публикация сообщений»'
           : 'Telegram не принял картинку: ' + why,
