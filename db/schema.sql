@@ -912,3 +912,6 @@ CREATE TABLE IF NOT EXISTS giveaway_draws (
   msg_id      BIGINT
 );
 CREATE INDEX IF NOT EXISTS giveaway_draws_gw ON giveaway_draws (giveaway_id);
+
+-- Лид заблокировал бота: статус становится «Отвал», а прежний запоминается и возвращается, когда лид снова нажмёт /start
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS status_before_block TEXT;

@@ -6,6 +6,7 @@ import { recordIncoming } from './chat.js';
 import { sendReply } from './replies.js';
 
 import { bot } from './tg.js';
+import { markLeadAlive, markLeadBlocked } from './leadblock.js';
 export { bot };
 
 const BANNED_TEXT = 'Ваш доступ к Hunter AI заблокирован. Если это ошибка, напишите сюда сообщение — поддержка ответит.';
@@ -42,7 +43,7 @@ bot.command('start', async (ctx) => {
     return;
   }
 
-  await db.query('UPDATE leads SET bot_started = TRUE, bot_blocked = FALSE, last_seen_at = now() WHERE tg_id = $1', [from.id]);
+  await markLeadAlive(from.id);
 
   const cabinet = config.miniAppUrl ? new InlineKeyboard().webApp('Открыть кабинет', config.miniAppUrl) : undefined;
   if (lead.access) {
@@ -82,6 +83,14 @@ export async function setupBotProfile(): Promise<void> {
   }
 }
 
+// Клиент заблокировал бота или разблокировал его: Telegram сообщает об этом сразу
+bot.on('my_chat_member', async (ctx) => {
+  if (ctx.chat.type !== 'private') return;
+  const st = ctx.myChatMember.new_chat_member.status;
+  if (st === 'kicked') await markLeadBlocked(ctx.chat.id);
+  else if (st === 'member') await markLeadAlive(ctx.chat.id);
+});
+
 bot.catch((err) => console.error('Ошибка бота:', err.error));
 
 /** Любое обычное сообщение клиента это обращение в поддержку: сохраняем и показываем команде в Office. */
@@ -91,7 +100,7 @@ bot.on('message', async (ctx) => {
   const m = ctx.message;
   if (m.text?.startsWith('/')) return;
   await attachLead(from.id, from.username, from.first_name, null);
-  await db.query('UPDATE leads SET bot_started = TRUE, bot_blocked = FALSE, last_seen_at = now() WHERE tg_id = $1', [from.id]);
+  await markLeadAlive(from.id);
 
   let kind = 'other';
   let fileId: string | null = null;

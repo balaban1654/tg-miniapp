@@ -1,3 +1,4 @@
+import { startBlockCheck } from './leadblock.js';
 import { monoHookRoutes, startMonoWorker } from './mono.js';
 import { fraudBackfill } from './fraud.js';
 import Fastify from 'fastify';
@@ -135,6 +136,8 @@ setInterval(closeTick, 10 * 60_000);
 setTimeout(closeTick, 30_000);
 // monobank: фоновая загрузка счетов и операций (если админ сохранил токен)
 startMonoWorker(app.log);
+// Раз в сутки проверяем всех лидов на блокировку бота (первая проверка через минуту после запуска, если её ещё не было)
+if (process.env.DISABLE_BOT !== '1') startBlockCheck(app.log);
 if (process.env.DISABLE_BOT !== '1') {
   startScheduler();
   void setupBotProfile();

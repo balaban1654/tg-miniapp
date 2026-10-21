@@ -5,6 +5,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { GrammyError, InputFile } from 'grammy';
 import { db } from './db.js';
 import { bot } from './bot.js';
+import { markLeadBlocked, BLOCKED_RE } from './leadblock.js';
 import { config } from './config.js';
 import { createBroadcast, segmentWhere, SEGMENTS, deliverAnimation, type Button } from './push.js';
 import { randomInt, randomBytes, createHash } from 'node:crypto';
@@ -124,8 +125,8 @@ async function syncAdminStreams(): Promise<void> {
  *  Если клиент заблокировал или удалил бота, отмечаем это у лида */
 async function tgSendFail(reply: FastifyReply, tgId: number, e: unknown, what: string) {
   const d = (e as { description?: string }).description ?? String(e);
-  if (/blocked by the user|user is deactivated|chat not found/i.test(d)) {
-    await db.query('UPDATE leads SET bot_blocked = TRUE WHERE tg_id = $1', [tgId]).catch(() => {});
+  if (BLOCKED_RE.test(d)) {
+    await markLeadBlocked(tgId).catch(() => {});
     return reply.code(422).send({ error: 'Клиент заблокировал или удалил бота: ' + what + ' не дойдёт, пока он снова не запустит бота' });
   }
   return reply.code(422).send({ error: 'Telegram не принял ' + what + ': ' + d });

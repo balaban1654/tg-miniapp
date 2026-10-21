@@ -1,4 +1,5 @@
 import { GrammyError, InlineKeyboard, InputFile } from 'grammy';
+import { markLeadBlocked, BLOCKED_RE } from './leadblock.js';
 import type { InlineKeyboardButton } from 'grammy/types';
 import { db } from './db.js';
 import { config } from './config.js';
@@ -154,7 +155,7 @@ export async function deliver(tgId: string, text: string, kb?: InlineKeyboard, p
   } catch (e) {
     if (e instanceof GrammyError) {
       if (e.error_code === 429) return { ok: false, retry: true, error: 'лимит Telegram' };
-      return { ok: false, blocked: e.error_code === 403 && /blocked/i.test(e.description), error: e.description };
+      return { ok: false, blocked: e.error_code === 403 && BLOCKED_RE.test(e.description), error: e.description };
     }
     return { ok: false, error: String(e) };
   }
@@ -180,14 +181,14 @@ export async function deliverAnimation(chatId: string, data: Buffer, mime: strin
   } catch (e) {
     if (e instanceof GrammyError) {
       if (e.error_code === 429) return { ok: false, retry: true, error: 'лимит Telegram' };
-      return { ok: false, blocked: e.error_code === 403 && /blocked/i.test(e.description), error: e.description };
+      return { ok: false, blocked: e.error_code === 403 && BLOCKED_RE.test(e.description), error: e.description };
     }
     return { ok: false, error: String(e) };
   }
 }
 
 async function markBlocked(tgId: string) {
-  await db.query('UPDATE leads SET bot_blocked = TRUE WHERE tg_id = $1', [tgId]);
+  await markLeadBlocked(tgId);
 }
 
 // ---------- Автоматические правила ----------

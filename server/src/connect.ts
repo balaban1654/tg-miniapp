@@ -1,4 +1,5 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import { markLeadBlocked } from './leadblock.js';
 import { db } from './db.js';
 import { buildKeyboard, deliver, loadTarget, renderText, type Button } from './push.js';
 
@@ -88,7 +89,7 @@ async function sendOffer(o: Offer, tgId: string, by: number | null): Promise<{ o
   if (res.ok) await db.query(`UPDATE connect_sends SET delivery = 'sent' WHERE id = $1`, [id]);
   else {
     await db.query(`UPDATE connect_sends SET delivery = 'failed', error = $2 WHERE id = $1`, [id, res.error.slice(0, 300)]);
-    if (res.blocked) await db.query('UPDATE leads SET bot_blocked = TRUE WHERE tg_id = $1', [tgId]);
+    if (res.blocked) await markLeadBlocked(tgId);
   }
   return res.ok ? { ok: true } : { ok: false, error: res.error, blocked: res.blocked };
 }
