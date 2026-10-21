@@ -7,13 +7,14 @@ export async function mainMediaTeam(): Promise<number> {
 
 /**
  * Команда медиа клиента: стример, за которым закреплён клиент, → его тимлидер → команда этого тимлидера.
- * Клиент самого тимлидера идёт в его команду. Нет тимлидера или у тимлидера нет своей вкладки: Основная
+ * Клиент самого тимлидера идёт в его команду. Тимлидером команды может быть и админ (временно): тогда так же его клиенты
+ * и клиенты стримеров, у которых он указан тимлидером. Нет тимлидера или у него нет своей вкладки: Основная
  */
 export async function mediaTeamOf(tgId: number): Promise<number> {
   const r = (
     await db.query(
       `SELECT mt.id FROM leads d JOIN staff o ON o.id = d.owner_id
-         JOIN media_teams mt ON mt.teamlead_id = CASE WHEN o.role = 'teamlead' THEN o.id ELSE o.parent_id END
+         JOIN media_teams mt ON mt.teamlead_id = CASE WHEN o.role IN ('teamlead', 'admin') THEN o.id ELSE o.parent_id END
         WHERE d.tg_id = $1`,
       [tgId],
     )

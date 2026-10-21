@@ -4078,13 +4078,13 @@ async function viewMedia(){
   }));
   drawTeams();
   const addTeam=el('button',{type:'button',class:'mono-add',title:'Новая команда','aria-label':'Новая команда',onclick:async()=>{try{const r=await api('/media/teams',{method:'POST'});mediaSetTeam(r.id);mediaTab='ch';toast('Команда создана: выберите её тимлидера');render({soft:true})}catch(x){toast(x.message)}}},svgIcon('<path d="M12 5v14M5 12h14"/>',18));
-  const leads=staffAll.filter(x=>x.role==='teamlead'&&x.active!==false);
+  const leads=staffAll.filter(x=>['teamlead','admin'].includes(x.role)&&x.active!==false).sort((a,b)=>(a.role==='admin')-(b.role==='admin')||a.id-b.id);
   const leadSel=el('select',{'aria-label':'Тимлидер команды',style:'width:auto;min-width:200px',onchange:async()=>{try{await api('/media/teams/'+team.id,{method:'PATCH',body:{teamlead_id:leadSel.value||null}});toast(leadSel.value?'Тимлидер закреплён: его клиенты видят медиа этой команды':'Тимлидер откреплён');render({soft:true})}catch(x){toast(x.message);leadSel.value=team.teamlead_id||''}}},
-    el('option',{value:''},'Не выбран'),...leads.map(x=>{const other=teams.find(t=>t.teamlead_id===x.id&&t.id!==team.id);return el('option',{value:x.id,disabled:other?'':null},x.name+(other?' · уже в «'+other.title+'»':''))}));
+    el('option',{value:''},'Не выбран'),...leads.map(x=>{const other=teams.find(t=>t.teamlead_id===x.id&&t.id!==team.id);return el('option',{value:x.id,disabled:other?'':null},x.name+(x.role==='admin'?' · админ':'')+(other?' · уже в «'+other.title+'»':''))}));
   leadSel.value=team.teamlead_id||'';
   const delTeam=team.is_main?null:el('button',{class:'btn o s',type:'button',style:'color:var(--bad)',onclick:async()=>{if(!await askC('Удалить команду «'+team.title+'» вместе с её трейдерами, новостями и отзывами? Её клиенты будут видеть Основную.'))return;try{await api('/media/teams/'+team.id,{method:'DELETE'});mediaSetTeam(null);toast('Команда удалена');render({soft:true})}catch(x){toast(x.message)}}},'Удалить команду');
   const teamInfo=el('div',{class:'card',style:'display:flex;gap:12px;align-items:center;flex-wrap:wrap'},
-    team.is_main?el('div',{class:'mut sm',style:'flex:1;min-width:240px'},'Основная команда: её медиа видят клиенты из органики, клиенты по вашим ссылкам и клиенты стримеров без тимлидера.')
+    team.is_main?el('div',{class:'mut sm',style:'flex:1;min-width:240px'},'Основная команда: её медиа видят клиенты из органики, клиенты по ссылкам админов и клиенты стримеров без тимлидера. Если админа закрепить тимлидером другой команды, его клиенты будут видеть медиа той команды.')
       :[el('label',{style:'display:flex;align-items:center;gap:10px;white-space:nowrap'},'Тимлидер',leadSel),el('div',{class:'mut sm',style:'flex:1;min-width:220px'},team.teamlead_id?'Клиенты тимлидера и его стримеров видят в Mini App медиа этой команды.':'Выберите тимлидера: пока его нет, эту команду никто не видит.'),delTeam]);
   const streamers=staffAll.filter(x=>(x.role==='streamer'||x.streams)&&x.active!==false);
   const staffSel=()=>el('select',{},el('option',{value:''},'Не привязан'),...streamers.map(x=>el('option',{value:x.id},x.name)));

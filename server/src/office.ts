@@ -1497,7 +1497,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     const title = str(((req.body ?? {}) as Record<string, unknown>).title, 40) || 'Команда ' + (n + 1);
     return { ok: true, id: (await db.query('INSERT INTO media_teams (title) VALUES ($1) RETURNING id', [title])).rows[0].id };
   });
-  // Название и тимлидер команды. Тимлидер у одной команды: его клиенты (и клиенты его стримеров) видят медиа этой команды
+  // Название и тимлидер команды (тимлидер или админ, временно ведущий команду). Тимлидер у одной команды: его клиенты (и клиенты его стримеров) видят медиа этой команды
   app.patch<{ Params: { id: string } }>('/media/teams/:id', { preHandler: need('admin') }, async (req, reply) => {
     const id = Number(req.params.id);
     const b = (req.body ?? {}) as Record<string, unknown>;
@@ -1511,7 +1511,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     if (b.teamlead_id !== undefined) {
       if (t.is_main) return reply.code(400).send({ error: 'Основная команда без тимлидера: её видят органика и клиенты без тимлидера' });
       const lead = b.teamlead_id ? Number(b.teamlead_id) : null;
-      if (lead && !(await db.query(`SELECT 1 FROM staff WHERE id = $1 AND role = 'teamlead' AND deleted_at IS NULL`, [lead])).rowCount) return reply.code(400).send({ error: 'Это не тимлидер' });
+      if (lead && !(await db.query(`SELECT 1 FROM staff WHERE id = $1 AND role IN ('teamlead', 'admin') AND deleted_at IS NULL`, [lead])).rowCount) return reply.code(400).send({ error: 'Выберите тимлидера или админа' });
       const busy = lead ? (await db.query('SELECT title FROM media_teams WHERE teamlead_id = $1 AND id <> $2', [lead, id])).rows[0] : null;
       if (busy) return reply.code(409).send({ error: `Этот тимлидер уже закреплён за командой «${busy.title}»` });
       await db.query('UPDATE media_teams SET teamlead_id = $2 WHERE id = $1', [id, lead]);
