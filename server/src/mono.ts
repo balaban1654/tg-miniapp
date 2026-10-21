@@ -38,6 +38,7 @@ interface Settings {
   webhook_ok: boolean;
   last_info_at: string | null;
   last_error: string | null;
+  watch_account: string | null;
 }
 
 class MonoError extends Error {
@@ -187,11 +188,17 @@ export async function monoTick(): Promise<void> {
         await db.query('UPDATE mono_accounts SET bf_cursor = $2, synced_to = coalesce(synced_to, $3) WHERE id = $1', [bf.id, next, nowS]);
         return;
       }
-      // Дозагрузка: со вебхуком раз в 30 минут на счёт, без него раз в 5 минут
-      const every = s.use_webhook && s.webhook_ok ? 1800 : 300;
-      const inc = (
-        await db.query(`SELECT id, synced_to FROM mono_accounts WHERE synced_to IS NULL OR synced_to < $1 ORDER BY synced_to NULLS FIRST LIMIT 1`, [nowS - every])
-      ).rows[0];
+      // Дозагрузка: со вебхуком раз в 30 минут на счёт, без него раз в 5 минут.
+      // Счёт, за которым следят в плитке «Общий баланс», без вебхука проверяем каждую минуту
+      const live = !(s.use_webhook && s.webhook_ok);
+      const watched =
+        live && s.watch_account
+          ? (await db.query('SELECT id, synced_to FROM mono_accounts WHERE id = $1 AND (synced_to IS NULL OR synced_to < $2)', [s.watch_account, nowS - 60])).rows[0]
+          : null;
+      const every = live ? 300 : 1800;
+      const inc =
+        watched ??
+        (await db.query(`SELECT id, synced_to FROM mono_accounts WHERE synced_to IS NULL OR synced_to < $1 ORDER BY synced_to NULLS FIRST LIMIT 1`, [nowS - every])).rows[0];
       if (!inc) return;
       const from = Math.max(nowS - WIN, Number(inc.synced_to ?? nowS - 86400) - 3600);
       lastStatement = now;
@@ -285,7 +292,9 @@ export async function monoRoutes(app: FastifyInstance, h: Helpers): Promise<void
         maskedPan: a.masked_pan,
         iban: a.iban,
         loading: Number(a.bf_cursor) > Number(a.bf_since),
+        hidden: !!a.hidden,
       })),
+      watchAccount: s?.watch_account ?? null,
       totals: { byCurrency: [...byCur].map(([currency, amount]) => ({ currency, amount })), uah: Math.round(uah * 100) / 100, uahExact },
     };
   });
@@ -336,6 +345,49 @@ export async function monoRoutes(app: FastifyInstance, h: Helpers): Promise<void
     await db.query('UPDATE mono_accounts SET bf_since = $1 WHERE bf_since IS NULL OR $1 < bf_since', [since]);
     setImmediate(() => void monoTick());
     return { ok: true };
+  });
+
+  // Скрыть или снова показать счёт в списке (в общем балансе он остаётся)
+  app.patch<{ Params: { id: string } }>('/mono/accounts/:id', { preHandler: admin }, async (req, reply) => {
+    const hidden = !!((req.body ?? {}) as Record<string, unknown>).hidden;
+    const r = await db.query('UPDATE mono_accounts SET hidden = $2 WHERE id = $1 RETURNING id', [req.params.id, hidden]);
+    if (!r.rowCount) return reply.code(404).send({ error: 'Счёт не найден' });
+    return { ok: true };
+  });
+  // Счёт, за которым следим в плитке «Общий баланс» (null: не следим)
+  app.put('/mono/watch', { preHandler: admin }, async (req, reply) => {
+    const id = ((req.body ?? {}) as Record<string, unknown>).account;
+    const acc = id ? String(id) : null;
+    if (acc && !(await db.query('SELECT 1 FROM mono_accounts WHERE id = $1', [acc])).rowCount) return reply.code(404).send({ error: 'Счёт не найден' });
+    await db.query('UPDATE mono_settings SET watch_account = $1 WHERE id = 1', [acc]);
+    return { ok: true };
+  });
+  // Живая плитка: баланс выбранного счёта и последние пополнения на него
+  app.get('/mono/watch', { preHandler: admin }, async () => {
+    const s = await getSettings();
+    if (!s?.watch_account) return { account: null };
+    const a = (await db.query('SELECT * FROM mono_accounts WHERE id = $1', [s.watch_account])).rows[0];
+    if (!a) return { account: null };
+    const tx = (
+      await db.query(
+        `SELECT id, time, description, comment, counter_name, amount, hold FROM mono_tx WHERE account_id = $1 AND amount > 0 ORDER BY time DESC LIMIT 12`,
+        [a.id],
+      )
+    ).rows.map((t) => ({ ...t, amount: Number(t.amount) }));
+    const today = (
+      await db.query(
+        `SELECT coalesce(sum(amount), 0)::bigint AS s, count(*)::int AS n FROM mono_tx
+          WHERE account_id = $1 AND amount > 0 AND (time AT TIME ZONE 'Europe/Kyiv')::date = (now() AT TIME ZONE 'Europe/Kyiv')::date`,
+        [a.id],
+      )
+    ).rows[0];
+    return {
+      account: { id: a.id, kind: a.kind, title: a.title, type: a.type, currency: a.currency_code, balance: Number(a.balance) - Number(a.credit_limit || 0), maskedPan: a.masked_pan, goal: a.goal === null ? null : Number(a.goal) },
+      today: { amount: Number(today.s), n: today.n },
+      tx,
+      live: !!(s.use_webhook && s.webhook_ok),
+      now: new Date().toISOString(),
+    };
   });
 
   // Отключить: токен и все загруженные данные удаляются

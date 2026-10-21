@@ -853,3 +853,6 @@ CREATE TABLE IF NOT EXISTS mono_tx (
 );
 CREATE INDEX IF NOT EXISTS mono_tx_time ON mono_tx (time DESC);
 CREATE INDEX IF NOT EXISTS mono_tx_acc ON mono_tx (account_id, time DESC);
+-- monobank: скрытые в списке счета и счёт, за которым следим в плитке «Общий баланс»
+ALTER TABLE mono_accounts ADD COLUMN IF NOT EXISTS hidden BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE mono_settings ADD COLUMN IF NOT EXISTS watch_account TEXT;
