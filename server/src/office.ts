@@ -2314,6 +2314,9 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
       if (t === 'comm' && me.role === 'teamlead') { fin[t] = { sum: null, count: 0, dates: [] }; continue; }
       fin[t] = { sum: showSum ? rows.reduce((a, e) => a + Number(e.amount || 0), 0) : null, count: rows.length, dates: rows.map((e) => ({ at: e.created_at, amount: showSum ? Number(e.amount || 0) : null })) };
     }
+    // Бонусы из розыгрышей, которые клиент забрал: сумма, дата и время видны всем ролям
+    const gb = (await db.query(`SELECT prize::float AS amount, claimed_at FROM giveaway_draws WHERE tg_id = $1 AND claimed_at IS NOT NULL ORDER BY claimed_at`, [tgId])).rows;
+    fin.bonus = { sum: gb.reduce((a, x) => a + Number(x.amount), 0), count: gb.length, dates: gb.map((x) => ({ at: x.claimed_at, amount: Number(x.amount) })) };
     // Градации додепов (без порогов) и состояние запроса бонуса
     let tier: unknown = null;
     if (!r.rows[0].lead_role || r.rows[0].lead_role === 'lead') {
