@@ -801,3 +801,55 @@ CREATE TABLE IF NOT EXISTS app_settings (
   value      TEXT,
   updated_at TIMESTAMPTZ DEFAULT now()
 );
+
+-- monobank API (раздел «МоноБанк API», только админ): токен, счета и банки, операции из выписки
+CREATE TABLE IF NOT EXISTS mono_settings (
+  id            INT PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+  token         TEXT,
+  client_id     TEXT,
+  client_name   TEXT,
+  history_days  INT NOT NULL DEFAULT 90,
+  use_webhook   BOOLEAN NOT NULL DEFAULT TRUE,
+  hook_secret   TEXT,
+  webhook_url   TEXT,
+  webhook_ok    BOOLEAN NOT NULL DEFAULT FALSE,
+  last_info_at  TIMESTAMPTZ,
+  last_error    TEXT,
+  error_at      TIMESTAMPTZ,
+  updated_at    TIMESTAMPTZ DEFAULT now(),
+  updated_by    INT REFERENCES staff(id) ON DELETE SET NULL
+);
+CREATE TABLE IF NOT EXISTS mono_accounts (
+  id            TEXT PRIMARY KEY,
+  kind          TEXT NOT NULL,              -- account | jar
+  title         TEXT,
+  type          TEXT,
+  currency_code INT,
+  balance       BIGINT NOT NULL DEFAULT 0,  -- в копейках/центах
+  credit_limit  BIGINT NOT NULL DEFAULT 0,
+  goal          BIGINT,
+  masked_pan    TEXT,
+  iban          TEXT,
+  bf_since      BIGINT,                     -- загрузка истории: от (unix-секунды)
+  bf_cursor     BIGINT,                     -- загрузка истории: дошли до (идём от новых к старым)
+  synced_to     BIGINT,                     -- последняя дозагрузка новых операций (unix-секунды)
+  synced_at     TIMESTAMPTZ,
+  updated_at    TIMESTAMPTZ DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS mono_tx (
+  id               TEXT PRIMARY KEY,
+  account_id       TEXT NOT NULL,
+  time             TIMESTAMPTZ NOT NULL,
+  description      TEXT,
+  comment          TEXT,
+  counter_name     TEXT,
+  amount           BIGINT NOT NULL,         -- в валюте счёта, копейки; плюс = пополнение
+  operation_amount BIGINT,
+  currency_code    INT,
+  balance          BIGINT,
+  hold             BOOLEAN,
+  mcc              INT,
+  created_at       TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS mono_tx_time ON mono_tx (time DESC);
+CREATE INDEX IF NOT EXISTS mono_tx_acc ON mono_tx (account_id, time DESC);

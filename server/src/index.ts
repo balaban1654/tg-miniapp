@@ -1,3 +1,4 @@
+import { monoHookRoutes, startMonoWorker } from './mono.js';
 import { fraudBackfill } from './fraud.js';
 import Fastify from 'fastify';
 import type { FastifyReply, FastifyRequest } from 'fastify';
@@ -55,6 +56,7 @@ const swJs = readFileSync(resolve(process.cwd(), 'public/office-sw.js'), 'utf8')
 app.get('/office-sw.js', async (_req, reply) => reply.type('text/javascript; charset=utf-8').header('Cache-Control', 'no-cache').send(swJs));
 await app.register(officeRoutes, { prefix: '/api/office' });
 await app.register(postbackRoutes);
+await app.register(monoHookRoutes);
 
 // Шрифт Montserrat отдаём со своего сервера, чтобы он не зависел от Google
 const fontsDir = resolve(process.cwd(), 'public/fonts');
@@ -128,6 +130,8 @@ await app.listen({ port: config.port, host: '0.0.0.0' });
 const closeTick = () => void autoCloseMonth().then((p) => p && app.log.info(`Месяц ${p} закрыт автоматически`)).catch((e) => app.log.error(e, 'Ошибка автозакрытия месяца'));
 setInterval(closeTick, 10 * 60_000);
 setTimeout(closeTick, 30_000);
+// monobank: фоновая загрузка счетов и операций (если админ сохранил токен)
+startMonoWorker(app.log);
 if (process.env.DISABLE_BOT !== '1') {
   startScheduler();
   void setupBotProfile();

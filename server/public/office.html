@@ -583,6 +583,7 @@ const ICONS={
   push:'<path d="M6 16V11a6 6 0 1112 0v5l2 2H4z"/><path d="M10 21a2 2 0 004 0"/>',
   media:'<rect x="3" y="5" width="18" height="14" rx="3"/><path d="M10 9.5v5l4.5-2.5z"/>',
   pb:'<path d="M4 12h5l2-6 3 12 2-6h4"/>',
+  mono:'<rect x="2.5" y="5" width="19" height="14" rx="3"/><path d="M2.5 10h19M6.5 15h4"/>',
   shifts:'<circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3 2"/>',
   acc:'<rect x="3" y="6" width="18" height="13" rx="2.5"/><path d="M3 10h18M16 15h2"/>',
   plans:'<path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 6l1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2"/>',
@@ -652,6 +653,7 @@ function navItemsFor(role){
   // Смена команды: админ, тимлидер, аналитик, медиабайер начинают смену и в конце пишут, что сделали
   if(['admin','teamlead','analyst','buyer'].includes(role))items.push(['tshift','Моя смена']);
   if(role==='teamlead')items.push(['pb','Постбеки']);
+  if(role==='admin')items.push(['mono','МоноБанк API']);
   return items;
 }
 /** Сохранённая раскладка, приведённая к доступным разделам: лишние убираем, новые добавляем в конец */
@@ -904,6 +906,7 @@ async function render(opt){
     else if(tab==='signals')m.replaceChildren(...await viewSignals());
     else if(tab==='push')m.replaceChildren(...await viewPush());
     else if(tab==='media'){m.replaceChildren(...await viewMedia());updateBadge()}
+    else if(tab==='mono')m.replaceChildren(...await viewMono());
     else if(tab==='pb'){m.replaceChildren(...await viewPostbacks());api('/postbacks/seen',{method:'POST'}).then(()=>{if(pbNew){pbNew=0;drawNav()}}).catch(()=>{})}
     else if(tab==='shifts')m.replaceChildren(...await viewShifts());
     else if(tab==='tshift')m.replaceChildren(...await viewTeamShift());
@@ -1394,6 +1397,73 @@ function dxLeadPay(d){
     el('div',{class:'dx-list'},...(p.members.length?p.members.map(m=>el('div',{class:'r',style:'align-items:center;gap:8px;flex-wrap:wrap'},
       el('span',{},m.name,el('em',{},hmin(m.hoursMin).replace(' мин','м')+' из '+Math.round(m.planMin/60)+' ч · FTD '+m.ftd+' из '+m.planLeads)),
       el('span',{style:'display:inline-flex;gap:6px;align-items:center'},ok(m.shiftsDone,'смены'),ok(m.leadsDone,'лиды'),el('b',{},'+'+usd0(m.bonus))))):[el('div',{class:'mut sm'},'В вашей команде пока нет стримеров.')])));
+}
+
+/* ---------- МоноБанк API (админ): токен, счета и банки, общий баланс, пополнения ---------- */
+const MONO_CUR={980:'₴',840:'$',978:'€',985:'zł',826:'£'};
+const monoMoney=(v,c)=>(v<0?'−':'')+(Math.abs(v)/100).toLocaleString('ru-RU',{minimumFractionDigits:2,maximumFractionDigits:2})+' '+(MONO_CUR[c]||c||'');
+const MONO_TYPE={black:'Чёрная карта',white:'Белая карта',platinum:'Platinum',iron:'Iron',fop:'ФОП',yellow:'Детская карта',eAid:'єПідтримка',jar:'Банка'};
+let monoTimer=null;
+async function viewMono(){
+  clearTimeout(monoTimer);
+  const d=await api('/mono');
+  const err=el('div',{class:'err',role:'alert'});
+  const token=el('input',{type:'password',autocomplete:'off',spellcheck:'false',placeholder:d.connected?'Сохранён '+d.tokenMask+'. Вставьте новый, чтобы заменить':'Вставьте токен с api.monobank.ua',style:'flex:1;min-width:240px'});
+  const hist=el('select',{'aria-label':'История за'},...[[30,'1 месяц'],[90,'3 месяца'],[180,'6 месяцев'],[365,'12 месяцев']].map(([v,t])=>el('option',{value:v},t)));hist.value=String(d.historyDays);
+  const hook=el('input',{type:'checkbox',style:'width:18px;height:18px;flex:none;margin:0'});hook.checked=d.useWebhook;
+  const save=el('button',{class:'btn',type:'button',onclick:async()=>{err.textContent='';save.disabled=true;
+    try{
+      if(token.value.trim()){const r=await api('/mono/token',{method:'PUT',body:{token:token.value.trim(),historyDays:+hist.value,useWebhook:hook.checked}});toast('Токен сохранён'+(r.clientName?': '+r.clientName:''))}
+      else if(d.connected){await api('/mono/settings',{method:'PUT',body:{historyDays:+hist.value,useWebhook:hook.checked}});toast('Настройки сохранены')}
+      else throw new Error('Вставьте токен');
+      render({soft:true});
+    }catch(x){err.textContent=x.message;save.disabled=false}}},'Сохранить');
+  const off=d.connected?el('button',{class:'btn o',type:'button',style:'color:var(--bad)',onclick:async()=>{if(!await askC('Отключить monobank? Токен, счета и загруженные операции удалятся из кабинета.'))return;try{await api('/mono',{method:'DELETE'});toast('monobank отключён');render({soft:true})}catch(x){toast(x.message)}}},'Отключить'):null;
+  const status=d.connected?el('div',{style:'display:flex;gap:8px;flex-wrap:wrap;align-items:center'},
+      el('span',{class:'pill p-ok'},'подключено'),d.clientName?el('b',{},d.clientName):null,
+      d.lastInfoAt?el('span',{class:'mut sm'},'балансы обновлены '+fmtDT(d.lastInfoAt)):null,
+      d.historyLeftMin>0?el('span',{class:'pill p-warn'},'загружаем историю, осталось ~'+d.historyLeftMin+' мин'):el('span',{class:'mut sm'},'история загружена'),
+      d.useWebhook?el('span',{class:'pill '+(d.webhookOk?'p-ok':'p-pur'),title:d.webhookPossible?'':'Нужен адрес сервера с https (PUBLIC_URL)'},d.webhookOk?'мгновенные операции включены':'подключаем мгновенные операции…'):null)
+    :el('span',{class:'pill p-pur'},'не подключено');
+  const conn=el('div',{class:'card',style:'display:grid;gap:12px'},el('h3',{style:'font-size:15px'},'Подключение'),status,
+    d.lastError?el('div',{class:'err'},d.lastError):null,
+    el('div',{style:'display:flex;gap:10px;flex-wrap:wrap;align-items:center'},token,el('label',{style:'display:flex;align-items:center;gap:8px;white-space:nowrap'},'История за',hist)),
+    el('label',{style:'display:flex;flex-direction:row;justify-content:flex-start;align-items:center;gap:10px;font-size:13px;cursor:pointer'},hook,'Получать операции сразу (вебхук). Заменит вебхук, если он уже был настроен у этого токена в другом сервисе'),
+    err,el('div',{style:'display:flex;gap:10px;flex-wrap:wrap'},save,off),
+    el('div',{class:'mut sm'},'Токен создаётся на api.monobank.ua (вход через приложение monobank). Он даёт только просмотр: перевести деньги по нему нельзя. monobank разрешает запрос раз в минуту, поэтому история грузится постепенно, около минуты на каждый месяц каждого счёта. Токен хранится на сервере и здесь не показывается.'));
+  // Курсы валют monobank (обновляются банком не чаще раза в 5 минут)
+  const fx=v=>v?Number(v).toFixed(2).replace('.',','):'—';
+  const rates=d.rates&&d.rates.length?el('div',{style:'display:flex;gap:10px;flex-wrap:wrap'},...d.rates.map(r=>el('div',{class:'card',style:'padding:10px 14px;display:grid;gap:2px;min-width:150px'},
+      el('div',{style:'display:flex;justify-content:space-between;gap:10px'},el('b',{},(MONO_CUR[r.code]||'')+' '+({840:'USD',978:'EUR',985:'PLN',826:'GBP'}[r.code]||r.code)),el('span',{class:'mut sm'},new Date(r.date*1000).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit',timeZone:'Europe/Kyiv'}))),
+      r.buy||r.sell?el('div',{class:'sm'},'покупка ',el('b',{},fx(r.buy)),' · продажа ',el('b',{},fx(r.sell))):el('div',{class:'sm'},'курс ',el('b',{},fx(r.cross)))))):null;
+  const head=el('div',{class:'head'},el('h2',{style:'font-size:20px'},'МоноБанк API'));
+  if(!d.connected)return[head,rates,conn];
+  // Общий баланс
+  const t=d.totals;
+  const bal=el('div',{class:'card',style:'display:grid;gap:8px'},el('div',{class:'dx-lbl'},'Общий баланс'),
+    el('div',{class:'big pos',style:'font-size:32px;font-weight:800'},'≈ '+monoMoney(Math.round(t.uah*100),980)),
+    el('div',{class:'mut sm'},t.byCurrency.map(x=>monoMoney(x.amount,x.currency)).join(' · ')+' · по курсу monobank'+(t.uahExact?'':' (часть валют без курса не учтена)')),
+    el('div',{class:'mut sm'},'Свои деньги на всех картах и в банках. Кредитный лимит не входит.'));
+  const accRows=d.accounts.map(a=>{const own=a.balance-a.creditLimit;return[
+    el('td',{style:'text-align:left'},el('b',{},a.kind==='jar'?(a.title||'Банка'):(MONO_TYPE[a.type]||a.type||'Счёт')),el('div',{class:'mut sm'},a.kind==='jar'?'Банка':(a.maskedPan||a.iban||''))),
+    td(MONO_CUR[a.currency]||a.currency),el('td',{class:'n'},el('b',{},monoMoney(own,a.currency))),
+    td(a.creditLimit?monoMoney(a.creditLimit,a.currency):a.goal?'цель '+monoMoney(a.goal,a.currency):'—'),
+    el('td',{},a.loading?el('span',{class:'pill p-warn'},'грузим историю'):el('span',{class:'pill p-ok'},'готово'))]});
+  // Пополнения за период
+  const q=dxQuery(),per=dxCur();
+  const inc=await api('/mono/incoming'+q);
+  const sums=inc.sums.length?inc.sums.map(x=>monoMoney(x.amount,x.currency)+' ('+x.n+')').join(' · '):'нет';
+  const accName=r=>r.kind==='jar'?(r.title||'Банка'):(r.masked_pan||'Счёт');
+  const incRows=inc.rows.map(r=>[td(fmtDT(r.time)),td(accName(r)),el('td',{style:'white-space:normal;text-align:left;min-width:200px'},r.counter_name||r.description||'—',r.counter_name&&r.description&&r.description!==r.counter_name?el('div',{class:'mut sm'},r.description):null),
+    el('td',{style:'white-space:normal;text-align:left;max-width:260px'},r.comment||el('span',{class:'mut'},'—')),
+    el('td',{class:'n'},el('b',{style:'color:var(--ok)'},'+'+monoMoney(r.amount,r.currency)),r.hold?el('div',{class:'mut sm'},'в обработке'):null)]);
+  if(d.historyLeftMin>0)monoTimer=setTimeout(()=>{if(tab==='mono')render({soft:true})},30000);
+  return[head,rates,conn,bal,
+    el('h3',{style:'font-size:15px'},'Счета и банки'),ctrT(table(['Счёт','Валюта','Свои средства','Кредитный лимит / цель','История'],accRows,'Счетов нет.')),
+    el('div',{style:'display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:space-between'},el('h3',{style:'font-size:15px'},'Пополнения за '+dxRangeLabel(per)),rangeBar(()=>render({soft:true}))),
+    el('div',{class:'card',style:'display:flex;gap:10px;align-items:center;flex-wrap:wrap'},el('span',{class:'dx-lbl'},'Всего пополнений'),el('b',{style:'font-size:18px;color:var(--ok)'},sums)),
+    ctrT(table(['Когда','Счёт','От кого','Комментарий','Сумма'],incRows,d.historyLeftMin>0?'История ещё загружается, пополнения появятся по мере загрузки.':'За этот период пополнений нет.')),
+    inc.rows.length>=500?el('div',{class:'mut sm'},'Показаны последние 500 пополнений периода, сумма посчитана по всем.'):null];
 }
 
 /* ---------- Планы и задачи (админ) ---------- */

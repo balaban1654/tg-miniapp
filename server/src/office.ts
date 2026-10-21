@@ -10,6 +10,7 @@ import { createBroadcast, segmentWhere, SEGMENTS, deliverAnimation, type Button 
 import { randomInt, randomBytes, createHash } from 'node:crypto';
 const sha256 = (v: string) => createHash('sha256').update(v).digest('hex');
 import { accountingRoutes } from './accounting.js';
+import { monoRoutes } from './mono.js';
 import { leadStatusDate, leadListDate } from './leaddate.js';
 import { connectRoutes, connectInfo, requiredFor, TOL } from './connect.js';
 import { toVoice, toVideoNote } from './media.js';
@@ -2372,6 +2373,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
   });
 
   await accountingRoutes(app, { need, str, num });
+  await monoRoutes(app, { need, str });
   await connectRoutes(app, { need, str });
 }
 
