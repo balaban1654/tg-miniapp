@@ -1319,6 +1319,16 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     ).rows as { owner_id: number; n: number }[];
     const clicks = new Map(clicksRows.map((r) => [r.owner_id, r.n]));
     const clicksSince = (await db.query(`SELECT to_char(min(at AT TIME ZONE '${TZ}'), 'YYYY-MM-DD') AS d FROM link_clicks`)).rows[0].d as string | null;
+    // Отвал: лиды, пришедшие за период, у которых сейчас статус «Отвал» (в том числе заблокировавшие бота)
+    const churned = new Map(
+      ((await db.query(
+        `SELECT owner_id, count(*)::int AS n FROM leads
+          WHERE status = 'churned' AND owner_id IS NOT NULL AND removed_at IS NULL AND coalesce(lead_role, 'lead') = 'lead'
+            ${allTime ? '' : `AND (created_at AT TIME ZONE '${TZ}')::date BETWEEN $1::date AND $2::date`}
+          GROUP BY owner_id`,
+        allTime ? [] : [from, to],
+      )).rows as { owner_id: number; n: number }[]).map((r) => [r.owner_id, r.n]),
+    );
 
     const nowIso = new Date().toISOString();
     const live = new Map(
@@ -1386,7 +1396,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
         minLeft: lv ? Math.max(0, plan.shiftH * 60 - doneToday) : null,
         todayMin: doneToday,
         pending: pendingBy.get(s.id) ?? 0,
-        range: { clicks: clicks.get(s.id) ?? 0, regs: a.reg, ftd: a.ftd, ftdSum: a.ftdSum, dep: a.dep, depSum: a.depSum, deposits: a.ftdSum + a.depSum, commission: a.comm, salary: r2(salary), paid: r2(paid) },
+        range: { clicks: clicks.get(s.id) ?? 0, regs: a.reg, ftd: a.ftd, churned: churned.get(s.id) ?? 0, ftdSum: a.ftdSum, dep: a.dep, depSum: a.depSum, deposits: a.ftdSum + a.depSum, commission: a.comm, salary: r2(salary), paid: r2(paid) },
         month: {
           period: refMonth,
           ftd: am.ftd,
@@ -1488,6 +1498,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
         clicks: sum((x) => x.range.clicks),
         regs: sum((x) => x.range.regs),
         ftd: sum((x) => x.range.ftd),
+        churned: sum((x) => x.range.churned),
         ftdSum: sum((x) => x.range.ftdSum),
         dep: sum((x) => x.range.dep),
         depSum: sum((x) => x.range.depSum),

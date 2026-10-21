@@ -1236,7 +1236,7 @@ function smSocial(d){
 function dxColorOf(d){const ids=d.streamers.map(s=>s.id).sort((a,b)=>a-b);return id=>DXC[ids.indexOf(id)%DXC.length]}
 function dxFunnel(d){
   const C=dxColorOf(d),t=d.totals;
-  const stages=[['Клики','clicks'],['Регистрации','regs'],['FTD','ftd'],['Додепы','dep']];
+  const stages=[['Клики','clicks'],['Регистрации','regs'],['FTD','ftd'],['Додепы','dep'],['Отвал','churned']];
   const ctr=t.clicks?t.regs/t.clicks*100:null,rtd=t.regs?t.ftd/t.regs*100:null;
   const pc=v=>v===null?'—':v.toFixed(1).replace('.',',')+'%';
   const note=!d.range.all&&d.clicksSince&&d.range.from<d.clicksSince?el('div',{class:'mut sm'},'Клики считаются с '+dmy(d.clicksSince)+': раньше их время не записывалось.'):null;
