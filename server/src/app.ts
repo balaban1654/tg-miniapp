@@ -7,6 +7,7 @@ import { config } from './config.js';
 import { loadDepConfig, leadTierState } from './depbonus.js';
 import { requiredFor } from './connect.js';
 import { parseReviewPhoto, cleanReviewText, cleanRating } from './reviews.js';
+import { mediaTeamOf } from './mediaTeams.js';
 
 export interface TgUser {
   id: number;
@@ -540,16 +541,19 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
     return { ok: true };
   });
 
+  // Медиа по командам: клиент видит новости, трейдеров и отзывы своей команды (см. mediaTeamOf)
   // Новости команды: свежие сверху
-  app.get('/news', { preHandler: auth }, async () =>
-    (await db.query('SELECT id, title, body, created_at FROM news ORDER BY id DESC LIMIT 30')).rows);
+  app.get('/news', { preHandler: auth }, async (req) =>
+    (await db.query('SELECT id, title, body, created_at FROM news WHERE team_id = $1 ORDER BY id DESC LIMIT 30', [await mediaTeamOf(req.tg!.id)])).rows);
 
-  app.get('/media', { preHandler: auth }, async () => {
+  app.get('/media', { preHandler: auth }, async (req) => {
+    const team = await mediaTeamOf(req.tg!.id);
     // live: ссылка на эфир, пока у привязанного стримера идёт смена
     const r = await db.query(
       `SELECT m.id, m.kind, m.title, m.subtitle, m.url, m.country, m.contact_url,
               (SELECT s.stream_url FROM shift_reports s WHERE s.staff_id = m.staff_id AND s.status = 'live' AND NOT s.team ORDER BY s.id DESC LIMIT 1) AS live_url
-         FROM media_items m WHERE m.active ORDER BY m.sort, m.id`,
+         FROM media_items m WHERE m.active AND m.team_id = $1 ORDER BY m.sort, m.id`,
+      [team],
     );
     const rows = await Promise.all(
       r.rows.map(async (x) => {
@@ -599,18 +603,19 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
   };
   const req_log = (m: string) => console.warn('avatar:', m);
   app.get('/reviews', { preHandler: auth }, async (req) => {
+    const team = await mediaTeamOf(req.tg!.id);
     const r = await db.query(
       `SELECT id, tg_id, author, rating, body, status, created_at, photo_key, (tg_id = $1) AS mine
-         FROM reviews WHERE status = 'published' OR (tg_id = $1 AND status = 'pending')
+         FROM reviews WHERE (status = 'published' AND team_id = $2) OR (tg_id = $1 AND status = 'pending')
         ORDER BY created_at DESC, id DESC LIMIT 100`,
-      [req.tg!.id],
+      [req.tg!.id, team],
     );
     const ids = [...new Set(r.rows.map((x) => x.tg_id).filter(Boolean).map(String))] as string[];
     await Promise.race([ensureAvatars(ids).catch(() => {}), new Promise((res) => setTimeout(res, 4000))]);
     const av = new Map<string, string>();
     if (ids.length) for (const a of (await db.query(`SELECT tg_id, key FROM tg_avatars WHERE tg_id = ANY($1::bigint[]) AND photo IS NOT NULL`, [ids])).rows) av.set(String(a.tg_id), a.key);
     const rows = r.rows.map((x) => ({ ...x, tg_id: undefined, photo_key: undefined, avatar: x.tg_id && av.has(String(x.tg_id)) ? `/api/app/avatar/${av.get(String(x.tg_id))}` : null, photo: x.photo_key ? `/api/app/reviews/photo/${x.photo_key}` : null }));
-    const stats = (await db.query(`SELECT count(*)::int AS n, coalesce(round(avg(rating)::numeric, 1), 0)::float AS avg FROM reviews WHERE status = 'published'`)).rows[0];
+    const stats = (await db.query(`SELECT count(*)::int AS n, coalesce(round(avg(rating)::numeric, 1), 0)::float AS avg FROM reviews WHERE status = 'published' AND team_id = $1`, [team])).rows[0];
     return { items: rows, count: stats.n, avg: stats.avg };
   });
   app.get<{ Params: { key: string } }>('/avatar/:key', async (req, reply) => {
@@ -638,8 +643,8 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
     const lead = (await db.query('SELECT first_name, username FROM leads WHERE tg_id = $1', [req.tg!.id])).rows[0];
     const author = (lead?.first_name || lead?.username || 'Клиент').slice(0, 60);
     await db.query(
-      `INSERT INTO reviews (tg_id, author, rating, body, photo, photo_type, photo_key, status) VALUES ($1,$2,$3,$4,$5,$6,$7,'pending')`,
-      [req.tg!.id, author, rating, body, ph?.data ?? null, ph?.type ?? null, ph?.key ?? null],
+      `INSERT INTO reviews (tg_id, author, rating, body, photo, photo_type, photo_key, status, team_id) VALUES ($1,$2,$3,$4,$5,$6,$7,'pending',$8)`,
+      [req.tg!.id, author, rating, body, ph?.data ?? null, ph?.type ?? null, ph?.key ?? null, await mediaTeamOf(req.tg!.id)],
     );
     return { ok: true };
   });

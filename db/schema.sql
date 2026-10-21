@@ -868,3 +868,25 @@ ALTER TABLE mono_tx ADD COLUMN IF NOT EXISTS profile_id INT NOT NULL DEFAULT 1;
 CREATE INDEX IF NOT EXISTS mono_accounts_profile ON mono_accounts (profile_id);
 CREATE INDEX IF NOT EXISTS mono_tx_profile ON mono_tx (profile_id, time DESC);
 CREATE UNIQUE INDEX IF NOT EXISTS mono_settings_hook ON mono_settings (hook_secret) WHERE hook_secret IS NOT NULL;
+
+-- Медиа по командам: у каждой команды (тимлидера) свои трейдеры и каналы, новости и отзывы.
+-- Основная команда: органика, клиенты по ссылкам админов и клиенты стримеров без тимлидера. Прежнее медиа переходит в Основную
+CREATE TABLE IF NOT EXISTS media_teams (
+  id          SERIAL PRIMARY KEY,
+  title       TEXT NOT NULL,
+  teamlead_id INT REFERENCES staff(id) ON DELETE SET NULL,
+  is_main     BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at  TIMESTAMPTZ DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS media_teams_main ON media_teams (is_main) WHERE is_main;
+CREATE UNIQUE INDEX IF NOT EXISTS media_teams_lead ON media_teams (teamlead_id) WHERE teamlead_id IS NOT NULL;
+INSERT INTO media_teams (title, is_main) SELECT 'Основная', TRUE WHERE NOT EXISTS (SELECT 1 FROM media_teams WHERE is_main);
+ALTER TABLE media_items ADD COLUMN IF NOT EXISTS team_id INT REFERENCES media_teams(id) ON DELETE CASCADE;
+ALTER TABLE news ADD COLUMN IF NOT EXISTS team_id INT REFERENCES media_teams(id) ON DELETE CASCADE;
+ALTER TABLE reviews ADD COLUMN IF NOT EXISTS team_id INT REFERENCES media_teams(id) ON DELETE CASCADE;
+UPDATE media_items SET team_id = (SELECT id FROM media_teams WHERE is_main) WHERE team_id IS NULL;
+UPDATE news SET team_id = (SELECT id FROM media_teams WHERE is_main) WHERE team_id IS NULL;
+UPDATE reviews SET team_id = (SELECT id FROM media_teams WHERE is_main) WHERE team_id IS NULL;
+CREATE INDEX IF NOT EXISTS media_items_team ON media_items (team_id);
+CREATE INDEX IF NOT EXISTS news_team ON news (team_id, id DESC);
+CREATE INDEX IF NOT EXISTS reviews_team ON reviews (team_id, status, created_at DESC);

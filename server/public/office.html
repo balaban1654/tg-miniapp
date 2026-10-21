@@ -4052,17 +4052,47 @@ async function viewSignals(mode){
 }
 
 let mediaEdit=null,mediaTab='ch';
+/** Команда медиа, которую сейчас редактируем (вкладка вверху раздела «Медиа»), запоминаем в браузере */
+let mediaTeam=(()=>{try{return Number(localStorage.getItem('mediaTeam'))||null}catch{return null}})();
+const mediaSetTeam=id=>{mediaTeam=id;try{localStorage.setItem('mediaTeam',String(id))}catch{}};
 const COUNTRIES=[['UA','Украина'],['RU','Россия'],['KZ','Казахстан'],['BY','Беларусь'],['UZ','Узбекистан'],['GE','Грузия'],['AM','Армения'],['AZ','Азербайджан'],['MD','Молдова'],['KG','Кыргызстан'],['PL','Польша'],['LT','Литва'],['LV','Латвия'],['EE','Эстония'],['DE','Германия'],['GB','Великобритания'],['US','США'],['TR','Турция'],['AE','ОАЭ'],['CY','Кипр'],['IL','Израиль'],['ES','Испания'],['IT','Италия'],['FR','Франция'],['CZ','Чехия'],['BR','Бразилия'],['IN','Индия'],['ID','Индонезия'],['VN','Вьетнам'],['TH','Таиланд']];
 const countrySel=()=>el('select',{'aria-label':'Страна'},el('option',{value:''},'Без флага'),COUNTRIES.map(([c,n])=>el('option',{value:c},c+' · '+n)));
 async function viewMedia(){
-  const [rows,staffAll]=await Promise.all([api('/media'),api('/staff').catch(()=>[])]);
+  // Команды: вкладки вверху. Карандаш у активной переименовывает, «+» добавляет команду
+  const teams=await api('/media/teams');
+  if(!teams.some(t=>t.id===mediaTeam))mediaSetTeam(teams[0].id);
+  const team=teams.find(t=>t.id===mediaTeam);
+  const [rows,staffAll]=await Promise.all([api('/media?team='+team.id),api('/staff').catch(()=>[])]);
+  const PEN='<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/>';
+  const tBar=el('div',{class:'lc-tabs',role:'tablist',style:'flex:1;min-width:0'});
+  const drawTeams=()=>tBar.replaceChildren(...teams.map(t=>{
+    const on=t.id===team.id;
+    const b=el('button',{type:'button',role:'tab','aria-selected':String(on),class:'lc-tab'+(on?' on':''),onclick:()=>{if(on)return;mediaSetTeam(t.id);mediaEdit=null;reviewEdit=null;render({soft:true})}},t.title,t.pending?el('span',{class:'nbadge vio pulse tb',title:'Отзывы ждут проверки'},String(t.pending)):null);
+    if(!on)return b;
+    const ren=el('button',{type:'button',title:'Переименовать команду','aria-label':'Переименовать команду',style:'background:none;border:0;color:var(--mut);cursor:pointer;padding:2px 4px;margin-left:2px;display:inline-grid;vertical-align:middle',onclick:e=>{e.stopPropagation();
+      const inp=el('input',{value:t.title,maxlength:'40','aria-label':'Название команды',style:'width:170px;padding:6px 8px'});
+      let fin=false;const done=async ok=>{if(fin)return;fin=true;const v=inp.value.trim();if(ok&&v&&v!==t.title){try{await api('/media/teams/'+t.id,{method:'PATCH',body:{title:v}});t.title=v;toast('Команда переименована')}catch(x){toast(x.message)}}drawTeams()};
+      inp.addEventListener('keydown',ev=>{if(ev.key==='Enter'){ev.preventDefault();done(true)}if(ev.key==='Escape')done(false)});inp.addEventListener('blur',()=>done(true));
+      wrap.replaceWith(inp);inp.focus();inp.select()}},svgIcon(PEN,14));
+    const wrap=el('span',{style:'display:inline-flex;align-items:center'},b,ren);return wrap;
+  }));
+  drawTeams();
+  const addTeam=el('button',{type:'button',class:'mono-add',title:'Новая команда','aria-label':'Новая команда',onclick:async()=>{try{const r=await api('/media/teams',{method:'POST'});mediaSetTeam(r.id);mediaTab='ch';toast('Команда создана: выберите её тимлидера');render({soft:true})}catch(x){toast(x.message)}}},svgIcon('<path d="M12 5v14M5 12h14"/>',18));
+  const leads=staffAll.filter(x=>x.role==='teamlead'&&x.active!==false);
+  const leadSel=el('select',{'aria-label':'Тимлидер команды',style:'width:auto;min-width:200px',onchange:async()=>{try{await api('/media/teams/'+team.id,{method:'PATCH',body:{teamlead_id:leadSel.value||null}});toast(leadSel.value?'Тимлидер закреплён: его клиенты видят медиа этой команды':'Тимлидер откреплён');render({soft:true})}catch(x){toast(x.message);leadSel.value=team.teamlead_id||''}}},
+    el('option',{value:''},'Не выбран'),...leads.map(x=>{const other=teams.find(t=>t.teamlead_id===x.id&&t.id!==team.id);return el('option',{value:x.id,disabled:other?'':null},x.name+(other?' · уже в «'+other.title+'»':''))}));
+  leadSel.value=team.teamlead_id||'';
+  const delTeam=team.is_main?null:el('button',{class:'btn o s',type:'button',style:'color:var(--bad)',onclick:async()=>{if(!await askC('Удалить команду «'+team.title+'» вместе с её трейдерами, новостями и отзывами? Её клиенты будут видеть Основную.'))return;try{await api('/media/teams/'+team.id,{method:'DELETE'});mediaSetTeam(null);toast('Команда удалена');render({soft:true})}catch(x){toast(x.message)}}},'Удалить команду');
+  const teamInfo=el('div',{class:'card',style:'display:flex;gap:12px;align-items:center;flex-wrap:wrap'},
+    team.is_main?el('div',{class:'mut sm',style:'flex:1;min-width:240px'},'Основная команда: её медиа видят клиенты из органики, клиенты по вашим ссылкам и клиенты стримеров без тимлидера.')
+      :[el('label',{style:'display:flex;align-items:center;gap:10px;white-space:nowrap'},'Тимлидер',leadSel),el('div',{class:'mut sm',style:'flex:1;min-width:220px'},team.teamlead_id?'Клиенты тимлидера и его стримеров видят в Mini App медиа этой команды.':'Выберите тимлидера: пока его нет, эту команду никто не видит.'),delTeam]);
   const streamers=staffAll.filter(x=>(x.role==='streamer'||x.streams)&&x.active!==false);
   const staffSel=()=>el('select',{},el('option',{value:''},'Не привязан'),...streamers.map(x=>el('option',{value:x.id},x.name)));
   if(!rows.some(r=>r.id===mediaEdit))mediaEdit=null;
   const f={kind:el('select',{},el('option',{value:'trader'},'Трейдер'),el('option',{value:'channel'},'Канал')),title:el('input',{required:'',placeholder:'Лера'}),country:countrySel(),contact:el('input',{placeholder:'https://t.me/username'}),sub:el('input',{placeholder:'Трейдер команды'}),url:el('input',{required:'',placeholder:'https://t.me/...'}),sort:el('input',{type:'number',placeholder:'1'}),staff:staffSel()};
   const err=el('div',{class:'err',role:'alert'});
   const form=el('form',{class:'card form',onsubmit:async e=>{e.preventDefault();err.textContent='';
-    try{await api('/media',{method:'POST',body:{kind:f.kind.value,title:f.title.value,country:f.country.value,contact_url:f.contact.value,subtitle:f.sub.value,url:f.url.value,sort:f.sort.value,staff_id:f.staff.value}});render({soft:true})}catch(x){err.textContent=x.message}}},
+    try{await api('/media',{method:'POST',body:{team_id:team.id,kind:f.kind.value,title:f.title.value,country:f.country.value,contact_url:f.contact.value,subtitle:f.sub.value,url:f.url.value,sort:f.sort.value,staff_id:f.staff.value}});render({soft:true})}catch(x){err.textContent=x.message}}},
     el('label',{},'Тип',f.kind),el('label',{},'Имя',f.title),el('label',{},'Страна (флаг)',f.country),el('label',{},'Личка трейдера (ссылка, для аватарки и @юзернейма)',f.contact),el('label',{},'Подпись (если не подтянулась из Telegram)',f.sub),el('label',{},'Ссылка',f.url),el('label',{},'Стример (эфир на аватарке)',f.staff),el('label',{},'Порядок',f.sort),el('button',{class:'btn',type:'submit'},'Добавить'),err);
   const ICON={pen:'<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/>',ok:'<path d="M5 12.5l4.5 4.5L19 7.5"/>',eye:'<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',eyeOff:'<path d="M3 3l18 18"/><path d="M10.6 5.1A10.8 10.8 0 0112 5c6.4 0 10 7 10 7a17.6 17.6 0 01-3.2 4.2M6.6 6.6C3.8 8.4 2 12 2 12s3.6 7 10 7a10 10 0 005.4-1.6"/><path d="M9.9 9.9a3 3 0 004.2 4.2"/>'};
   const BS='display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;height:30px;vertical-align:middle;margin-left:6px';
@@ -4082,13 +4112,13 @@ async function viewMedia(){
   const mBar=el('div',{class:'lc-tabs',role:'tablist'}),mBody=el('div',{style:'display:grid;gap:14px'});
   const drawM=async()=>{
     // На «Отзывах» мигает число отзывов, ждущих проверки (как у пункта «Медиа» в меню)
-    const drawTabs=()=>mBar.replaceChildren(...MT.map(([k,t])=>el('button',{type:'button',role:'tab','aria-selected':String(k===mediaTab),class:'lc-tab'+(k===mediaTab?' on':''),onclick:()=>{mediaTab=k;drawM()}},t,k==='rev'&&mediaPend>0?el('span',{class:'nbadge vio pulse tb',title:'Ждут проверки'},String(mediaPend)):null)));
+    const drawTabs=()=>mBar.replaceChildren(...MT.map(([k,t])=>el('button',{type:'button',role:'tab','aria-selected':String(k===mediaTab),class:'lc-tab'+(k===mediaTab?' on':''),onclick:()=>{mediaTab=k;drawM()}},t,k==='rev'&&team.pending>0?el('span',{class:'nbadge vio pulse tb',title:'Ждут проверки'},String(team.pending)):null)));
     window.__mediaTabsRedraw=drawTabs;drawTabs();
     const refreshTg=el('div',{style:'display:flex;align-items:center;gap:12px;flex-wrap:wrap'},el('button',{class:'btn o s',type:'button',onclick:async e=>{const b=e.currentTarget;b.disabled=true;try{await api('/media/refresh',{method:'POST'});toast('Готово: Mini App возьмёт свежие названия и аватарки из Telegram')}catch(x){toast(x.message)}b.disabled=false}},'Обновить из Telegram'),el('span',{class:'mut sm'},'Названия, подписчики и аватарки каналов и трейдеров обновляются сами раз в 5 минут. Кнопка обновит сразу.'));
     // Ссылка кнопки «Попробовать демо» в Тренажёре Mini App
     const demoIn=el('input',{type:'text',inputmode:'url',autocapitalize:'off',autocomplete:'off',placeholder:'https://… (пусто: кнопки нет)',maxlength:'500',style:'flex:1;min-width:220px'});
     api('/app-settings/demo').then(d=>{demoIn.value=d.url||''}).catch(()=>{});
-    const demoCard=el('div',{class:'card',style:'display:grid;gap:10px'},el('h3',{style:'font-size:14px'},'Кнопка «Попробовать демо» в Тренажёре'),
+    const demoCard=el('div',{class:'card',style:'display:grid;gap:10px'},el('h3',{style:'font-size:14px'},'Кнопка «Попробовать демо» в Тренажёре (общая для всех команд)'),
       el('div',{style:'display:flex;gap:10px;flex-wrap:wrap;align-items:center'},demoIn,el('button',{class:'btn s',type:'button',onclick:async e=>{const b=e.currentTarget;b.disabled=true;try{await api('/app-settings/demo',{method:'PUT',body:{url:demoIn.value.trim()}});toast(demoIn.value.trim()?'Ссылка сохранена: кнопка появилась в Тренажёре':'Ссылка очищена: кнопки в Тренажёре нет')}catch(x){toast(x.message)}b.disabled=false}},'Сохранить')),
       el('div',{class:'mut sm'},'Клиент нажимает «Попробовать демо» во вкладке «Тренажёр» и попадает по этой ссылке. Ссылка на t.me откроется внутри Telegram, остальные в браузере.'));
     if(mediaTab==='ch'){mBody.replaceChildren(form,refreshTg,demoCard,
@@ -4097,7 +4127,7 @@ async function viewMedia(){
     try{mBody.replaceChildren(...(mediaTab==='news'?await newsAdmin():await reviewsAdmin()))}catch(x){mBody.replaceChildren(el('div',{class:'err'},x.message))}
   };
   drawM();
-  return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Медиа в Mini App')),mBar,mBody];
+  return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Медиа в Mini App')),el('div',{style:'display:flex;gap:10px;align-items:center'},tBar,addTeam),teamInfo,mBar,mBody];
 }
 
 let reviewEdit=null;
@@ -4106,14 +4136,14 @@ const starsTxt=n=>el('span',{style:'color:var(--warn);letter-spacing:1px;white-s
 const ratingSel=(v)=>{const s=el('select',{'aria-label':'Оценка'},...[5,4,3,2,1].map(n=>el('option',{value:n},'★'.repeat(n)+' '+n)));s.value=String(v||5);return s};
 /** Новости команды: что написали здесь, то видно в мини-аппе во вкладке «Медиа», свежие сверху */
 async function newsAdmin(){
-  const rows=await api('/news');
+  const rows=await api('/news?team='+mediaTeam);
   let editId=null;
   const title=el('input',{placeholder:'Заголовок',maxlength:'120'}),text=el('textarea',{class:'big',rows:'5',maxlength:'3000',placeholder:'Текст новости'});
   const err=el('div',{class:'err',role:'alert'});
   const okBtn=el('button',{class:'btn',type:'button'},'Опубликовать');
   const cancel=el('button',{class:'btn o',type:'button',hidden:'',onclick:()=>{editId=null;title.value='';text.value='';okBtn.textContent='Опубликовать';cancel.hidden=true}},'Отмена');
   okBtn.onclick=async()=>{err.textContent='';okBtn.disabled=true;
-    try{await api(editId?'/news/'+editId:'/news',{method:editId?'PUT':'POST',body:{title:title.value,body:text.value}});toast(editId?'Новость сохранена':'Новость опубликована');render({soft:true})}
+    try{await api(editId?'/news/'+editId:'/news',{method:editId?'PUT':'POST',body:{title:title.value,body:text.value,team_id:mediaTeam}});toast(editId?'Новость сохранена':'Новость опубликована');render({soft:true})}
     catch(x){err.textContent=x.message;okBtn.disabled=false}};
   const form=el('div',{class:'card',style:'display:grid;gap:10px'},el('b',{style:'font-size:14px'},'Новая новость'),
     el('label',{},'Заголовок',title),el('label',{},'Текст',text),
@@ -4131,7 +4161,7 @@ async function newsAdmin(){
   return[form,...(rows.length?rows.map(item):[el('div',{class:'mut'},'Новостей пока нет.')])];
 }
 async function reviewsAdmin(){
-  const rows=await api('/reviews');
+  const rows=await api('/reviews?team='+mediaTeam);
   if(!rows.some(r=>r.id===reviewEdit))reviewEdit=null;
   const err=el('div',{class:'err',role:'alert'});
   const fa={author:el('input',{required:'',maxlength:'60',placeholder:'Имя автора'}),rating:ratingSel(5),body:el('textarea',{class:'big',required:'',rows:'3',maxlength:'1500',placeholder:'Текст отзыва',style:'min-height:80px;resize:vertical'})};
@@ -4145,7 +4175,7 @@ async function reviewsAdmin(){
     if(f.size>5*1024*1024){err.textContent='Фото больше 5 МБ';return}
     err.textContent='';photo=await fileToDataUrl(f);drawPv()});
   const form=el('form',{class:'card form',onsubmit:async e=>{e.preventDefault();err.textContent='';
-    try{await api('/reviews',{method:'POST',body:{author:fa.author.value,rating:fa.rating.value,body:fa.body.value,photo}});render({soft:true})}catch(x){err.textContent=x.message}}},
+    try{await api('/reviews',{method:'POST',body:{author:fa.author.value,rating:fa.rating.value,body:fa.body.value,photo,team_id:mediaTeam}});render({soft:true})}catch(x){err.textContent=x.message}}},
     el('label',{},'Автор',fa.author),el('label',{},'Оценка',fa.rating),el('label',{style:'grid-column:1/-1'},'Текст',fa.body),el('div',{style:'grid-column:1/-1;display:grid;gap:6px'},el('span',{class:'mut',style:'font-size:12px'},'Фото (необязательно)'),pv,file),
     el('div',{style:'grid-column:1/-1;display:flex;gap:10px;align-items:center;flex-wrap:wrap'},el('button',{class:'btn',type:'submit'},'Добавить отзыв'),err));
   const rowErr=el('div',{class:'err',role:'alert'});

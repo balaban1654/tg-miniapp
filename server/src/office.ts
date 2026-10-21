@@ -11,6 +11,7 @@ import { randomInt, randomBytes, createHash } from 'node:crypto';
 const sha256 = (v: string) => createHash('sha256').update(v).digest('hex');
 import { accountingRoutes } from './accounting.js';
 import { monoRoutes } from './mono.js';
+import { mainMediaTeam } from './mediaTeams.js';
 import { leadStatusDate, leadListDate } from './leaddate.js';
 import { connectRoutes, connectInfo, requiredFor, TOL } from './connect.js';
 import { toVoice, toVideoNote } from './media.js';
@@ -1473,15 +1474,71 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     return r.rows;
   });
 
+  // Команды медиа (вкладки в «Медиа»): у каждой свои трейдеры и каналы, новости и отзывы. ?team= / team_id: какая команда, без него Основная
+  const teamParam = async (v: unknown): Promise<number | null> => {
+    if (v === undefined || v === null || v === '') return mainMediaTeam();
+    const id = Number(v);
+    return Number.isInteger(id) && (await db.query('SELECT 1 FROM media_teams WHERE id = $1', [id])).rowCount ? id : null;
+  };
+  app.get('/media/teams', { preHandler: need('admin') }, async () => {
+    await mainMediaTeam();
+    return (
+      await db.query(
+        `SELECT t.id, t.title, t.is_main, t.teamlead_id, s.name AS teamlead_name,
+                (SELECT count(*)::int FROM media_items m WHERE m.team_id = t.id) AS items,
+                (SELECT count(*)::int FROM news n WHERE n.team_id = t.id) AS news,
+                (SELECT count(*)::int FROM reviews r WHERE r.team_id = t.id AND r.status = 'pending') AS pending
+           FROM media_teams t LEFT JOIN staff s ON s.id = t.teamlead_id ORDER BY t.is_main DESC, t.id`,
+      )
+    ).rows;
+  });
+  app.post('/media/teams', { preHandler: need('admin') }, async (req) => {
+    const n = Number((await db.query('SELECT count(*) AS n FROM media_teams')).rows[0].n);
+    const title = str(((req.body ?? {}) as Record<string, unknown>).title, 40) || 'Команда ' + (n + 1);
+    return { ok: true, id: (await db.query('INSERT INTO media_teams (title) VALUES ($1) RETURNING id', [title])).rows[0].id };
+  });
+  // Название и тимлидер команды. Тимлидер у одной команды: его клиенты (и клиенты его стримеров) видят медиа этой команды
+  app.patch<{ Params: { id: string } }>('/media/teams/:id', { preHandler: need('admin') }, async (req, reply) => {
+    const id = Number(req.params.id);
+    const b = (req.body ?? {}) as Record<string, unknown>;
+    const t = (await db.query('SELECT id, is_main FROM media_teams WHERE id = $1', [id])).rows[0];
+    if (!t) return reply.code(404).send({ error: 'Команда не найдена' });
+    if (b.title !== undefined) {
+      const title = str(b.title, 40);
+      if (!title) return reply.code(400).send({ error: 'Введите название команды' });
+      await db.query('UPDATE media_teams SET title = $2 WHERE id = $1', [id, title]);
+    }
+    if (b.teamlead_id !== undefined) {
+      if (t.is_main) return reply.code(400).send({ error: 'Основная команда без тимлидера: её видят органика и клиенты без тимлидера' });
+      const lead = b.teamlead_id ? Number(b.teamlead_id) : null;
+      if (lead && !(await db.query(`SELECT 1 FROM staff WHERE id = $1 AND role = 'teamlead' AND deleted_at IS NULL`, [lead])).rowCount) return reply.code(400).send({ error: 'Это не тимлидер' });
+      const busy = lead ? (await db.query('SELECT title FROM media_teams WHERE teamlead_id = $1 AND id <> $2', [lead, id])).rows[0] : null;
+      if (busy) return reply.code(409).send({ error: `Этот тимлидер уже закреплён за командой «${busy.title}»` });
+      await db.query('UPDATE media_teams SET teamlead_id = $2 WHERE id = $1', [id, lead]);
+    }
+    return { ok: true };
+  });
+  // Удалить команду вместе с её трейдерами, новостями и отзывами. Её клиенты снова видят Основную
+  app.delete<{ Params: { id: string } }>('/media/teams/:id', { preHandler: need('admin') }, async (req, reply) => {
+    const r = await db.query('DELETE FROM media_teams WHERE id = $1 AND NOT is_main RETURNING id', [Number(req.params.id)]);
+    if (!r.rowCount) return reply.code(400).send({ error: 'Основную команду удалить нельзя' });
+    return { ok: true };
+  });
+
   // Новости команды для вкладки «Медиа» в Mini App
-  app.get('/news', { preHandler: need('admin') }, async () =>
-    (await db.query(`SELECT n.id, n.title, n.body, n.created_at, s.name AS author FROM news n LEFT JOIN staff s ON s.id = n.created_by ORDER BY n.id DESC LIMIT 200`)).rows);
+  app.get<{ Querystring: { team?: string } }>('/news', { preHandler: need('admin') }, async (req, reply) => {
+    const team = await teamParam(req.query.team);
+    if (!team) return reply.code(404).send({ error: 'Команда не найдена' });
+    return (await db.query(`SELECT n.id, n.title, n.body, n.created_at, s.name AS author FROM news n LEFT JOIN staff s ON s.id = n.created_by WHERE n.team_id = $1 ORDER BY n.id DESC LIMIT 200`, [team])).rows;
+  });
   app.post('/news', { preHandler: need('admin') }, async (req, reply) => {
     const b = (req.body ?? {}) as Record<string, unknown>;
     const title = str(b.title, 120), body = str(b.body, 3000);
     if (!title) return reply.code(400).send({ error: 'Укажите заголовок' });
     if (!body) return reply.code(400).send({ error: 'Напишите текст новости' });
-    const r = await db.query('INSERT INTO news (title, body, created_by) VALUES ($1,$2,$3) RETURNING id', [title, body, req.staff!.id]);
+    const team = await teamParam(b.team_id);
+    if (!team) return reply.code(404).send({ error: 'Команда не найдена' });
+    const r = await db.query('INSERT INTO news (title, body, created_by, team_id) VALUES ($1,$2,$3,$4) RETURNING id', [title, body, req.staff!.id, team]);
     return { ok: true, id: r.rows[0].id };
   });
   app.put<{ Params: { id: string } }>('/news/:id', { preHandler: need('admin') }, async (req, reply) => {
@@ -1498,8 +1555,10 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // Медиа для Mini App: трейдеры и каналы
-  app.get('/media', { preHandler: need('admin') }, async () => {
-    return (await db.query('SELECT id, kind, title, subtitle, url, country, contact_url, staff_id, sort, active FROM media_items ORDER BY kind DESC, sort, id')).rows;
+  app.get<{ Querystring: { team?: string } }>('/media', { preHandler: need('admin') }, async (req, reply) => {
+    const team = await teamParam(req.query.team);
+    if (!team) return reply.code(404).send({ error: 'Команда не найдена' });
+    return (await db.query('SELECT id, kind, title, subtitle, url, country, contact_url, staff_id, sort, active FROM media_items WHERE team_id = $1 ORDER BY kind DESC, sort, id', [team])).rows;
   });
   function cleanMedia(b: Record<string, unknown>) {
     const kind = str(b.kind, 10);
@@ -1537,9 +1596,11 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
   app.post('/media', { preHandler: need('admin') }, async (req, reply) => {
     const m = cleanMedia((req.body ?? {}) as Record<string, unknown>);
     if (typeof m === 'string') return reply.code(400).send({ error: m });
+    const team = await teamParam(((req.body ?? {}) as Record<string, unknown>).team_id);
+    if (!team) return reply.code(404).send({ error: 'Команда не найдена' });
     const r = await db.query(
-      'INSERT INTO media_items (kind, title, subtitle, url, sort, country, contact_url, staff_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id',
-      [m.kind, m.title, m.subtitle, m.url, m.sort, m.country, m.contact_url, m.staff_id],
+      'INSERT INTO media_items (kind, title, subtitle, url, sort, country, contact_url, staff_id, team_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id',
+      [m.kind, m.title, m.subtitle, m.url, m.sort, m.country, m.contact_url, m.staff_id, team],
     );
     return { id: r.rows[0].id };
   });
@@ -1570,8 +1631,10 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
   app.get('/reviews/count', { preHandler: need('admin') }, async () => ({
     pending: Number((await db.query(`SELECT count(*)::int AS n FROM reviews WHERE status = 'pending'`)).rows[0].n),
   }));
-  app.get('/reviews', { preHandler: need('admin') }, async () => {
-    return (await db.query(`SELECT ${REVIEW_COLS} FROM reviews ORDER BY (status = 'pending') DESC, created_at DESC, id DESC`)).rows;
+  app.get<{ Querystring: { team?: string } }>('/reviews', { preHandler: need('admin') }, async (req, reply) => {
+    const team = await teamParam(req.query.team);
+    if (!team) return reply.code(404).send({ error: 'Команда не найдена' });
+    return (await db.query(`SELECT ${REVIEW_COLS} FROM reviews WHERE team_id = $1 ORDER BY (status = 'pending') DESC, created_at DESC, id DESC`, [team])).rows;
   });
   app.get<{ Params: { id: string } }>('/reviews/:id/photo', { preHandler: need('admin') }, async (req, reply) => {
     const r = (await db.query('SELECT photo, photo_type FROM reviews WHERE id = $1', [Number(req.params.id)])).rows[0];
@@ -1588,9 +1651,11 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     if (body.length < 2) return reply.code(400).send({ error: 'Напишите текст отзыва' });
     const ph = parseReviewPhoto(b.photo);
     if (typeof ph === 'string') return reply.code(400).send({ error: ph });
+    const team = await teamParam(b.team_id);
+    if (!team) return reply.code(404).send({ error: 'Команда не найдена' });
     const r = await db.query(
-      `INSERT INTO reviews (author, rating, body, photo, photo_type, photo_key, status, by_admin) VALUES ($1,$2,$3,$4,$5,$6,$7,TRUE) RETURNING id`,
-      [author, rating, body, ph?.data ?? null, ph?.type ?? null, ph?.key ?? null, b.status === 'hidden' ? 'hidden' : 'published'],
+      `INSERT INTO reviews (author, rating, body, photo, photo_type, photo_key, status, by_admin, team_id) VALUES ($1,$2,$3,$4,$5,$6,$7,TRUE,$8) RETURNING id`,
+      [author, rating, body, ph?.data ?? null, ph?.type ?? null, ph?.key ?? null, b.status === 'hidden' ? 'hidden' : 'published', team],
     );
     return { id: r.rows[0].id };
   });
