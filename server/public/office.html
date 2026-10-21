@@ -1643,7 +1643,7 @@ const smTile=(lbl,v,small,pct,mark,left,right,cls,extra,xcls)=>el('div',{class:'
   el('div',{class:'dx-bar'},el('i',{style:'width:'+Math.min(100,pct)+'%'}),mark!==null?el('u',{style:'left:'+mark+'%'}):null),el('div',{class:'dx-meta'},el('span',{class:cls},left),el('span',{},right)),extra?el('div',{class:'dx-meta'},el('span',{class:xcls},extra)):null);
 function smFunnel(d){
   const f=d.funnel,ctr=f.clicks?f.regs/f.clicks*100:null,rtd=f.regs?f.ftd/f.regs*100:null,pc=v=>v===null?'—':v.toFixed(1).replace('.',',')+'%';
-  const stages=[['Клики',f.clicks],['Регистрации',f.regs],['FTD',f.ftd]];
+  const stages=[['Клики',f.clicks],['Регистрации',f.regs],['FTD',f.ftd],['Отвал',f.churned||0]];
   const note=d.clicksSince&&d.range.from<d.clicksSince?el('div',{class:'mut sm'},'Клики считаются с '+dmy(d.clicksSince)+': раньше их время не записывалось.'):null;
   const model={ctr:pc(ctr),rtd:pc(rtd),note:note?note.textContent:'',stages:stages.map(([n,v])=>({name:n,total:n0(v),segs:v>0?[{t:n+' '+n0(v),w:v,c:getComputedStyle(document.documentElement).getPropertyValue('--acc').trim()||'#9b5cff'}]:[]}))};
   return[dxFunnelCopy(model),el('div',{class:'dx-fk'},el('b',{title:'Из клика в регистрацию'},'CTR: '+pc(ctr)),el('b',{title:'Из регистрации в депозит'},'RTD: '+pc(rtd))),
@@ -1676,7 +1676,7 @@ function smLeads(d){
   const pc=v=>v===null?'—':v.toFixed(1).replace('.',',')+'%';
   return el('div',{class:'card',style:'display:grid;gap:12px'},el('div',{class:'dx-lbl'},'Мои лиды по статусам'),
     el('div',{class:'dx-seg2',style:'height:30px',role:'img','aria-label':Object.keys(DXS).filter(k=>b[k]).map(k=>DXS[k][0]+' '+b[k]).join(', ')},...(segs.length?segs:[el('span',{style:'flex:1;background:#ffffff1a;color:var(--mut)'},'Лидов за период нет')])),
-    el('div',{class:'dx-row',style:'flex-wrap:wrap;gap:8px 18px;justify-content:space-between'},el('span',{},'Всего лидов ',el('b',{},String(total))),el('span',{},'RTD ',el('b',{},pc(f.regs?f.ftd/f.regs*100:null))),el('span',{},'Отвал ',el('b',{},pc(total?(b.churned||0)/total*100:null)))));
+    el('div',{class:'dx-row',style:'flex-wrap:wrap;gap:8px 18px;justify-content:space-between'},el('span',{},'Всего лидов ',el('b',{},String(total))),el('span',{},'RTD ',el('b',{},pc(f.regs?f.ftd/f.regs*100:null))),el('span',{},'Отвал ',el('b',{},pc(total?(f.churned||0)/total*100:null)))));
 }
 function smSalary(d){
   const s=d.salary,tot=i=>s.base[i]+s.leads[i]+s.ftdBonus+s.dayBonus+(s.depBonus||0)+s.bonus-s.penalty,pay=[tot(0)-s.paid,tot(1)-s.paid];
@@ -1781,7 +1781,7 @@ async function viewHome(){
   const k=(t,v)=>el('div',{class:'kpi'},el('small',{},t),el('b',{},String(v)));
   const kpi=await simpleTasksCard();
   return[el('div',{class:'dx'},dxHead(dxRangeLabel(r),()=>render({soft:true})),kpi,
-    el('div',{class:'kpis'},k('Клики по ссылкам',s.clicks),k('Лиды',s.total),k('Регистрации',(b.registered||0)+(b.ftd||0)+(b.active||0)),k('FTD',(b.ftd||0)+(b.active||0)),k('Отвал',b.churned||0)),
+    el('div',{class:'kpis'},k('Клики по ссылкам',s.clicks),k('Лиды',s.total),k('Регистрации',(b.registered||0)+(b.ftd||0)+(b.active||0)),k('FTD',(b.ftd||0)+(b.active||0)),k('Отвал',s.churned||0)),
     el('div',{class:'kpis'},k('Депозиты',money(s.deposits)),k('Выводы',money(s.withdrawals))))];
 }
 

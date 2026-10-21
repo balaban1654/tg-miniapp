@@ -386,10 +386,16 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     }
     const TZ = 'Europe/Kyiv';
     const leads = await db.query(
-      `SELECT d.status, count(*)::int AS n FROM leads d WHERE d.lead_role = 'lead' AND ${ownerScope(me, 'd.owner_id')}
-         ${range ? `AND (${leadStatusDate('d', true)} AT TIME ZONE '${TZ}')::date BETWEEN $1::date AND $2::date` : ''} GROUP BY d.status`,
+      `SELECT coalesce(d.status_before_block, d.status) AS status, count(*)::int AS n FROM leads d WHERE d.lead_role = 'lead' AND ${ownerScope(me, 'd.owner_id')}
+         ${range ? `AND (${leadStatusDate('d', true)} AT TIME ZONE '${TZ}')::date BETWEEN $1::date AND $2::date` : ''} GROUP BY 1`,
       (range ?? []) as string[],
     );
+    // Отвал отдельным показателем: лиды, пришедшие за период, со статусом «Отвал» сейчас (в том числе заблокировавшие бота)
+    const churnedN = Number((await db.query(
+      `SELECT count(*)::int AS n FROM leads d WHERE d.lead_role = 'lead' AND d.status = 'churned' AND ${ownerScope(me, 'd.owner_id')}
+         ${range ? `AND (d.created_at AT TIME ZONE '${TZ}')::date BETWEEN $1::date AND $2::date` : ''}`,
+      (range ?? []) as string[],
+    )).rows[0].n);
     const clicks = range
       ? await db.query(
           `SELECT count(*)::int AS n FROM link_clicks c JOIN links l ON l.id = c.link_id
@@ -410,6 +416,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     for (const x of leads.rows) by[x.status] = x.n;
     return {
       byStatus: by,
+      churned: churnedN,
       total: Object.values(by).reduce((a, b) => a + b, 0),
       clicks: clicks.rows[0].n,
       // Стример видит только первые депозиты (без додепов и выводов)
@@ -2269,7 +2276,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
   app.get('/leads/today', { preHandler: auth }, async (req) => {
     const me = req.staff!;
     const r = await db.query(
-      `SELECT count(*)::int AS total, count(*) FILTER (WHERE status IN ('ftd','active'))::int AS paid, count(*) FILTER (WHERE status = 'registered')::int AS reg,
+      `SELECT count(*)::int AS total, count(*) FILTER (WHERE coalesce(status_before_block, status) IN ('ftd','active'))::int AS paid, count(*) FILTER (WHERE coalesce(status_before_block, status) = 'registered')::int AS reg,
               count(*) FILTER (WHERE (d.created_at AT TIME ZONE 'Europe/Kyiv')::date = (now() AT TIME ZONE 'Europe/Kyiv')::date)::int AS fresh
          FROM leads d
         WHERE d.removed_at IS NULL AND coalesce(d.lead_role, 'lead') = 'lead' AND ${ownerScope(me, 'd.owner_id')}`,
@@ -2468,7 +2475,8 @@ export async function rollbackLeadAfterEventRemoval(tgId: number, type: string):
     );
   }
   if (!['reg', 'ftd', 'dep'].includes(type)) return;
-  const lead = (await db.query('SELECT status, removed_at, trader_id FROM leads WHERE tg_id = $1', [tgId])).rows[0];
+  // У лида в «Отвале» из-за блокировки бота пересчитываем прежний статус (он вернётся, когда лид снова запустит бота)
+  const lead = (await db.query('SELECT coalesce(status_before_block, status) AS status, status_before_block IS NOT NULL AS blocked, removed_at, trader_id FROM leads WHERE tg_id = $1', [tgId])).rows[0];
   if (!lead || lead.removed_at || !['registered', 'ftd', 'active'].includes(lead.status)) return;
   const e = (
     await db.query(
@@ -2486,7 +2494,7 @@ export async function rollbackLeadAfterEventRemoval(tgId: number, type: string):
   const next = enough ? (e.dep ? 'active' : 'ftd') : e.reg || hasPay || lead.trader_id ? 'registered' : 'new';
   if (next === lead.status) return;
   const paid = next === 'ftd' || next === 'active';
-  await db.query(`UPDATE leads SET status = $2${paid ? '' : ', access = FALSE'} WHERE tg_id = $1`, [tgId, next]);
+  await db.query(`UPDATE leads SET ${lead.blocked ? 'status_before_block' : 'status'} = $2${paid ? '' : ', access = FALSE'} WHERE tg_id = $1`, [tgId, next]);
   // Депозит удалён, лид снова не подключён: отмечаем подключение отменённым, чтобы акцию можно было предложить заново
   if (!paid) {
     await db.query(

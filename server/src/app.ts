@@ -179,7 +179,7 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
   app.get('/me', { preHandler: auth }, async (req) => {
     const u = req.tg!;
     const r = await db.query(
-      `SELECT d.status, d.access, d.is_tester, d.lead_role, d.region, d.created_at, d.trader_id, o.name AS manager,
+      `SELECT coalesce(d.status_before_block, d.status) AS status, d.access, d.is_tester, d.lead_role, d.region, d.created_at, d.trader_id, o.name AS manager,
               o.po_promo, o.po_link, o.po_link_ru, o.tg_username AS manager_tg
          FROM leads d LEFT JOIN staff o ON o.id = d.owner_id WHERE d.tg_id = $1`,
       [u.id],

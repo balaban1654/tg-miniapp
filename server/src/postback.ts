@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify';
+import { markLeadBlocked } from './leadblock.js';
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { db } from './db.js';
 import { config } from './config.js';
@@ -53,10 +54,10 @@ export async function postbackRoutes(app: FastifyInstance): Promise<void> {
     const idValid = Number.isSafeInteger(tgId) && tgId > 0;
     let lead: { rowCount: number | null; rows: any[] } = { rowCount: 0, rows: [] };
     if (idValid) {
-      lead = await db.query('SELECT tg_id, status, access, trader_id, owner_id FROM leads WHERE tg_id = $1', [tgId]);
+      lead = await db.query('SELECT tg_id, status, status_before_block, access, trader_id, owner_id FROM leads WHERE tg_id = $1', [tgId]);
     }
     if (!lead.rowCount && traderId) {
-      lead = await db.query('SELECT tg_id, status, access, trader_id, owner_id FROM leads WHERE trader_id = $1 OR tg_id = (SELECT tg_id FROM lead_pockets WHERE trader_id = $1) LIMIT 1', [traderId]);
+      lead = await db.query('SELECT tg_id, status, status_before_block, access, trader_id, owner_id FROM leads WHERE trader_id = $1 OR tg_id = (SELECT tg_id FROM lead_pockets WHERE trader_id = $1) LIMIT 1', [traderId]);
       if (lead.rowCount) tgId = Number(lead.rows[0].tg_id);
     }
     if (!lead.rowCount) {
@@ -110,6 +111,12 @@ export async function postbackRoutes(app: FastifyInstance): Promise<void> {
     }
 
     const cur = lead.rows[0];
+    // Лид в «Отвале» из-за блокировки бота: статус воронки считаем по прежнему (FTD, регистрация), а после снова ставим «Отвал»
+    const wasBlocked = cur.status === 'churned' && cur.status_before_block;
+    if (wasBlocked) {
+      await db.query(`UPDATE leads SET status = status_before_block, status_before_block = NULL WHERE tg_id = $1`, [tgId]);
+      cur.status = cur.status_before_block;
+    }
     if (event === 'reg' && cur.status === 'new') {
       await db.query(`UPDATE leads SET status = 'registered' WHERE tg_id = $1`, [tgId]);
     }
@@ -138,6 +145,8 @@ export async function postbackRoutes(app: FastifyInstance): Promise<void> {
     if (event === 'comm' && amount && ['new', 'registered'].includes(cur.status)) {
       await db.query(`UPDATE leads SET status = 'active', access = (removed_at IS NULL) WHERE tg_id = $1`, [tgId]);
     }
+
+    if (wasBlocked) await markLeadBlocked(tgId);
 
     // Пуши по событию (например «Депозит получен») уходят сразу. Сбой пуша не должен ломать постбек
     await processLead(tgId).catch(() => {});

@@ -1638,7 +1638,9 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     );
     const clicksSince = (await db.query(`SELECT to_char(min(at AT TIME ZONE '${TZ}'), 'YYYY-MM-DD') AS d FROM link_clicks`)).rows[0].d as string | null;
     const byStatus: Record<string, number> = {};
-    for (const r of (await db.query(`SELECT d.status, count(*)::int AS n FROM leads d WHERE d.owner_id = $1 AND d.removed_at IS NULL AND coalesce(d.lead_role, 'lead') = 'lead' AND (${leadStatusDate('d', true)} AT TIME ZONE '${TZ}')::date BETWEEN $2::date AND $3::date GROUP BY d.status`, [me.id, from, to])).rows) byStatus[r.status] = r.n;
+    for (const r of (await db.query(`SELECT coalesce(d.status_before_block, d.status) AS status, count(*)::int AS n FROM leads d WHERE d.owner_id = $1 AND d.removed_at IS NULL AND coalesce(d.lead_role, 'lead') = 'lead' AND (${leadStatusDate('d', true)} AT TIME ZONE '${TZ}')::date BETWEEN $2::date AND $3::date GROUP BY 1`, [me.id, from, to])).rows) byStatus[r.status] = r.n;
+    // Отвал: свои лиды, пришедшие за период, у которых сейчас статус «Отвал» (как в воронке у админа). На FTD и зарплату не влияет
+    const churnedN = Number((await db.query(`SELECT count(*)::int AS n FROM leads WHERE owner_id = $1 AND status = 'churned' AND removed_at IS NULL AND coalesce(lead_role, 'lead') = 'lead' AND (created_at AT TIME ZONE '${TZ}')::date BETWEEN $2::date AND $3::date`, [me.id, from, to])).rows[0].n);
 
     const live = (await db.query(`SELECT id, stream_url, started_at FROM shift_reports WHERE staff_id = $1 AND status = 'live' AND NOT team ORDER BY id DESC LIMIT 1`, [me.id])).rows[0] ?? null;
     const t = await todayInfo(me.id);
@@ -1694,7 +1696,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
       me: { id: me.id, name: me.name },
       month: { period: refMonth, hoursMin: k.hoursMin, totalMin: k.hoursMin + (refMonth === today.slice(0, 7) ? t.pendingToday + elapsed : 0), shifts: k.shifts, planShifts: plan.hours / plan.shiftH, ftd: k.ftdCount },
       today_: { minutes: todayMin, shiftMin, minLeft: Math.max(0, shiftMin - todayMin), live },
-      funnel: { clicks, regs: ev.reg, ftd: ev.ftd },
+      funnel: { clicks, regs: ev.reg, ftd: ev.ftd, churned: churnedN },
       // Просмотры, подписчики и т. д. только самого стримера за период
       social: { fields: socialFs.fields, totals: socialFs.fields.map((f: string) => socialFs.rows.filter((r) => r.staff_id === me.id).reduce((a, r) => a + (r.sums[f] ?? 0), 0)) },
       clicksSince,
