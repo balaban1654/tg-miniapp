@@ -3,6 +3,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { createHash, createHmac, timingSafeEqual, randomBytes } from 'node:crypto';
 import { db, attachLead } from './db.js';
 import { bot } from './bot.js';
+import { InputFile } from 'grammy';
 import { config } from './config.js';
 import { loadDepConfig, leadTierState } from './depbonus.js';
 import { requiredFor } from './connect.js';
@@ -712,6 +713,46 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
     const at = 46;
     for (let i = 0; i < at + 6; i++) reel.push(i === at ? cards.get(String(winner.tg_id)) : cards.get(pool[i % pool.length]));
     return { drawId: d.id, place, prize: prizes[place - 1], winner: cards.get(String(winner.tg_id)), reel, at };
+  });
+  // Итоги: прошлые розыгрыши (сколько мест, сколько бонусов забрали и на какую сумму)
+  app.get('/giveaway/history', { preHandler: [auth, gwAdmin] }, async () => {
+    const rows = (
+      await db.query(
+        `SELECT g.id, g.created_at, g.groups, g.prizes,
+                (SELECT count(*)::int FROM giveaway_draws x WHERE x.giveaway_id = g.id AND x.claimed_at IS NOT NULL) AS won,
+                (SELECT coalesce(sum(x.prize), 0)::float FROM giveaway_draws x WHERE x.giveaway_id = g.id AND x.claimed_at IS NOT NULL) AS paid
+           FROM giveaways g WHERE EXISTS (SELECT 1 FROM giveaway_draws x WHERE x.giveaway_id = g.id) ORDER BY g.id DESC LIMIT 50`,
+      )
+    ).rows;
+    return rows.map((g) => ({ id: g.id, created_at: g.created_at, groups: g.groups, places: g.prizes.length, prizes: g.prizes.map(Number), won: g.won, paid: g.paid }));
+  });
+  // Итоги одного розыгрыша: победители, которые забрали бонус, по местам
+  app.get<{ Params: { id: string } }>('/giveaway/:id/result', { preHandler: [auth, gwAdmin] }, async (req, reply) => {
+    const g = (await db.query('SELECT id, created_at, groups, prizes FROM giveaways WHERE id = $1', [Number(req.params.id)])).rows[0];
+    if (!g) return reply.code(404).send({ error: 'Розыгрыш не найден' });
+    const draws = (await db.query('SELECT place, prize::float AS prize, tg_id, claimed_at FROM giveaway_draws WHERE giveaway_id = $1 AND claimed_at IS NOT NULL ORDER BY place, claimed_at', [g.id])).rows;
+    const cards = await gwCards(draws.map((d) => String(d.tg_id)));
+    return {
+      id: g.id,
+      created_at: g.created_at,
+      groups: g.groups,
+      prizes: g.prizes.map(Number),
+      winners: draws.map((d) => ({ place: d.place, prize: d.prize, claimed_at: d.claimed_at, ...cards.get(String(d.tg_id)) })),
+    };
+  });
+  // Картинка итогов (собирается в Mini App): бот присылает её админу, оттуда её удобно переслать в канал
+  app.post<{ Params: { id: string } }>('/giveaway/:id/poster', { preHandler: [auth, gwAdmin], bodyLimit: 8 * 1024 * 1024 }, async (req, reply) => {
+    const img = String(((req.body ?? {}) as Record<string, unknown>).image ?? '');
+    const m = /^data:image\/(png|jpeg);base64,([A-Za-z0-9+/=]+)$/.exec(img);
+    if (!m) return reply.code(400).send({ error: 'Картинка не собралась, попробуйте ещё раз' });
+    const buf = Buffer.from(m[2], 'base64');
+    if (buf.length > 6 * 1024 * 1024) return reply.code(400).send({ error: 'Картинка слишком большая' });
+    try {
+      await bot.api.sendPhoto(req.tg!.id, new InputFile(buf, `giveaway-${req.params.id}.${m[1] === 'png' ? 'png' : 'jpg'}`), { caption: '🎁 Итоги розыгрыша: картинку можно переслать в канал' });
+    } catch {
+      return reply.code(502).send({ error: 'Бот не смог отправить картинку. Откройте бота и нажмите /start' });
+    }
+    return { ok: true };
   });
   // Отправить победителю сообщение с кнопкой «Забрать бонус»: с этой секунды идут 15 секунд
   app.post<{ Params: { id: string } }>('/giveaway/draws/:id/send', { preHandler: [auth, gwAdmin] }, async (req, reply) => {
