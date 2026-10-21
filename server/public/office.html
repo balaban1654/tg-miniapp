@@ -522,8 +522,16 @@ function pushHash(){const h='#'+hashPath();if(location.hash!==h)history.pushStat
 function readHash(){const[,t,sub]=(location.hash||'').split('/');if(!t)return;tab=t;if(t==='acc'&&ACC_TABS.includes(sub))accState.tab=sub;if(t==='plans'&&PLANS_TABS.includes(sub))plansState.tab=sub;if(t==='staff'&&STAFF_TABS.includes(sub))staffState.tab=sub}
 window.addEventListener('popstate',()=>{if(!me)return;readHash();showApp()});
 
+/* GET при 502/503/504 или обрыве сети повторяем несколько раз: сервер мог перезапускаться после обновления */
+async function fetchRetry(url,o,get){
+  for(let i=0;;i++){
+    try{const r=await fetch(url,o);if(!get||i>=4||![502,503,504].includes(r.status))return r}
+    catch(e){if(!get||i>=4)throw e}
+    await new Promise(res=>setTimeout(res,1500+i*1000));
+  }
+}
 async function api(path,opts={}){
-  const r=await fetch('/api/office'+path,{credentials:'same-origin',headers:{'content-type':'application/json'},...opts,body:opts.body?JSON.stringify(opts.body):(opts.method&&opts.method!=='GET'?'{}':undefined)});
+  const r=await fetchRetry('/api/office'+path,{credentials:'same-origin',headers:{'content-type':'application/json'},...opts,body:opts.body?JSON.stringify(opts.body):(opts.method&&opts.method!=='GET'?'{}':undefined)},!opts.method||opts.method==='GET');
   const data=await r.json().catch(()=>({}));
   if(r.status===401&&!path.startsWith('/login')){showLogin();throw new Error('auth')}
   if(r.status===403&&data.code==='totp_setup'&&me){me.totp=false;if(!document.querySelector('.tf-overlay'))showApp();throw new Error(data.error)}

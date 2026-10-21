@@ -21,6 +21,9 @@ import { parseClick } from './clicks.js';
 import { RESERVED_SLUGS, SITE_URL } from './reserved.js';
 
 const app = Fastify({ logger: true, trustProxy: true });
+// Случайная необработанная ошибка в фоне не должна ронять весь сервер (иначе nginx отдаёт 502, пока контейнер перезапускается)
+process.on('unhandledRejection', (e) => app.log.error(e, 'Необработанная ошибка (promise)'));
+process.on('uncaughtException', (e) => app.log.error(e, 'Необработанная ошибка'));
 await app.register(cookie);
 
 await migrate();
@@ -139,3 +142,17 @@ if (process.env.DISABLE_BOT !== '1') {
     .start({ onStart: (me) => app.log.info(`Бот @${me.username} запущен`) })
     .catch((e) => app.log.error(e, 'Бот не запустился. Проверьте BOT_TOKEN'));
 }
+
+
+// Остановка при деплое: быстро закрываемся сами, а не ждём, пока Docker убьёт процесс через 10 секунд
+let stopping = false;
+async function shutdown(sig: string) {
+  if (stopping) return;
+  stopping = true;
+  app.log.info(`${sig}: останавливаемся`);
+  setTimeout(() => process.exit(0), 5000).unref();
+  await Promise.allSettled([bot.isRunning() ? bot.stop() : Promise.resolve(), app.close()]);
+  process.exit(0);
+}
+process.on('SIGTERM', () => void shutdown('SIGTERM'));
+process.on('SIGINT', () => void shutdown('SIGINT'));
