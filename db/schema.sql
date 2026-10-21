@@ -890,3 +890,25 @@ UPDATE reviews SET team_id = (SELECT id FROM media_teams WHERE is_main) WHERE te
 CREATE INDEX IF NOT EXISTS media_items_team ON media_items (team_id);
 CREATE INDEX IF NOT EXISTS news_team ON news (team_id, id DESC);
 CREATE INDEX IF NOT EXISTS reviews_team ON reviews (team_id, status, created_at DESC);
+
+-- Розыгрыши (Mini App, только админ): среди кого, призы по местам, кто выпал и забрал ли бонус за 15 секунд
+CREATE TABLE IF NOT EXISTS giveaways (
+  id         SERIAL PRIMARY KEY,
+  created_by BIGINT,
+  groups     TEXT[] NOT NULL,             -- newbie (новые и зарегистрированные) | ftd | active
+  prizes     NUMERIC[] NOT NULL,          -- приз за каждое место, $
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS giveaway_draws (
+  id          SERIAL PRIMARY KEY,
+  giveaway_id INT NOT NULL REFERENCES giveaways(id) ON DELETE CASCADE,
+  place       INT NOT NULL,
+  tg_id       BIGINT NOT NULL,
+  prize       NUMERIC NOT NULL,
+  drawn_at    TIMESTAMPTZ DEFAULT now(),
+  sent_at     TIMESTAMPTZ,
+  deadline    TIMESTAMPTZ,
+  claimed_at  TIMESTAMPTZ,
+  msg_id      BIGINT
+);
+CREATE INDEX IF NOT EXISTS giveaway_draws_gw ON giveaway_draws (giveaway_id);

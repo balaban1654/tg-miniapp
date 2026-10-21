@@ -139,6 +139,7 @@ main{flex:1;padding:6px 16px 96px;display:grid;gap:12px;align-content:start}
 .btn.pulse{animation:btnPulse 1.6s ease-in-out infinite}
 @keyframes btnPulse{0%,100%{box-shadow:0 0 0 0 rgba(155,92,255,.55),0 0 14px rgba(155,92,255,.35)}50%{box-shadow:0 0 0 9px rgba(155,92,255,0),0 0 26px rgba(155,92,255,.7)}}
 @media (prefers-reduced-motion:reduce){.btn.pulse{animation:none;box-shadow:0 0 0 2px var(--acc2)}}
+.gw{padding:16px 16px 28px;display:grid;gap:14px;width:100%;box-sizing:border-box;max-width:560px;margin:0 auto}.gw-top{display:flex;align-items:center;justify-content:space-between;gap:10px}.gw-top h2{font:800 20px var(--fd)}.gw-x{width:38px;height:38px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--mut);font-size:18px;cursor:pointer}.gw-lbl{font:700 12px var(--fd);letter-spacing:.06em;text-transform:uppercase;color:var(--mut)}.gw-chips{display:flex;flex-wrap:wrap;gap:8px}.gw-chip{border:1px solid var(--line);background:var(--card);color:var(--fg);border-radius:999px;padding:10px 14px;font:600 14px var(--fb);cursor:pointer}.gw-chip.on{background:var(--acc);border-color:var(--acc);color:#fff}.gw-step{display:flex;align-items:center;gap:10px}.gw-step button{width:40px;height:40px;border-radius:12px;border:1px solid var(--line);background:var(--card2);color:var(--fg);font-size:20px;cursor:pointer}.gw-step b{min-width:34px;text-align:center;font:800 20px var(--fd)}.gw-in{width:100%;background:var(--bg2);border:1px solid var(--line);border-radius:12px;color:var(--fg);padding:12px;font:600 16px var(--fb)}.gw-pl{display:grid;grid-template-columns:90px 1fr;gap:10px;align-items:center}.gw-reel{position:relative;overflow:hidden;border-radius:16px;border:1px solid var(--line);background:var(--bg2)}.gw-reel::before,.gw-reel::after{content:'';position:absolute;top:0;bottom:0;width:60px;z-index:2;pointer-events:none}.gw-reel::before{left:0;background:linear-gradient(90deg,var(--bg2),transparent)}.gw-reel::after{right:0;background:linear-gradient(-90deg,var(--bg2),transparent)}.gw-mark{position:absolute;left:50%;top:6px;bottom:6px;width:2px;margin-left:-1px;background:var(--acc2);z-index:3;box-shadow:0 0 12px var(--acc)}.gw-track{display:flex;gap:10px;padding:14px 0;will-change:transform}.gw-card{flex:none;width:118px;display:grid;justify-items:center;gap:6px;padding:10px 6px;border-radius:14px;background:var(--card);border:1px solid var(--line);text-align:center}.gw-card.win{border-color:var(--ok);box-shadow:0 0 0 2px #3ddc9755,0 0 24px #3ddc9744}.gw-ava{width:62px;height:62px;border-radius:50%;background:var(--card2);display:grid;place-items:center;font:800 22px var(--fd);color:var(--acc2);overflow:hidden}.gw-ava img{width:100%;height:100%;object-fit:cover}.gw-nm{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:700 13px var(--fd)}.gw-pid{font:600 11px var(--fm);color:var(--mut)}.gw-win{display:grid;justify-items:center;gap:8px;text-align:center}.gw-win .gw-ava{width:96px;height:96px;font-size:34px;box-shadow:0 0 0 3px var(--ok)}.gw-timer{font:800 56px var(--fd);text-align:center;font-variant-numeric:tabular-nums}.gw-timer.low{color:var(--bad)}.gw-ok{color:var(--ok)}.gw-sum{display:grid;gap:8px}.gw-row{display:flex;align-items:center;gap:10px;padding:10px;border-radius:12px;background:var(--card);border:1px solid var(--line)}.gw-row .gw-ava{width:40px;height:40px;font-size:15px}.gw-open{font-size:15px}
 .btn{display:block;width:100%;text-align:center;background:var(--acc);color:#fff;border:0;border-radius:14px;padding:13px;font-weight:700;font-size:14px;cursor:pointer}
 .btn:active{transform:scale(.98)}.btn.o{background:none;border:1px solid var(--acc);color:var(--acc2)}.btn:disabled{opacity:.45}
 .btn.g{background:var(--ok);color:#06210f}.btn.r{background:var(--bad);color:#2b0610}
@@ -1541,12 +1542,113 @@ function pocketAddRow(){
 }
 /** Статус игрока для клиента: по регистрации и сумме депозитов */
 function clientRank(){return me.tier?me.tier.name:'Новичок'}
+/** Розыгрыш (только админ): выбор групп и призов, барабан 15–20 секунд, сообщение победителю и 15 секунд на «Забрать бонус» */
+const GW_GROUPS=[['newbie','Ещё не в команде'],['ftd','Новенький'],['active','Профессионал']];
+function viewGiveaway(){
+  clearTimers();
+  const st={groups:new Set(GW_GROUPS.map(g=>g[0])),places:1,same:true,amounts:[''],gw:null,place:1,results:[],count:null};
+  const exit=()=>{try{tg.BackButton.hide();tg.BackButton.offClick(exit)}catch{}clearTimers();go('profile')};
+  try{tg.BackButton.show();tg.BackButton.onClick(exit)}catch{}
+  const money=v=>'$'+Number(v).toLocaleString('ru-RU',{maximumFractionDigits:2});
+  const ava=c=>{const a=el('div',{class:'gw-ava'},((c&&c.name)||'?').trim().slice(0,1).toUpperCase());if(c&&c.avatar){const i=new Image();i.alt='';i.onload=()=>a.replaceChildren(i);i.src=c.avatar}return a};
+  const card=(c,win)=>el('div',{class:'gw-card'+(win?' win':'')},ava(c),el('div',{class:'gw-nm'},(c&&c.name)||'Клиент'),el('div',{class:'gw-pid'},c&&c.pocketId?'ID '+c.pocketId:'ID —'));
+  const page=(...kids)=>root.replaceChildren(el('main',{class:'gw'},el('div',{class:'gw-top'},el('h2',{},'🎁 Розыгрыш'),el('button',{class:'gw-x',type:'button','aria-label':'Закрыть',onclick:exit},'✕')),...kids));
+  const err=el('div',{class:'card err',hidden:''});
+  const fail=x=>{err.textContent=x.message;err.hidden=false};
+  // Шаг 1: среди кого и какие призы
+  async function setup(){
+    const cnt=el('div',{class:'sm'},'Участников: …');
+    const chips=el('div',{class:'gw-chips'});
+    const loadCount=async()=>{cnt.textContent='Участников: …';try{const r=await api('/giveaway/pool?groups='+[...st.groups].join(','));st.count=r.count;cnt.textContent='Участников: '+r.count;}catch(x){cnt.textContent=x.message}};
+    const drawChips=()=>chips.replaceChildren(
+      el('button',{type:'button',class:'gw-chip'+(st.groups.size===GW_GROUPS.length?' on':''),onclick:()=>{st.groups=st.groups.size===GW_GROUPS.length?new Set():new Set(GW_GROUPS.map(g=>g[0]));drawChips();loadCount()}},'Все'),
+      ...GW_GROUPS.map(([k,t])=>el('button',{type:'button',class:'gw-chip'+(st.groups.has(k)?' on':''),onclick:()=>{st.groups.has(k)?st.groups.delete(k):st.groups.add(k);drawChips();loadCount()}},t)));
+    drawChips();loadCount();
+    const amounts=el('div',{style:'display:grid;gap:10px'});
+    const drawAmounts=()=>{
+      while(st.amounts.length<st.places)st.amounts.push(st.amounts[0]||'');st.amounts.length=st.places;
+      const inp=i=>{const x=el('input',{class:'gw-in',type:'number',inputmode:'decimal',min:'0',step:'any',placeholder:'Сумма, $',value:st.amounts[i]});x.addEventListener('input',()=>{st.amounts[i]=x.value;if(st.same)st.amounts.fill(x.value)});return x};
+      amounts.replaceChildren(...(st.same||st.places===1?[el('div',{class:'gw-pl'},el('span',{class:'sm'},st.places>1?'За каждое место':'Приз'),inp(0))]:st.amounts.map((_,i)=>el('div',{class:'gw-pl'},el('span',{class:'sm'},(i+1)+' место'),inp(i)))));
+    };
+    const placesB=el('b',{},String(st.places));
+    const setPlaces=n=>{st.places=Math.max(1,Math.min(10,n));placesB.textContent=String(st.places);sameRow.hidden=st.places<2;drawAmounts()};
+    const same=el('input',{type:'checkbox',style:'width:20px;height:20px;accent-color:var(--acc)'});same.checked=st.same;
+    same.addEventListener('change',()=>{st.same=same.checked;if(st.same)st.amounts.fill(st.amounts[0]||'');drawAmounts()});
+    const sameRow=el('label',{style:'display:flex;align-items:center;gap:10px;font-size:14px'},same,'Одинаковая сумма для всех мест');sameRow.hidden=st.places<2;
+    drawAmounts();
+    const start=el('button',{class:'btn',type:'button',onclick:async()=>{err.hidden=true;
+      const prizes=st.amounts.map(Number);
+      if(!st.groups.size)return fail(new Error('Выберите, среди кого розыгрыш'));
+      if(prizes.some(x=>!(x>0)))return fail(new Error('Укажите сумму приза'+(st.places>1&&!st.same?' для каждого места':'')));
+      start.disabled=true;
+      try{st.gw=await api('/giveaway',{method:'POST',body:{groups:[...st.groups],prizes}});st.prizes=prizes;st.place=1;st.results=[];spin()}catch(x){fail(x);start.disabled=false}}},'🚀 Запустить');
+    page(el('div',{class:'card',style:'display:grid;gap:12px'},el('div',{class:'gw-lbl'},'Среди кого'),chips,cnt),
+      el('div',{class:'card',style:'display:grid;gap:12px'},el('div',{class:'gw-lbl'},'Призы'),
+        el('div',{class:'gw-step'},el('span',{class:'sm',style:'flex:1'},'Количество мест'),el('button',{type:'button','aria-label':'Меньше',onclick:()=>setPlaces(st.places-1)},'−'),placesB,el('button',{type:'button','aria-label':'Больше',onclick:()=>setPlaces(st.places+1)},'+')),
+        sameRow,amounts),
+      err,start);
+  }
+  // Шаг 2: барабан с аватарками и Pocket ID, останавливается на победителе через 15–20 секунд
+  async function spin(){
+    err.hidden=true;
+    let r;try{r=await api('/giveaway/'+st.gw.id+'/draw',{method:'POST',body:{place:st.place}})}catch(x){page(err,el('button',{class:'btn o',type:'button',onclick:summary},'Итоги'));return fail(x)}
+    const track=el('div',{class:'gw-track'},...r.reel.map((c,i)=>card(c,false)));
+    const reel=el('div',{class:'gw-reel'},el('div',{class:'gw-mark'}),track);
+    const status=el('div',{class:'sm',style:'text-align:center'},'Ищем победителя…');
+    page(el('div',{class:'gw-lbl',style:'text-align:center'},st.place+' место из '+st.prizes.length+' · приз '+money(r.prize)),reel,status);
+    requestAnimationFrame(()=>{
+      const W=118,G=10,box=reel.clientWidth;
+      const target=-(r.at*(W+G))+box/2-W/2+(Math.random()-.5)*W*.6;
+      const dur=15000+Math.random()*5000;
+      track.style.transform='translateX(0px)';
+      requestAnimationFrame(()=>{track.style.transition='transform '+dur+'ms cubic-bezier(.1,.65,.08,1)';track.style.transform='translateX('+target+'px)'});
+      timers.push(setTimeout(()=>{track.children[r.at].classList.add('win');try{tg.HapticFeedback.notificationOccurred('success')}catch{}winner(r)},dur+200));
+    });
+  }
+  // Шаг 3: победитель, отправка сообщения и 15 секунд на «Забрать бонус»
+  function winner(r){
+    const w=r.winner||{};
+    const box=el('div',{style:'display:grid;gap:14px'});
+    const head=el('div',{class:'card gw-win'},ava(w),el('b',{style:'font:800 20px var(--fd)'},w.name||'Клиент'),el('div',{class:'sm'},(w.username?'@'+w.username+' · ':'')+(w.pocketId?'Pocket ID '+w.pocketId:'Pocket ID —')),el('div',{class:'gw-lbl'},st.place+' место · '+money(r.prize)));
+    const done=claimed=>{st.results.push({place:st.place,prize:r.prize,w,claimed});};
+    const next=()=>{if(st.place<st.prizes.length){st.place++;spin()}else summary()};
+    const send=el('button',{class:'btn',type:'button',onclick:async()=>{send.disabled=true;err.hidden=true;
+      let s;try{s=await api('/giveaway/draws/'+r.drawId+'/send',{method:'POST'})}catch(x){fail(x);send.disabled=false;box.replaceChildren(send,reroll());return}
+      countdown(s.leftMs)}},'✉️ Отправить сообщение победителю');
+    const reroll=()=>el('button',{class:'btn o',type:'button',onclick:()=>{done(false);spin()}},'🔄 Выбрать другого победителя');
+    function countdown(leftMs){
+      const end=Date.now()+leftMs;
+      const t=el('div',{class:'gw-timer'},'15');
+      const note=el('div',{class:'sm',style:'text-align:center'},'Сообщение отправлено. Ждём, пока победитель нажмёт «Забрать бонус»');
+      box.replaceChildren(t,note);
+      let over=false;
+      const tick=setInterval(()=>{const left=Math.max(0,end-Date.now());t.textContent=String(Math.ceil(left/1000));t.classList.toggle('low',left<=5000)},100);
+      const poll=setInterval(async()=>{if(over)return;let d;try{d=await api('/giveaway/draws/'+r.drawId)}catch{return}
+        if(d.state==='claimed'){over=true;clearInterval(tick);clearInterval(poll);try{tg.HapticFeedback.notificationOccurred('success')}catch{}done(true);
+          box.replaceChildren(el('div',{class:'gw-timer gw-ok'},'✅'),el('div',{style:'text-align:center;font-weight:700'},'Победитель забрал бонус!'),el('button',{class:'btn',type:'button',onclick:next},st.place<st.prizes.length?'Следующее место':'Итоги'))}
+        else if(d.state==='expired'){over=true;clearInterval(tick);clearInterval(poll);t.textContent='0';
+          box.replaceChildren(el('div',{class:'gw-timer low'},'0'),el('div',{style:'text-align:center;font-weight:700'},'Время вышло: бонус не забран'),reroll())}},1000);
+      timers.push(tick,poll);
+    }
+    box.replaceChildren(send);
+    page(el('div',{class:'gw-lbl',style:'text-align:center'},'🎉 Победитель'),head,box,err);
+  }
+  // Итоги: кто выиграл какое место и забрал ли бонус
+  function summary(){
+    const won=st.results.filter(x=>x.claimed);
+    page(el('div',{class:'gw-lbl'},'Итоги розыгрыша'),
+      el('div',{class:'gw-sum'},...(won.length?won.map(x=>el('div',{class:'gw-row'},ava(x.w),el('div',{style:'flex:1;min-width:0'},el('b',{},x.place+' место · '+(x.w.name||'Клиент')),el('div',{class:'sm'},x.w.pocketId?'Pocket ID '+x.w.pocketId:'')),el('b',{class:'gw-ok'},money(x.prize)))):[el('div',{class:'card sm'},'Никто не забрал бонус')])),
+      err,el('button',{class:'btn',type:'button',onclick:()=>{st.results=[];setup()}},'Новый розыгрыш'),el('button',{class:'btn o',type:'button',onclick:exit},'Закрыть'));
+  }
+  setup();
+}
 function viewProfile(){
   const rows=[['Telegram ID',me.tgId,true],['Pocket ID',me.pocketId||null,true],...(me.leadRole&&me.leadRole!=='lead'?[['Роль',ROLE_NAME[me.leadRole]||me.leadRole]]:[['Статус',clientRank()]]),...(me.leadRole&&me.leadRole!=='lead'?[]:[['Менеджер',me.manager?(me.managerTg?el('a',{href:'https://t.me/'+me.managerTg,style:'color:var(--acc2);text-decoration:none',onclick:e=>{e.preventDefault();openLink('https://t.me/'+me.managerTg)}},'@'+me.managerTg):me.manager):'не назначен']]),['Доступ',me.access?'открыт':'закрыт']];
   const copyBtn=v=>el('button',{type:'button','aria-label':'Копировать',title:'Копировать',style:'background:none;border:0;padding:2px;color:var(--mut);cursor:pointer;display:grid;place-items:center',onclick:()=>copyText(v)},svgEl(COPY_ICON));
   shell('Профиль',[el('div',{class:'card row',style:'justify-content:flex-start;gap:12px'},withPhoto(el('div',{class:'ava'},(me.name||'?').trim().slice(0,1).toUpperCase())),el('div',{},el('b',{style:'font:700 16px var(--fd)'},me.name),el('div',{class:'sm'},me.username?'@'+me.username:''))),
     el('div',{class:'card',style:'display:grid;grid-template-columns:minmax(0,1fr);gap:10px'},rows.map(([k,v,cp])=>k==='Pocket ID'&&!v?pocketAddRow():el('div',{class:'row'},el('span',{class:'sm'},k),
       el('span',{style:'display:inline-flex;align-items:center;gap:8px'},el('b',{class:'mono'},v instanceof Node?v:String(v)),cp?copyBtn(v):null)))),
+    me.leadRole==='admin'?el('button',{class:'btn gw-open',type:'button',onclick:()=>viewGiveaway()},'🎁 Провести розыгрыш'):
     me.promo&&['new','registered'].includes(me.status)?el('div',{class:'card row'},el('span',{class:'sm'},'Промокод'),el('span',{style:'display:inline-flex;align-items:center;gap:8px'},el('b',{class:'mono'},me.promo),copyBtn(me.promo))):null,
     el('button',{class:'btn o',type:'button',onclick:support},'Написать в поддержку'),
     el('button',{class:'back',type:'button',onclick:()=>go('home')},'‹ На главную')]);

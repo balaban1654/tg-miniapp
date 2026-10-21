@@ -8,6 +8,7 @@ import { loadDepConfig, leadTierState } from './depbonus.js';
 import { requiredFor } from './connect.js';
 import { parseReviewPhoto, cleanReviewText, cleanRating } from './reviews.js';
 import { mediaTeamOf } from './mediaTeams.js';
+import { GROUPS, poolWhere, drawState, sendClaim, CLAIM_SEC } from './giveaway.js';
 
 export interface TgUser {
   id: number;
@@ -647,6 +648,82 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
       [req.tg!.id, author, rating, body, ph?.data ?? null, ph?.type ?? null, ph?.key ?? null, await mediaTeamOf(req.tg!.id)],
     );
     return { ok: true };
+  });
+
+  // ----- Розыгрыш (только админ Mini App): участники по группам, призы по местам, барабан, сообщение победителю -----
+  const gwAdmin = async (req: FastifyRequest, reply: FastifyReply) => {
+    const r = (await db.query(`SELECT 1 FROM leads WHERE tg_id = $1 AND lead_role = 'admin'`, [req.tg!.id])).rowCount;
+    if (!r) return reply.code(403).send({ error: 'Розыгрыш доступен только админу' });
+  };
+  const groupsOf = (v: unknown) => [...new Set((Array.isArray(v) ? v : String(v ?? '').split(',')).map(String).filter((g) => g in GROUPS))];
+  // Карточка участника для барабана: имя, Pocket ID, аватарка из Telegram
+  const gwCards = async (ids: string[]) => {
+    if (!ids.length) return new Map<string, any>();
+    await Promise.race([ensureAvatars(ids).catch(() => {}), new Promise((res) => setTimeout(res, 2500))]);
+    const rows = (
+      await db.query(
+        `SELECT d.tg_id, coalesce(nullif(d.first_name, ''), d.username, 'Клиент') AS name, d.username, d.trader_id, a.key
+           FROM leads d LEFT JOIN tg_avatars a ON a.tg_id = d.tg_id AND a.photo IS NOT NULL WHERE d.tg_id = ANY($1::bigint[])`,
+        [ids],
+      )
+    ).rows;
+    return new Map(rows.map((x) => [String(x.tg_id), { name: x.name, username: x.username, pocketId: x.trader_id ?? null, avatar: x.key ? `/api/app/avatar/${x.key}` : null }]));
+  };
+  // Сколько участников в выбранных группах
+  app.get<{ Querystring: { groups?: string } }>('/giveaway/pool', { preHandler: [auth, gwAdmin] }, async (req) => {
+    const w = poolWhere(groupsOf(req.query.groups));
+    if (!w.statuses.length) return { count: 0 };
+    return { count: Number((await db.query(`SELECT count(*)::int AS n FROM leads d WHERE ${w.sql}`, [w.statuses])).rows[0].n) };
+  });
+  // Новый розыгрыш: группы и приз за каждое место
+  app.post('/giveaway', { preHandler: [auth, gwAdmin] }, async (req, reply) => {
+    const b = (req.body ?? {}) as Record<string, unknown>;
+    const groups = groupsOf(b.groups);
+    if (!groups.length) return reply.code(400).send({ error: 'Выберите, среди кого розыгрыш' });
+    const prizes = (Array.isArray(b.prizes) ? b.prizes : []).map(Number);
+    if (!prizes.length || prizes.length > 20 || prizes.some((x) => !Number.isFinite(x) || x <= 0 || x > 1_000_000)) return reply.code(400).send({ error: 'Укажите сумму приза для каждого места' });
+    const w = poolWhere(groups);
+    const n = Number((await db.query(`SELECT count(*)::int AS n FROM leads d WHERE ${w.sql}`, [w.statuses])).rows[0].n);
+    if (!n) return reply.code(400).send({ error: 'В выбранных группах нет участников' });
+    const r = await db.query('INSERT INTO giveaways (created_by, groups, prizes) VALUES ($1,$2,$3) RETURNING id', [req.tg!.id, groups, prizes]);
+    return { id: r.rows[0].id, count: n };
+  });
+  // Выбрать победителя места: случайный участник, который ещё не выпадал в этом розыгрыше. reel: карточки для барабана, победитель на позиции at
+  app.post<{ Params: { id: string } }>('/giveaway/:id/draw', { preHandler: [auth, gwAdmin] }, async (req, reply) => {
+    const g = (await db.query('SELECT id, groups, prizes FROM giveaways WHERE id = $1', [Number(req.params.id)])).rows[0];
+    if (!g) return reply.code(404).send({ error: 'Розыгрыш не найден' });
+    const place = Number(((req.body ?? {}) as Record<string, unknown>).place);
+    const prizes = (g.prizes as string[]).map(Number);
+    if (!Number.isInteger(place) || place < 1 || place > prizes.length) return reply.code(400).send({ error: 'Неверное место' });
+    const w = poolWhere(g.groups);
+    const winner = (
+      await db.query(`SELECT d.tg_id FROM leads d WHERE ${w.sql} AND NOT EXISTS (SELECT 1 FROM giveaway_draws x WHERE x.giveaway_id = $2 AND x.tg_id = d.tg_id) ORDER BY random() LIMIT 1`, [
+        w.statuses,
+        g.id,
+      ])
+    ).rows[0];
+    if (!winner) return reply.code(409).send({ error: 'Участники закончились: все уже выпадали в этом розыгрыше' });
+    const others = (await db.query(`SELECT d.tg_id FROM leads d WHERE ${w.sql} AND d.tg_id <> $2 ORDER BY random() LIMIT 40`, [w.statuses, winner.tg_id])).rows.map((x) => String(x.tg_id));
+    const d = (await db.query('INSERT INTO giveaway_draws (giveaway_id, place, tg_id, prize) VALUES ($1,$2,$3,$4) RETURNING id', [g.id, place, winner.tg_id, prizes[place - 1]])).rows[0];
+    const cards = await gwCards([String(winner.tg_id), ...others]);
+    // Барабан: случайные участники по кругу (если их мало, повторяются), победитель ближе к концу ленты
+    const pool = others.length ? others : [String(winner.tg_id)];
+    const reel: any[] = [];
+    const at = 46;
+    for (let i = 0; i < at + 6; i++) reel.push(i === at ? cards.get(String(winner.tg_id)) : cards.get(pool[i % pool.length]));
+    return { drawId: d.id, place, prize: prizes[place - 1], winner: cards.get(String(winner.tg_id)), reel, at };
+  });
+  // Отправить победителю сообщение с кнопкой «Забрать бонус»: с этой секунды идут 15 секунд
+  app.post<{ Params: { id: string } }>('/giveaway/draws/:id/send', { preHandler: [auth, gwAdmin] }, async (req, reply) => {
+    const r = await sendClaim(Number(req.params.id));
+    if ('error' in r) return reply.code(400).send({ error: r.error });
+    return { ok: true, leftMs: Math.max(0, +new Date(r.deadline) - Date.now()), seconds: CLAIM_SEC };
+  });
+  // Состояние победителя для экрана админа: отправлено, забрал, время вышло, сколько осталось
+  app.get<{ Params: { id: string } }>('/giveaway/draws/:id', { preHandler: [auth, gwAdmin] }, async (req, reply) => {
+    const d = (await db.query('SELECT id, sent_at, deadline, claimed_at FROM giveaway_draws WHERE id = $1', [Number(req.params.id)])).rows[0];
+    if (!d) return reply.code(404).send({ error: 'Не найдено' });
+    return { state: drawState(d), leftMs: d.deadline ? Math.max(0, +new Date(d.deadline) - Date.now()) : null };
   });
 
   // Аватарки каналов и трейдеров берём из Telegram. Картинка публичная, отдаём без авторизации, чтобы работал <img>
