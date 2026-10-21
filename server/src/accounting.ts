@@ -1411,6 +1411,23 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
         },
       });
     }
+    // Тимлиду в верхней полосе ещё и админы (в эфире ли, FTD за месяц), без карточки и без денег. В его план и суммы они не входят
+    const adminsLive = lead
+      ? ((await db.query(`SELECT id, name, role, active FROM staff WHERE role = 'admin' AND streams AND active AND deleted_at IS NULL ORDER BY id`)).rows as any[]).map((s) => {
+          const lv = live.get(s.id) ?? null;
+          return {
+            id: s.id,
+            name: s.name,
+            role: s.role,
+            active: true,
+            noCard: true,
+            live: lv ? { id: lv.id, started_at: lv.started_at, stream_url: lv.stream_url, elapsed: Math.max(0, Math.floor((Date.now() - Date.parse(lv.started_at)) / 60000)) } : null,
+            lastEnd: lastEnd.get(s.id) ?? null,
+            lastMin: lastLen.get(s.id) ?? null,
+            month: { ftd: (evMonth.get(s.id) ?? emptyAgg()).ftd, hoursMin: 0 },
+          };
+        })
+      : [];
     out.sort((x, y) => (y.live ? y.live.elapsed + 1e6 : 0) - (x.live ? x.live.elapsed + 1e6 : 0) || (Date.parse(y.lastEnd ?? '0') || 0) - (Date.parse(x.lastEnd ?? '0') || 0));
 
     const sum = (f: (x: any) => number) => out.reduce((acc, x) => acc + f(x), 0);
@@ -1466,6 +1483,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
       goalsMonthly: g,
       clicksSince,
       streamers: out,
+      adminsLive,
       totals: {
         clicks: sum((x) => x.range.clicks),
         regs: sum((x) => x.range.regs),
@@ -1618,7 +1636,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     const shiftMin = plan.shiftH * 60;
 
     // Коллеги: имена, часы за месяц и эфир, без денег и без карточек
-    const colRows = (await db.query(`SELECT id, name, role FROM staff WHERE (role = 'streamer' OR streams) AND active AND id <> $1 ORDER BY id`, [me.id])).rows as { id: number; name: string; role: string }[];
+    const colRows = (await db.query(`SELECT id, name, role, parent_id FROM staff WHERE (role = 'streamer' OR streams) AND active AND id <> $1 ORDER BY id`, [me.id])).rows as { id: number; name: string; role: string; parent_id: number | null }[];
     const liveBy = new Map(((await db.query(`SELECT DISTINCT ON (staff_id) staff_id, started_at, stream_url FROM shift_reports WHERE status = 'live' AND NOT team ORDER BY staff_id, id DESC`)).rows as any[]).map((r) => [r.staff_id, r]));
     const lastBy = new Map(((await db.query(`SELECT DISTINCT ON (staff_id) staff_id, ended_at, coalesce(approved_min, declared_min) AS m FROM shift_reports WHERE status <> 'live' AND NOT team AND ended_at IS NOT NULL ORDER BY staff_id, ended_at DESC`)).rows as any[]).map((r) => [r.staff_id, r]));
     const hoursBy = new Map(((await db.query(`SELECT staff_id, coalesce(sum(approved_min), 0)::int AS m FROM shift_reports WHERE status = 'approved' AND NOT team AND to_char(day, 'YYYY-MM') = $1 GROUP BY staff_id`, [refMonth])).rows as any[]).map((r) => [r.staff_id, r.m]));
@@ -1630,7 +1648,9 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     const teamDeposits = Number(
       (await db.query(`SELECT coalesce(sum(e.amount), 0)::float AS s FROM events e JOIN leads d ON d.tg_id = e.tg_id WHERE e.type IN ('ftd','dep') AND d.lead_role = 'lead' AND d.owner_id IS NOT NULL AND to_char(e.created_at AT TIME ZONE '${TZ}', 'YYYY-MM') = $1`, [refMonth])).rows[0].s,
     );
+    // В полосе коллег стример видит только свою команду (тот же тимлидер), админов не видит. Общие суммы выше считаются по всем
     const colleagues = colRows
+      .filter((c) => c.role !== 'admin' && c.parent_id === me.parent_id)
       .map((c) => {
         const lv = liveBy.get(c.id) ?? null;
         const ls = lastBy.get(c.id) ?? null;

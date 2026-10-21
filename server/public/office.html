@@ -1056,10 +1056,10 @@ function dxLive(d,skew){
   // Порядок: сначала те, кто сейчас в эфире, дальше по FTD за месяц (больше выше); админы (Николай, Богдан) всегда в конце
   const ord=s=>[s.role==='admin'?1:0,s.live?0:1,-(s.month.ftd||0)];
   const cmp=(a,b)=>{const x=ord(a),y=ord(b);for(let i=0;i<x.length;i++)if(x[i]!==y[i])return x[i]-y[i];return 0};
-  const cards=d.streamers.filter(s=>s.active||s.live).slice().sort(cmp).map(s=>{
+  const cards=d.streamers.concat(d.adminsLive||[]).filter(s=>s.active||s.live).slice().sort(cmp).map(s=>{
     const lvl=dxLvl(s.month.hoursMin,pace);
     const name=el('button',{type:'button',class:'dx-nm','aria-haspopup':'dialog'},s.name);
-    dxAttachCard(name,s,d,skew);
+    if(!s.noCard)dxAttachCard(name,s,d,skew);else{name.style.cursor='default';name.style.borderBottom='0'}
     const head=el('b',{},name,s.role==='streamer'?el('span',{class:'dx-hp '+lvl,title:'По графику сегодня '+hw(pace)+' ч'},hw(s.month.hoursMin)+'/'+d.plan.hours+' ч'):null,el('span',{class:'dx-fc',title:'FTD за месяц'},'FTD '+(s.month.ftd||0)));
     const time=s.live
       ?el('span',{class:'t'},el('span',{'data-live':s.live.started_at},hm(Math.max(0,Math.floor((Date.now()+skew-Date.parse(s.live.started_at))/60000)))))
