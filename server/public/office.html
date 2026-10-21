@@ -261,7 +261,7 @@ textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10
 
 .dx-ib.only-m{display:none}
 @media(max-width:760px){.only-d,.dx-hd .mark{display:none!important}.dx-ib.only-m{display:grid}.dx-ext{display:none}.dx-hd{flex-wrap:nowrap}.dx-hd .l{flex:1 1 auto;min-width:0;flex-wrap:wrap;gap:6px 8px}.dx-hd .l .dx-lbl{flex:1 1 auto;min-width:0}.dx-hd .l .dx-pw,.dx-hd .l>.dx-ib{flex:none}}
-@media(max-width:560px){.dx-pop,.dx-pop.wide{width:min(340px,calc(100vw - 24px));padding:10px;gap:8px}.dx-pop .dx-rg{width:min(100%,220px)}.dx-seg2{min-height:24px}.dx-seg2 span{height:24px;padding:0 5px;font-size:10.5px}.dx-fk b{font-size:15px}.dx-fsh b{font-size:14px}.dx-pop .dx-lbl{font-size:11px}}
+@media(max-width:560px){.dx-pop,.dx-pop.wide{width:min(340px,calc(100vw - 24px));padding:10px;gap:8px}.dx-pop .dx-rg{width:min(100%,220px)}.dx-seg2{min-height:24px}.dx-seg2 span{height:24px;padding:0 5px;font-size:10.5px}.dx-fsh b{font-size:14px}.dx-pop .dx-lbl{font-size:11px}}
 .burger{display:none}.side-menu{display:contents}
 @media(max-width:760px){
  .side{position:sticky;top:0;z-index:60;flex-wrap:nowrap;background:#0a0613}
@@ -382,7 +382,8 @@ textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10
 .dx-rg .tr{fill:none;stroke:#ffffff1a;stroke-width:14}.dx-rg .pr{fill:none;stroke-width:14;stroke-linecap:round}
 .dx-rg .ctr{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;text-align:center}
 .dx-cv{display:flex;flex-direction:column;align-items:center}.dx-cv b{font-size:16px;line-height:1.1}.dx-cv span{font-size:12px;color:var(--mut);display:inline-flex;align-items:center;gap:6px}.dx-cv i{width:9px;height:9px;border-radius:50%}
-.dx-fk{display:flex;gap:16px;flex-wrap:wrap}.dx-fk b{font-size:18px;color:var(--acc2)}
+.dx-fk{display:flex;gap:14px;flex-wrap:nowrap;white-space:nowrap;padding-right:46px}.dx-fk b{font-size:17px;color:var(--acc2)}
+@media(max-width:560px){.dx-fk{gap:9px;padding-right:40px}.dx-fk b{font-size:12.5px}}
 .dx-fs{display:grid;gap:6px}.dx-fsh{display:flex;justify-content:space-between;align-items:baseline}.dx-fsh b{font-size:16px}
 .dx-seg2{display:flex;flex-wrap:wrap;gap:2px;min-height:28px}.dx-seg2 span{display:flex;align-items:center;height:28px;padding:0 8px;min-width:max-content;overflow:hidden;white-space:nowrap;font-size:12px;font-weight:700;color:#0d0817;border-radius:6px}.dx-seg2 span:first-child{border-radius:8px 6px 6px 8px}.dx-seg2 span:last-child{border-radius:6px 8px 8px 6px}
 .dx-list{display:grid}.dx-list .r{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--line);font-size:13px}.dx-list .r:last-child{border:0}.dx-list .r em{font-style:normal;color:var(--mut);font-size:12px;display:block}.dx-list .neg{color:var(--bad)}
@@ -1181,7 +1182,7 @@ function dxFunnelCopy(model){
     x.textAlign='left';
     for(const it of items){
       if(it.k==='lbl'){lbl(it.t,12,X0,y+12)}
-      else if(it.k==='fk'){fnt(700,18);x.fillStyle=col('--acc2')||'#c9a6ff';x.fillText('CTR: '+model.ctr,X0,y+18);const w1=x.measureText('CTR: '+model.ctr).width;x.fillText('RTD: '+model.rtd,X0+w1+16,y+18)}
+      else if(it.k==='fk'){fnt(700,18);x.fillStyle=col('--acc2')||'#c9a6ff';x.fillText('CTR: '+model.ctr,X0,y+18);const w1=x.measureText('CTR: '+model.ctr).width;x.fillText('RTD: '+model.rtd,X0+w1+16,y+18);if(model.churn){const w2=x.measureText('RTD: '+model.rtd).width;x.fillText('Churn: '+model.churn,X0+w1+w2+32,y+18)}}
       else if(it.k==='note'){fnt(400,12);x.fillStyle=col('--mut')||'#a89cc8';noteLines.forEach((l,i)=>x.fillText(l,X0,y+12+i*16))}
       else if(it.k==='plain'){lbl(it.st.name,12,X0,y+20);fnt(700,22);x.fillStyle=col('--fg')||'#fff';x.textAlign='right';x.fillText(it.st.total,X0+IW,y+24);x.textAlign='left'}
       else{
@@ -1237,11 +1238,11 @@ function dxColorOf(d){const ids=d.streamers.map(s=>s.id).sort((a,b)=>a-b);return
 function dxFunnel(d){
   const C=dxColorOf(d),t=d.totals;
   const stages=[['Клики','clicks'],['Регистрации','regs'],['FTD','ftd'],['Додепы','dep'],['Отвал','churned']];
-  const ctr=t.clicks?t.regs/t.clicks*100:null,rtd=t.regs?t.ftd/t.regs*100:null;
+  const ctr=t.clicks?t.regs/t.clicks*100:null,rtd=t.regs?t.ftd/t.regs*100:null,churn=t.ftd?(t.churned||0)/t.ftd*100:null;
   const pc=v=>v===null?'—':v.toFixed(1).replace('.',',')+'%';
   const note=!d.range.all&&d.clicksSince&&d.range.from<d.clicksSince?el('div',{class:'mut sm'},'Клики считаются с '+dmy(d.clicksSince)+': раньше их время не записывалось.'):null;
-  const model={ctr:pc(ctr),rtd:pc(rtd),note:note?note.textContent:'',stages:stages.map(([n,k])=>({name:n,total:n0(t[k]),segs:d.streamers.filter(s=>s.range[k]>0).map(s=>({t:s.name+' '+n0(s.range[k]),w:s.range[k],c:C(s.id)}))}))};
-  return[dxFunnelCopy(model),el('div',{class:'dx-fk'},el('b',{title:'Из клика в регистрацию'},'CTR: '+pc(ctr)),el('b',{title:'Из регистрации в депозит'},'RTD: '+pc(rtd))),
+  const model={ctr:pc(ctr),rtd:pc(rtd),churn:pc(churn),note:note?note.textContent:'',stages:stages.map(([n,k])=>({name:n,total:n0(t[k]),segs:d.streamers.filter(s=>s.range[k]>0).map(s=>({t:s.name+' '+n0(s.range[k]),w:s.range[k],c:C(s.id)}))}))};
+  return[dxFunnelCopy(model),el('div',{class:'dx-fk'},el('b',{title:'Из клика в регистрацию'},'CTR: '+pc(ctr)),el('b',{title:'Из регистрации в депозит'},'RTD: '+pc(rtd)),el('b',{title:'Отвал: доля FTD и активных, которые заблокировали бота'},'Churn: '+pc(churn))),
     ...stages.map(([n,k])=>{
       const rows=d.streamers.filter(s=>s.range[k]>0);
       return el('div',{class:'dx-fs'},el('div',{class:'dx-fsh'},el('span',{class:'dx-lbl'},n),el('b',{},n0(t[k]))),

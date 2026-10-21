@@ -1319,13 +1319,13 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     ).rows as { owner_id: number; n: number }[];
     const clicks = new Map(clicksRows.map((r) => [r.owner_id, r.n]));
     const clicksSince = (await db.query(`SELECT to_char(min(at AT TIME ZONE '${TZ}'), 'YYYY-MM-DD') AS d FROM link_clicks`)).rows[0].d as string | null;
-    // Отвал: лиды, пришедшие за период, у которых сейчас статус «Отвал» (в том числе заблокировавшие бота)
+    // Отвал в воронке: только ушедшие (заблокировали бота) из FTD и активных, по дате их FTD, как и счётчик FTD
     const churned = new Map(
       ((await db.query(
-        `SELECT owner_id, count(*)::int AS n FROM leads
-          WHERE status = 'churned' AND owner_id IS NOT NULL AND removed_at IS NULL AND coalesce(lead_role, 'lead') = 'lead'
-            ${allTime ? '' : `AND (created_at AT TIME ZONE '${TZ}')::date BETWEEN $1::date AND $2::date`}
-          GROUP BY owner_id`,
+        `SELECT d.owner_id, count(*)::int AS n FROM leads d
+          WHERE d.status = 'churned' AND d.status_before_block IN ('ftd','active') AND d.owner_id IS NOT NULL AND d.removed_at IS NULL AND coalesce(d.lead_role, 'lead') = 'lead'
+            ${allTime ? '' : `AND (${leadStatusDate('d', true)} AT TIME ZONE '${TZ}')::date BETWEEN $1::date AND $2::date`}
+          GROUP BY d.owner_id`,
         allTime ? [] : [from, to],
       )).rows as { owner_id: number; n: number }[]).map((r) => [r.owner_id, r.n]),
     );
