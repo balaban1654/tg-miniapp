@@ -740,17 +740,25 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
       winners: draws.map((d) => ({ place: d.place, prize: d.prize, claimed_at: d.claimed_at, ...cards.get(String(d.tg_id)) })),
     };
   });
-  // Картинка итогов (собирается в Mini App): бот присылает её админу, оттуда её удобно переслать в канал
+  // Картинка итогов (собирается в Mini App): бот публикует её в канал итогов
   app.post<{ Params: { id: string } }>('/giveaway/:id/poster', { preHandler: [auth, gwAdmin], bodyLimit: 8 * 1024 * 1024 }, async (req, reply) => {
     const img = String(((req.body ?? {}) as Record<string, unknown>).image ?? '');
     const m = /^data:image\/(png|jpeg);base64,([A-Za-z0-9+/=]+)$/.exec(img);
     if (!m) return reply.code(400).send({ error: 'Картинка не собралась, попробуйте ещё раз' });
     const buf = Buffer.from(m[2], 'base64');
     if (buf.length > 6 * 1024 * 1024) return reply.code(400).send({ error: 'Картинка слишком большая' });
+    // Канал для итогов: app_settings.giveaway_channel (по умолчанию канал команды). Бот должен быть админом канала с правом публикации
+    const ch = (await db.query(`SELECT value FROM app_settings WHERE key = 'giveaway_channel'`)).rows[0]?.value || '-1004359729515';
     try {
-      await bot.api.sendPhoto(req.tg!.id, new InputFile(buf, `giveaway-${req.params.id}.${m[1] === 'png' ? 'png' : 'jpg'}`), { caption: '🎁 Итоги розыгрыша: картинку можно переслать в канал' });
-    } catch {
-      return reply.code(502).send({ error: 'Бот не смог отправить картинку. Откройте бота и нажмите /start' });
+      await bot.api.sendPhoto(ch, new InputFile(buf, `giveaway-${req.params.id}.${m[1] === 'png' ? 'png' : 'jpg'}`), { caption: '🎁 Итоги розыгрыша Hunter AI' });
+    } catch (e) {
+      const why = (e as { description?: string }).description ?? String(e);
+      req.log.warn({ err: why, channel: ch }, 'giveaway poster: не удалось отправить в канал');
+      return reply.code(502).send({
+        error: /chat not found|not enough rights|not a member|have no rights|CHAT_ADMIN_REQUIRED/i.test(why)
+          ? 'Бот не может публиковать в канале: добавьте бота в канал админом с правом «Публикация сообщений»'
+          : 'Telegram не принял картинку: ' + why,
+      });
     }
     return { ok: true };
   });

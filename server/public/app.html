@@ -1666,7 +1666,7 @@ function viewGiveaway(){
         el('b',{class:'gw-p-prize'},money(w.prize)))):[el('div',{class:'sm',style:'text-align:center;padding:18px'},'Никто не забрал бонус')])),
       r.winners.length?el('div',{class:'gw-p-total'},'Разыграно ',el('b',{},money(total))):null);
     const sendB=el('button',{class:'btn',type:'button',onclick:async()=>{sendB.disabled=true;err.hidden=true;
-      try{const image=await posterPng(r,total);await api('/giveaway/'+id+'/poster',{method:'POST',body:{image}});toast('Картинка у вас в боте: перешлите её в канал')}catch(x){fail(x)}sendB.disabled=false}},'📤 Прислать картинку мне в бот');
+      try{const image=await posterPng(r,total);await api('/giveaway/'+id+'/poster',{method:'POST',body:{image}});toast('Картинка опубликована в канале')}catch(x){fail(x)}sendB.disabled=false}},'📤 Опубликовать картинку в канале');
     page(poster,err,r.winners.length?sendB:null,el('button',{class:'btn o',type:'button',onclick:history},'‹ К итогам'));
   }
   // Картинка для канала (1080 в ширину): то же, что карточка итогов, нарисованное на canvas
@@ -1698,7 +1698,7 @@ function viewGiveaway(){
       y+=rowH;
     }
     x.textAlign='center';x.fillStyle='#a89cc8';x.font='500 36px '+F;x.fillText('Разыграно',W/2,y+60);x.fillStyle='#3ddc97';x.font='800 64px '+F;x.fillText(money(total),W/2,y+135);
-    return c.toDataURL('image/png');
+    return c.toDataURL('image/jpeg',.92);
   }
   setup();
 }
