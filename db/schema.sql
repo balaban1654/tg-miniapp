@@ -856,3 +856,15 @@ CREATE INDEX IF NOT EXISTS mono_tx_acc ON mono_tx (account_id, time DESC);
 -- monobank: скрытые в списке счета и счёт, за которым следим в плитке «Общий баланс»
 ALTER TABLE mono_accounts ADD COLUMN IF NOT EXISTS hidden BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE mono_settings ADD COLUMN IF NOT EXISTS watch_account TEXT;
+-- monobank: несколько подключений (вкладки в разделе «МоноБанк API»: мой счёт, жены, мамы...). Прежнее подключение становится вкладкой 1
+ALTER TABLE mono_settings DROP CONSTRAINT IF EXISTS mono_settings_id_check;
+ALTER TABLE mono_settings ADD COLUMN IF NOT EXISTS title TEXT;
+ALTER TABLE mono_settings ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT now();
+CREATE SEQUENCE IF NOT EXISTS mono_settings_id_seq OWNED BY mono_settings.id;
+SELECT setval('mono_settings_id_seq', (SELECT coalesce(max(id), 1) FROM mono_settings), (SELECT count(*) > 0 FROM mono_settings));
+ALTER TABLE mono_settings ALTER COLUMN id SET DEFAULT nextval('mono_settings_id_seq');
+ALTER TABLE mono_accounts ADD COLUMN IF NOT EXISTS profile_id INT NOT NULL DEFAULT 1;
+ALTER TABLE mono_tx ADD COLUMN IF NOT EXISTS profile_id INT NOT NULL DEFAULT 1;
+CREATE INDEX IF NOT EXISTS mono_accounts_profile ON mono_accounts (profile_id);
+CREATE INDEX IF NOT EXISTS mono_tx_profile ON mono_tx (profile_id, time DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS mono_settings_hook ON mono_settings (hook_secret) WHERE hook_secret IS NOT NULL;
