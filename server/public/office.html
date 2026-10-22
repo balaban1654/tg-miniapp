@@ -1421,7 +1421,7 @@ function dxLeadPay(d){
 const MONO_CUR={980:'₴',840:'$',978:'€',985:'zł',826:'£'};
 const monoMoney=(v,c)=>(v<0?'−':'')+(Math.abs(v)/100).toLocaleString('ru-RU',{minimumFractionDigits:2,maximumFractionDigits:2})+' '+(MONO_CUR[c]||c||'');
 const MONO_TYPE={black:'Чёрная карта',white:'Белая карта',platinum:'Platinum',iron:'Iron',fop:'ФОП',yellow:'Детская карта',eAid:'єПідтримка',jar:'Банка'};
-let monoTimer=null,monoShowHidden=false;
+let monoTimer=null,monoShowHidden=false,monoConnOpen=false;
 let monoDir=(()=>{try{return localStorage.getItem('monoDir')||'all'}catch{return 'all'}})();
 /** Выбранная вкладка (подключение) раздела: запоминаем в браузере */
 let monoTab=(()=>{try{return Number(localStorage.getItem('monoTab'))||null}catch{return null}})();
@@ -1504,12 +1504,15 @@ async function viewMono(){
       d.historyLeftMin>0?el('span',{class:'pill p-warn'},'загружаем историю, осталось ~'+d.historyLeftMin+' мин'):el('span',{class:'mut sm'},'история загружена'),
       d.useWebhook?el('span',{class:'pill '+(d.webhookOk?'p-ok':'p-pur'),title:d.webhookPossible?'':'Нужен адрес сервера с https (PUBLIC_URL)'},d.webhookOk?'мгновенные операции включены':'подключаем мгновенные операции…'):null)
     :el('div',{},el('span',{class:'pill p-pur'},'не подключено'));
-  const conn=el('div',{class:'card',style:'display:grid;gap:12px'},el('div',{style:'display:flex;align-items:center;justify-content:space-between;gap:10px'},el('h3',{style:'font-size:15px'},'Подключение'),addTab),status,
+  // Когда токен подключён, карточка свёрнута в одну строку статуса; «Настройки» раскрывают её
+  const connToggle=open=>el('button',{type:'button',class:'btn o s','aria-expanded':String(!open),onclick:()=>{monoConnOpen=open;render({soft:true})}},open?'Настройки':'Свернуть');
+  const connFull=el('div',{class:'card',style:'display:grid;gap:12px'},el('div',{style:'display:flex;align-items:center;justify-content:space-between;gap:10px'},el('h3',{style:'font-size:15px'},'Подключение'),el('div',{style:'display:flex;gap:8px;align-items:center'},d.connected?connToggle(false):null,addTab)),status,
     d.lastError?el('div',{class:'err'},d.lastError):null,
     el('div',{style:'display:flex;gap:10px;flex-wrap:wrap;align-items:center'},token,el('label',{style:'display:flex;align-items:center;gap:8px;white-space:nowrap'},'История за',hist)),
     el('label',{style:'display:flex;flex-direction:row;justify-content:flex-start;align-items:center;gap:10px;font-size:13px;cursor:pointer'},hook,'Получать операции сразу (вебхук). Заменит вебхук, если он уже был настроен у этого токена в другом сервисе'),
     err,el('div',{style:'display:flex;gap:10px;flex-wrap:wrap'},save,off,delTab),
     el('div',{class:'mut sm'},'Токен создаётся на api.monobank.ua (вход через приложение monobank того, чьи счета подключаете). Он даёт только просмотр: перевести деньги по нему нельзя. monobank разрешает запрос раз в минуту, поэтому история грузится постепенно, около минуты на каждый месяц каждого счёта. Токен хранится на сервере и здесь не показывается. «+» справа: новая вкладка для ещё одного человека.'));
+  const conn=d.connected&&!monoConnOpen?el('div',{class:'card',style:'display:grid;gap:8px'},el('div',{style:'display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap'},status,el('div',{style:'display:flex;gap:8px;align-items:center'},connToggle(true),addTab)),d.lastError?el('div',{class:'err sm'},d.lastError):null):connFull;
   // Курсы валют monobank (обновляются банком не чаще раза в 5 минут)
   const fx=v=>v?Number(v).toFixed(2).replace('.',','):'—';
   const rates=g.rates&&g.rates.length?el('div',{class:'fx-grid'},...g.rates.map(r=>el('div',{class:'card fx-t'},
