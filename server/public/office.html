@@ -1166,7 +1166,10 @@ function dxFunnelCopy(model){
     const items=[];
     // шапка
     if(model.head)items.push({k:'lbl',h:15,t:model.head});else items.push({k:'fk',h:22});
-    for(const st of model.stages)items.push({k:model.plain?'plain':'stage',h:model.plain?33:24+6+28,st});
+    // Плашки переносятся на новую строку, как flex-wrap в офисе: раскладываем заранее, чтобы знать высоту
+    const mz=document.createElement('canvas').getContext('2d');mz.font='700 12px '+ff;
+    const pack=segs=>{const rs=[];let cur=[],w=0;for(const g of segs){const bw=mz.measureText(g.t).width+16;if(cur.length&&w+2+bw>IW){rs.push(cur);cur=[];w=0}cur.push({g,bw});w+=(cur.length>1?2:0)+bw}if(cur.length)rs.push(cur);return rs};
+    for(const st of model.stages){const lines=model.plain?[]:pack(st.segs);items.push({k:model.plain?'plain':'stage',h:model.plain?33:24+6+Math.max(1,lines.length)*30-2,st,lines})}
     let noteLines=[];
     if(model.note){const m=document.createElement('canvas').getContext('2d');m.font='400 12px '+ff;let ln='';
       for(const w of model.note.split(' ')){const t=ln?ln+' '+w:w;if(m.measureText(t).width>IW&&ln){noteLines.push(ln);ln=w}else ln=t}noteLines.push(ln);
@@ -1182,7 +1185,7 @@ function dxFunnelCopy(model){
     x.textAlign='left';
     for(const it of items){
       if(it.k==='lbl'){lbl(it.t,12,X0,y+12)}
-      else if(it.k==='fk'){fnt(700,18);x.fillStyle=col('--acc2')||'#c9a6ff';x.fillText('CTR: '+model.ctr,X0,y+18);const w1=x.measureText('CTR: '+model.ctr).width;x.fillText('RTD: '+model.rtd,X0+w1+16,y+18);if(model.churn){const w2=x.measureText('RTD: '+model.rtd).width;x.fillText('Churn: '+model.churn,X0+w1+w2+32,y+18)}}
+      else if(it.k==='fk'){let fs=18;const ft=()=>{fnt(700,fs);return x.measureText('CTR: '+model.ctr).width+16+x.measureText('RTD: '+model.rtd).width+(model.churn?16+x.measureText('Churn: '+model.churn).width:0)};while(fs>12&&ft()>IW)fs--;x.fillStyle=col('--acc2')||'#c9a6ff';x.fillText('CTR: '+model.ctr,X0,y+18);const w1=x.measureText('CTR: '+model.ctr).width;x.fillText('RTD: '+model.rtd,X0+w1+16,y+18);if(model.churn){const w2=x.measureText('RTD: '+model.rtd).width;x.fillText('Churn: '+model.churn,X0+w1+w2+32,y+18)}}
       else if(it.k==='note'){fnt(400,12);x.fillStyle=col('--mut')||'#a89cc8';noteLines.forEach((l,i)=>x.fillText(l,X0,y+12+i*16))}
       else if(it.k==='plain'){lbl(it.st.name,12,X0,y+20);fnt(700,22);x.fillStyle=col('--fg')||'#fff';x.textAlign='right';x.fillText(it.st.total,X0+IW,y+24);x.textAlign='left'}
       else{
@@ -1190,14 +1193,14 @@ function dxFunnelCopy(model){
         const by=y+24+6,BH=28;
         if(!st.segs.length){x.fillStyle='#ffffff1a';x.beginPath();x.roundRect(X0,by,IW,BH,8);x.fill();fnt(700,12);x.fillStyle=col('--mut')||'#a89cc8';x.fillText('нет данных',X0+8,by+18)}
         else{
-          // как flex: v 1 auto и min-width: max-content: базовая ширина = текст + 16, остаток делится пропорционально значениям
-          fnt(700,12);const base=st.segs.map(g=>x.measureText(g.t).width+16),sum=base.reduce((a,v)=>a+v,0),gaps=(st.segs.length-1)*2;
-          const free=IW-gaps-sum,tot=st.segs.reduce((a,g)=>a+g.w,0);
-          let px=X0;
-          st.segs.forEach((g,i)=>{const w=free>0?base[i]+free*g.w/tot:base[i];const n=st.segs.length;
-            const r=[i===0?8:6,i===n-1?8:6,i===n-1?8:6,i===0?8:6];
-            x.fillStyle=g.c;x.beginPath();x.roundRect(px,by,w,BH,r);x.fill();
-            x.save();x.beginPath();x.rect(px,by,w,BH);x.clip();x.fillStyle='#0d0817';fnt(700,12);x.fillText(g.t,px+8,by+18);x.restore();px+=w+2});
+          // как flex: v 1 auto и min-width: max-content: базовая ширина = текст + 16, остаток строки делится пропорционально значениям
+          const all=it.lines.flat(),N=all.length;let k=0;
+          it.lines.forEach((ln,li)=>{const ry=by+li*30,sum=ln.reduce((a,v)=>a+v.bw,0),free=IW-(ln.length-1)*2-sum,tot=ln.reduce((a,v)=>a+v.g.w,0);
+            let px=X0;
+            ln.forEach(({g,bw})=>{const w=free>0?bw+free*g.w/tot:bw,i=k++;
+              const r=[i===0?8:6,i===N-1?8:6,i===N-1?8:6,i===0?8:6];
+              x.fillStyle=g.c;x.beginPath();x.roundRect(px,ry,w,BH,r);x.fill();
+              x.save();x.beginPath();x.rect(px,ry,w,BH);x.clip();x.fillStyle='#0d0817';fnt(700,12);x.fillText(g.t,px+8,ry+18);x.restore();px+=w+2})});
         }
       }
       y+=it.h+gap;
