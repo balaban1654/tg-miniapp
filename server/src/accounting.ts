@@ -514,18 +514,23 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     return { ok: true };
   });
 
-  // Админ закрывает смену стримера без отчёта: данные потом внесёт сам стример (у него это задача)
-  app.post<{ Params: { id: string } }>('/shifts/:id/close', { preHandler: admin }, async (req, reply) => {
-    const r = await db.query(`UPDATE shift_reports SET status = 'await', ended_at = now() WHERE id = $1 AND status = 'live'`, [Number(req.params.id)]);
+  // Админ или тимлид (только своей команде) закрывает смену стримера без отчёта: данные потом внесёт сам стример (у него это задача)
+  app.post<{ Params: { id: string } }>('/shifts/:id/close', { preHandler: need('admin', 'teamlead') }, async (req, reply) => {
+    const lead = req.staff!.role === 'teamlead' ? req.staff!.id : null;
+    const r = await db.query(
+      `UPDATE shift_reports SET status = 'await', ended_at = now() WHERE id = $1 AND status = 'live'
+          AND ($2::int IS NULL OR staff_id IN (SELECT id FROM staff WHERE parent_id = $2))`,
+      [Number(req.params.id), lead],
+    );
     if (!r.rowCount) return reply.code(404).send({ error: 'Идущая смена не найдена' });
     return { ok: true };
   });
 
-  // Отчёт отправляет стример; админ может заполнить его за стримера (смена идёт или ждёт отчёта)
+  // Отчёт отправляет стример; админ (любого) или тимлид (своей команды) может заполнить его за стримера (смена идёт или ждёт отчёта)
   app.post<{ Params: { id: string } }>('/shifts/:id/finish', { preHandler: need('streamer', 'admin', 'teamlead', 'analyst', 'buyer'), bodyLimit: 9 * 1024 * 1024 }, async (req, reply) => {
     const me = req.staff!;
     const b = (req.body ?? {}) as Record<string, any>;
-    const row = (await db.query(`SELECT id, started_at FROM shift_reports WHERE id = $1 AND ($2 OR staff_id = $3) AND status IN ('live','await')`, [Number(req.params.id), me.role === 'admin', me.id])).rows[0];
+    const row = (await db.query(`SELECT id, started_at FROM shift_reports WHERE id = $1 AND ($2 OR staff_id = $3 OR ($4 AND staff_id IN (SELECT id FROM staff WHERE parent_id = $3))) AND status IN ('live','await')`, [Number(req.params.id), me.role === 'admin', me.id, me.role === 'teamlead'])).rows[0];
     if (!row) return reply.code(404).send({ error: 'Смена не найдена или уже отправлена' });
     const declared = Math.trunc(Number(b.declared_min));
     if (!Number.isFinite(declared) || declared < 1 || declared > 720) return reply.code(400).send({ error: 'Укажите время эфира в минутах, от 1 до 720' });
