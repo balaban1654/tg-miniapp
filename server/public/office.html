@@ -1422,6 +1422,7 @@ const MONO_CUR={980:'₴',840:'$',978:'€',985:'zł',826:'£'};
 const monoMoney=(v,c)=>(v<0?'−':'')+(Math.abs(v)/100).toLocaleString('ru-RU',{minimumFractionDigits:2,maximumFractionDigits:2})+' '+(MONO_CUR[c]||c||'');
 const MONO_TYPE={black:'Чёрная карта',white:'Белая карта',platinum:'Platinum',iron:'Iron',fop:'ФОП',yellow:'Детская карта',eAid:'єПідтримка',jar:'Банка'};
 let monoTimer=null,monoShowHidden=false;
+let monoDir=(()=>{try{return localStorage.getItem('monoDir')||'all'}catch{return 'all'}})();
 /** Выбранная вкладка (подключение) раздела: запоминаем в браузере */
 let monoTab=(()=>{try{return Number(localStorage.getItem('monoTab'))||null}catch{return null}})();
 const monoSetTab=id=>{monoTab=id;try{localStorage.setItem('monoTab',String(id))}catch{}};
@@ -1538,19 +1539,23 @@ async function viewMono(){
   const hiddenToggle=hiddenAcc.length?el('button',{type:'button',class:'btn o s',style:'justify-self:start',onclick:()=>{monoShowHidden=!monoShowHidden;render({soft:true})}},monoShowHidden?'Свернуть скрытые':'Показать скрытые ('+hiddenAcc.length+')'):null;
   // Пополнения за период
   const q=dxQuery(),per=dxCur();
-  const inc=await api('/mono/'+pid+'/incoming'+q);
-  const sums=inc.sums.length?inc.sums.map(x=>monoMoney(x.amount,x.currency)+' ('+x.n+')').join(' · '):'нет';
+  const inc=await api('/mono/'+pid+'/incoming'+q+(q?'&':'?')+'dir='+monoDir);
+  const sumTxt=a=>a.length?a.map(x=>monoMoney(Math.abs(x.amount),x.currency)+' ('+x.n+')').join(' · '):'нет';
+  const dirSel=el('select',{'aria-label':'Какие операции показать',style:'width:auto',onchange:e=>{monoDir=e.target.value;try{localStorage.setItem('monoDir',monoDir)}catch{}render({soft:true})}},
+    ...[['all','Все транзакции'],['in','Пополнения'],['out','Списания']].map(([v,t])=>el('option',v===monoDir?{value:v,selected:''}:{value:v},t)));
+  const sumCard=(lbl,txt,c)=>el('div',{style:'display:flex;gap:10px;align-items:center;flex-wrap:wrap'},el('span',{class:'dx-lbl'},lbl),el('b',{style:'font-size:18px;color:'+c},txt));
   const accName=r=>r.kind==='jar'?(r.title||'Банка'):(r.masked_pan||'Счёт');
   const incRows=inc.rows.map(r=>[td(fmtDT(r.time)),td(accName(r)),el('td',{style:'white-space:normal;text-align:left;min-width:200px'},r.counter_name||r.description||'—',r.counter_name&&r.description&&r.description!==r.counter_name?el('div',{class:'mut sm'},r.description):null),
     el('td',{style:'white-space:normal;text-align:left;max-width:260px'},r.comment||el('span',{class:'mut'},'—')),
-    el('td',{class:'n'},el('b',{style:'color:var(--ok)'},'+'+monoMoney(r.amount,r.currency)),r.hold?el('div',{class:'mut sm'},'в обработке'):null)]);
+    el('td',{class:'n'},el('b',{style:'color:'+(r.amount>0?'var(--ok)':'var(--bad)')},(r.amount>0?'+':'−')+monoMoney(Math.abs(r.amount),r.currency)),r.hold?el('div',{class:'mut sm'},'в обработке'):null)]);
+  const DIRL={all:['Транзакции','операций'],in:['Пополнения','пополнений'],out:['Списания','списаний']}[monoDir]||['Транзакции','операций'];
   if(d.historyLeftMin>0)monoTimer=setTimeout(()=>{if(tab==='mono')render({soft:true})},30000);
   return[head,rates,tabs,conn,bal,
     el('h3',{style:'font-size:15px'},'Счета и банки'),ctrT(table(['Счёт','Валюта','Свои средства','Кредитный лимит / цель','История',''],accRows,hiddenAcc.length?'Все счета скрыты.':'Счетов нет.')),hiddenToggle,
-    el('div',{style:'display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:space-between'},el('h3',{style:'font-size:15px'},'Пополнения за '+dxRangeLabel(per)),rangeBar(()=>render({soft:true}))),
-    el('div',{class:'card',style:'display:flex;gap:10px;align-items:center;flex-wrap:wrap'},el('span',{class:'dx-lbl'},'Всего пополнений'),el('b',{style:'font-size:18px;color:var(--ok)'},sums)),
-    ctrT(table(['Когда','Счёт','От кого','Комментарий','Сумма'],incRows,d.historyLeftMin>0?'История ещё загружается, пополнения появятся по мере загрузки.':'За этот период пополнений нет.')),
-    inc.rows.length>=500?el('div',{class:'mut sm'},'Показаны последние 500 пополнений периода, сумма посчитана по всем.'):null];
+    el('div',{style:'display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:space-between'},el('h3',{style:'font-size:15px'},DIRL[0]+' за '+dxRangeLabel(per)),el('div',{style:'display:flex;gap:8px;align-items:center;flex-wrap:wrap'},dirSel,rangeBar(()=>render({soft:true})))),
+    el('div',{class:'card',style:'display:grid;gap:8px'},monoDir!=='out'?sumCard('Всего пополнений',(monoDir==='all'&&inc.sums.length?'+':'')+sumTxt(inc.sums),'var(--ok)'):null,monoDir!=='in'?sumCard('Всего списаний',(inc.sumsOut.length?'−':'')+sumTxt(inc.sumsOut),'var(--bad)'):null),
+    ctrT(table(['Когда','Счёт',monoDir==='in'?'От кого':monoDir==='out'?'Куда':'От кого / куда','Комментарий','Сумма'],incRows,d.historyLeftMin>0?'История ещё загружается, '+DIRL[1]+' появятся по мере загрузки.':'За этот период '+DIRL[1]+' нет.')),
+    inc.rows.length>=500?el('div',{class:'mut sm'},'Показаны последние 500 '+DIRL[1]+' периода, сумма посчитана по всем.'):null];
 }
 
 /* ---------- Планы и задачи (админ) ---------- */

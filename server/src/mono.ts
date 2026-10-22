@@ -494,13 +494,15 @@ export async function monoRoutes(app: FastifyInstance, h: Helpers): Promise<void
     return { ok: true };
   });
 
-  // Пополнения вкладки за период (по Киеву): список и сумма по валютам
-  app.get<{ Params: { pid: string }; Querystring: { from?: string; to?: string; account?: string } }>('/mono/:pid/incoming', { preHandler: admin }, async (req) => {
+  // Операции вкладки за период (по Киеву): все, только пополнения (dir=in) или только списания (dir=out); суммы по валютам отдельно для прихода и расхода
+  app.get<{ Params: { pid: string }; Querystring: { from?: string; to?: string; account?: string; dir?: string } }>('/mono/:pid/incoming', { preHandler: admin }, async (req) => {
+    const dir = req.query.dir === 'all' || req.query.dir === 'out' ? req.query.dir : 'in';
+    const sign = dir === 'in' ? 't.amount > 0' : dir === 'out' ? 't.amount < 0' : 't.amount <> 0';
     const D = /^\d{4}-\d{2}-\d{2}$/;
     const from = D.test(String(req.query.from)) ? String(req.query.from) : null;
     const to = D.test(String(req.query.to)) ? String(req.query.to) : null;
     const acc = req.query.account ? String(req.query.account) : null;
-    const where = `t.profile_id = $4 AND t.amount > 0 AND ($1::date IS NULL OR (t.time AT TIME ZONE 'Europe/Kyiv')::date >= $1::date)
+    const where = `t.profile_id = $4 AND ${sign} AND ($1::date IS NULL OR (t.time AT TIME ZONE 'Europe/Kyiv')::date >= $1::date)
       AND ($2::date IS NULL OR (t.time AT TIME ZONE 'Europe/Kyiv')::date <= $2::date) AND ($3::text IS NULL OR t.account_id = $3)`;
     const args = [from, to, acc, Number(req.params.pid)];
     const rows = (
@@ -513,14 +515,15 @@ export async function monoRoutes(app: FastifyInstance, h: Helpers): Promise<void
     ).rows;
     const sums = (
       await db.query(
-        `SELECT coalesce(a.currency_code, t.currency_code) AS currency, sum(t.amount)::bigint AS amount, count(*)::int AS n
-           FROM mono_tx t LEFT JOIN mono_accounts a ON a.id = t.account_id WHERE ${where} GROUP BY 1 ORDER BY 2 DESC`,
+        `SELECT coalesce(a.currency_code, t.currency_code) AS currency, (t.amount > 0) AS inc, sum(t.amount)::bigint AS amount, count(*)::int AS n
+           FROM mono_tx t LEFT JOIN mono_accounts a ON a.id = t.account_id WHERE ${where} GROUP BY 1, 2 ORDER BY abs(sum(t.amount)) DESC`,
         args,
       )
     ).rows;
     return {
       rows: rows.map((r) => ({ ...r, amount: Number(r.amount), currency: r.acc_currency ?? r.currency_code })),
-      sums: sums.map((x) => ({ currency: x.currency, amount: Number(x.amount), n: x.n })),
+      sums: sums.filter((x) => x.inc).map((x) => ({ currency: x.currency, amount: Number(x.amount), n: x.n })),
+      sumsOut: sums.filter((x) => !x.inc).map((x) => ({ currency: x.currency, amount: Number(x.amount), n: x.n })),
     };
   });
 }
