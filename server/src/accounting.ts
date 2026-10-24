@@ -780,12 +780,40 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     return { ok: true };
   });
 
+  // Ставка из «ЗП (команда)» за месяц: фикс или ставка × принятые смены команды, у тимлида ещё бонус за команду. null, если ставки нет
+  const teamPayFor = async (s: { id: number; role: string }, period: string, plan: KpiPlan) => {
+    if (!['admin', 'teamlead', 'analyst', 'buyer'].includes(s.role)) return null;
+    const p = (await db.query('SELECT mode, amount::float AS amount FROM team_pay WHERE staff_id = $1', [s.id])).rows[0] as { mode: string; amount: number } | undefined;
+    if (!p && s.role !== 'teamlead') return null;
+    const shifts = Number((await db.query(`SELECT count(*)::int AS n FROM shift_reports WHERE staff_id = $1 AND team AND status = 'approved' AND to_char(day, 'YYYY-MM') = $2`, [s.id, period])).rows[0].n);
+    const base = r2(p ? (p.mode === 'shift' ? shifts * p.amount : p.amount) : 0);
+    const bonus = s.role === 'teamlead' ? (await teamleadPay(s.id, period, plan)).bonus : 0;
+    if (!base && !bonus && !(p && p.amount > 0)) return null;
+    return { mode: p?.mode ?? 'month', amount: p?.amount ?? 0, shifts, base, bonus: r2(bonus), accrued: r2(base + bonus) };
+  };
+  // КPI стримера плюс ставка из «ЗП (команда)»: итог и «к выплате» считаются по обоим, выплаты одни на человека
+  const withTeam = (k: KpiResult, team: Awaited<ReturnType<typeof teamPayFor>>) => {
+    if (!team) return { ...k, team: null };
+    const total = r2(k.total + team.accrued);
+    return { ...k, team, total, due: r2(total - k.paid) };
+  };
+
   app.get<{ Querystring: { period?: string; all?: string } }>('/kpi/summary', { preHandler: admin }, async (req) => {
     const period = PERIOD.test(String(req.query.period)) ? String(req.query.period) : await currentPeriod();
     const plan = await planFor(period);
-    const staff = (await db.query(`SELECT id, name, login, active, role, streams FROM staff WHERE ${req.query.all ? 'active' : `(role = 'streamer' OR streams)`} ORDER BY active DESC, (role = 'streamer') DESC, name`)).rows;
+    // Стримеры и все, у кого есть ставка в «ЗП (команда)» (админы, тимлиды, аналитики, медиабайеры)
+    const staff = (await db.query(
+      `SELECT id, name, login, active, role, streams FROM staff
+        WHERE ${req.query.all ? 'active' : `(role = 'streamer' OR streams OR role = 'teamlead' OR id IN (SELECT staff_id FROM team_pay WHERE amount > 0))`}
+          AND deleted_at IS NULL
+        ORDER BY active DESC, (role = 'streamer' OR streams) DESC, name`,
+    )).rows;
     const rows = [];
-    for (const s of staff) rows.push({ staff: s, kpi: await kpiFor(s.id, period, plan) });
+    for (const s of staff) {
+      const team = await teamPayFor(s, period, plan);
+      if (!req.query.all && s.role !== 'streamer' && !s.streams && !team) continue;
+      rows.push({ staff: s, kpi: withTeam(await kpiFor(s.id, period, plan), team) });
+    }
     return { plan, period, rows };
   });
 
@@ -793,11 +821,11 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     const period = PERIOD.test(String(req.query.period)) ? String(req.query.period) : await currentPeriod();
     const plan = await planFor(period);
     const id = Number(req.params.id);
-    const s = (await db.query(`SELECT id, name, login FROM staff WHERE id = $1 AND (role = 'streamer' OR streams)`, [id])).rows[0];
-    if (!s) return reply.code(404).send({ error: 'Стример не найден' });
+    const s = (await db.query(`SELECT id, name, login, role, streams FROM staff WHERE id = $1 AND (role IN ('streamer','admin','teamlead','analyst','buyer') OR streams)`, [id])).rows[0];
+    if (!s) return reply.code(404).send({ error: 'Сотрудник не найден' });
     const adj = (await db.query(`SELECT a.id, a.kind, a.amount::float AS amount, a.comment, a.created_at, c.name AS by FROM staff_adjustments a LEFT JOIN staff c ON c.id = a.created_by WHERE a.staff_id = $1 AND a.period = $2 ORDER BY a.id`, [id, period])).rows;
     const pay = (await db.query(`SELECT id, kind, amount::float AS amount, note, created_at FROM staff_payouts WHERE staff_id = $1 AND period = $2 ORDER BY id`, [id, period])).rows;
-    return { plan, period, staff: s, kpi: await kpiFor(id, period, plan), adjustments: adj, payouts: pay };
+    return { plan, period, staff: s, kpi: withTeam(await kpiFor(id, period, plan), await teamPayFor(s, period, plan)), adjustments: adj, payouts: pay };
   });
 
   // ----- Закрытие месяца -----

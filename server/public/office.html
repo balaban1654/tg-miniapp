@@ -2936,7 +2936,7 @@ async function accSum(){
   const d=await api('/kpi/summary?period='+accState.period);
   const R=d.rows.filter(r=>r.staff.active||r.kpi.hoursMin||r.kpi.ftdCount||r.kpi.paid);
   const tot=R.reduce((a,r)=>a+r.kpi.total,0),paid=R.reduce((a,r)=>a+r.kpi.paid,0);
-  const tiles=el('div',{class:'kpis'},...[['Начислено за месяц',usd2(tot)],['Выплачено',usd2(paid)],['К выплате',usd2(tot-paid)],['Оба плана выполнили',R.filter(r=>r.kpi.shiftsDone&&r.kpi.leadsDone).length+' из '+R.length]].map(([a,b])=>el('div',{class:'kpi'},el('small',{},a),el('b',{style:'font-size:20px'},b))));
+  const tiles=el('div',{class:'kpis'},...[['Начислено за месяц',usd2(tot)],['Выплачено',usd2(paid)],['К выплате',usd2(tot-paid)],['Оба плана выполнили',(()=>{const S=R.filter(r=>r.staff.role==='streamer'||r.staff.streams);return S.filter(r=>r.kpi.shiftsDone&&r.kpi.leadsDone).length+' из '+S.length})()]].map(([a,b])=>el('div',{class:'kpi'},el('small',{},a),el('b',{style:'font-size:20px'},b))));
   const detail=el('div',{style:'display:grid;gap:12px'});
   const rows=R.map(r=>{const k=r.kpi;
     const tr=el('tr',{class:'rowc',tabindex:'0'},
@@ -2948,12 +2948,13 @@ async function accSum(){
       el('td',{class:'n'},usd2(k.act.leadsPay),el('div',{class:'sm mut'},k.ftdCount+'×$'+k.act.price)),
       td(usd2(k.ftdBonus),'n'),td(usd2(k.dayBonus),'n'),td(usd2(k.depBonus||0),'n'),
       td(k.adjBonus||k.adjPenalty?usd2(k.adjBonus-k.adjPenalty):'—','n'),
+      k.team?el('td',{class:'n'},usd2(k.team.accrued),el('div',{class:'sm mut'},k.team.mode==='shift'?k.team.shifts+'×$'+k.team.amount:'фикс'+(k.team.bonus?' + команда':''))):td('—','n'),
       el('td',{class:'n'},el('b',{},usd2(k.total))),td(k.paid?usd2(-k.paid):'—','n'),el('td',{class:'n'},el('b',{},usd2(k.due))));
     const open=()=>{accState.sel=r.staff.id;[...tr.parentNode.children].forEach(x=>x.classList.toggle('on',x===tr));accDetail(detail,r.staff.id)};
     tr.addEventListener('click',open);tr.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open()}});
     if(accState.sel===r.staff.id)setTimeout(()=>{tr.classList.add('on');accDetail(detail,r.staff.id)},0);
     return tr});
-  const SUMH=['Сотрудник','Часы','Смены','План смен','Лиды (FTD)','План лидов','За смены','За лидов','Бонусы FTD','Дневные','Додепы','Доп.','Итого','Выплачено','К выплате'];
+  const SUMH=['Сотрудник','Часы','Смены','План смен','Лиды (FTD)','План лидов','За смены','За лидов','Бонусы FTD','Дневные','Додепы','Доп.','Ставка (команда)','Итого','Выплачено','К выплате'];
   rows.forEach(tr=>[...tr.children].forEach((c,i)=>c.setAttribute('data-l',SUMH[i]||'')));
   const tbl=el('div',{class:'tbl ctr sumt'},el('table',{},el('thead',{},el('tr',{},SUMH.map(c=>el('th',{},c)))),el('tbody',{},rows)));
   // Телефон: у каждого стримера своя карточка, строки «название ······ сумма» выровнены по обоим краям
@@ -2979,6 +2980,7 @@ async function accSum(){
       row('Бонусы за додепы',usd2(k.depBonus||0)),
       row('Премии',usd2(k.adjBonus)),
       row('Штрафы',k.adjPenalty?'−'+usd2(k.adjPenalty):usd2(0)),
+      k.team?row('Ставка (ЗП команда)',usd2(k.team.accrued)):null,
       el('div',{class:'sc-sep'}),
       row('Итого',usd2(k.total),'strong'),
       row('Выплачено',k.paid?usd2(-k.paid):'—'),
@@ -2999,6 +3001,7 @@ async function accDetail(box,id){
     step('Бонусы за FTD','Один уровень по сумме первого депозита, с запасом '+Math.round(plan.tol*100)+'% на курс',usd2(k.ftdBonus),'pos2'),
     step('Дневные бонусы',k.dayRows.filter(x=>x.hit).length+' дн. по $'+plan.day.bonus,usd2(k.dayBonus),'pos2'),
     step('Бонусы за додепы','Принятые запросы за градации лидов',usd2(k.depBonus||0),'pos2'),
+    k.team?step('Ставка из «ЗП (команда)»',(k.team.mode==='shift'?k.team.shifts+' принятых смен × $'+k.team.amount:'фиксированная за месяц $'+k.team.amount)+(k.team.bonus?' + бонус за команду '+usd2(k.team.bonus):''),usd2(k.team.accrued),'pos2'):null,
     ...d.adjustments.map(a=>step(a.kind==='bonus'?'Доп. бонус':'Штраф',(a.comment||'без комментария')+' · '+(a.by||'')+' (комментарий видите только вы)',usd2(a.kind==='bonus'?a.amount:-a.amount),a.kind==='bonus'?'pos2':'neg2'))
   ];
   const tierTbl=ctrT(table(['Депозит FTD','Кол-во','С запасом','Бонус','Сумма'],[...k.tiers.map(t=>[td('>$'+t.over),td(t.n,'n'),td(t.tol||'—','n'),td('$'+t.bonus,'n'),td(t.n?'+'+usd2(t.n*t.bonus):'—','n')]),[td('ниже порога'),td(k.belowTier,'n'),td('—'),td('—'),td('—')]],''));
