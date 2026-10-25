@@ -3862,8 +3862,9 @@ async function gifCard(){
 function recentSignals(rows){
   const list=rows.filter(r=>!r.requested&&!r.is_test).slice(0,12);
   const tm=v=>new Date(v).toLocaleString('ru-RU',{timeZone:'Europe/Kyiv',day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'});
-  const res=r=>r.result==='win'?el('span',{class:'pill p-ok'},'Плюс · '+(r.result_step?'перекрытие '+r.result_step:'со входа')):r.result==='loss'?el('span',{class:'pill p-bad'},'Минус'):el('span',{class:'mut'},'—');
-  const btn=r=>{if(r.result)return el('span',{class:'mut sm'},'Результат отправлен');const early=new Date(r.entry_at)>new Date();
+  const res=r=>r.result==='win'?el('span',{class:'pill p-ok'},'Плюс · '+(r.result_step?'перекрытие '+r.result_step:'со входа')):r.result==='loss'?el('span',{class:'pill p-bad'},'Минус'):r.gif_kind==='skip'?el('span',{class:'pill p-warn'},'Пропуск'):el('span',{class:'mut'},'—');
+  // Пропуск (ушла гифка «упал процент») считается итогом: результат сигналу больше не даётся
+  const btn=r=>{if(r.result)return el('span',{class:'mut sm'},'Результат отправлен');if(r.gif_kind==='skip')return el('span',{class:'mut sm'},'Сигнал пропущен');const early=new Date(r.entry_at)>new Date();
     return el('button',{class:'btn o s',type:'button',disabled:early?'':null,title:early?'Сигнал ещё не начался':'',onclick:()=>signalResultDialog(r,()=>render({soft:true}))},'Дать результат')};
   let gifPush=true;try{gifPush=localStorage.getItem('gifPush')!=='0'}catch{}
   const gp=el('input',{type:'checkbox',style:'width:auto'});gp.checked=gifPush;gp.addEventListener('change',()=>{try{localStorage.setItem('gifPush',gp.checked?'1':'0')}catch{}});

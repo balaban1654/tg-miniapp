@@ -1836,8 +1836,9 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     const maxEv = Number((await db.query('SELECT max_events FROM signal_settings WHERE id = 1')).rows[0]?.max_events) || 4;
     const step = result === 'win' ? Math.trunc(Number(b.step ?? 0)) : null;
     if (step !== null && !(step >= 0 && step < maxEv)) return reply.code(400).send({ error: 'Неверный шаг: со входа или перекрытие 1–' + (maxEv - 1) });
-    const sg = (await db.query('SELECT id, pair, direction, expiry_min, expiry_sec, entry_at, requested_by, is_test, result FROM signals WHERE id = $1', [Number(req.params.id)])).rows[0];
+    const sg = (await db.query('SELECT id, pair, direction, expiry_min, expiry_sec, entry_at, requested_by, is_test, result, gif_kind FROM signals WHERE id = $1', [Number(req.params.id)])).rows[0];
     if (!sg) return reply.code(404).send({ error: 'Сигнал не найден' });
+    if (sg.gif_kind === 'skip') return reply.code(409).send({ error: 'Сигнал пропущен (ушла гифка «Пропуск»), результат ему не даётся' });
     if (sg.requested_by) return reply.code(400).send({ error: 'Это сигнал по запросу клиента, итог ставит сам клиент' });
     if (sg.result) return reply.code(409).send({ error: 'Результат уже отправлен' });
     if (+new Date(sg.entry_at) > Date.now()) return reply.code(409).send({ error: 'Сигнал ещё не начался' });
