@@ -1434,12 +1434,13 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     return { ok: true, applied, left, second };
   });
 
-  // Закрепление лида за стримером (или снятие)
+  // Закрепление лида за стримером (или снятие). Меняется только владелец: «Откуда пришёл» и ссылка остаются как были (органика остаётся органикой),
+  // а ссылки на регистрацию, промокод и имя менеджера в боте и Mini App берутся у нового владельца
   app.patch<{ Params: { tgId: string } }>('/leads/:tgId/owner', { preHandler: need('admin') }, async (req, reply) => {
     const raw = (req.body as any)?.owner_id;
     const owner = raw === null || raw === '' || raw === undefined ? null : Number(raw);
     if (owner !== null && !(await db.query(`SELECT 1 FROM staff WHERE id = $1 AND active`, [owner])).rowCount) return reply.code(404).send({ error: 'Сотрудник не найден' });
-    const r = await db.query('UPDATE leads SET owner_id = $2, taken_from = NULL, link_id = coalesce(link_id, (SELECT id FROM links WHERE owner_id = $2 ORDER BY id LIMIT 1)) WHERE tg_id = $1 RETURNING tg_id', [Number(req.params.tgId), owner]);
+    const r = await db.query('UPDATE leads SET owner_id = $2, taken_from = NULL WHERE tg_id = $1 RETURNING tg_id', [Number(req.params.tgId), owner]);
     if (!r.rowCount) return reply.code(404).send({ error: 'Лид не найден' });
     return { ok: true };
   });
