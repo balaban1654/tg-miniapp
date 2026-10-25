@@ -3842,7 +3842,7 @@ async function signalConfigBlock(){
 }
 
 /** Последние опубликованные вручную сигналы с кнопкой «Дать результат» */
-/** Вкладка «Гифка»: две гифки (плюс и минус), которые по кнопке уходят в каналы */
+/** Вкладка «Гифка»: три гифки (плюс, минус, пропуск), которые по кнопке уходят в каналы */
 async function gifCard(){
   let have={};try{(await api('/signal-gifs')).forEach(g=>have[g.kind]=g)}catch{}
   const err=el('div',{class:'err',role:'alert'});
@@ -3856,8 +3856,8 @@ async function gifCard(){
     return el('div',{class:'card',style:'display:grid;gap:10px;align-content:start'},el('h3',{style:'font-size:15px'},title),pv,
       el('div',{style:'display:flex;gap:8px;flex-wrap:wrap'},el('button',{class:'btn o s',type:'button',onclick:()=>inp.click()},g?'Заменить':'Загрузить'),g?el('button',{class:'btn o s',type:'button',onclick:async()=>{try{await api('/signal-gifs/'+kind,{method:'DELETE'});render({soft:true})}catch(x){err.textContent=x.message}}},'Удалить'):null),inp)};
   return el('div',{style:'display:grid;gap:12px'},
-    el('p',{class:'mut sm',style:'margin:0'},'Гифка (GIF), видео MP4 или видеостикер WEBM до 10 МБ (WEBM уходит в канал как стикер: он должен быть в формате стикера Telegram, 512 пикселей, до 3 секунд). В таблице «Последние отправленные сигналы» у каждого сигнала есть кнопка «Гифка в канал»: уйдёт гифка плюса или минуса, в те же каналы, что указаны в шаблоне «Результат сигнала». Клиентам в бота гифка не отправляется.'),
-    el('div',{style:'display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px'},box('win','Плюс'),box('loss','Минус')),err)
+    el('p',{class:'mut sm',style:'margin:0'},'Гифка (GIF), видео MP4 или видеостикер WEBM до 10 МБ (WEBM уходит в канал как стикер: он должен быть в формате стикера Telegram, 512 пикселей, до 3 секунд). В таблице «Последние отправленные сигналы» у каждого сигнала есть кнопка «Гифка в канал»: уйдёт гифка плюса, минуса или пропуска (упал процент, сигнал пропускаем), в те же каналы, что указаны в шаблоне «Результат сигнала». Клиентам в бота гифка не отправляется.'),
+    el('div',{style:'display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px'},box('win','Плюс'),box('loss','Минус'),box('skip','Пропуск')),err)
 }
 function recentSignals(rows){
   const list=rows.filter(r=>!r.requested&&!r.is_test).slice(0,12);
@@ -3870,12 +3870,12 @@ function recentSignals(rows){
   const sendGif=async(r,kind)=>{try{const x=await api('/signals/'+r.id+'/gif',{method:'POST',body:{kind,push:gp.checked}});
     toast((x.sent?'Гифка ушла в '+x.sent+' кан.':'В каналы не ушла')+(x.users?', в бот: '+x.users+' лидам':'')+(x.errors.length?'. Не получили: '+x.errors.join('; '):''));render({soft:true})}catch(e){toast(e.message)}};
   const gifBtn=r=>{
-    if(r.gif_sent_at)return el('span',{class:'mut sm'},'Отправлена · '+(r.gif_kind==='win'?'плюс':'минус'));
+    if(r.gif_sent_at)return el('span',{class:'mut sm'},'Отправлена · '+(r.gif_kind==='win'?'плюс':r.gif_kind==='skip'?'пропуск':'минус'));
     const early=new Date(r.entry_at)>new Date();
     if(r.result)return el('button',{class:'btn o s',type:'button',disabled:early?'':null,onclick:()=>sendGif(r,r.result)},'Отправить гифку');
     const w=el('span',{style:'display:inline-flex;gap:6px'});
     const ask=el('button',{class:'btn o s',type:'button',disabled:early?'':null,title:early?'Сигнал ещё не начался':'',onclick:()=>{ask.hidden=true;w.hidden=false}},'Отправить гифку');
-    w.hidden=true;w.append(el('button',{class:'btn s',type:'button',onclick:()=>sendGif(r,'win')},'Плюс'),el('button',{class:'btn s r',type:'button',onclick:()=>sendGif(r,'loss')},'Минус'),el('button',{class:'btn o s',type:'button',onclick:()=>{w.hidden=true;ask.hidden=false}},'×'));
+    w.hidden=true;w.append(el('button',{class:'btn s',type:'button',onclick:()=>sendGif(r,'win')},'Плюс'),el('button',{class:'btn s r',type:'button',onclick:()=>sendGif(r,'loss')},'Минус'),el('button',{class:'btn o s',type:'button',style:'color:var(--warn);border-color:var(--warn)',onclick:()=>sendGif(r,'skip')},'Пропуск'),el('button',{class:'btn o s',type:'button',onclick:()=>{w.hidden=true;ask.hidden=false}},'×'));
     return el('span',{},ask,w)};
   return el('div',{style:'display:grid;gap:8px'},el('div',{style:'display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap'},el('h3',{style:'font-size:15px'},'Последние отправленные сигналы'),el('label',{style:'display:flex;gap:8px;align-items:center;cursor:pointer',class:'mut sm'},gp,'Гифку отправлять и всем лидам в бот')),
     ctrT(table(['Вход (Киев)','Пара','Направление','Экспирация','Отправил','Результат','Гифка',''],list.map(r=>[td(tm(r.entry_at)),td(r.pair),td(r.direction==='up'?'Вверх':'Вниз'),td(r.expiry_sec?r.expiry_sec+' сек':r.expiry_min+' мин'),td(r.author||'—'),el('td',{},res(r)),el('td',{},gifBtn(r)),el('td',{style:'white-space:nowrap'},btn(r))]),'Сигналов пока нет')));

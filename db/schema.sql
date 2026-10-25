@@ -915,3 +915,9 @@ CREATE INDEX IF NOT EXISTS giveaway_draws_gw ON giveaway_draws (giveaway_id);
 
 -- Лид заблокировал бота: статус становится «Отвал», а прежний запоминается и возвращается, когда лид снова нажмёт /start
 ALTER TABLE leads ADD COLUMN IF NOT EXISTS status_before_block TEXT;
+
+-- Третья гифка «Пропуск» (упал процент, сигнал пропускаем)
+ALTER TABLE signal_gifs DROP CONSTRAINT IF EXISTS signal_gifs_kind_check;
+ALTER TABLE signal_gifs ADD CONSTRAINT signal_gifs_kind_check CHECK (kind IN ('win','loss','skip'));
+ALTER TABLE signals DROP CONSTRAINT IF EXISTS signals_gif_kind_check;
+ALTER TABLE signals ADD CONSTRAINT signals_gif_kind_check CHECK (gif_kind IN ('win','loss','skip'));

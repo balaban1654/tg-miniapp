@@ -1914,7 +1914,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
   });
   app.put<{ Params: { kind: string } }>('/signal-gifs/:kind', { preHandler: need('admin'), bodyLimit: 16 * 1024 * 1024 }, async (req, reply) => {
     const kind = req.params.kind;
-    if (kind !== 'win' && kind !== 'loss') return reply.code(400).send({ error: 'Неизвестный тип' });
+    if (kind !== 'win' && kind !== 'loss' && kind !== 'skip') return reply.code(400).send({ error: 'Неизвестный тип' });
     const g = parseGif((req.body as any)?.file);
     if (typeof g === 'string') return reply.code(400).send({ error: g });
     await db.query(
@@ -1935,10 +1935,11 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     if (!sg) return reply.code(404).send({ error: 'Сигнал не найден' });
     if (sg.requested_by) return reply.code(400).send({ error: 'Это сигнал по запросу клиента' });
     if (sg.gif_sent_at) return reply.code(409).send({ error: 'Гифка по этому сигналу уже отправлена' });
-    const kind = sg.result ?? (b.kind === 'win' || b.kind === 'loss' ? b.kind : null);
-    if (!kind) return reply.code(400).send({ error: 'Выберите плюс или минус' });
+    // «Пропуск» (упал процент) только у сигнала без итога
+    const kind = sg.result ?? (b.kind === 'win' || b.kind === 'loss' || b.kind === 'skip' ? b.kind : null);
+    if (!kind) return reply.code(400).send({ error: 'Выберите плюс, минус или пропуск' });
     const g = (await db.query('SELECT data, mime FROM signal_gifs WHERE kind = $1', [kind])).rows[0];
-    if (!g) return reply.code(400).send({ error: `Гифка «${kind === 'win' ? 'плюс' : 'минус'}» не загружена: вкладка «Гифка»` });
+    if (!g) return reply.code(400).send({ error: `Гифка «${kind === 'win' ? 'плюс' : kind === 'loss' ? 'минус' : 'пропуск'}» не загружена: вкладка «Гифка»` });
     const channels: string[] = (await db.query(`SELECT channels FROM push_templates WHERE key IN ('result','result_win','result_step')`)).rows.flatMap((x) => x.channels as string[]);
     channels.splice(0, channels.length, ...new Set(channels));
     if (!channels.length && b.push !== true) return reply.code(400).send({ error: 'Канал не указан в шаблоне «Результат сигнала»' });
