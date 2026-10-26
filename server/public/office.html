@@ -1346,11 +1346,14 @@ function dxNet(d){
   const RLS={admin:'админ',teamlead:'тимлид',analyst:'аналитик',buyer:'медиабайер'};
   // Кто и стримит, и получает ставку из «ЗП (команда)», показывается одной строкой: начисления складываются, выплаты у человека одни
   const TS=new Map((d.teamSalaries||[]).map(s=>[s.id,s]));
+  // Сумма справа: начислено (это расход в чистой прибыли, выплата его не уменьшает). Под ней: сколько выплачено и сколько осталось
+  const payTxt=(acc,paid)=>paid>=acc-0.5&&acc>0?'выплачено полностью ✓':'выплачено '+usd0(paid)+' · к выплате '+usd0(Math.max(0,acc-paid));
   const sal=el('div',{class:'dx-list'},...d.streamers.filter(s=>s.range.salary||s.range.paid||TS.has(s.id)).map(s=>{const t=TS.get(s.id);TS.delete(s.id);
-      return el('div',{class:'r'},el('span',{},s.name,el('em',{},t?'смены и лиды '+usd0(s.range.salary)+' + ставка «ЗП (команда)» '+usd0(t.salary)+' · выплачено '+usd0(s.range.paid):'начислено · выплачено '+usd0(s.range.paid))),el('b',{},usd0(s.range.salary+(t?t.salary:0))))}),
-    ...[...TS.values()].map(s=>el('div',{class:'r'},el('span',{},s.name,el('em',{},(RLS[s.role]||s.role)+' · ставка из «ЗП (команда)» · выплачено '+usd0(s.paid))),el('b',{},usd0(s.salary)))),
+      const tot=s.range.salary+(t?t.salary:0);
+      return el('div',{class:'r'},el('span',{},s.name,el('em',{},(t?'смены и лиды '+usd0(s.range.salary)+' + ставка «ЗП (команда)» '+usd0(t.salary):'начислено')+' · '+payTxt(tot,s.range.paid))),el('b',{},usd0(tot)))}),
+    ...[...TS.values()].map(s=>el('div',{class:'r'},el('span',{},s.name,el('em',{},(RLS[s.role]||s.role)+' · ставка из «ЗП (команда)» · '+payTxt(s.salary,s.paid))),el('b',{},usd0(s.salary)))),
     el('div',{class:'r'},el('span',{},'Итого начислено'),el('b',{},usd0(t.salaries))));
-  const salPop=el('div',{style:'display:grid;gap:8px'},el('div',{class:'dx-hd'},el('span',{class:'dx-lbl'},'Зарплаты за период'),el('a',{href:'#/acc/sum',style:'color:var(--acc2);font-weight:700;font-size:12px',onclick:e=>{e.preventDefault();dxGo('acc','sum')}},'Бухгалтерия →')),sal,
+  const salPop=el('div',{style:'display:grid;gap:8px'},el('div',{class:'dx-hd'},el('span',{class:'dx-lbl'},'Зарплаты за период (начислено)'),el('a',{href:'#/acc/sum',style:'color:var(--acc2);font-weight:700;font-size:12px',onclick:e=>{e.preventDefault();dxGo('acc','sum')}},'Бухгалтерия →')),sal,
     d.range.whole?null:el('div',{class:'mut sm'},'Неполный месяц: зарплата считается пропорционально дням.'));
   const exp=el('div',{class:'dx-list'},...(d.expenses.length?d.expenses.slice(0,12).map(x=>el('div',{class:'r'},el('span',{},x.comment,el('em',{},dmy(x.day).slice(0,5))),el('b',{class:'dx-neg'},'−'+usd0(x.amount)))):[el('div',{class:'dx-ok'},'Расходов за период нет')]),
     d.expenses.length?el('div',{class:'r'},el('span',{},'Итого расходов'),el('b',{class:'dx-neg'},'−'+usd0(t.expenses))):null);
