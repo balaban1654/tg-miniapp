@@ -804,15 +804,17 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     // Стримеры и все, у кого есть ставка в «ЗП (команда)» (админы, тимлиды, аналитики, медиабайеры)
     const staff = (await db.query(
       `SELECT id, name, login, active, role, streams FROM staff
-        WHERE ${req.query.all ? 'active' : `(role = 'streamer' OR streams OR role = 'teamlead' OR id IN (SELECT staff_id FROM team_pay WHERE amount > 0))`}
+        WHERE ${req.query.all ? 'active' : `(role = 'streamer' OR streams OR role = 'teamlead' OR id IN (SELECT staff_id FROM team_pay WHERE amount > 0) OR id IN (SELECT staff_id FROM staff_adjustments WHERE period = $1))`}
           AND deleted_at IS NULL
         ORDER BY active DESC, (role = 'streamer' OR streams) DESC, name`,
+      req.query.all ? [] : [period],
     )).rows;
     const rows = [];
     for (const s of staff) {
       const team = await teamPayFor(s, period, plan);
-      if (!req.query.all && s.role !== 'streamer' && !s.streams && !team) continue;
-      rows.push({ staff: s, kpi: withTeam(await kpiFor(s.id, period, plan), team) });
+      const k = await kpiFor(s.id, period, plan);
+      if (!req.query.all && s.role !== 'streamer' && !s.streams && !team && !k.adjBonus && !k.adjPenalty) continue;
+      rows.push({ staff: s, kpi: withTeam(k, team) });
     }
     return { plan, period, rows };
   });
@@ -1478,16 +1480,24 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     // ЗП команды (админы, тимлиды, аналитики, медиабайеры) из «ЗП (команда)»: тоже расход компании. Тимлиду не показываем
     const teamSal: { id: number; name: string; role: string; salary: number; paid: number }[] = [];
     if (!lead) {
-      const tm = (await db.query(`SELECT s.id, s.name, s.role FROM staff s JOIN team_pay p ON p.staff_id = s.id WHERE s.role IN ('admin','teamlead','analyst','buyer') AND s.deleted_at IS NULL AND (p.amount > 0 OR s.role = 'teamlead') ORDER BY s.id`)).rows as { id: number; name: string; role: string }[];
+      // Плюс бонусы и штрафы из «Бонусы и штрафы» у тех, кто не стримит (у стримящих они уже в зарплате стримера)
+      const tm = (await db.query(
+        `SELECT s.id, s.name, s.role, coalesce(s.streams, FALSE) AS streams FROM staff s LEFT JOIN team_pay p ON p.staff_id = s.id
+          WHERE s.role IN ('admin','teamlead','analyst','buyer') AND s.deleted_at IS NULL
+            AND (p.amount > 0 OR s.role = 'teamlead' OR (NOT s.streams AND EXISTS (SELECT 1 FROM staff_adjustments a WHERE a.staff_id = s.id AND a.period = ANY($1::text[]))))
+          ORDER BY s.id`,
+        [months.map((mm) => mm.m)],
+      )).rows as { id: number; name: string; role: string; streams: boolean }[];
       for (const t of tm) {
         let salary = 0;
         let paid = 0;
         for (const mm of months) {
-          const p = (await db.query('SELECT mode, amount::float AS amount FROM team_pay WHERE staff_id = $1', [t.id])).rows[0];
+          const p = (await db.query('SELECT mode, amount::float AS amount FROM team_pay WHERE staff_id = $1', [t.id])).rows[0] as { mode: string; amount: number } | undefined;
           const n = Number((await db.query(`SELECT count(*)::int AS n FROM shift_reports WHERE staff_id = $1 AND team AND status = 'approved' AND to_char(day, 'YYYY-MM') = $2`, [t.id, mm.m])).rows[0].n);
-          const base = p.mode === 'shift' ? n * p.amount : p.amount;
+          const base = !p ? 0 : p.mode === 'shift' ? n * p.amount : p.amount;
           const bonus = t.role === 'teamlead' ? (await teamleadPay(t.id, mm.m, await planFor(mm.m))).bonus : 0;
-          salary += (base + bonus) * mm.w;
+          const adj = t.streams ? 0 : Number((await db.query(`SELECT coalesce(sum(CASE WHEN kind = 'bonus' THEN amount ELSE -amount END), 0)::float AS s FROM staff_adjustments WHERE staff_id = $1 AND period = $2`, [t.id, mm.m])).rows[0].s);
+          salary += (base + bonus + adj) * mm.w;
           paid += Number((await db.query(`SELECT coalesce(sum(amount), 0)::float AS s FROM staff_payouts WHERE staff_id = $1 AND period = $2`, [t.id, mm.m])).rows[0].s) * mm.w;
         }
         if (salary > 0 || paid > 0) teamSal.push({ ...t, salary: r2(salary), paid: r2(paid) });

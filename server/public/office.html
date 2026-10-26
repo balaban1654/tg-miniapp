@@ -3129,8 +3129,10 @@ async function allStaffList(){return(await api('/staff')).filter(s=>s.active)}
 async function streamersList(){return(await api('/staff')).filter(s=>(s.role==='streamer'||s.streams)&&s.active)}
 
 async function accBonus(){
-  const [list,st,ms]=await Promise.all([api('/adjustments?period='+accState.period),streamersList(),api('/month/status?period='+accState.period)]);
-  const who=el('select',{},...st.map(s=>el('option',{value:s.id},s.name)));
+  const [list,st,ms]=await Promise.all([api('/adjustments?period='+accState.period),allStaffList(),api('/month/status?period='+accState.period)]);
+  // Все активные сотрудники: стримеры, админы, тимлиды, аналитики, медиабайеры
+  const RLB={admin:'админ',teamlead:'тимлид',analyst:'аналитик',buyer:'медиабайер'};
+  const who=el('select',{},...st.map(s=>el('option',{value:s.id},s.name+(RLB[s.role]&&!s.streams?' · '+RLB[s.role]:''))));
   const kind=el('select',{},el('option',{value:'bonus'},'Бонус'),el('option',{value:'penalty'},'Штраф'));
   const amount=el('input',{type:'number',min:'0',step:'0.01',placeholder:'Сумма, $'});
   const comment=el('input',{placeholder:'За что (видите только вы)',maxlength:'500'});
