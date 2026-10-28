@@ -7,6 +7,16 @@
 <title>Hunter AI</title>
 <link rel="icon" type="image/png" href="/img/favicon.png">
 <link rel="apple-touch-icon" href="/img/apple-touch-icon.png">
+<script>
+/* Диагностика пустого экрана: ошибки скрипта и зависшая загрузка видны клиенту текстом (старый синтаксис, чтобы работало в любом движке) */
+(function(){
+  function show(t){var r=document.getElementById('root');if(!r||r.getAttribute('data-ok'))return;r.innerHTML='<main style="padding:40px 16px;text-align:center;display:grid;gap:10px;color:#f1ebff;font:14px system-ui,sans-serif"><b style="font-size:17px">Кабинет не открылся</b><div style="opacity:.8;line-height:1.5"></div><div style="opacity:.6;font-size:12px;line-height:1.5">Обновите Telegram до последней версии. На компьютере с Windows также установите или обновите Microsoft Edge WebView2. Если не помогло, отправьте скриншот этого экрана в поддержку.</div></main>';r.querySelector('div').textContent=t}
+  window.__diag=show;
+  window.addEventListener('error',function(e){show('Ошибка: '+(e&&e.message?e.message:'скрипт не загрузился')+(e&&e.filename?' ('+String(e.filename).split('/').pop()+':'+e.lineno+')':''))});
+  window.addEventListener('unhandledrejection',function(e){var m=e&&e.reason&&e.reason.message;if(m)show('Ошибка: '+m)});
+  setTimeout(function(){var r=document.getElementById('root');if(r&&!r.getAttribute('data-ok'))show('Загрузка длится слишком долго: нет ответа от сервера или от Telegram.')},20000);
+})();
+</script>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
 @font-face{font-family:'Montserrat';font-weight:400;font-style:normal;font-display:swap;src:url('/fonts/Montserrat-Regular.woff2') format('woff2')}
@@ -243,7 +253,7 @@ svg{max-width:100%}
 </style>
 </head>
 <body>
-<div id="root"></div>
+<div id="root"><main style="padding:40px 16px;text-align:center;opacity:.7;font:14px system-ui,sans-serif;color:#f1ebff">Загрузка…</main></div>
 <script>
 const tg=window.Telegram&&window.Telegram.WebApp;
 try{tg&&tg.ready();tg&&tg.expand();tg&&tg.setHeaderColor&&tg.setHeaderColor('#0d0817');tg&&tg.setBackgroundColor&&tg.setBackgroundColor('#0d0817')}catch{}
@@ -1726,7 +1736,7 @@ function viewProfile(){
 document.addEventListener('visibilitychange',async()=>{if(!document.hidden&&me&&!me.access&&tab==='home'){try{await refreshMe();if(me.access)render()}catch{}}});
 
 (async()=>{
-  if(!tg||!tg.initData){root.replaceChildren(el('main',{style:'padding:40px 16px;text-align:center;display:grid;gap:12px'},el('div',{class:'logo',style:'margin:auto;width:48px;height:48px;font-size:20px'},'H'),el('h2',{style:'font-size:18px'},'Hunter AI'),el('p',{class:'mut'},'Откройте приложение из Telegram, через бота @hunters_aibot.')));return}
+  if(!tg||!tg.initData){root.setAttribute('data-ok','1');root.replaceChildren(el('main',{style:'padding:40px 16px;text-align:center;display:grid;gap:12px'},el('div',{class:'logo',style:'margin:auto;width:48px;height:48px;font-size:20px'},'H'),el('h2',{style:'font-size:18px'},'Hunter AI'),el('p',{class:'mut'},'Откройте приложение из Telegram, через бота @hunters_aibot.')));return}
   try{
     await refreshMe();
     // Кнопка из пуша «Оставить отзыв»: открываем вкладку «Медиа» и сразу окно отзыва
@@ -1734,8 +1744,9 @@ document.addEventListener('visibilitychange',async()=>{if(!document.hidden&&me&&
     try{const u=new URL(location.href);if(u.searchParams.get('go')==='review'){goReview=true;u.searchParams.delete('go');history.replaceState(null,'',u.pathname+u.search+u.hash)}}catch{}
     if(goReview)tab='media';
     await render();
+    root.setAttribute('data-ok','1');
     if(goReview)reviewDialog(()=>render());
-  }catch(e){root.replaceChildren(el('main',{style:'padding:40px 16px;text-align:center'},el('p',{class:'err'},e.message)))}
+  }catch(e){root.replaceChildren(el('main',{style:'padding:40px 16px;text-align:center'},el('p',{class:'err'},e.message)));root.setAttribute('data-ok','1')}
 })();
 </script>
 </body>
