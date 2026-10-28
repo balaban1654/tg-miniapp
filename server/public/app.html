@@ -14,7 +14,11 @@
   window.__diag=show;
   window.addEventListener('error',function(e){show('Ошибка: '+(e&&e.message?e.message:'скрипт не загрузился')+(e&&e.filename?' ('+String(e.filename).split('/').pop()+':'+e.lineno+')':''))});
   window.addEventListener('unhandledrejection',function(e){var m=e&&e.reason&&e.reason.message;if(m)show('Ошибка: '+m)});
-  setTimeout(function(){var r=document.getElementById('root');if(r&&!r.getAttribute('data-ok'))show('Загрузка длится слишком долго: нет ответа от сервера или от Telegram.')},20000);
+  // Что именно зависло: этап, запросы без ответа, последняя сетевая ошибка, версия движка
+  window.__dg={step:'старт',pending:{},err:''};
+  setTimeout(function(){var r=document.getElementById('root');if(!r||r.getAttribute('data-ok'))return;var d=window.__dg,p=Object.keys(d.pending);
+    var ua=(navigator.userAgent.match(/(Chrome|Edg|Safari|Firefox)\/[\d.]+/g)||[]).join(' ');
+    show('Загрузка длится слишком долго. Этап: '+d.step+(p.length?'. Нет ответа на: '+p.join(', '):'')+(d.err?'. Ошибка: '+d.err:'')+(window.Telegram&&window.Telegram.WebApp?'':'. Скрипт Telegram не загрузился')+'. '+ua)},20000);
 })();
 </script>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -285,12 +289,16 @@ function syncClock(iso,t0,t1){
 /* GET при 502/503/504 или обрыве сети повторяем несколько раз: сервер мог перезапускаться после обновления */
 async function fetchRetry(url,o,get){
   for(let i=0;;i++){
-    try{const r=await fetch(url,o);if(!get||i>=4||![502,503,504].includes(r.status))return r}
-    catch(e){if(!get||i>=4)throw e}
+    try{const r=await fetch(url,o);if(!get||i>=4||![502,503,504].includes(r.status))return r;if(window.__dg)window.__dg.err=url.split('?')[0]+': ответ '+r.status+' (попытка '+(i+1)+')'}
+    catch(e){if(window.__dg)window.__dg.err=url.split('?')[0]+': '+e.message+' (попытка '+(i+1)+')';if(!get||i>=4)throw e}
     await new Promise(res=>setTimeout(res,1500+i*1000));
   }
 }
 async function api(path,opts={}){
+  const dg=window.__dg,key=path.split('?')[0];if(dg)dg.pending[key]=1;
+  try{return await apiCall(path,opts)}catch(e){if(dg)dg.err=key+': '+e.message;throw e}finally{if(dg)delete dg.pending[key]}
+}
+async function apiCall(path,opts){
   const t0=Date.now();
   const get=!opts.method||opts.method==='GET';
   const r=await fetchRetry('/api/app'+path,{method:opts.method||'GET',headers:{'content-type':'application/json',authorization:'tma '+(tg?tg.initData:''),'x-tz':(()=>{try{return Intl.DateTimeFormat().resolvedOptions().timeZone||''}catch{return ''}})()},body:opts.body?JSON.stringify(opts.body):(opts.method&&opts.method!=='GET'?'{}':undefined)},get);
@@ -1738,7 +1746,9 @@ document.addEventListener('visibilitychange',async()=>{if(!document.hidden&&me&&
 (async()=>{
   if(!tg||!tg.initData){root.setAttribute('data-ok','1');root.replaceChildren(el('main',{style:'padding:40px 16px;text-align:center;display:grid;gap:12px'},el('div',{class:'logo',style:'margin:auto;width:48px;height:48px;font-size:20px'},'H'),el('h2',{style:'font-size:18px'},'Hunter AI'),el('p',{class:'mut'},'Откройте приложение из Telegram, через бота @hunters_aibot.')));return}
   try{
+    if(window.__dg)window.__dg.step='профиль (/me)';
     await refreshMe();
+    if(window.__dg)window.__dg.step='главный экран';
     // Кнопка из пуша «Оставить отзыв»: открываем вкладку «Медиа» и сразу окно отзыва
     let goReview=false;
     try{const u=new URL(location.href);if(u.searchParams.get('go')==='review'){goReview=true;u.searchParams.delete('go');history.replaceState(null,'',u.pathname+u.search+u.hash)}}catch{}
@@ -1746,7 +1756,12 @@ document.addEventListener('visibilitychange',async()=>{if(!document.hidden&&me&&
     await render();
     root.setAttribute('data-ok','1');
     if(goReview)reviewDialog(()=>render());
-  }catch(e){root.replaceChildren(el('main',{style:'padding:40px 16px;text-align:center'},el('p',{class:'err'},e.message)));root.setAttribute('data-ok','1')}
+  }catch(e){
+    // Сетевой сбой (запрос до сервера не дошёл): подсказываем, что проверить
+    const net=/failed to fetch|networkerror|load failed|network/i.test(e.message);
+    root.replaceChildren(el('main',{style:'padding:40px 16px;text-align:center;display:grid;gap:10px'},el('p',{class:'err'},net?'Нет связи с сервером Hunter AI ('+e.message+')':e.message),
+      net?el('p',{class:'sm',style:'opacity:.7'},'Проверьте интернет. Если включён VPN, прокси или антивирус с проверкой HTTPS, отключите их и откройте кабинет снова.'):null));
+    root.setAttribute('data-ok','1')}
 })();
 </script>
 </body>
