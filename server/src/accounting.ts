@@ -1046,14 +1046,15 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     await db.query(`UPDATE advance_requests SET status = $2, decided_by = $3, decided_at = now() WHERE id = $1`, [r.id, pay ? 'paid' : 'rejected', me.id]);
     return { ok: true };
   });
-  // Запись выплаты вручную: итоговая или дополнительная (в том числе аванс больше обычного)
+  // Запись выплаты вручную любому сотруднику: итоговая или дополнительная (в том числе аванс больше обычного)
   app.post('/payouts', { preHandler: admin }, async (req, reply) => {
     const b = (req.body ?? {}) as Record<string, any>;
     const kind = ['advance', 'final', 'extra'].includes(b.kind) ? b.kind : 'final';
     const amount = Number(b.amount);
     const sid = Number(b.staff_id);
     if (!Number.isFinite(amount) || amount <= 0 || amount > 1e6) return reply.code(400).send({ error: 'Укажите сумму выплаты' });
-    if (!(await db.query(`SELECT 1 FROM staff WHERE id = $1 AND (role = 'streamer' OR streams)`, [sid])).rowCount) return reply.code(404).send({ error: 'Стример не найден' });
+    // Любой сотрудник: стример, админ, тимлид, аналитик, медиабайер (у них ставка из «ЗП (команда)», бонусы и штрафы)
+    if (!(await db.query(`SELECT 1 FROM staff WHERE id = $1 AND deleted_at IS NULL`, [sid])).rowCount) return reply.code(404).send({ error: 'Сотрудник не найден' });
     const period = PERIOD.test(String(b.period)) ? String(b.period) : await currentPeriod();
     await db.query('INSERT INTO staff_payouts (staff_id, period, kind, amount, note, created_by) VALUES ($1,$2,$3,$4,$5,$6)', [sid, period, kind, amount, str(b.note, 300) || null, req.staff!.id]);
     return { ok: true };
