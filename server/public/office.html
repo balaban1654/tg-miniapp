@@ -339,7 +339,7 @@ textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10
 .dx-pop{position:absolute;left:0;top:0;z-index:75;background:var(--card2);border:1px solid var(--line);border-radius:14px;padding:14px;box-shadow:0 18px 44px rgba(0,0,0,.55);text-transform:none;letter-spacing:0;font-weight:400;font-size:14px;color:var(--fg);width:min(360px,calc(100vw - 32px));display:grid;gap:10px}
 .dx-pop.wide{width:min(430px,calc(100vw - 32px))}.dx-pop.top30{top:36px}
 .dx-pop label{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:13px;color:var(--mut)}.dx-pop input[type=date]{width:auto}
-.dx-live{display:flex;gap:10px;flex-wrap:wrap;padding:12px 14px;align-items:stretch}
+.dx-live{display:flex;gap:10px;flex-wrap:wrap;padding:12px 14px;align-items:stretch}.dx-more{justify-content:center;align-items:center;cursor:pointer;color:var(--acc2);font:inherit;font-weight:700;font-size:13px;border-style:dashed}.dx-more:hover{border-color:var(--acc)}
 .dx-lc{display:flex;flex-direction:column;padding:7px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg2);min-width:0}
 .dx-lc b{font-weight:600;font-size:14px}.dx-lc .t{font-size:18px;font-weight:700;color:var(--ok);display:flex;align-items:center;gap:6px}.dx-lc .t.off{color:var(--mut);font-size:14px;font-weight:500}
 .dx-nm{background:none;border:0;padding:0;color:var(--fg);font-weight:600;cursor:pointer;border-bottom:1px dashed var(--mut)}.dx-nm:hover,.dx-nm.on{color:var(--acc2);border-bottom-color:var(--acc2)}
@@ -1065,7 +1065,10 @@ function dxLive(d,skew){
   // Порядок: сначала те, кто сейчас в эфире, дальше по FTD за месяц (больше выше); админы (Николай, Богдан) всегда в конце
   const ord=s=>[s.role==='admin'?1:0,s.live?0:1,-(s.month.ftd||0)];
   const cmp=(a,b)=>{const x=ord(a),y=ord(b);for(let i=0;i<x.length;i++)if(x[i]!==y[i])return x[i]-y[i];return 0};
-  const cards=d.streamers.concat(d.adminsLive||[]).filter(s=>s.active||s.live).slice().sort(cmp).map(s=>{
+  const list=d.streamers.concat(d.adminsLive||[]).filter(s=>s.active||s.live).slice().sort(cmp);
+  // Видны 4 лучших (все, кто в эфире, видны всегда), остальные под кнопкой «Ещё»; выбор запоминается
+  const top=list.filter((s,i)=>i<4||s.live),more=list.length-top.length;
+  const cards=(dxLiveAll?list:top).map(s=>{
     const lvl=dxLvl(s.month.hoursMin,pace);
     const name=el('button',{type:'button',class:'dx-nm','aria-haspopup':'dialog'},s.name);
     if(!s.noCard)dxAttachCard(name,s,d,skew);else{name.style.cursor='default';name.style.borderBottom='0'}
@@ -1077,8 +1080,10 @@ function dxLive(d,skew){
     const link=s.live.stream_url?el('a',{class:'dx-go big',href:s.live.stream_url,target:'_blank',rel:'noopener',title:'Открыть эфир','aria-label':'Открыть эфир'},svgIcon(IC_EXT,18)):null;
     return el('div',{class:'dx-lc live'},el('div',{class:'dx-lcl'},head,time),el('div',{class:'dx-lvx'},el('span',{class:'dx-liv'},'LIVE'),link));
   });
-  return el('div',{class:'card dx-live'},...(cards.length?cards:[el('span',{class:'mut'},'Стримеров пока нет. Добавьте их в разделе «Сотрудники».')]));
+  const tog=more>0?el('button',{type:'button',class:'dx-lc dx-more','aria-expanded':String(dxLiveAll),onclick:()=>{dxLiveAll=!dxLiveAll;try{localStorage.setItem('dxLiveAll',dxLiveAll?'1':'0')}catch{}render({soft:true})}},dxLiveAll?'Свернуть ▴':'Ещё '+more+' ▾'):null;
+  return el('div',{class:'card dx-live'},...(cards.length?[...cards,tog]:[el('span',{class:'mut'},'Стримеров пока нет. Добавьте их в разделе «Сотрудники».')]));
 }
+let dxLiveAll=(()=>{try{return localStorage.getItem('dxLiveAll')==='1'}catch{return false}})();
 
 /* Карточка стримера: на компьютере по наведению, на телефоне по нажатию */
 let dxHoverT=null;
