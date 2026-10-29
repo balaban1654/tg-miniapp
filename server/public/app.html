@@ -255,49 +255,96 @@ svg{max-width:100%}
 .rv-all{display:inline-flex;align-items:center;justify-content:center;gap:6px;background:none;border:0;color:var(--acc2);font:600 13.5px var(--fb);text-decoration:underline;text-underline-offset:3px;cursor:pointer;padding:4px;justify-self:center}
 .rv-full{height:92vh;align-content:start}.rv-x{width:34px;height:34px;border-radius:50%;border:0;background:var(--card2);color:#fff;font-size:20px;cursor:pointer}
 
-/* Заставка при открытии: логотип, приветствие и процент загрузки, пока в фоне грузится кабинет */
-#splash{position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;padding:24px;text-align:center;
-  background:radial-gradient(700px 520px at 50% 34%,#2a1659 0%,#150b2b 48%,#0b0614 100%);color:#f1ebff;font-family:Montserrat,system-ui,sans-serif;transition:opacity .45s ease,visibility .45s}
+/* Заставка при открытии: как сайт-заглушка (логотип с орбитами и пульсом, текст появляется по строкам) + полоса загрузки; на 100% кнопка «Старт» */
+#splash{position:fixed;inset:0;z-index:9999;overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px 20px;
+  background:radial-gradient(900px 600px at 50% 28%,#2a1659 0%,#150b2b 45%,#0b0614 100%);color:#f1ebff;font-family:Montserrat,system-ui,sans-serif;transition:opacity .5s ease,visibility .5s}
 #splash.out{opacity:0;visibility:hidden}
-#splash .sr{position:absolute;inset:0;overflow:hidden;pointer-events:none}
-#splash .sr i{position:absolute;top:-60px;width:4px;border-radius:2px;animation:spfall linear infinite}
+#splash .sp-rain{position:fixed;inset:0;pointer-events:none;overflow:hidden}
+#splash .sp-rain i{position:absolute;top:-60px;width:5px;border-radius:2px;opacity:.5;animation:spfall linear infinite}
+#splash .sp-rain i::before{content:"";position:absolute;left:50%;top:-10px;bottom:-10px;width:1px;background:inherit;transform:translateX(-50%)}
 @keyframes spfall{to{transform:translateY(calc(100vh + 140px))}}
-#splash .lg{position:relative;width:150px;height:150px;animation:sprise .8s ease-out backwards}
-#splash .lg::before{content:'';position:absolute;inset:-60px;border-radius:50%;background:radial-gradient(circle,#9b5cff66 0%,#9b5cff22 38%,transparent 68%);animation:sppulse 3s ease-in-out infinite}
-#splash .lg img{position:absolute;inset:14px;width:122px;height:122px;border-radius:50%;object-fit:cover;border:3px solid #9b5cff;background:#000}
-#splash .lg b{position:absolute;inset:0;border-radius:50%;border:2px dashed #9b5cff66;animation:spspin 9s linear infinite}
-#splash .lg b+b{inset:-14px;border:1px solid #c9a6ff33;border-top-color:#c9a6ffaa;animation-duration:3.2s}
-@keyframes spspin{to{transform:rotate(360deg)}}
-@keyframes sppulse{50%{opacity:.55;transform:scale(1.08)}}
-@keyframes sprise{from{opacity:0;transform:translateY(18px)}}
-#splash h1{position:relative;font-weight:800;font-size:26px;line-height:1.2;margin:0;animation:sprise .8s .2s ease-out backwards}
-#splash h1 span{color:#9b5cff}
-#splash .pg{position:relative;width:min(260px,70vw);display:grid;gap:8px;animation:sprise .8s .4s ease-out backwards}
-#splash .bar{height:6px;border-radius:6px;background:#ffffff14;overflow:hidden}
-#splash .bar i{display:block;height:100%;width:0;border-radius:6px;background:linear-gradient(90deg,#6a2fe0,#9b5cff,#c9a6ff);box-shadow:0 0 12px #9b5cff99;transition:width .25s ease}
-#splash .pc{display:flex;justify-content:space-between;font-size:12px;color:#b6a9d6;font-weight:600}
+#splash .sp-logo{position:relative;width:min(460px,100%);aspect-ratio:500/340;margin-bottom:-5%;animation:sprise 1s ease-out backwards}
+#splash .sp-logo svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none}
+#splash .sp-back{z-index:1}#splash .sp-front{z-index:3}
+#splash .sp-planet{position:absolute;z-index:2;left:27%;top:50%;width:46%;aspect-ratio:1;margin-top:-23%}
+#splash .sp-core{position:absolute;inset:0;border-radius:50%;overflow:hidden;border:3px solid #9b5cff;background:#000;box-shadow:0 0 44px #9b5cff77,inset 0 0 30px #9b5cff55;animation:spglow 4s ease-in-out infinite}
+#splash .sp-core img{width:100%;height:100%;object-fit:cover;display:block;user-select:none;-webkit-user-drag:none}
+@keyframes spglow{50%{box-shadow:0 0 70px #9b5cffb0,inset 0 0 36px #9b5cff77}}
+#splash h1{position:relative;z-index:4;font-weight:800;font-size:clamp(28px,8vw,44px);line-height:1.1;letter-spacing:-.01em;margin:0}
+#splash h1 .ln{display:block}
+#splash h1 span span{color:#9b5cff}
+#splash p{position:relative;z-index:4;color:#b6a9d6;font-weight:500;font-size:14px;line-height:1.6;max-width:360px;margin:18px 0 0}
+#splash .sp-pg{position:relative;z-index:4;width:min(280px,76vw);display:grid;gap:8px;margin-top:26px}
+#splash .sp-bar{height:6px;border-radius:6px;background:#ffffff14;overflow:hidden}
+#splash .sp-bar i{display:block;height:100%;width:0;border-radius:6px;background:linear-gradient(90deg,#6a2fe0,#9b5cff,#c9a6ff);box-shadow:0 0 12px #9b5cff99;transition:width .25s ease}
+#splash .sp-pc{display:flex;justify-content:space-between;font-size:12px;color:#b6a9d6;font-weight:600}
+#splash .sp-btn{position:relative;z-index:4;display:inline-flex;align-items:center;gap:10px;margin-top:26px;padding:16px 40px;border:0;border-radius:14px;background:#9b5cff;color:#fff;font:700 16px Montserrat,system-ui,sans-serif;box-shadow:0 10px 36px #9b5cff55;cursor:pointer;transition:transform .15s,background .15s}
+#splash .sp-btn:focus{outline:none}#splash .sp-btn:focus-visible{outline:2px solid #c9a6ff;outline-offset:3px}
+#splash .sp-btn:active{transform:translateY(1px) scale(.98);background:#6a2fe0}
+#splash .sp-btn[hidden],#splash .sp-pg[hidden]{display:none}
+@keyframes sprise{from{opacity:0;transform:translateY(22px);filter:blur(6px)}}
+#splash .ln,#splash p,#splash .sp-pg,#splash .sp-btn{animation:sprise .9s cubic-bezier(.2,.7,.2,1) backwards;animation-delay:var(--d,0s)}
+#splash p{--d:1.25s}#splash .sp-pg{--d:1.6s}#splash .sp-btn{--d:0s}
 @media (prefers-reduced-motion:reduce){#splash *{animation:none!important}}
 </style>
 </head>
 <body>
 <div id="splash" role="status" aria-live="polite">
-  <div class="sr" id="sprain" aria-hidden="true"></div>
-  <div class="lg" aria-hidden="true"><b></b><b></b><img src="/img/hunter-hood.webp" alt=""></div>
-  <h1>Добро пожаловать<br>в <span>Hunter AI</span></h1>
-  <div class="pg"><div class="bar"><i id="spbar"></i></div><div class="pc"><span id="sptxt">Загружаем кабинет</span><span id="sppc">0%</span></div></div>
+  <div class="sp-rain" id="sprain" aria-hidden="true"></div>
+  <div class="sp-logo" aria-hidden="true">
+    <svg class="sp-back" id="spback" viewBox="-250 -170 500 340"></svg>
+    <div class="sp-planet"><div class="sp-core"><img src="/img/hunter-hood.webp" width="720" height="720" alt="" draggable="false"></div></div>
+    <svg class="sp-front" id="spfront" viewBox="-250 -170 500 340"></svg>
+  </div>
+  <h1><span class="ln" style="--d:.35s">Добро пожаловать</span><span class="ln" style="--d:.65s">в <span>Hunter AI</span></span></h1>
+  <p>Анализ рынка и сигналы — прямо в Telegram. Готовим ваш кабинет.</p>
+  <div class="sp-pg" id="sppg"><div class="sp-bar"><i id="spbar"></i></div><div class="sp-pc"><span id="sptxt">Загружаем кабинет</span><span id="sppc">0%</span></div></div>
+  <button type="button" class="sp-btn" id="spbtn" hidden>Старт</button>
 </div>
 <script>
-/* Процент заставки: плавно ползёт к цели текущего этапа (window.__splash(цель, текст)), в конце 100% и заставка исчезает */
+/* Заставка: орбиты и пульс вокруг логотипа (как на сайте), «дождь» свечей, процент загрузки.
+   window.__splash(цель, текст) двигает процент к цели этапа; на 100% вместо полосы появляется кнопка «Старт» */
 (function(){
-  var el=document.getElementById('splash'),bar=document.getElementById('spbar'),pc=document.getElementById('sppc'),tx=document.getElementById('sptxt'),rain=document.getElementById('sprain');
-  for(var k=0;k<14;k++){var c=document.createElement('i'),h=40+Math.random()*90;c.style.cssText='left:'+(Math.random()*100)+'%;height:'+h+'px;background:'+(Math.random()<.5?'#43b82f':'#ff3b1d')+';opacity:'+(.12+Math.random()*.25)+';animation-duration:'+(6+Math.random()*8)+'s;animation-delay:-'+(Math.random()*10)+'s';rain.appendChild(c)}
+  var el=document.getElementById('splash'),NS='http://www.w3.org/2000/svg',still=matchMedia('(prefers-reduced-motion:reduce)').matches;
+  var back=document.getElementById('spback'),front=document.getElementById('spfront');
+  function mk(tag,attrs,parent){var n=document.createElementNS(NS,tag);for(var k in attrs)n.setAttribute(k,attrs[k]);if(parent)parent.appendChild(n);return n}
+  var ORB=[{rx:215,ry:66,tilt:-14,sp:.11},{rx:178,ry:50,tilt:23,sp:-.07}];
+  [[back,'b',-300],[front,'f',0]].forEach(function(L){
+    var defs=mk('defs',{},L[0]);var cp=mk('clipPath',{id:'spc'+L[1],clipPathUnits:'userSpaceOnUse'},defs);
+    mk('rect',{x:-400,y:L[2],width:800,height:300},cp);
+    L[0]._orbs=ORB.map(function(o){
+      var g=mk('g',{transform:'rotate('+o.tilt+')'},L[0]);var c=mk('g',{'clip-path':'url(#spc'+L[1]+')'},g);
+      mk('ellipse',{rx:o.rx,ry:o.ry,fill:'none',stroke:'#9b5cff',opacity:.4,'stroke-width':1.2},c);
+      var gl=mk('ellipse',{rx:o.rx,ry:o.ry,fill:'none',stroke:'#d9bfff','stroke-width':2.4,'stroke-linecap':'round',pathLength:100,'stroke-dasharray':'14 86',opacity:.9},c);
+      var dot=mk('circle',{r:4.5,fill:'#e6d4ff'},c);dot.style.filter='drop-shadow(0 0 6px #b98cff)';
+      return{gl:gl,dot:dot,o:o};
+    });
+  });
+  var pulses=[0,1].map(function(){return mk('circle',{cx:0,cy:0,fill:'none',stroke:'#b98cff'},back)});
+  var a0=performance.now();
+  function frame(now){
+    if(!el.parentNode)return;var t=(now-a0)/1000;
+    [back,front].forEach(function(S){S._orbs.forEach(function(it){var a=t*it.o.sp*Math.PI*2;
+      it.dot.setAttribute('cx',(it.o.rx*Math.cos(a)).toFixed(2));it.dot.setAttribute('cy',(it.o.ry*Math.sin(a)).toFixed(2));
+      it.gl.setAttribute('stroke-dashoffset',(-(t*it.o.sp*100)%100).toFixed(2))})});
+    pulses.forEach(function(c,i){var p=((t/3.6)+i*.5)%1;c.setAttribute('r',(106+78*p).toFixed(1));c.setAttribute('stroke-opacity',(.6*Math.pow(1-p,1.6)).toFixed(3));c.setAttribute('stroke-width',(2.4-1.4*p).toFixed(2))});
+    if(!still)requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+  var rain=document.getElementById('sprain');
+  if(!still)for(var k=0;k<26;k++){var c=document.createElement('i'),h=14+Math.random()*34;c.style.cssText='left:'+(Math.random()*100)+'%;height:'+h+'px;background:'+(Math.random()<.5?'#43b82f':'#ff3b1d')+';opacity:'+(.15+Math.random()*.3)+';animation-duration:'+(14+Math.random()*18)+'s;animation-delay:-'+(Math.random()*30)+'s';rain.appendChild(c)}
+  // Процент: плавно ползёт к цели этапа; полоса появляется после текста (1,6 с), кнопка не раньше, чем доиграет анимация
+  var bar=document.getElementById('spbar'),pc=document.getElementById('sppc'),tx=document.getElementById('sptxt'),pg=document.getElementById('sppg'),btn=document.getElementById('spbtn');
   var cur=0,target=15,t0=Date.now(),done=false;
-  function tick(){if(!el.parentNode)return;var cap=done?100:target;cur+=Math.max(.4,(cap-cur)*(done?.35:.06));if(cur>cap)cur=cap;if(!done&&cur>cap-1)cur=Math.min(cap-1,cur);
+  function hide(){el.classList.add('out');setTimeout(function(){el.parentNode&&el.parentNode.removeChild(el)},550)}
+  btn.addEventListener('click',hide);
+  function tick(){if(!el.parentNode)return;var cap=done?100:target;cur+=Math.max(.4,(cap-cur)*(done?.3:.06));if(cur>cap)cur=cap;if(!done)cur=Math.min(cap-1,cur);
     bar.style.width=cur.toFixed(1)+'%';pc.textContent=Math.floor(cur)+'%';
-    if(done&&cur>=99.9){pc.textContent='100%';setTimeout(function(){el.classList.add('out');setTimeout(function(){el.parentNode&&el.parentNode.removeChild(el)},500)},Math.max(150,900-(Date.now()-t0)));return}
+    if(done&&cur>=99.9){pc.textContent='100%';tx.textContent='Готово';
+      setTimeout(function(){pg.hidden=true;btn.hidden=false},Math.max(250,2300-(Date.now()-t0)));return}
     setTimeout(tick,40)}
   tick();
-  window.__splash=function(p,t){if(p>=100){done=true;tx.textContent='Готово';return}if(p>target)target=p;if(t)tx.textContent=t};
+  window.__splash=function(p,t){if(p>=100){done=true;return}if(p>target)target=p;if(t)tx.textContent=t};
   window.__splashHide=function(){done=true;el.parentNode&&el.parentNode.removeChild(el)};
 })();
 </script>
