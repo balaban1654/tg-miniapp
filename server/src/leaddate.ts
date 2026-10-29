@@ -31,3 +31,6 @@ export const funnelStage = (a: string): string =>
 /** Дата для этапа: FTD и активный по дате первого FTD (как в KPI), остальные по дате прихода */
 export const funnelStageDate = (a: string): string =>
   `(CASE WHEN ${funnelStage(a)} IN ('ftd','active') THEN (SELECT min(e.created_at) FROM events e WHERE e.tg_id = ${a}.tg_id AND e.type = 'ftd') ELSE ${a}.created_at END)`;
+/** «Отвал» в статистике: заблокировал бота (статус «Отвал») после первого депозита, то есть был FTD или активным.
+ *  Новые и регистрации, заблокировавшие бота, сюда не входят и остаются на своём этапе */
+export const churnedAfterFtd = (a: string): string => `(${a}.status = 'churned' AND ${funnelStage(a)} IN ('ftd','active'))`;

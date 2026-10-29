@@ -1694,7 +1694,7 @@ function smLeads(d){
   const pc=v=>v===null?'—':v.toFixed(1).replace('.',',')+'%';
   return el('div',{class:'card',style:'display:grid;gap:12px'},el('div',{class:'dx-lbl'},'Мои лиды по статусам'),
     el('div',{class:'dx-seg2',style:'height:30px',role:'img','aria-label':Object.keys(DXS).filter(k=>b[k]).map(k=>DXS[k][0]+' '+b[k]).join(', ')},...(segs.length?segs:[el('span',{style:'flex:1;background:#ffffff1a;color:var(--mut)'},'Лидов за период нет')])),
-    el('div',{class:'dx-row',style:'flex-wrap:wrap;gap:8px 18px;justify-content:space-between'},el('span',{},'Всего лидов ',el('b',{},String(total))),el('span',{},'RTD ',el('b',{},pc(f.regs?f.ftd/f.regs*100:null))),el('span',{},'Отвал ',el('b',{},pc(total?(b.churned||0)/total*100:null)))));
+    el('div',{class:'dx-row',style:'flex-wrap:wrap;gap:8px 18px;justify-content:space-between'},el('span',{},'Всего лидов ',el('b',{},String(total))),el('span',{},'RTD ',el('b',{},pc(f.regs?f.ftd/f.regs*100:null))),el('span',{title:'Доля ушедших из FTD: заблокировали бота после первого депозита'},'Отвал ',el('b',{},pc((b.ftd||0)+(b.active||0)+(b.churned||0)?(b.churned||0)/((b.ftd||0)+(b.active||0)+(b.churned||0))*100:null)))));
 }
 function smSalary(d){
   const s=d.salary,tot=i=>s.base[i]+s.leads[i]+s.ftdBonus+s.dayBonus+(s.depBonus||0)+s.bonus-s.penalty,pay=[tot(0)-s.paid,tot(1)-s.paid];
