@@ -13,7 +13,7 @@ const sha256 = (v: string) => createHash('sha256').update(v).digest('hex');
 import { accountingRoutes } from './accounting.js';
 import { monoRoutes } from './mono.js';
 import { mainMediaTeam } from './mediaTeams.js';
-import { leadStatusDate, leadListDate } from './leaddate.js';
+import { leadStatusDate, leadListDate, funnelStage, funnelStageDate } from './leaddate.js';
 import { connectRoutes, connectInfo, requiredFor, TOL } from './connect.js';
 import { toVoice, toVideoNote } from './media.js';
 import { parseReviewPhoto, cleanReviewText, cleanRating } from './reviews.js';
@@ -386,8 +386,8 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     }
     const TZ = 'Europe/Kyiv';
     const leads = await db.query(
-      `SELECT coalesce(d.status_before_block, d.status) AS status, count(*)::int AS n FROM leads d WHERE d.lead_role = 'lead' AND ${ownerScope(me, 'd.owner_id')}
-         ${range ? `AND (${leadStatusDate('d', true)} AT TIME ZONE '${TZ}')::date BETWEEN $1::date AND $2::date` : ''} GROUP BY 1`,
+      `SELECT ${funnelStage('d')} AS status, count(*)::int AS n FROM leads d WHERE d.lead_role = 'lead' AND ${ownerScope(me, 'd.owner_id')}
+         ${range ? `AND (${funnelStageDate('d')} AT TIME ZONE '${TZ}')::date BETWEEN $1::date AND $2::date` : ''} GROUP BY 1`,
       (range ?? []) as string[],
     );
     // Отвал отдельным показателем: лиды, пришедшие за период, со статусом «Отвал» сейчас (в том числе заблокировавшие бота)

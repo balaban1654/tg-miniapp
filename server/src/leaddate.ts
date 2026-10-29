@@ -21,3 +21,13 @@ export const leadListDate = (a: string): string =>
          WHEN coalesce(${a}.status_before_block, ${a}.status) = 'registered'
          THEN coalesce((SELECT min(e.created_at) FROM events e WHERE e.tg_id = ${a}.tg_id AND e.type = 'reg'), ${a}.created_at)
          ELSE ${a}.created_at END)`;
+
+/** Этап лида для полосы «Лиды по статусам»: лид с событием FTD (первым депозитом) считается FTD, даже если его статус остался
+ *  «Регистрация» (депозит меньше минимума для доступа) или он в «Отвале» из-за блокировки бота. Так полоса сходится со счётчиком FTD */
+export const funnelStage = (a: string): string =>
+  `(CASE WHEN coalesce(${a}.status_before_block, ${a}.status) = 'active' THEN 'active'
+         WHEN coalesce(${a}.status_before_block, ${a}.status) = 'ftd' OR EXISTS (SELECT 1 FROM events e WHERE e.tg_id = ${a}.tg_id AND e.type = 'ftd') THEN 'ftd'
+         ELSE coalesce(${a}.status_before_block, ${a}.status) END)`;
+/** Дата для этапа: FTD и активный по дате первого FTD (как в KPI), остальные по дате прихода */
+export const funnelStageDate = (a: string): string =>
+  `(CASE WHEN ${funnelStage(a)} IN ('ftd','active') THEN (SELECT min(e.created_at) FROM events e WHERE e.tg_id = ${a}.tg_id AND e.type = 'ftd') ELSE ${a}.created_at END)`;
