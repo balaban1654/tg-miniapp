@@ -921,3 +921,6 @@ ALTER TABLE signal_gifs DROP CONSTRAINT IF EXISTS signal_gifs_kind_check;
 ALTER TABLE signal_gifs ADD CONSTRAINT signal_gifs_kind_check CHECK (kind IN ('win','loss','skip'));
 ALTER TABLE signals DROP CONSTRAINT IF EXISTS signals_gif_kind_check;
 ALTER TABLE signals ADD CONSTRAINT signals_gif_kind_check CHECK (gif_kind IN ('win','loss','skip'));
+
+-- Откуда пришёл лид без ссылки стримера: 'site' — кнопка «Открыть бота» на сайте (иначе органика miniapp-org)
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS origin TEXT;

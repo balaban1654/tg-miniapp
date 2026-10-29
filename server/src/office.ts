@@ -2309,7 +2309,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
       `SELECT d.tg_id, d.username, d.first_name, d.status, d.access, d.trader_id, d.is_tester, d.lead_role, d.region, d.tz,
               d.created_at, d.last_seen_at, d.bot_started, d.bot_blocked, d.owner_id, d.banned_at, d.ban_reason,
               (SELECT name FROM staff WHERE id = d.banned_by) AS banned_by_name,
-              o.name AS owner_name, l.slug AS link_slug, l.source AS link_source, l.campaign AS link_campaign
+              o.name AS owner_name, l.slug AS link_slug, l.source AS link_source, l.campaign AS link_campaign, d.origin
          FROM leads d LEFT JOIN staff o ON o.id = d.owner_id LEFT JOIN links l ON l.id = d.link_id
         WHERE d.tg_id = $1 AND (${ownerScope(me, 'd.owner_id')} OR ${chatScope(me, 'd.owner_id')})`,
       [tgId],
@@ -2407,7 +2407,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     }
     const DT = depTypes(me);
     const r = await db.query(
-      `SELECT d.tg_id, d.trader_id, d.is_tester, d.lead_role, d.username, d.first_name, d.status, d.access, d.created_at, d.owner_id, (d.banned_at IS NOT NULL) AS banned, ${leadListDate('d')} AS status_at,
+      `SELECT d.tg_id, d.trader_id, d.is_tester, d.lead_role, d.origin, d.username, d.first_name, d.status, d.access, d.created_at, d.owner_id, (d.banned_at IS NOT NULL) AS banned, ${leadListDate('d')} AS status_at,
               s.name AS owner_name, coalesce(l.slug, (SELECT slug FROM links WHERE owner_id = d.owner_id ORDER BY id LIMIT 1)) AS link_slug,
               (SELECT amount FROM events e WHERE e.tg_id = d.tg_id AND e.type = 'ftd' ORDER BY e.created_at, e.id LIMIT 1) AS ftd_amount,
               coalesce((SELECT sum(amount) FROM events e WHERE e.tg_id = d.tg_id AND e.type IN ${DT}),0) AS deposits,
@@ -2427,9 +2427,9 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
         [config.adminLogin ?? ''],
       )
     ).rows[0];
-    // Лид без ссылки пришёл сам (поиск по нику в Telegram, сайт-заглушка): органический трафик, метка miniapp-org
+    // Лид без ссылки пришёл сам: с кнопки на сайте — метка site, иначе (поиск по нику в Telegram) органика miniapp-org
     return r.rows.map((x) =>
-      x.lead_role && x.lead_role !== 'lead' ? { ...x, deposits: 0, commission: 0, owner_id: main?.id ?? x.owner_id, owner_name: main?.name ?? x.owner_name, link_slug: main?.slug ?? x.link_slug } : x.link_slug ? x : { ...x, link_slug: 'miniapp-org' },
+      x.lead_role && x.lead_role !== 'lead' ? { ...x, deposits: 0, commission: 0, owner_id: main?.id ?? x.owner_id, owner_name: main?.name ?? x.owner_name, link_slug: main?.slug ?? x.link_slug } : x.link_slug ? x : { ...x, link_slug: x.origin || 'miniapp-org' },
     );
   });
 

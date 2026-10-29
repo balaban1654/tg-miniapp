@@ -30,7 +30,9 @@ bot.command('start', async (ctx) => {
   if (!from) return;
   const payload = (ctx.match ?? '').trim();
   const slug = parseStartPayload(payload);
-  const { lead } = await attachLead(from.id, from.username, from.first_name, slug);
+  const { lead, isNew } = await attachLead(from.id, from.username, from.first_name, slug);
+  // Новый лид с кнопки «Открыть бота» на сайте (?start=site): метка «site» вместо органики
+  if (isNew && payload === 'site') await db.query(`UPDATE leads SET origin = 'site' WHERE tg_id = $1 AND link_id IS NULL`, [from.id]);
 
   // Заблокированный лид: воронки нет, только сообщение (написать в поддержку он может)
   if (await isBanned(from.id) && payload !== 'support') {
