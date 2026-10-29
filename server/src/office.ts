@@ -2416,9 +2416,10 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
          LEFT JOIN staff s ON s.id = d.owner_id
          LEFT JOIN links l ON l.id = d.link_id
         WHERE d.removed_at IS NULL AND ${ownerScope(me, 'd.owner_id')}${me.role === 'admin' ? '' : " AND coalesce(d.lead_role, 'lead') = 'lead'"}${extra}
-        ORDER BY ${leadListDate('d')} DESC LIMIT 300`,
+        ORDER BY (coalesce(d.lead_role, 'lead') <> 'lead') DESC, ${leadListDate('d')} DESC LIMIT 3000`,
       vals,
     );
+    // Сотрудники (админ состав) идут первыми, чтобы предел строк их никогда не отрезал; лидов за период до 3000
     // Сотрудники в списке лидов: владелец и ссылка у них общие (создатель компании), деньги и результаты нулевые
     const main = (
       await db.query(
