@@ -255,10 +255,11 @@ svg{max-width:100%}
 .rv-all{display:inline-flex;align-items:center;justify-content:center;gap:6px;background:none;border:0;color:var(--acc2);font:600 13.5px var(--fb);text-decoration:underline;text-underline-offset:3px;cursor:pointer;padding:4px;justify-self:center}
 .rv-full{height:92vh;align-content:start}.rv-x{width:34px;height:34px;border-radius:50%;border:0;background:var(--card2);color:#fff;font-size:20px;cursor:pointer}
 
-/* Заставка при открытии: как сайт-заглушка (логотип с орбитами и пульсом, текст появляется по строкам) + полоса загрузки; на 100% кнопка «Старт» */
-#splash{position:fixed;inset:0;z-index:9999;overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px 20px;
+/* Заставка при открытии: как сайт-заглушка (логотип с орбитами и пульсом, текст появляется по строкам) + полоса загрузки; после 100% открывается кабинет */
+#splash{position:fixed;inset:0;z-index:9999;overflow-y:auto;overflow-x:hidden;display:flex;text-align:center;padding:24px 20px;
   background:radial-gradient(900px 600px at 50% 28%,#2a1659 0%,#150b2b 45%,#0b0614 100%);color:#f1ebff;font-family:Montserrat,system-ui,sans-serif;transition:opacity .5s ease,visibility .5s}
 #splash.out{opacity:0;visibility:hidden}
+#splash .sp-in{margin:auto;width:100%;display:flex;flex-direction:column;align-items:center;justify-content:center}
 #splash .sp-rain{position:fixed;inset:0;pointer-events:none;overflow:hidden}
 #splash .sp-rain i{position:absolute;top:-60px;width:5px;border-radius:2px;opacity:.5;animation:spfall linear infinite}
 #splash .sp-rain i::before{content:"";position:absolute;left:50%;top:-10px;bottom:-10px;width:1px;background:inherit;transform:translateX(-50%)}
@@ -278,19 +279,17 @@ svg{max-width:100%}
 #splash .sp-bar{height:6px;border-radius:6px;background:#ffffff14;overflow:hidden}
 #splash .sp-bar i{display:block;height:100%;width:0;border-radius:6px;background:linear-gradient(90deg,#6a2fe0,#9b5cff,#c9a6ff);box-shadow:0 0 12px #9b5cff99;transition:width .25s ease}
 #splash .sp-pc{display:flex;justify-content:space-between;font-size:12px;color:#b6a9d6;font-weight:600}
-#splash .sp-btn{position:relative;z-index:4;display:inline-flex;align-items:center;gap:10px;margin-top:26px;padding:16px 40px;border:0;border-radius:14px;background:#9b5cff;color:#fff;font:700 16px Montserrat,system-ui,sans-serif;box-shadow:0 10px 36px #9b5cff55;cursor:pointer;transition:transform .15s,background .15s}
-#splash .sp-btn:focus{outline:none}#splash .sp-btn:focus-visible{outline:2px solid #c9a6ff;outline-offset:3px}
-#splash .sp-btn:active{transform:translateY(1px) scale(.98);background:#6a2fe0}
-#splash .sp-btn[hidden],#splash .sp-pg[hidden]{display:none}
+#splash .sp-pg[hidden]{display:none}
 @keyframes sprise{from{opacity:0;transform:translateY(22px);filter:blur(6px)}}
-#splash .ln,#splash p,#splash .sp-pg,#splash .sp-btn{animation:sprise .9s cubic-bezier(.2,.7,.2,1) backwards;animation-delay:var(--d,0s)}
-#splash p{--d:1.25s}#splash .sp-pg{--d:1.6s}#splash .sp-btn{--d:0s}
+#splash .ln,#splash p,#splash .sp-pg{animation:sprise .9s cubic-bezier(.2,.7,.2,1) backwards;animation-delay:var(--d,0s)}
+#splash p{--d:1.25s}#splash .sp-pg{--d:1.6s}
 @media (prefers-reduced-motion:reduce){#splash *{animation:none!important}}
 </style>
 </head>
 <body>
 <div id="splash" role="status" aria-live="polite">
   <div class="sp-rain" id="sprain" aria-hidden="true"></div>
+  <div class="sp-in">
   <div class="sp-logo" aria-hidden="true">
     <svg class="sp-back" id="spback" viewBox="-250 -170 500 340"></svg>
     <div class="sp-planet"><div class="sp-core"><img src="/img/hunter-hood.webp" width="720" height="720" alt="" draggable="false"></div></div>
@@ -299,11 +298,11 @@ svg{max-width:100%}
   <h1><span class="ln" style="--d:.35s">Добро пожаловать</span><span class="ln" style="--d:.65s">в <span>Hunter AI</span></span></h1>
   <p>Анализ рынка и сигналы — прямо в Telegram. Готовим ваш кабинет.</p>
   <div class="sp-pg" id="sppg"><div class="sp-bar"><i id="spbar"></i></div><div class="sp-pc"><span id="sptxt">Запускаем Hunter AI</span><span id="sppc">0%</span></div></div>
-  <button type="button" class="sp-btn" id="spbtn" hidden>Старт</button>
+  </div>
 </div>
 <script>
 /* Заставка: орбиты и пульс вокруг логотипа (как на сайте), «дождь» свечей, процент загрузки.
-   window.__splash(цель, текст) двигает процент к цели этапа; на 100% вместо полосы появляется кнопка «Старт» */
+   window.__splash(цель, текст) двигает процент к цели этапа; на 100% через секунду заставка исчезает и открывается кабинет */
 (function(){
   var el=document.getElementById('splash'),NS='http://www.w3.org/2000/svg',still=matchMedia('(prefers-reduced-motion:reduce)').matches;
   var back=document.getElementById('spback'),front=document.getElementById('spfront');
@@ -334,17 +333,16 @@ svg{max-width:100%}
   var rain=document.getElementById('sprain');
   if(!still)for(var k=0;k<26;k++){var c=document.createElement('i'),h=14+Math.random()*34;c.style.cssText='left:'+(Math.random()*100)+'%;height:'+h+'px;background:'+(Math.random()<.5?'#43b82f':'#ff3b1d')+';opacity:'+(.15+Math.random()*.3)+';animation-duration:'+(14+Math.random()*18)+'s;animation-delay:-'+(Math.random()*30)+'s';rain.appendChild(c)}
   // Процент: плавно ползёт к цели этапа; полоса появляется после текста (1,6 с), кнопка не раньше, чем доиграет анимация
-  var bar=document.getElementById('spbar'),pc=document.getElementById('sppc'),tx=document.getElementById('sptxt'),pg=document.getElementById('sppg'),btn=document.getElementById('spbtn');
+  var bar=document.getElementById('spbar'),pc=document.getElementById('sppc'),tx=document.getElementById('sptxt'),pg=document.getElementById('sppg');
   var cur=0,target=15,t0=Date.now(),done=false;
   function hide(){el.classList.add('out');setTimeout(function(){el.parentNode&&el.parentNode.removeChild(el)},550)}
-  btn.addEventListener('click',hide);
-  // Полоса появляется на 1,6 с и заполняется не быстрее чем за 3 с, даже если всё загрузилось сразу; на 100% держится 0,8 с, потом «Старт»
+  // Полоса появляется на 1,6 с и заполняется не быстрее чем за 3 с, даже если всё загрузилось сразу; на 100% «Готово» держится 1 с, потом заставка сама исчезает
   var SHOW=1600,FILL=3000;
   function tick(){if(!el.parentNode)return;var cap=done?100:target,ceil=Math.max(0,(Date.now()-t0-SHOW)/FILL*100);cap=Math.min(cap,ceil);
     cur+=Math.max(.3,(cap-cur)*(done?.25:.06));if(cur>cap)cur=cap;if(!done)cur=Math.min(target-1,cur);
     bar.style.width=cur.toFixed(1)+'%';pc.textContent=Math.floor(cur)+'%';
     if(done&&cur>=99.9){pc.textContent='100%';tx.textContent='Готово';
-      setTimeout(function(){pg.hidden=true;btn.hidden=false},800);return}
+      setTimeout(hide,1000);return}
     setTimeout(tick,40)}
   tick();
   window.__splash=function(p,t){if(p>=100){done=true;return}if(p>target)target=p;if(t)tx.textContent=t};
