@@ -298,7 +298,7 @@ svg{max-width:100%}
   </div>
   <h1><span class="ln" style="--d:.35s">Добро пожаловать</span><span class="ln" style="--d:.65s">в <span>Hunter AI</span></span></h1>
   <p>Анализ рынка и сигналы — прямо в Telegram. Готовим ваш кабинет.</p>
-  <div class="sp-pg" id="sppg"><div class="sp-bar"><i id="spbar"></i></div><div class="sp-pc"><span id="sptxt">Загружаем кабинет</span><span id="sppc">0%</span></div></div>
+  <div class="sp-pg" id="sppg"><div class="sp-bar"><i id="spbar"></i></div><div class="sp-pc"><span id="sptxt">Запускаем Hunter AI</span><span id="sppc">0%</span></div></div>
   <button type="button" class="sp-btn" id="spbtn" hidden>Старт</button>
 </div>
 <script>
@@ -354,7 +354,7 @@ svg{max-width:100%}
 <div id="root"><main style="padding:40px 16px;text-align:center;opacity:.7;font:14px system-ui,sans-serif;color:#f1ebff">Загрузка…</main></div>
 <script>
 const tg=window.Telegram&&window.Telegram.WebApp;
-if(window.__splash)window.__splash(30,'Подключаемся');
+if(window.__splash)window.__splash(30,'Запускаем Hunter AI');
 try{tg&&tg.ready();tg&&tg.expand();tg&&tg.setHeaderColor&&tg.setHeaderColor('#0d0817');tg&&tg.setBackgroundColor&&tg.setBackgroundColor('#0d0817')}catch{}
 const $=s=>document.querySelector(s);
 const root=$('#root');
@@ -1842,10 +1842,10 @@ document.addEventListener('visibilitychange',async()=>{if(!document.hidden&&me&&
   if(!tg||!tg.initData){root.setAttribute('data-ok','1');if(window.__splashHide)window.__splashHide();root.replaceChildren(el('main',{style:'padding:40px 16px;text-align:center;display:grid;gap:12px'},el('div',{class:'logo',style:'margin:auto;width:48px;height:48px;font-size:20px'},'H'),el('h2',{style:'font-size:18px'},'Hunter AI'),el('p',{class:'mut'},'Откройте приложение из Telegram, через бота @hunters_aibot.')));return}
   try{
     if(window.__dg)window.__dg.step='профиль (/me)';
-    if(window.__splash)window.__splash(55,'Загружаем профиль');
+    if(window.__splash)window.__splash(55,'Подключаем ИИ-ассистента');
     await refreshMe();
     if(window.__dg)window.__dg.step='главный экран';
-    if(window.__splash)window.__splash(92,'Загружаем сигналы');
+    if(window.__splash)window.__splash(92,'Открываем личный кабинет');
     // Кнопка из пуша «Оставить отзыв»: открываем вкладку «Медиа» и сразу окно отзыва
     let goReview=false;
     try{const u=new URL(location.href);if(u.searchParams.get('go')==='review'){goReview=true;u.searchParams.delete('go');history.replaceState(null,'',u.pathname+u.search+u.hash)}}catch{}
