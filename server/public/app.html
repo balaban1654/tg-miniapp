@@ -341,11 +341,13 @@ svg{max-width:100%}
   function tick(){if(!el.parentNode)return;var cap=done?100:target,ceil=Math.max(0,(Date.now()-t0-SHOW)/FILL*100);cap=Math.min(cap,ceil);
     cur+=Math.max(.3,(cap-cur)*(done?.25:.06));if(cur>cap)cur=cap;if(!done)cur=Math.min(target-1,cur);
     bar.style.width=cur.toFixed(1)+'%';pc.textContent=Math.floor(cur)+'%';
+    // Подпись идёт по проценту полосы, чтобы каждую было видно: до 33% — запуск, до 66% — ИИ-ассистент, дальше — кабинет
+    if(cur<99.9)tx.textContent=cur<33?'Запускаем Hunter AI':cur<66?'Подключаем ИИ-ассистента':'Открываем личный кабинет';
     if(done&&cur>=99.9){pc.textContent='100%';tx.textContent='Готово';
       setTimeout(hide,1000);return}
     setTimeout(tick,40)}
   tick();
-  window.__splash=function(p,t){if(p>=100){done=true;return}if(p>target)target=p;if(t)tx.textContent=t};
+  window.__splash=function(p){if(p>=100){done=true;return}if(p>target)target=p};
   window.__splashHide=function(){done=true;el.parentNode&&el.parentNode.removeChild(el)};
 })();
 </script>
