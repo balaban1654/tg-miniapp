@@ -338,10 +338,13 @@ svg{max-width:100%}
   var cur=0,target=15,t0=Date.now(),done=false;
   function hide(){el.classList.add('out');setTimeout(function(){el.parentNode&&el.parentNode.removeChild(el)},550)}
   btn.addEventListener('click',hide);
-  function tick(){if(!el.parentNode)return;var cap=done?100:target;cur+=Math.max(.4,(cap-cur)*(done?.3:.06));if(cur>cap)cur=cap;if(!done)cur=Math.min(cap-1,cur);
+  // Полоса появляется на 1,6 с и заполняется не быстрее чем за 3 с, даже если всё загрузилось сразу; на 100% держится 0,8 с, потом «Старт»
+  var SHOW=1600,FILL=3000;
+  function tick(){if(!el.parentNode)return;var cap=done?100:target,ceil=Math.max(0,(Date.now()-t0-SHOW)/FILL*100);cap=Math.min(cap,ceil);
+    cur+=Math.max(.3,(cap-cur)*(done?.25:.06));if(cur>cap)cur=cap;if(!done)cur=Math.min(target-1,cur);
     bar.style.width=cur.toFixed(1)+'%';pc.textContent=Math.floor(cur)+'%';
     if(done&&cur>=99.9){pc.textContent='100%';tx.textContent='Готово';
-      setTimeout(function(){pg.hidden=true;btn.hidden=false},Math.max(250,2300-(Date.now()-t0)));return}
+      setTimeout(function(){pg.hidden=true;btn.hidden=false},800);return}
     setTimeout(tick,40)}
   tick();
   window.__splash=function(p,t){if(p>=100){done=true;return}if(p>target)target=p;if(t)tx.textContent=t};
