@@ -1590,7 +1590,8 @@ function reviewDialog(done){
 /** Длинный текст сворачивается до 4 строк, кнопка «Читать далее» появляется только если текст не поместился */
 function clampBody(text,cls,style,tail){
   // tail: ссылка в конце текста (например «…читать продолжение»): в свёрнутом виде обрезается вместе с текстом
-  const body=el('div',{class:(cls||'')+' clamp',style:style||''},text,tail?' ':null,tail||null);
+  // Хвост идёт вплотную к тексту: точки в конце текста убираем, у хвоста свои «...» («просто... читать продолжение»)
+  const body=el('div',{class:(cls||'')+' clamp',style:style||''},tail?String(text).replace(/\s*(\.+|…)\s*$/,''):text,tail||null);
   const btn=el('button',{type:'button',class:'rd-more',hidden:''},'Читать далее');
   let open=false;
   btn.onclick=()=>{open=!open;body.classList.toggle('clamp',!open);btn.textContent=open?'Свернуть':'Читать далее'};
@@ -1632,7 +1633,7 @@ async function reviewsBlock(){
 function newsBlock(items){
   if(!items.length)return el('div',{class:'card',style:'display:grid;gap:6px'},el('b',{style:'font-size:14px'},'Скоро здесь появятся новости'),el('div',{class:'sm',style:'line-height:1.5'},'Обновления тренажёра, итоги недели, новые трейдеры и важные объявления команды. Заглядывайте сюда почаще, чтобы ничего не пропустить.'));
   const dt=v=>new Date(v).toLocaleDateString('ru-RU',{day:'numeric',month:'long',year:'numeric'}).replace(/\s*г\.?$/,'');
-  return el('div',{style:'display:grid;gap:10px'},items.map(n=>el('div',{class:'card',style:'display:grid;gap:6px'},el('div',{class:'sm'},dt(n.created_at)),el('b',{style:'font-size:14.5px'},n.title),clampBody(n.body,'','white-space:pre-wrap;line-height:1.5;font-size:13.5px;word-break:break-word',n.url?el('a',{href:n.url,class:'nw-more',onclick:e=>{e.preventDefault();openLink(n.url)}},'…читать продолжение'):null))));
+  return el('div',{style:'display:grid;gap:10px'},items.map(n=>el('div',{class:'card',style:'display:grid;gap:6px'},el('div',{class:'sm'},dt(n.created_at)),el('b',{style:'font-size:14.5px'},n.title),clampBody(n.body,'','white-space:pre-wrap;line-height:1.5;font-size:13.5px;word-break:break-word',n.url?el('a',{href:n.url,class:'nw-more',onclick:e=>{e.preventDefault();openLink(n.url)}},'... читать продолжение'):null))));
 }
 async function viewMedia(){
   if(!me)await refreshMe();
