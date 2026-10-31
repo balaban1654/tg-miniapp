@@ -528,8 +528,11 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     if ('error' in cf) return reply.code(400).send({ error: cf.error });
     for (const [k, v] of Object.entries(cf.cols)) add(k, v);
     if (b.tg_username !== undefined) {
-      const u = str(b.tg_username, 40).replace(/^@/, '');
-      if (u && !/^[A-Za-z][A-Za-z0-9_]{3,31}$/.test(u)) return reply.code(400).send({ error: 'Telegram: юзернейм без ссылки, например daria_manager' });
+      // Можно вставить ник (@daria_manager) или ссылку (https://t.me/daria_manager, t.me/daria_manager?..., tg://resolve?domain=...): храним ник
+      const raw = str(b.tg_username, 200).trim();
+      const m = /^(?:https?:\/\/)?(?:www\.)?(?:t\.me|telegram\.me|telegram\.dog)\/([A-Za-z0-9_]+)/i.exec(raw) ?? /^tg:\/\/resolve\?domain=([A-Za-z0-9_]+)/i.exec(raw);
+      const u = (m ? m[1] : raw).replace(/^@/, '');
+      if (u && !/^[A-Za-z][A-Za-z0-9_]{3,31}$/.test(u)) return reply.code(400).send({ error: 'Telegram менеджера: вставьте ссылку https://t.me/ник или ник, например daria_manager' });
       add('tg_username', u || null);
     }
     if (b.live_channel !== undefined) {

@@ -2122,7 +2122,7 @@ async function staffTeam(){
   };
   const toggle=r=>isAdmin&&r.id!==me.id?el('button',{class:'btn o s',type:'button',onclick:async()=>{await api('/staff/'+r.id,{method:'PATCH',body:{active:!r.active}});render()}},r.active?'Отключить':'Включить'):'';
   const pickP=el('select',{},...rows.filter(s=>['admin','streamer','teamlead','buyer'].includes(s.role)).map(s=>el('option',{value:s.id},s.name+' · '+ROLE[s.role])));
-  const po={t:el('input',{placeholder:'daria_manager',maxlength:'40'}),c:el('input',{placeholder:'daria'}),p:el('input',{placeholder:'LIO669'}),l:el('input',{placeholder:'https://…/register?…&ac=daria&cid=…'}),r:el('input',{placeholder:'https://… (необязательно)'}),ch:el('input',{placeholder:'@daria_channel',maxlength:'80'})};
+  const po={t:el('input',{placeholder:'https://t.me/daria_manager или ник',maxlength:'200'}),c:el('input',{placeholder:'daria'}),p:el('input',{placeholder:'LIO669'}),l:el('input',{placeholder:'https://…/register?…&ac=daria&cid=…'}),r:el('input',{placeholder:'https://… (необязательно)'}),ch:el('input',{placeholder:'@daria_channel',maxlength:'80'})};
   const fill=()=>{const r=rows.find(x=>String(x.id)===pickP.value)||{};po.t.value=r.tg_username||'';po.c.value=r.po_campaign||'';po.p.value=r.po_promo||'';po.l.value=r.po_link||'';po.r.value=r.po_link_ru||'';po.ch.value=r.live_channel||''};
   pickP.addEventListener('change',fill);fill();
   const perr=el('div',{class:'err',role:'alert'});
