@@ -928,3 +928,6 @@ ALTER TABLE leads ADD COLUMN IF NOT EXISTS origin TEXT;
 -- Медиа команды: показывать ли блок «Наши трейдеры» и уведомления об эфирах (плашка «Сейчас в эфире», LIVE на аватарках)
 ALTER TABLE media_teams ADD COLUMN IF NOT EXISTS show_traders BOOLEAN NOT NULL DEFAULT TRUE;
 ALTER TABLE media_teams ADD COLUMN IF NOT EXISTS show_live BOOLEAN NOT NULL DEFAULT TRUE;
+
+-- Ссылка на менеджера в Telegram, как её вписали в «Сотрудниках» (например https://t.me/ник). Ник для показа берётся из неё
+ALTER TABLE staff ADD COLUMN IF NOT EXISTS tg_link TEXT;

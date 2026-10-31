@@ -180,7 +180,7 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
     const u = req.tg!;
     const r = await db.query(
       `SELECT coalesce(d.status_before_block, d.status) AS status, d.access, d.is_tester, d.lead_role, d.region, d.created_at, d.trader_id, o.name AS manager,
-              o.po_promo, o.po_link, o.po_link_ru, o.tg_username AS manager_tg
+              o.po_promo, o.po_link, o.po_link_ru, o.tg_username AS manager_tg, o.tg_link AS manager_link
          FROM leads d LEFT JOIN staff o ON o.id = d.owner_id WHERE d.tg_id = $1`,
       [u.id],
     );
@@ -216,6 +216,7 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
       pocketId: l.trader_id,
       manager: l.manager,
       managerTg: l.manager_tg ?? null,
+      managerLink: l.manager_link ?? (l.manager_tg ? 'https://t.me/' + l.manager_tg : null),
       deposited: Number(dep.rows[0].s),
       depositCount: dep.rows[0].c,
       minDeposit: rq.required,
