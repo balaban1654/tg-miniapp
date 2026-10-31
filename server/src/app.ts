@@ -567,7 +567,7 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
   // Медиа по командам: клиент видит новости, трейдеров и отзывы своей команды (см. mediaTeamOf)
   // Новости команды: свежие сверху
   app.get('/news', { preHandler: auth }, async (req) =>
-    (await db.query('SELECT id, title, body, created_at FROM news WHERE team_id = $1 ORDER BY id DESC LIMIT 30', [await mediaTeamOf(req.tg!.id)])).rows);
+    (await db.query('SELECT id, title, body, url, created_at FROM news WHERE team_id = $1 ORDER BY id DESC LIMIT 30', [await mediaTeamOf(req.tg!.id)])).rows);
 
   app.get('/media', { preHandler: auth }, async (req) => {
     const team = await mediaTeamOf(req.tg!.id);

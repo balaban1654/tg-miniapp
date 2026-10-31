@@ -1559,10 +1559,17 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // Новости команды для вкладки «Медиа» в Mini App
+  // Ссылка новости (необязательная): пусто → null, не https/http → false (ошибка). t.me/... без протокола дополняем
+  const newsUrl = (v: unknown): string | null | false => {
+    let u = str(v, 500).trim();
+    if (!u) return null;
+    if (/^(t\.me|telegram\.me)\//i.test(u)) u = 'https://' + u;
+    return /^https?:\/\/[^\s]+\.[^\s]+$/i.test(u) ? u : false;
+  };
   app.get<{ Querystring: { team?: string } }>('/news', { preHandler: need('admin') }, async (req, reply) => {
     const team = await teamParam(req.query.team);
     if (!team) return reply.code(404).send({ error: 'Команда не найдена' });
-    return (await db.query(`SELECT n.id, n.title, n.body, n.created_at, s.name AS author FROM news n LEFT JOIN staff s ON s.id = n.created_by WHERE n.team_id = $1 ORDER BY n.id DESC LIMIT 200`, [team])).rows;
+    return (await db.query(`SELECT n.id, n.title, n.body, n.url, n.created_at, s.name AS author FROM news n LEFT JOIN staff s ON s.id = n.created_by WHERE n.team_id = $1 ORDER BY n.id DESC LIMIT 200`, [team])).rows;
   });
   app.post('/news', { preHandler: need('admin') }, async (req, reply) => {
     const b = (req.body ?? {}) as Record<string, unknown>;
@@ -1571,14 +1578,18 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     if (!body) return reply.code(400).send({ error: 'Напишите текст новости' });
     const team = await teamParam(b.team_id);
     if (!team) return reply.code(404).send({ error: 'Команда не найдена' });
-    const r = await db.query('INSERT INTO news (title, body, created_by, team_id) VALUES ($1,$2,$3,$4) RETURNING id', [title, body, req.staff!.id, team]);
+    const url = newsUrl(b.url);
+    if (url === false) return reply.code(400).send({ error: 'Ссылка должна начинаться с https://' });
+    const r = await db.query('INSERT INTO news (title, body, created_by, team_id, url) VALUES ($1,$2,$3,$4,$5) RETURNING id', [title, body, req.staff!.id, team, url]);
     return { ok: true, id: r.rows[0].id };
   });
   app.put<{ Params: { id: string } }>('/news/:id', { preHandler: need('admin') }, async (req, reply) => {
     const b = (req.body ?? {}) as Record<string, unknown>;
     const title = str(b.title, 120), body = str(b.body, 3000);
     if (!title || !body) return reply.code(400).send({ error: 'Заполните заголовок и текст' });
-    const r = await db.query('UPDATE news SET title = $2, body = $3 WHERE id = $1', [Number(req.params.id), title, body]);
+    const url = newsUrl(b.url);
+    if (url === false) return reply.code(400).send({ error: 'Ссылка должна начинаться с https://' });
+    const r = await db.query('UPDATE news SET title = $2, body = $3, url = $4 WHERE id = $1', [Number(req.params.id), title, body, url]);
     if (!r.rowCount) return reply.code(404).send({ error: 'Новость не найдена' });
     return { ok: true };
   });

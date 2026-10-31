@@ -931,3 +931,6 @@ ALTER TABLE media_teams ADD COLUMN IF NOT EXISTS show_live BOOLEAN NOT NULL DEFA
 
 -- Ссылка на менеджера в Telegram, как её вписали в «Сотрудниках» (например https://t.me/ник). Ник для показа берётся из неё
 ALTER TABLE staff ADD COLUMN IF NOT EXISTS tg_link TEXT;
+
+-- Новость может вести на полный пост (ссылка необязательная): в Mini App под текстом «…читать продолжение»
+ALTER TABLE news ADD COLUMN IF NOT EXISTS url TEXT;

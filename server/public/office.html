@@ -4198,15 +4198,16 @@ async function newsAdmin(){
   const rows=await api('/news?team='+mediaTeam);
   let editId=null;
   const title=el('input',{placeholder:'Заголовок',maxlength:'120'}),text=el('textarea',{class:'big',rows:'5',maxlength:'3000',placeholder:'Текст новости'});
+  const link=el('input',{placeholder:'https://t.me/канал/123 (необязательно)',maxlength:'500',inputmode:'url'});
   const err=el('div',{class:'err',role:'alert'});
   const okBtn=el('button',{class:'btn',type:'button'},'Опубликовать');
-  const cancel=el('button',{class:'btn o',type:'button',hidden:'',onclick:()=>{editId=null;title.value='';text.value='';okBtn.textContent='Опубликовать';cancel.hidden=true}},'Отмена');
+  const cancel=el('button',{class:'btn o',type:'button',hidden:'',onclick:()=>{editId=null;title.value='';text.value='';link.value='';okBtn.textContent='Опубликовать';cancel.hidden=true}},'Отмена');
   okBtn.onclick=async()=>{err.textContent='';okBtn.disabled=true;
-    try{await api(editId?'/news/'+editId:'/news',{method:editId?'PUT':'POST',body:{title:title.value,body:text.value,team_id:mediaTeam}});toast(editId?'Новость сохранена':'Новость опубликована');render({soft:true})}
+    try{await api(editId?'/news/'+editId:'/news',{method:editId?'PUT':'POST',body:{title:title.value,body:text.value,url:link.value,team_id:mediaTeam}});toast(editId?'Новость сохранена':'Новость опубликована');render({soft:true})}
     catch(x){err.textContent=x.message;okBtn.disabled=false}};
   const form=el('div',{class:'card',style:'display:grid;gap:10px'},el('b',{style:'font-size:14px'},'Новая новость'),
-    el('label',{},'Заголовок',title),el('label',{},'Текст',text),
-    el('div',{class:'mut sm'},'Новость сразу появляется в мини-аппе, во вкладке «Медиа», блок «Новости команды». Свежие сверху.'),
+    el('label',{},'Заголовок',title),el('label',{},'Текст',text),el('label',{},'Ссылка на полный пост (необязательно)',link),
+    el('div',{class:'mut sm'},'Новость сразу появляется в мини-аппе, во вкладке «Медиа», блок «Новости команды». Свежие сверху. Если указать ссылку, под текстом будет «…читать продолжение» с переходом на неё.'),
     el('div',{style:'display:flex;gap:8px;flex-wrap:wrap'},okBtn,cancel),err);
   const dt=v=>new Date(v).toLocaleString('ru-RU',{timeZone:'Europe/Kyiv',day:'numeric',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit'});
   const item=r=>{
@@ -4214,8 +4215,8 @@ async function newsAdmin(){
     const sure=el('span',{hidden:'',style:'display:inline-flex;gap:6px;align-items:center'},el('span',{class:'mut sm'},'Удалить новость?'),
       el('button',{class:'btn s',type:'button',onclick:async()=>{try{await api('/news/'+r.id,{method:'DELETE'});render({soft:true})}catch(x){toast(x.message)}}},'Да'),
       el('button',{class:'btn o s',type:'button',onclick:()=>{sure.hidden=true;del.hidden=false}},'Нет'));
-    const ed=el('button',{class:'btn o s',type:'button',onclick:()=>{editId=r.id;title.value=r.title;text.value=r.body;okBtn.textContent='Сохранить';cancel.hidden=false;form.scrollIntoView({behavior:'smooth',block:'center'})}},'Изменить');
-    return el('div',{class:'card',style:'display:grid;gap:6px'},el('div',{class:'mut sm'},dt(r.created_at)+(r.author?' · '+r.author:'')),el('b',{},r.title),el('div',{style:'white-space:pre-wrap;line-height:1.5'},r.body),el('div',{style:'display:flex;gap:8px;flex-wrap:wrap;align-items:center'},ed,del,sure));
+    const ed=el('button',{class:'btn o s',type:'button',onclick:()=>{editId=r.id;title.value=r.title;text.value=r.body;link.value=r.url||'';okBtn.textContent='Сохранить';cancel.hidden=false;form.scrollIntoView({behavior:'smooth',block:'center'})}},'Изменить');
+    return el('div',{class:'card',style:'display:grid;gap:6px'},el('div',{class:'mut sm'},dt(r.created_at)+(r.author?' · '+r.author:'')),el('b',{},r.title),el('div',{style:'white-space:pre-wrap;line-height:1.5'},r.body),r.url?el('a',{href:r.url,target:'_blank',rel:'noopener',style:'color:var(--acc2);font-size:13px;word-break:break-all'},'…читать продолжение → '+r.url):null,el('div',{style:'display:flex;gap:8px;flex-wrap:wrap;align-items:center'},ed,del,sure));
   };
   return[form,...(rows.length?rows.map(item):[el('div',{class:'mut'},'Новостей пока нет.')])];
 }
