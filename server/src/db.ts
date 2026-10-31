@@ -40,6 +40,9 @@ export async function attachLead(
     await db.query(`INSERT INTO events (tg_id, type) VALUES ($1,'start')`, [tgId]);
     return { lead: ins.rows[0], isNew: true };
   }
+  // Лид, которого удалили из списка (снят с Mini App), вернулся сам (/start, сообщение, открыл Mini App): снова показываем его в «Лидах»
+  // как пришедшего сейчас. Доступ при этом не открывается сам: он закрыт, пока не придёт депозит или его не выдадут вручную
+  await db.query('UPDATE leads SET removed_at = NULL, created_at = now() WHERE tg_id = $1 AND removed_at IS NOT NULL', [tgId]);
   // Лид мог быть заведён вручную из постбеков (только Telegram ID и Pocket ID): дописываем юзернейм, имя, ссылку и владельца
   await db.query(
     `UPDATE leads SET username = coalesce($2, username), first_name = coalesce($3, first_name), link_id = coalesce(link_id, $4), owner_id = coalesce(owner_id, $5) WHERE tg_id = $1`,
