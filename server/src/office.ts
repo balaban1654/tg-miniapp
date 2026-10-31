@@ -2420,7 +2420,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
       vals,
     );
     // Сотрудники (админ состав) идут первыми, чтобы предел строк их никогда не отрезал; лидов за период до 3000
-    // Сотрудники в списке лидов: владелец и ссылка у них общие (создатель компании), деньги и результаты нулевые
+    // Сотрудники в списке лидов: свой владелец (его можно менять, он же менеджер в Mini App); без владельца — создатель компании. Деньги и результаты нулевые
     const main = (
       await db.query(
         `SELECT s.id, s.name, (SELECT slug FROM links WHERE owner_id = s.id ORDER BY id LIMIT 1) AS slug
@@ -2430,7 +2430,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     ).rows[0];
     // Лид без ссылки пришёл сам: с кнопки на сайте — метка site, иначе (поиск по нику в Telegram) органика miniapp-org
     return r.rows.map((x) =>
-      x.lead_role && x.lead_role !== 'lead' ? { ...x, deposits: 0, commission: 0, owner_id: main?.id ?? x.owner_id, owner_name: main?.name ?? x.owner_name, link_slug: main?.slug ?? x.link_slug } : x.link_slug ? x : { ...x, link_slug: x.origin || 'miniapp-org' },
+      x.lead_role && x.lead_role !== 'lead' ? { ...x, deposits: 0, commission: 0, owner_id: x.owner_id ?? main?.id ?? null, owner_name: x.owner_id ? x.owner_name : main?.name ?? null, link_slug: x.link_slug ?? main?.slug ?? null } : x.link_slug ? x : { ...x, link_slug: x.origin || 'miniapp-org' },
     );
   });
 
