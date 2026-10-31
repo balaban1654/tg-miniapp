@@ -284,6 +284,13 @@ svg{max-width:100%}
 #splash .ln,#splash p,#splash .sp-pg{animation:sprise .9s cubic-bezier(.2,.7,.2,1) backwards;animation-delay:var(--d,0s)}
 #splash p{--d:1.25s}#splash .sp-pg{--d:1.6s}
 @media (prefers-reduced-motion:reduce){#splash *{animation:none!important}}
+
+/* Реферальная программа: отсчёт до запуска */
+.rf-cd{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;width:100%;max-width:320px}
+.rf-c{display:grid;gap:4px;padding:12px 4px;border-radius:14px;background:var(--card2,#251847);border:1px solid var(--line,#34255c)}
+.rf-c b{font:800 24px var(--fd,Montserrat),sans-serif;font-variant-numeric:tabular-nums;color:var(--acc2,#c9a6ff)}
+.rf-c span{font-size:11px;opacity:.7}
+.rf-p{background:#ffb84d22;color:#ffb84d;padding:4px 12px;border-radius:999px;font-size:12px;font-weight:700}
 </style>
 </head>
 <body>
@@ -465,6 +472,7 @@ async function render(){
     else if(tab==='trainer')await viewTrainer();
     else if(tab==='media')await viewMedia();
     else if(tab==='profile')viewProfile();
+    else if(tab==='referral')viewReferral();
   }catch(e){shell('Hunter AI',el('div',{class:'card err'},e.message))}
 }
 
@@ -1833,7 +1841,36 @@ function viewProfile(){
     me.leadRole==='admin'?el('button',{class:'btn gw-open',type:'button',onclick:()=>viewGiveaway()},'🎁 Провести розыгрыш'):
     me.promo&&['new','registered'].includes(me.status)?el('div',{class:'card row'},el('span',{class:'sm'},'Промокод'),el('span',{style:'display:inline-flex;align-items:center;gap:8px'},el('b',{class:'mono'},me.promo),copyBtn(me.promo))):null,
     el('button',{class:'btn o',type:'button',onclick:support},'Написать в поддержку'),
+    el('button',{class:'btn',type:'button',onclick:()=>go('referral')},'Реферальная программа'),
     el('button',{class:'back',type:'button',onclick:()=>go('home')},'‹ На главную')]);
+}
+/** Реферальная программа: пока в разработке, отсчёт до запуска 1-го числа в 22:00 по Киеву (ближайшее, ещё не прошедшее) */
+function referralLaunch(){
+  const kyivParts=d=>Object.fromEntries(new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Kyiv',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(d).map(p=>[p.type,p.value]));
+  // Киевское время в UTC: подбираем смещение (зимой +2, летом +3)
+  const at=(y,m)=>{for(const off of [2,3]){const t=Date.UTC(y,m-1,1,22-off,0,0);const k=kyivParts(new Date(t));if(+k.day===1&&+k.hour===22)return t}return Date.UTC(y,m-1,1,20,0,0)};
+  const k=kyivParts(new Date(nowMs()));let y=+k.year,m=+k.month;
+  let t=at(y,m);if(t<=nowMs()){m++;if(m>12){m=1;y++}t=at(y,m)}
+  return t;
+}
+function viewReferral(){
+  const target=referralLaunch();
+  const cell=(v,l)=>el('div',{class:'rf-c'},el('b',{},v),el('span',{},l));
+  const box=el('div',{class:'rf-cd',role:'timer','aria-live':'off'});
+  const two=n=>String(n).padStart(2,'0');
+  const paint=()=>{const left=Math.max(0,target-nowMs()),s=Math.floor(left/1000);
+    box.replaceChildren(cell(Math.floor(s/86400),'дн'),cell(two(Math.floor(s%86400/3600)),'ч'),cell(two(Math.floor(s%3600/60)),'мин'),cell(two(s%60),'сек'))};
+  paint();timers.push(setInterval(paint,1000));
+  const when=new Date(target).toLocaleString('ru-RU',{timeZone:'Europe/Kyiv',day:'numeric',month:'long',hour:'2-digit',minute:'2-digit'});
+  shell('Рефералы',[
+    el('div',{class:'card rf',style:'text-align:center;display:grid;gap:14px;justify-items:center'},
+      el('div',{style:'font-size:44px;line-height:1'},'🎁'),
+      el('h2',{style:'font-size:20px;margin:0'},'Реферальная программа'),
+      el('span',{class:'pill rf-p'},'В разработке'),
+      el('p',{class:'sm',style:'margin:0;max-width:300px'},'Скоро вы сможете приглашать друзей и получать бонусы. Запуск '+when+' по Киеву.'),
+      el('div',{class:'sm',style:'opacity:.7'},'До запуска осталось'),
+      box),
+    el('button',{class:'back',type:'button',onclick:()=>go('profile')},'‹ В профиль')]);
 }
 
 document.addEventListener('visibilitychange',async()=>{if(!document.hidden&&me&&!me.access&&tab==='home'){try{await refreshMe();if(me.access)render()}catch{}}});
