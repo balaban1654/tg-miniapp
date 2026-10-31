@@ -1832,6 +1832,15 @@ function viewGiveaway(){
   }
   setup();
 }
+/** ID в профиле скрыт точками; «глазик» показывает и снова прячет. Копирование работает и у скрытого */
+const EYE_ON='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s4-6 10-6 10 6 10 6-4 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+const EYE_OFF='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 6.1A10.6 10.6 0 0 1 12 6c6 0 10 6 10 6a17 17 0 0 1-3.2 3.8M6.5 7.6A17 17 0 0 0 2 12s4 6 10 6a9.7 9.7 0 0 0 4.4-1"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>';
+function hiddenId(v){
+  const val=String(v),b=el('b',{class:'mono'},'•'.repeat(Math.min(10,Math.max(6,val.length))));let shown=false;
+  const btn=el('button',{type:'button','aria-label':'Показать','aria-pressed':'false',title:'Показать',style:'background:none;border:0;padding:2px;color:var(--mut);cursor:pointer;display:grid;place-items:center'},svgEl(EYE_ON));
+  btn.addEventListener('click',()=>{shown=!shown;b.textContent=shown?val:'•'.repeat(Math.min(10,Math.max(6,val.length)));btn.replaceChildren(svgEl(shown?EYE_OFF:EYE_ON));btn.setAttribute('aria-label',shown?'Скрыть':'Показать');btn.title=shown?'Скрыть':'Показать';btn.setAttribute('aria-pressed',String(shown))});
+  return el('span',{style:'display:inline-flex;align-items:center;gap:8px'},b,btn);
+}
 /** Ссылка на менеджера из «Сотрудников» с параметром profile: Telegram открывает сначала профиль человека, а не сразу чат */
 function mgrProfileLink(){const u=me.managerLink||'https://t.me/'+me.managerTg;return /[?&]profile\b/.test(u)?u:u+(u.includes('?')?'&':'?')+'profile'}
 function viewProfile(){
@@ -1839,7 +1848,7 @@ function viewProfile(){
   const copyBtn=v=>el('button',{type:'button','aria-label':'Копировать',title:'Копировать',style:'background:none;border:0;padding:2px;color:var(--mut);cursor:pointer;display:grid;place-items:center',onclick:()=>copyText(v)},svgEl(COPY_ICON));
   shell('Профиль',[el('div',{class:'card row',style:'justify-content:flex-start;gap:12px'},withPhoto(el('div',{class:'ava'},(me.name||'?').trim().slice(0,1).toUpperCase())),el('div',{},el('b',{style:'font:700 16px var(--fd)'},me.name),el('div',{class:'sm'},me.username?'@'+me.username:''))),
     el('div',{class:'card',style:'display:grid;grid-template-columns:minmax(0,1fr);gap:10px'},rows.map(([k,v,cp])=>k==='Pocket ID'&&!v?pocketAddRow():el('div',{class:'row'},el('span',{class:'sm'},k),
-      el('span',{style:'display:inline-flex;align-items:center;gap:8px'},el('b',{class:'mono'},v instanceof Node?v:String(v)),cp?copyBtn(v):null)))),
+      el('span',{style:'display:inline-flex;align-items:center;gap:8px'},cp?hiddenId(v):el('b',{class:'mono'},v instanceof Node?v:String(v)),cp?copyBtn(v):null)))),
     me.leadRole==='admin'?el('button',{class:'btn gw-open',type:'button',onclick:()=>viewGiveaway()},'🎁 Провести розыгрыш'):
     me.promo&&['new','registered'].includes(me.status)?el('div',{class:'card row'},el('span',{class:'sm'},'Промокод'),el('span',{style:'display:inline-flex;align-items:center;gap:8px'},el('b',{class:'mono'},me.promo),copyBtn(me.promo))):null,
     el('button',{class:'btn o',type:'button',onclick:support},'Написать в поддержку'),
