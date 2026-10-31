@@ -4124,6 +4124,13 @@ async function viewMedia(){
     el('option',{value:''},'Не выбран'),...leads.map(x=>{const other=teams.find(t=>t.teamlead_id===x.id&&t.id!==team.id);return el('option',{value:x.id,disabled:other?'':null},x.name+(x.role==='admin'?' · админ':'')+(other?' · уже в «'+other.title+'»':''))}));
   leadSel.value=team.teamlead_id||'';
   const delTeam=team.is_main?null:el('button',{class:'btn o s',type:'button',style:'color:var(--bad)',onclick:async()=>{if(!await askC('Удалить команду «'+team.title+'» вместе с её трейдерами, новостями и отзывами? Её клиенты будут видеть Основную.'))return;try{await api('/media/teams/'+team.id,{method:'DELETE'});mediaSetTeam(null);toast('Команда удалена');render({soft:true})}catch(x){toast(x.message)}}},'Удалить команду');
+  // Что клиенты этой команды видят в «Медиа»: блок трейдеров и уведомления об эфирах
+  const tgl=(key,label,hint)=>{const c=el('input',{type:'checkbox',style:'width:18px;height:18px;margin:0;flex:none'});c.checked=team[key]!==false;
+    c.addEventListener('change',async()=>{try{await api('/media/teams/'+team.id,{method:'PATCH',body:{[key]:c.checked}});team[key]=c.checked;toast(c.checked?label+': включено':label+': выключено')}catch(x){c.checked=!c.checked;toast(x.message)}});
+    return el('label',{style:'display:flex;align-items:center;gap:8px;cursor:pointer;white-space:nowrap',title:hint},c,label)};
+  const showOpts=el('div',{class:'card',style:'display:flex;gap:10px 24px;align-items:center;flex-wrap:wrap'},el('span',{class:'dx-lbl'},'Показывать клиентам'),
+    tgl('show_traders','Блок «Наши трейдеры»','Если выключить, в Mini App в «Медиа» этой команды не будет блока трейдеров'),
+    tgl('show_live','Уведомления об эфирах','Плашка «Сейчас в эфире» и значок LIVE на аватарках трейдеров'));
   const teamInfo=el('div',{class:'card',style:'display:flex;gap:12px;align-items:center;flex-wrap:wrap'},
     team.is_main?el('div',{class:'mut sm',style:'flex:1;min-width:240px'},'Основная команда: её медиа видят клиенты из органики, клиенты по ссылкам админов и клиенты стримеров без тимлидера. Если админа закрепить тимлидером другой команды, его клиенты будут видеть медиа той команды.')
       :[el('label',{style:'display:flex;align-items:center;gap:10px;white-space:nowrap'},'Тимлидер',leadSel),el('div',{class:'mut sm',style:'flex:1;min-width:220px'},team.teamlead_id?'Клиенты тимлидера и его стримеров видят в Mini App медиа этой команды.':'Выберите тимлидера: пока его нет, эту команду никто не видит.'),delTeam]);
@@ -4168,7 +4175,7 @@ async function viewMedia(){
     try{mBody.replaceChildren(...(mediaTab==='news'?await newsAdmin():await reviewsAdmin()))}catch(x){mBody.replaceChildren(el('div',{class:'err'},x.message))}
   };
   drawM();
-  return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Медиа в Mini App')),el('div',{style:'display:flex;gap:10px;align-items:center'},tBar,addTeam),teamInfo,mBar,mBody];
+  return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Медиа в Mini App')),el('div',{style:'display:flex;gap:10px;align-items:center'},tBar,addTeam),teamInfo,showOpts,mBar,mBody];
 }
 
 let reviewEdit=null;

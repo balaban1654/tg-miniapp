@@ -1506,7 +1506,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     await mainMediaTeam();
     return (
       await db.query(
-        `SELECT t.id, t.title, t.is_main, t.teamlead_id, s.name AS teamlead_name,
+        `SELECT t.id, t.title, t.is_main, t.teamlead_id, t.show_traders, t.show_live, s.name AS teamlead_name,
                 (SELECT count(*)::int FROM media_items m WHERE m.team_id = t.id) AS items,
                 (SELECT count(*)::int FROM news n WHERE n.team_id = t.id) AS news,
                 (SELECT count(*)::int FROM reviews r WHERE r.team_id = t.id AND r.status = 'pending') AS pending
@@ -1530,6 +1530,9 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
       if (!title) return reply.code(400).send({ error: 'Введите название команды' });
       await db.query('UPDATE media_teams SET title = $2 WHERE id = $1', [id, title]);
     }
+    // Показывать ли клиентам блок трейдеров и уведомления об эфирах
+    if (typeof b.show_traders === 'boolean') await db.query('UPDATE media_teams SET show_traders = $2 WHERE id = $1', [id, b.show_traders]);
+    if (typeof b.show_live === 'boolean') await db.query('UPDATE media_teams SET show_live = $2 WHERE id = $1', [id, b.show_live]);
     if (b.teamlead_id !== undefined) {
       if (t.is_main) return reply.code(400).send({ error: 'Основная команда без тимлидера: её видят органика и клиенты без тимлидера' });
       const lead = b.teamlead_id ? Number(b.teamlead_id) : null;

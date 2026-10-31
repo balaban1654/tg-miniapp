@@ -566,7 +566,10 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
         return { ...x, contact_url: undefined, live_url: undefined, live: /^https?:\/\//i.test(x.live_url ?? '') ? x.live_url : null, contact: contact ? { handle: contact, url: x.contact_url } : null, photo: handle || contact ? `/api/app/media/${x.id}/photo?v=${photoVer(x.id, (contact ?? handle)!)}` : null, channelTitle: info?.title ?? null, members: info?.members ?? null };
       }),
     );
-    return { traders: rows.filter((x) => x.kind === 'trader'), channels: rows.filter((x) => x.kind === 'channel') };
+    // Настройки команды в Office: блок трейдеров можно скрыть, уведомления об эфирах (LIVE) отключить
+    const ts = (await db.query('SELECT show_traders, show_live FROM media_teams WHERE id = $1', [team])).rows[0] ?? { show_traders: true, show_live: true };
+    const out = ts.show_live ? rows : rows.map((x) => ({ ...x, live: null }));
+    return { traders: ts.show_traders ? out.filter((x) => x.kind === 'trader') : [], channels: out.filter((x) => x.kind === 'channel'), showTraders: ts.show_traders };
   });
 
   // Отзывы. Видны опубликованные и свои на проверке. Фото отдаётся по случайному ключу (для <img> без заголовков)

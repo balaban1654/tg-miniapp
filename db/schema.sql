@@ -924,3 +924,7 @@ ALTER TABLE signals ADD CONSTRAINT signals_gif_kind_check CHECK (gif_kind IN ('w
 
 -- Откуда пришёл лид без ссылки стримера: 'site' — кнопка «Открыть бота» на сайте (иначе органика miniapp-org)
 ALTER TABLE leads ADD COLUMN IF NOT EXISTS origin TEXT;
+
+-- Медиа команды: показывать ли блок «Наши трейдеры» и уведомления об эфирах (плашка «Сейчас в эфире», LIVE на аватарках)
+ALTER TABLE media_teams ADD COLUMN IF NOT EXISTS show_traders BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE media_teams ADD COLUMN IF NOT EXISTS show_live BOOLEAN NOT NULL DEFAULT TRUE;
