@@ -331,7 +331,8 @@ textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10
 /* дашборд админа */
 .dx{display:grid;gap:16px;min-width:0}
 .dx-top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
-.dx-ttl{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}.dx-ttl h2{font-size:24px}.dx-sub{color:var(--mut);font-size:14px}
+.dx-ttl{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}.dx-ttl h2{font-size:24px}.dx-onl{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:#3ddc971a;border:1px solid #3ddc9744;color:var(--ok);font-size:12px;font-weight:600;white-space:nowrap}.dx-onl b{font-weight:800}.dx-onl i{width:7px;height:7px;border-radius:50%;background:var(--ok);box-shadow:0 0 8px var(--ok);animation:onlb 1.4s ease-in-out infinite}@keyframes onlb{0%,100%{opacity:1}50%{opacity:.2}}
+.dx-sub{color:var(--mut);font-size:14px}
 .dx-rng{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-left:auto}
 .dx-seg{display:flex;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:3px;gap:2px}
 .dx-seg button{border:0;background:none;color:var(--mut);padding:6px 12px;border-radius:7px;cursor:pointer;font-size:13px}.dx-seg button.on{background:var(--acc);color:#fff;font-weight:700}
@@ -1043,7 +1044,17 @@ function rangeBar(onApply){
   return el('div',{class:'rb'},pill,go,pop);
 }
 function dxHead(sub,onApply){
-  return el('div',{class:'dx-top'},el('div',{class:'dx-ttl'},el('h2',{},'Дашборд'),el('span',{class:'dx-sub'},sub)),rangeBar(onApply));
+  return el('div',{class:'dx-top'},el('div',{class:'dx-ttl'},el('h2',{},'Дашборд'),(me.role==='admin'||me.role==='teamlead')?dxOnline():null,el('span',{class:'dx-sub'},sub)),rangeBar(onApply));
+}
+/* Плашка «онлайн»: сколько людей прямо сейчас с открытым Mini App (обновляется раз в 15 с) */
+let dxOnlineT=null,dxOnlineLast=null;
+function dxOnline(){
+  const n=el('b',{},dxOnlineLast?String(dxOnlineLast.total):'…');
+  const pill=el('span',{class:'dx-onl',title:'Сейчас с открытым Mini App'},el('i'),'онлайн ',n);
+  const upd=async()=>{if(!pill.isConnected&&dxOnlineLast){clearInterval(dxOnlineT);dxOnlineT=null;return}
+    try{const r=await api('/online');dxOnlineLast=r;n.textContent=String(r.total);pill.title='Сейчас с открытым Mini App: '+r.total+(r.staff?' (из них сотрудников '+r.staff+')':'')}catch{}};
+  clearInterval(dxOnlineT);upd();dxOnlineT=setInterval(upd,15000);
+  return pill;
 }
 function dxRangeLabel(r,today){
   const t=today||kyivToday();

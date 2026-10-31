@@ -1,4 +1,4 @@
-import { clearTgCaches } from './app.js';
+import { clearTgCaches, onlineNow } from './app.js';
 import QRCode from 'qrcode';
 import { newSecret, otpUri, verifyTotp, newRecoveryCodes } from './totp.js';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
@@ -1507,6 +1507,9 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     const id = Number(v);
     return Number.isInteger(id) && (await db.query('SELECT 1 FROM media_teams WHERE id = $1', [id])).rowCount ? id : null;
   };
+  // Сколько людей прямо сейчас с открытым Mini App (для плашки «онлайн» на дашборде)
+  app.get('/online', { preHandler: need('admin', 'teamlead') }, async () => onlineNow());
+
   app.get('/media/teams', { preHandler: need('admin') }, async () => {
     await mainMediaTeam();
     return (

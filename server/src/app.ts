@@ -151,6 +151,19 @@ function tgHandle(url: string): string | null {
   return m ? m[1] : null;
 }
 
+/** Кто сейчас с открытым Mini App (по отметкам /ping за последние 70 секунд) */
+const appOnline = new Map<number, { at: number; staff: boolean }>();
+export function onlineNow(): { total: number; staff: number } {
+  const edge = Date.now() - 70_000;
+  let total = 0, staff = 0;
+  for (const [id, v] of appOnline) {
+    if (v.at < edge) { appOnline.delete(id); continue; }
+    total++;
+    if (v.staff) staff++;
+  }
+  return { total, staff };
+}
+
 export async function appRoutes(app: FastifyInstance): Promise<void> {
   const auth = async (req: FastifyRequest, reply: FastifyReply) => {
     const h = String(req.headers.authorization ?? '');
@@ -175,6 +188,13 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
     }
     await db.query(`UPDATE leads SET last_seen_at = now() WHERE tg_id = $1 AND (last_seen_at IS NULL OR last_seen_at < now() - interval '10 minutes')`, [user.id]);
   };
+
+  // Онлайн: Mini App открыт на экране (отметка раз в 30 с). Храним в памяти: tg_id → время и сотрудник ли это
+  app.post('/ping', { preHandler: auth }, async (req) => {
+    const r = (await db.query(`SELECT coalesce(lead_role, 'lead') <> 'lead' AS staff FROM leads WHERE tg_id = $1`, [req.tg!.id])).rows[0];
+    appOnline.set(req.tg!.id, { at: Date.now(), staff: Boolean(r?.staff) });
+    return { ok: true };
+  });
 
   app.get('/me', { preHandler: auth }, async (req) => {
     const u = req.tg!;
