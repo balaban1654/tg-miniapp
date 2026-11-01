@@ -158,8 +158,6 @@ ALTER TABLE staff ADD COLUMN IF NOT EXISTS live_channel TEXT;
 ALTER TABLE push_templates ADD COLUMN IF NOT EXISTS to_staff_channel BOOLEAN NOT NULL DEFAULT TRUE;
 -- Клиента забрал другой стример, ответив в чате, пока владелец был не на смене: у кого забрали
 ALTER TABLE leads ADD COLUMN IF NOT EXISTS taken_from INT REFERENCES staff(id) ON DELETE SET NULL;
--- Сообщение команды исправлено после отправки (у клиента в Telegram тоже)
-ALTER TABLE messages ADD COLUMN IF NOT EXISTS edited_at TIMESTAMPTZ;
 -- Удалённый сотрудник: скрыт из списков и не может войти, но остаётся в истории (лиды, зарплата, сообщения)
 ALTER TABLE staff ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
 -- Блокировка лида админом (за поведение, второй аккаунт): без Mini App, пушей и воронки бота; в поддержку писать может
@@ -175,8 +173,6 @@ CREATE TABLE IF NOT EXISTS bot_replies (
   photo_type TEXT,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-ALTER TABLE broadcasts ADD COLUMN IF NOT EXISTS photo BYTEA;
-ALTER TABLE broadcasts ADD COLUMN IF NOT EXISTS photo_type TEXT;
 
 -- Чат поддержки через бота: сообщения клиентов и ответы команды
 CREATE TABLE IF NOT EXISTS messages (
@@ -191,6 +187,8 @@ CREATE TABLE IF NOT EXISTS messages (
   created_at    TIMESTAMPTZ DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS messages_tg ON messages(tg_id, id);
+-- Сообщение команды исправлено после отправки (у клиента в Telegram тоже)
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS edited_at TIMESTAMPTZ;
 ALTER TABLE messages ADD COLUMN IF NOT EXISTS file_name TEXT;
 -- Начало эфира, которое стример указал в отчёте (по Киеву, хранится как момент времени)
 -- Админ закрыл чат: он скрыт из списка, пока клиент не напишет снова
@@ -200,10 +198,6 @@ ALTER TABLE staff ADD COLUMN IF NOT EXISTS streams BOOLEAN NOT NULL DEFAULT FALS
 -- Свой порядок и папки бокового меню (у каждого сотрудника)
 ALTER TABLE staff ADD COLUMN IF NOT EXISTS nav_layout JSONB;
 CREATE TABLE IF NOT EXISTS nav_defaults (role TEXT PRIMARY KEY, layout JSONB NOT NULL);
-ALTER TABLE shift_reports ADD COLUMN IF NOT EXISTS declared_start TIMESTAMPTZ;
--- 'await': смену закрыл админ без отчёта, данные должен внести сам стример
-ALTER TABLE shift_reports DROP CONSTRAINT IF EXISTS shift_reports_status_check;
-ALTER TABLE shift_reports ADD CONSTRAINT shift_reports_status_check CHECK (status IN ('live','await','pending','approved','rejected'));
 
 -- Пуши: бот может писать только тем, кто нажал /start. last_seen_at нужен для «давно не заходил»
 ALTER TABLE leads ADD COLUMN IF NOT EXISTS bot_started BOOLEAN DEFAULT FALSE;
@@ -246,6 +240,8 @@ CREATE TABLE IF NOT EXISTS broadcasts (
   total      INT NOT NULL DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT now()
 );
+ALTER TABLE broadcasts ADD COLUMN IF NOT EXISTS photo BYTEA;
+ALTER TABLE broadcasts ADD COLUMN IF NOT EXISTS photo_type TEXT;
 CREATE TABLE IF NOT EXISTS broadcast_jobs (
   broadcast_id INT NOT NULL REFERENCES broadcasts(id) ON DELETE CASCADE,
   tg_id        BIGINT NOT NULL,
@@ -430,6 +426,10 @@ CREATE TABLE IF NOT EXISTS shift_reports (
   reject_reason   TEXT,
   created_at      TIMESTAMPTZ DEFAULT now()
 );
+ALTER TABLE shift_reports ADD COLUMN IF NOT EXISTS declared_start TIMESTAMPTZ;
+-- 'await': смену закрыл админ без отчёта, данные должен внести сам стример
+ALTER TABLE shift_reports DROP CONSTRAINT IF EXISTS shift_reports_status_check;
+ALTER TABLE shift_reports ADD CONSTRAINT shift_reports_status_check CHECK (status IN ('live','await','pending','approved','rejected'));
 CREATE INDEX IF NOT EXISTS shift_reports_staff ON shift_reports(staff_id, day);
 CREATE INDEX IF NOT EXISTS shift_reports_status ON shift_reports(status);
 
