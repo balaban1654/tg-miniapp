@@ -125,6 +125,11 @@ tr.rowc{cursor:pointer}tr.rowc:hover{background:#ffffff08}tr.rowc.on{background:
 .shot-ov{z-index:70;padding:0!important;background:rgba(5,2,12,.6);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
 .shot-ov .shot-box{background:none;border:0;box-shadow:none;padding:0;min-width:0;max-width:none;border-radius:0}
 .shot-ov .shot-box img{max-width:calc(100vw - 96px);max-height:calc(100vh - 32px);border-radius:8px;box-shadow:0 20px 70px rgba(0,0,0,.7)}
+.shot-ov .shot-box img{cursor:zoom-in}
+.shot-ov.zoom{display:block;overflow:auto;padding:0!important}
+.shot-ov.zoom .shot-box{display:block;width:max-content;margin:0 auto}
+.shot-ov.zoom .shot-box img{max-width:none;max-height:none;cursor:zoom-out;border-radius:0}
+.shot-info{position:fixed;left:50%;bottom:10px;transform:translateX(-50%);font-size:12px;color:#cfc3ee;background:rgba(13,8,23,.75);padding:4px 10px;border-radius:999px;pointer-events:none}
 .shot-ov .shot-x{position:fixed;top:14px;right:14px;width:42px;height:42px;padding:0;border-radius:50%;font-size:18px;display:grid;place-items:center;background:rgba(13,8,23,.75);z-index:2}.shot-box{position:relative;min-width:260px;max-width:94vw;margin:auto;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px;display:flex;flex-direction:column;align-items:center;gap:8px;box-shadow:0 20px 60px rgba(0,0,0,.6)}.shot-box img{display:block;width:auto;height:auto;max-width:min(1100px,calc(94vw - 24px));max-height:calc(100vh - 110px);object-fit:contain;border-radius:10px}.shot-x{position:absolute;top:10px;right:10px;background:rgba(13,8,23,.8)}
 .shotc{display:block;height:96px;border-radius:9px;overflow:hidden;border:1px solid var(--line)}.shotc img{width:100%;height:100%;object-fit:cover}
 .meta2{display:grid;gap:4px;min-width:0}.kv2{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--mut)}.kv2 b{color:var(--fg)}
@@ -2685,7 +2690,12 @@ function openShot(url){
   const close=()=>{ov.remove();document.removeEventListener('keydown',onKey)};
   const onKey=e=>{if(e.key==='Escape')close()};document.addEventListener('keydown',onKey);
   ov.addEventListener('mousedown',e=>{if(e.target===ov)close()});
-  ov.append(el('div',{class:'shot-box'},el('button',{class:'btn o s shot-x',type:'button','aria-label':'Закрыть',onclick:close},'✕'),el('img',{src:url,alt:'Скриншот'})));
+  // Сначала картинка целиком по размеру экрана; клик по ней — оригинальный размер (1:1, прокрутка), ещё клик — обратно
+  const img=el('img',{src:url,alt:'Скриншот',title:'Нажмите: оригинальный размер'});
+  const info=el('div',{class:'shot-info'});
+  img.addEventListener('load',()=>{info.textContent=img.naturalWidth+' × '+img.naturalHeight+' px'});
+  img.addEventListener('click',()=>{const z=ov.classList.toggle('zoom');img.title=z?'Нажмите: по размеру экрана':'Нажмите: оригинальный размер'});
+  ov.append(el('button',{class:'btn o s shot-x',type:'button','aria-label':'Закрыть',onclick:close},'✕'),el('div',{class:'shot-box'},img),info);
   document.body.append(ov);
 }
 function shotThumb(url,props={}){
