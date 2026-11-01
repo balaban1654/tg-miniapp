@@ -938,3 +938,20 @@ ALTER TABLE news ADD COLUMN IF NOT EXISTS url TEXT;
 -- Чат просмотрен: когда и кто из команды (стример, тимлид или владелец лида) последним открыл переписку
 ALTER TABLE leads ADD COLUMN IF NOT EXISTS chat_seen_at TIMESTAMPTZ;
 ALTER TABLE leads ADD COLUMN IF NOT EXISTS chat_seen_by INT REFERENCES staff(id) ON DELETE SET NULL;
+
+-- Ссылка с владельцем «Случайно»: новые лиды раздаются по очереди сотрудникам из списка (link_pool).
+-- За день (по Киеву) каждый получает по одному, начиная с лучшего (больше часов в эфире за месяц, потом больше FTD), затем круг повторяется
+ALTER TABLE links ADD COLUMN IF NOT EXISTS rotate BOOLEAN NOT NULL DEFAULT FALSE;
+CREATE TABLE IF NOT EXISTS link_pool (
+  link_id  INT NOT NULL REFERENCES links(id) ON DELETE CASCADE,
+  staff_id INT NOT NULL REFERENCES staff(id) ON DELETE CASCADE,
+  PRIMARY KEY (link_id, staff_id)
+);
+CREATE TABLE IF NOT EXISTS link_assign (
+  id       SERIAL PRIMARY KEY,
+  link_id  INT NOT NULL REFERENCES links(id) ON DELETE CASCADE,
+  staff_id INT NOT NULL REFERENCES staff(id) ON DELETE CASCADE,
+  tg_id    BIGINT,
+  at       TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS link_assign_day ON link_assign (link_id, at);

@@ -482,6 +482,7 @@ textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10
 @media(max-width:560px){.sm-pay .cols{grid-template-columns:minmax(0,1fr)}}
 .dx-tk .dx-tx{text-align:left}
 .seen-by{color:var(--warn)}
+.pool-box{grid-column:1/-1;display:grid;gap:8px}.pool-pick{display:flex;flex-wrap:wrap;gap:8px 16px}.pool-pick label{display:inline-flex!important;flex-direction:row!important;align-items:center;gap:6px;cursor:pointer;font-size:14px}.pool-pick input{width:16px;height:16px;margin:0}
 </style>
 </head>
 <body>
@@ -2059,23 +2060,40 @@ async function viewLinks(){
   const slug=el('input',{id:'nSlug',placeholder:'ivan-instagram',required:'',pattern:'[a-z0-9][a-z0-9_\\-]{1,39}',title:'a-z, 0-9, - и _'});
   const src=el('input',{id:'nSrc',placeholder:'Instagram'});
   const owner=me.role==='admin'
-    ?el('select',{id:'nOwner'},...staff.filter(s=>s.active!==false).map(s=>el('option',{value:s.id,selected:s.id===me.id?'':null},s.name+' · '+(ROLE[s.role]||s.role))))
+    ?el('select',{id:'nOwner',onchange:()=>{poolBox.hidden=owner.value!=='random'}},...staff.filter(s=>s.active!==false).map(s=>el('option',{value:s.id,selected:s.id===me.id?'':null},s.name+' · '+(ROLE[s.role]||s.role))),el('option',{value:'random'},'🎲 Случайно (по очереди)'))
     :el('select',{id:'nOwner'},el('option',{value:''},'Я сам'),...staff.filter(s=>s.id!==me.id&&['streamer','buyer'].includes(s.role)).map(s=>el('option',{value:s.id},s.name+' · '+ROLE[s.role])));
+  // «Случайно»: галочками выбираем, между кем раздавать лидов с этой ссылки
+  const poolPick=sel=>{const set=new Set(sel);return el('div',{class:'pool-pick'},...staff.filter(x=>x.active!==false&&(x.role==='streamer'||x.streams)).map(x=>{const c=el('input',{type:'checkbox',value:x.id});c.checked=set.has(x.id);return el('label',{},c,x.name)}))};
+  const poolIds=box=>[...box.querySelectorAll('input:checked')].map(c=>Number(c.value));
+  const poolList=poolPick(staff.filter(x=>x.role==='streamer'&&x.active!==false).map(x=>x.id));
+  const poolBox=el('div',{class:'pool-box',hidden:''},el('div',{class:'mut sm'},'Кому раздавать лидов. За день каждый получает по одному: сначала тот, у кого больше часов в эфире за месяц (потом больше FTD), и дальше по убыванию; когда все получили, круг повторяется. С 00:00 по Киеву очередь начинается заново.'),poolList);
+  const ownerBody=()=>owner.value==='random'?{owner_id:'random',pool:poolIds(poolList)}:{owner_id:owner.value||undefined};
   const err=el('div',{class:'err',role:'alert'});
   const form=el('form',{class:'card form',onsubmit:async e=>{e.preventDefault();err.textContent='';
-    try{await api('/links',{method:'POST',body:{slug:slug.value,source:src.value,owner_id:owner.value||undefined}});render()}catch(x){err.textContent=x.message}}},
+    try{await api('/links',{method:'POST',body:{slug:slug.value,source:src.value,...ownerBody()}});render()}catch(x){err.textContent=x.message}}},
     el('label',{},'Адрес ссылки',slug),el('label',{},'Источник',src),
     (me.role==='admin'||me.role==='teamlead')?el('label',{},'Владелец',owner):el('span'),
+    adm?poolBox:null,
     el('button',{class:'btn',type:'submit'},'Создать'),
     adm?el('button',{class:'btn o',type:'button',title:'Ссылка без имени: hunterai.space/jfsu2jd4l1',onclick:async()=>{err.textContent='';
-      try{const x=await api('/links/random',{method:'POST',body:{source:src.value,owner_id:owner.value||undefined}});const nu=goUrl(x.slug);try{await navigator.clipboard.writeText(nu);toast('Создана и скопирована: '+nu)}catch{toast('Создана: '+nu)}render({soft:true})}catch(x){err.textContent=x.message}}},'Создать случайную'):null,err);
+      try{const x=await api('/links/random',{method:'POST',body:{source:src.value,...ownerBody()}});const nu=goUrl(x.slug);try{await navigator.clipboard.writeText(nu);toast('Создана и скопирована: '+nu)}catch{toast('Создана: '+nu)}render({soft:true})}catch(x){err.textContent=x.message}}},'Создать случайную'):null,err);
+  // Владелец ссылки: у «Случайно» — список, между кем раздаются лиды; админ меняет его у основной ссылки
+  const ownerTd=r=>{
+    if(!r.rotate)return td(r.owner_name);
+    const cell=el('td',{style:'white-space:normal;min-width:160px'});
+    const show=()=>cell.replaceChildren(el('span',{},'🎲 Случайно: '+(r.pool.map(x=>x.name).join(', ')||'никого')),adm&&!r.parent_id?el('button',{type:'button',class:'own-btn',style:'margin-left:6px',onclick:edit},'изменить'):null);
+    const edit=()=>{const pk=poolPick(r.pool.map(x=>x.id));
+      cell.replaceChildren(el('div',{style:'display:grid;gap:8px;text-align:left'},pk,el('div',{style:'display:flex;gap:6px;flex-wrap:wrap'},
+        el('button',{type:'button',class:'btn s',onclick:async()=>{try{await api('/links/'+r.id+'/pool',{method:'PATCH',body:{pool:poolIds(pk)}});toast('Список сохранён');render({soft:true})}catch(x){toast(x.message)}}},'Сохранить'),
+        el('button',{type:'button',class:'btn o s',onclick:show},'Отмена'))))};
+    show();return cell};
   const copyBtn=u=>{const b=el('button',{type:'button',class:'cp-btn',title:'Скопировать ссылку','aria-label':'Скопировать ссылку',style:'background:none;border:0;color:var(--mut);cursor:pointer;padding:2px 4px;margin-left:6px;vertical-align:middle;display:inline-grid'},svgIcon(COPYI,15));
     b.addEventListener('click',async()=>{try{await navigator.clipboard.writeText(u);b.replaceChildren(svgIcon('<path d="M5 12.5l4.5 4.5L19 7.5"/>',15));b.style.color='var(--ok)';toast('Ссылка скопирована')}catch{toast('Выделите ссылку и скопируйте вручную')}setTimeout(()=>{b.replaceChildren(svgIcon(COPYI,15));b.style.color=''},1500)});return b};
   const srcTable=ctrT(table(['Источник','Ссылок','Клики','Старты','Регистрации','FTD','Депозиты',...(adm?['Комиссия']:[])],sources.map(x=>[el('td',{},x.source,adm?el('button',{type:'button',title:'Обнулить статистику источника','aria-label':'Обнулить статистику источника',style:'background:none;border:0;color:var(--mut);cursor:pointer;padding:2px 4px;margin-left:6px;vertical-align:middle;display:inline-grid',onclick:async()=>{if(!await askC('Обнулить статистику источника «'+x.source+'»?\nКлики и счётчики по его ссылкам начнутся с нуля. Лиды и деньги не удаляются.'))return;try{await api('/links/reset',{method:'POST',body:{source:x.source}});toast('Статистика источника обнулена');render({soft:true})}catch(e){toast(e.message)}}},svgIcon('<path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5"/>',14)):null),td(x.links,'n'),td(x.clicks,'n'),td(x.starts,'n'),td(x.regs,'n'),td(x.ftds,'n'),td(money(x.deposits),'n'),...(adm?[td(money(x.commission),'n')]:[])]),'Данные по источникам появятся, когда придут первые лиды.'));
   return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Ссылки')),adm?form:null,rangeRow,
     el('div',{style:'display:flex;align-items:center;gap:12px;justify-content:space-between'},el('h3',{style:'font-size:15px'},'По источникам'),adm?el('button',{type:'button',class:'btn o',onclick:async()=>{if(!await askC('Обнулить статистику ВСЕХ ссылок?\nКлики и счётчики начнутся с нуля. Лиды и деньги не удаляются.'))return;try{await api('/links/reset',{method:'POST',body:{all:true}});toast('Вся статистика ссылок обнулена');render({soft:true})}catch(e){toast(e.message)}}},'Обнулить всё'):null),srcTable,
     el('h3',{style:'font-size:15px'},'По ссылкам'),
-    ctrT(table(['Ссылка','Источник','Владелец','Клики','Старты','Рег','FTD','Депозиты',...(adm?['Комиссия']:[])],rows.map(r=>{const u=goUrl(r.slug);return[el('td',{style:'white-space:nowrap'},r.parent_id?el('span',{class:'mut',style:'margin-right:4px'},'↳'):null,el('code',{style:'display:inline'},u),copyBtn(u),el('button',{type:'button',title:'Аналитика ссылки','aria-label':'Аналитика ссылки',style:'background:none;border:0;color:var(--mut);cursor:pointer;padding:2px 4px;vertical-align:middle;display:inline-grid',onclick:()=>openLinkAnalytics(r)},svgIcon('<path d="M4 20V11M10 20V4M16 20v-7M22 20H2"/>',15)),adm?el('button',{type:'button',class:'del-ib sm',title:'Удалить ссылку','aria-label':'Удалить ссылку',onclick:async()=>{if(!await askC('Удалить ссылку '+u+(r.parent_id?'':' и все случайные под ней')+'?\nСсылка перестанет работать. Лиды останутся у владельца.'))return;try{await api('/links/'+r.id,{method:'DELETE'});toast('Ссылка удалена');render({soft:true})}catch(e){toast(e.message)}}},svgIcon(TRASH,14)):null),td(r.source||'—'),td(r.owner_name),td(r.clicks,'n'),td(r.starts,'n'),td(r.regs,'n'),td(r.ftds,'n'),td(money(r.deposits),'n'),...(adm?[td(money(r.commission),'n')]:[])]}),
+    ctrT(table(['Ссылка','Источник','Владелец','Клики','Старты','Рег','FTD','Депозиты',...(adm?['Комиссия']:[])],rows.map(r=>{const u=goUrl(r.slug);return[el('td',{style:'white-space:nowrap'},r.parent_id?el('span',{class:'mut',style:'margin-right:4px'},'↳'):null,el('code',{style:'display:inline'},u),copyBtn(u),el('button',{type:'button',title:'Аналитика ссылки','aria-label':'Аналитика ссылки',style:'background:none;border:0;color:var(--mut);cursor:pointer;padding:2px 4px;vertical-align:middle;display:inline-grid',onclick:()=>openLinkAnalytics(r)},svgIcon('<path d="M4 20V11M10 20V4M16 20v-7M22 20H2"/>',15)),adm?el('button',{type:'button',class:'del-ib sm',title:'Удалить ссылку','aria-label':'Удалить ссылку',onclick:async()=>{if(!await askC('Удалить ссылку '+u+(r.parent_id?'':' и все случайные под ней')+'?\nСсылка перестанет работать. Лиды останутся у владельца.'))return;try{await api('/links/'+r.id,{method:'DELETE'});toast('Ссылка удалена');render({soft:true})}catch(e){toast(e.message)}}},svgIcon(TRASH,14)):null),td(r.source||'—'),ownerTd(r),td(r.clicks,'n'),td(r.starts,'n'),td(r.regs,'n'),td(r.ftds,'n'),td(money(r.deposits),'n'),...(adm?[td(money(r.commission),'n')]:[])]}),
       'Ссылок пока нет. Создайте первую выше.'))];
 }
 

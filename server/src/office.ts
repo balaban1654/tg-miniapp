@@ -593,6 +593,8 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     const showComm = me.role !== 'streamer' && me.role !== 'teamlead';
     const r = await db.query(
       `SELECT l.id, l.slug, l.source, l.campaign, l.created_at, l.parent_id, l.token, s.name AS owner_name, l.owner_id,
+              coalesce((SELECT p.rotate FROM links p WHERE p.id = l.parent_id), l.rotate) AS rotate,
+              (SELECT coalesce(json_agg(json_build_object('id', ps.id, 'name', ps.name) ORDER BY ps.id), '[]'::json) FROM link_pool lp JOIN staff ps ON ps.id = lp.staff_id WHERE lp.link_id = coalesce(l.parent_id, l.id)) AS pool,
               ${from || to ? `(SELECT count(*)::int FROM link_clicks c WHERE c.link_id = l.id AND ${after('c.at')} AND ${inR('c.at')})` : 'l.clicks'} AS clicks,
               (SELECT count(*)::int FROM leads d WHERE ${lead} AND ${inR('d.created_at')}) AS starts,
               (SELECT count(DISTINCT e.tg_id)::int ${ev("('reg')")}) AS regs,
@@ -686,6 +688,33 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // Ссылки выдаёт только админ (в разделе «Сотрудники»)
+  // Владелец «Случайно»: список сотрудников, между которыми по очереди раздаются лиды (не пустой, только существующие активные)
+  const readPool = async (v: unknown): Promise<number[] | string> => {
+    const ids = [...new Set((Array.isArray(v) ? v : []).map(Number).filter((n) => Number.isInteger(n) && n > 0))];
+    if (!ids.length) return 'Отметьте хотя бы одного сотрудника, кому раздавать лидов';
+    const ok = (await db.query('SELECT id FROM staff WHERE id = ANY($1::int[]) AND active AND deleted_at IS NULL', [ids])).rows.map((x) => x.id as number);
+    return ok.length ? ok : 'Сотрудники не найдены';
+  };
+  const savePool = async (linkId: number, ids: number[]) => {
+    await db.query('DELETE FROM link_pool WHERE link_id = $1', [linkId]);
+    await db.query('INSERT INTO link_pool (link_id, staff_id) SELECT $1, unnest($2::int[])', [linkId, ids]);
+  };
+  // Изменить список «Случайно» у ссылки (или выключить случайную раздачу: rotate=false, владелец ссылки — тот, кто её создал)
+  app.patch<{ Params: { id: string } }>('/links/:id/pool', { preHandler: need('admin') }, async (req, reply) => {
+    const id = Number(req.params.id);
+    const b = (req.body ?? {}) as Record<string, unknown>;
+    if (!(await db.query('SELECT 1 FROM links WHERE id = $1 AND parent_id IS NULL', [id])).rowCount) return reply.code(404).send({ error: 'Ссылка не найдена' });
+    if (b.rotate === false) {
+      await db.query('UPDATE links SET rotate = FALSE WHERE id = $1', [id]);
+      return { ok: true };
+    }
+    const pool = await readPool(b.pool);
+    if (typeof pool === 'string') return reply.code(400).send({ error: pool });
+    await db.query('UPDATE links SET rotate = TRUE WHERE id = $1', [id]);
+    await savePool(id, pool);
+    return { ok: true };
+  });
+
   app.post('/links', { preHandler: need('admin') }, async (req, reply) => {
     const me = req.staff!;
     const b = (req.body ?? {}) as Record<string, unknown>;
@@ -694,8 +723,11 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     if (RESERVED_SLUGS.has(slug)) return reply.code(400).send({ error: 'Это слово занято под служебные адреса сайта, выберите другое' });
     if ((await db.query('SELECT 1 FROM links WHERE token = $1', [slug])).rowCount) return reply.code(409).send({ error: 'Такой адрес уже занят' });
 
+    const rotate = b.owner_id === 'random';
+    const pool = rotate ? await readPool(b.pool) : [];
+    if (typeof pool === 'string') return reply.code(400).send({ error: pool });
     let ownerId = me.id;
-    if (b.owner_id && Number(b.owner_id) !== me.id) {
+    if (!rotate && b.owner_id && Number(b.owner_id) !== me.id) {
       const allowed = await db.query(
         `SELECT 1 FROM staff WHERE id = $1 AND ${me.role === 'admin' ? 'TRUE' : `parent_id = ${me.id}`}`,
         [Number(b.owner_id)],
@@ -705,9 +737,10 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     }
     try {
       const r = await db.query(
-        `INSERT INTO links (slug, owner_id, source, campaign) VALUES ($1,$2,$3,$4) RETURNING id`,
-        [slug, ownerId, str(b.source, 60) || null, str(b.campaign, 60) || null],
+        `INSERT INTO links (slug, owner_id, source, campaign, rotate) VALUES ($1,$2,$3,$4,$5) RETURNING id`,
+        [slug, ownerId, str(b.source, 60) || null, str(b.campaign, 60) || null, rotate],
       );
+      if (rotate) await savePool(r.rows[0].id, pool as number[]);
       return { id: r.rows[0].id };
     } catch (e: any) {
       if (e.code === '23505') return reply.code(409).send({ error: 'Такой адрес уже занят' });
@@ -719,8 +752,11 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
   app.post('/links/random', { preHandler: need('admin') }, async (req, reply) => {
     const me = req.staff!;
     const b = (req.body ?? {}) as Record<string, unknown>;
+    const rotate = b.owner_id === 'random';
+    const pool = rotate ? await readPool(b.pool) : [];
+    if (typeof pool === 'string') return reply.code(400).send({ error: pool });
     let ownerId = me.id;
-    if (b.owner_id && Number(b.owner_id) !== me.id) {
+    if (!rotate && b.owner_id && Number(b.owner_id) !== me.id) {
       if (!(await db.query('SELECT 1 FROM staff WHERE id = $1', [Number(b.owner_id)])).rowCount) return reply.code(400).send({ error: 'Владелец не найден' });
       ownerId = Number(b.owner_id);
     }
@@ -730,7 +766,8 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
       for (let k = 0; k < 10; k++) slug += ALPHA[randomInt(ALPHA.length)];
       if (RESERVED_SLUGS.has(slug) || (await db.query('SELECT 1 FROM links WHERE slug = $1 OR token = $1', [slug])).rowCount) continue;
       try {
-        const r = await db.query(`INSERT INTO links (slug, owner_id, source) VALUES ($1,$2,$3) RETURNING id`, [slug, ownerId, str(b.source, 60) || null]);
+        const r = await db.query(`INSERT INTO links (slug, owner_id, source, rotate) VALUES ($1,$2,$3,$4) RETURNING id`, [slug, ownerId, str(b.source, 60) || null, rotate]);
+        if (rotate) await savePool(r.rows[0].id, pool as number[]);
         return { id: r.rows[0].id, slug };
       } catch (e: any) {
         if (e.code !== '23505') throw e;
