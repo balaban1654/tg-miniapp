@@ -915,30 +915,34 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
   });
 
   // ----- Бонусы и штрафы (админ). Стример видит только суммы -----
-  app.get<{ Querystring: { period?: string } }>('/adjustments', { preHandler: admin }, async (req) => {
+  // Бонусы и штрафы: админ — все, тимлидер — своей команды (выписывает и удаляет только свои). Кто выписал — by_name
+  app.get<{ Querystring: { period?: string } }>('/adjustments', { preHandler: reviewer }, async (req) => {
     const period = PERIOD.test(String(req.query.period)) ? String(req.query.period) : await currentPeriod();
     return (
       await db.query(
-        `SELECT a.id, a.staff_id, s.name AS staff_name, a.kind, a.amount::float AS amount, a.comment, a.created_at, to_char(a.created_at AT TIME ZONE '${TZ}', 'DD.MM') AS d
-           FROM staff_adjustments a JOIN staff s ON s.id = a.staff_id WHERE a.period = $1 ORDER BY a.id DESC`,
-        [period],
+        `SELECT a.id, a.staff_id, s.name AS staff_name, a.kind, a.amount::float AS amount, a.comment, a.created_at, to_char(a.created_at AT TIME ZONE '${TZ}', 'DD.MM') AS d,
+                a.created_by, c.name AS by_name, c.role AS by_role
+           FROM staff_adjustments a JOIN staff s ON s.id = a.staff_id LEFT JOIN staff c ON c.id = a.created_by
+          WHERE a.period = $1 AND ($2::int IS NULL OR s.parent_id = $2) ORDER BY a.id DESC`,
+        [period, teamScope(req)],
       )
-    ).rows;
+    ).rows.map((a) => (req.staff!.role === 'teamlead' && a.created_by !== req.staff!.id ? { ...a, comment: null } : a)); // чужой комментарий тимлидеру не показываем
   });
-  app.post('/adjustments', { preHandler: admin }, async (req, reply) => {
+  app.post('/adjustments', { preHandler: reviewer }, async (req, reply) => {
     const b = (req.body ?? {}) as Record<string, any>;
     const kind = b.kind === 'penalty' ? 'penalty' : b.kind === 'bonus' ? 'bonus' : '';
     const amount = Math.abs(Number(b.amount));
     if (!kind || !Number.isFinite(amount) || amount <= 0 || amount > 100000) return reply.code(400).send({ error: 'Укажите тип и сумму' });
     const sid = Number(b.staff_id);
-    if (!(await db.query(`SELECT 1 FROM staff WHERE id = $1 AND active`, [sid])).rowCount) return reply.code(404).send({ error: 'Сотрудник не найден' });
+    if (!(await db.query(`SELECT 1 FROM staff WHERE id = $1 AND active AND ($2::int IS NULL OR parent_id = $2)`, [sid, teamScope(req)])).rowCount) return reply.code(404).send({ error: 'Сотрудник не найден' });
     const period = PERIOD.test(String(b.period)) ? String(b.period) : await currentPeriod();
     if (await isClosed(period)) return reply.code(409).send({ error: 'Месяц закрыт, бонусы и штрафы менять нельзя. Откройте месяц заново в Бухгалтерии.' });
     await db.query('INSERT INTO staff_adjustments (staff_id, period, kind, amount, comment, created_by) VALUES ($1,$2,$3,$4,$5,$6)', [sid, period, kind, amount, str(b.comment, 500) || null, req.staff!.id]);
     return { ok: true };
   });
-  app.delete<{ Params: { id: string } }>('/adjustments/:id', { preHandler: admin }, async (req, reply) => {
-    const row = (await db.query('SELECT period FROM staff_adjustments WHERE id = $1', [Number(req.params.id)])).rows[0];
+  app.delete<{ Params: { id: string } }>('/adjustments/:id', { preHandler: reviewer }, async (req, reply) => {
+    const row = (await db.query('SELECT period, created_by FROM staff_adjustments WHERE id = $1', [Number(req.params.id)])).rows[0];
+    if (row && req.staff!.role === 'teamlead' && row.created_by !== req.staff!.id) return reply.code(403).send({ error: 'Удалить можно только то, что выписали вы' });
     if (row && (await isClosed(row.period))) return reply.code(409).send({ error: 'Месяц закрыт, бонусы и штрафы менять нельзя. Откройте месяц заново в Бухгалтерии.' });
     await db.query('DELETE FROM staff_adjustments WHERE id = $1', [Number(req.params.id)]);
     return { ok: true };
