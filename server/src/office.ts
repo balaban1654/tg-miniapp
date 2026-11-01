@@ -699,6 +699,50 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     await db.query('DELETE FROM link_pool WHERE link_id = $1', [linkId]);
     await db.query('INSERT INTO link_pool (link_id, staff_id) SELECT $1, unnest($2::int[])', [linkId, ids]);
   };
+  // Редактирование ссылки: источник и владелец (сотрудник или «Случайно» со списком). Касается новых лидов, уже пришедшие остаются у своих владельцев.
+  // Дочерние ссылки (…/код) берут источник и владельца основной
+  app.patch<{ Params: { id: string } }>('/links/:id', { preHandler: need('admin') }, async (req, reply) => {
+    const id = Number(req.params.id);
+    const b = (req.body ?? {}) as Record<string, unknown>;
+    if (!(await db.query('SELECT 1 FROM links WHERE id = $1 AND parent_id IS NULL', [id])).rowCount) return reply.code(404).send({ error: 'Ссылка не найдена' });
+    if (b.source !== undefined) await db.query('UPDATE links SET source = $2 WHERE id = $1 OR parent_id = $1', [id, str(b.source, 60) || null]);
+    if (b.owner_id === 'random') {
+      const pool = await readPool(b.pool);
+      if (typeof pool === 'string') return reply.code(400).send({ error: pool });
+      await db.query('UPDATE links SET rotate = TRUE WHERE id = $1', [id]);
+      await savePool(id, pool);
+    } else if (b.owner_id !== undefined) {
+      const owner = Number(b.owner_id);
+      if (!(await db.query('SELECT 1 FROM staff WHERE id = $1 AND active AND deleted_at IS NULL', [owner])).rowCount) return reply.code(400).send({ error: 'Выберите сотрудника' });
+      await db.query('UPDATE links SET owner_id = $2, rotate = FALSE WHERE id = $1 OR parent_id = $1', [id, owner]);
+      await db.query('DELETE FROM link_pool WHERE link_id = $1', [id]);
+    }
+    return { ok: true };
+  });
+
+  // Органика: кому отдавать лидов без ссылки стримера (сам нашёл бота — org, кнопка на сайте — site)
+  app.get('/organic', { preHandler: need('admin') }, async () =>
+    (await db.query(`SELECT kind, mode, owner_id, pool FROM organic_settings ORDER BY kind = 'site', kind`)).rows);
+  app.put<{ Params: { kind: string } }>('/organic/:kind', { preHandler: need('admin') }, async (req, reply) => {
+    const kind = req.params.kind;
+    if (kind !== 'org' && kind !== 'site') return reply.code(404).send({ error: 'Неизвестный тип' });
+    const b = (req.body ?? {}) as Record<string, unknown>;
+    const mode = b.mode === 'owner' || b.mode === 'random' ? b.mode : 'none';
+    let owner: number | null = null;
+    let pool: number[] = [];
+    if (mode === 'owner') {
+      owner = Number(b.owner_id);
+      if (!(await db.query('SELECT 1 FROM staff WHERE id = $1 AND active AND deleted_at IS NULL', [owner])).rowCount) return reply.code(400).send({ error: 'Выберите сотрудника' });
+    }
+    if (mode === 'random') {
+      const p = await readPool(b.pool);
+      if (typeof p === 'string') return reply.code(400).send({ error: p });
+      pool = p;
+    }
+    await db.query('UPDATE organic_settings SET mode = $2, owner_id = $3, pool = $4 WHERE kind = $1', [kind, mode, owner, pool]);
+    return { ok: true };
+  });
+
   // Изменить список «Случайно» у ссылки (или выключить случайную раздачу: rotate=false, владелец ссылки — тот, кто её создал)
   app.patch<{ Params: { id: string } }>('/links/:id/pool', { preHandler: need('admin') }, async (req, reply) => {
     const id = Number(req.params.id);

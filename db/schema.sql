@@ -955,3 +955,21 @@ CREATE TABLE IF NOT EXISTS link_assign (
   at       TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS link_assign_day ON link_assign (link_id, at);
+
+-- Органика (лиды без ссылки стримера): кому их отдавать. kind: 'org' — нашёл бота сам (miniapp-org), 'site' — кнопка на сайте.
+-- mode: none — не закреплять (забирает первый ответивший), owner — одному сотруднику, random — по очереди из списка (как у ссылок «Случайно»)
+CREATE TABLE IF NOT EXISTS organic_settings (
+  kind     TEXT PRIMARY KEY CHECK (kind IN ('org','site')),
+  mode     TEXT NOT NULL DEFAULT 'none' CHECK (mode IN ('none','owner','random')),
+  owner_id INT REFERENCES staff(id) ON DELETE SET NULL,
+  pool     INT[] NOT NULL DEFAULT '{}'
+);
+INSERT INTO organic_settings (kind) VALUES ('org'), ('site') ON CONFLICT DO NOTHING;
+CREATE TABLE IF NOT EXISTS organic_assign (
+  id       SERIAL PRIMARY KEY,
+  kind     TEXT NOT NULL,
+  staff_id INT NOT NULL REFERENCES staff(id) ON DELETE CASCADE,
+  tg_id    BIGINT,
+  at       TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS organic_assign_day ON organic_assign (kind, at);

@@ -19,6 +19,7 @@ export async function attachLead(
   username: string | undefined,
   firstName: string | undefined,
   slug: string | null,
+  origin: 'site' | null = null,
 ): Promise<{ lead: Lead; isNew: boolean }> {
   let linkId: number | null = null;
   let ownerId: number | null = null;
@@ -38,12 +39,14 @@ export async function attachLead(
       }
     }
   }
+  // Органика: новый лид без ссылки (сам нашёл бота или пришёл с сайта) — владелец по настройкам «Органика» в Office
+  if (!linkId && !(await db.query('SELECT 1 FROM leads WHERE tg_id = $1', [tgId])).rowCount) ownerId = await pickOrganicOwner(origin === 'site' ? 'site' : 'org', tgId);
   const ins = await db.query(
-    `INSERT INTO leads (tg_id, username, first_name, link_id, owner_id)
-     VALUES ($1,$2,$3,$4,$5)
+    `INSERT INTO leads (tg_id, username, first_name, link_id, owner_id, origin)
+     VALUES ($1,$2,$3,$4,$5,$6)
      ON CONFLICT (tg_id) DO NOTHING
      RETURNING *`,
-    [tgId, username ?? null, firstName ?? null, linkId, ownerId],
+    [tgId, username ?? null, firstName ?? null, linkId, ownerId, linkId ? null : origin],
   );
   if (ins.rows[0]) {
     await db.query(`INSERT INTO events (tg_id, type) VALUES ($1,'start')`, [tgId]);
@@ -66,22 +69,35 @@ export async function attachLead(
  *  при равенстве — у кого больше часов в эфире за месяц, затем больше FTD за месяц. Так за день каждый получает по одному от лучшего
  *  к худшему, потом круг повторяется. Выбор записывается, чтобы очередь знала, кто уже получил */
 export async function pickRotationOwner(rootLinkId: number, tgId: number): Promise<number | null> {
+  const id = await rankPool(`SELECT staff_id FROM link_pool WHERE link_id = $1`, `SELECT count(*)::int FROM link_assign a WHERE a.link_id = $1 AND a.staff_id = s.id`, rootLinkId);
+  if (id) await db.query('INSERT INTO link_assign (link_id, staff_id, tg_id) VALUES ($1,$2,$3)', [rootLinkId, id, tgId]);
+  return id;
+}
+
+/** Владелец нового лида из органики по настройкам Office: не закреплять, один сотрудник или по очереди из списка */
+export async function pickOrganicOwner(kind: 'org' | 'site', tgId: number): Promise<number | null> {
+  const st = (await db.query('SELECT mode, owner_id FROM organic_settings WHERE kind = $1', [kind])).rows[0];
+  if (!st || st.mode === 'none') return null;
+  if (st.mode === 'owner') return (await db.query('SELECT id FROM staff WHERE id = $1 AND active AND deleted_at IS NULL', [st.owner_id])).rows[0]?.id ?? null;
+  const id = await rankPool(`SELECT unnest(pool) FROM organic_settings WHERE kind = $1`, `SELECT count(*)::int FROM organic_assign a WHERE a.kind = $1 AND a.staff_id = s.id`, kind);
+  if (id) await db.query('INSERT INTO organic_assign (kind, staff_id, tg_id) VALUES ($1,$2,$3)', [kind, id, tgId]);
+  return id;
+}
+
+/** Очередь: меньше получил сегодня (по Киеву) → больше часов в эфире за месяц → больше FTD за месяц */
+async function rankPool(poolSql: string, todaySql: string, key: unknown): Promise<number | null> {
   const TZ = "'Europe/Kyiv'";
   const r = await db.query(
     `SELECT s.id,
-            (SELECT count(*)::int FROM link_assign a WHERE a.link_id = $1 AND a.staff_id = s.id
-               AND (a.at AT TIME ZONE ${TZ})::date = (now() AT TIME ZONE ${TZ})::date) AS today,
+            (${todaySql} AND (a.at AT TIME ZONE ${TZ})::date = (now() AT TIME ZONE ${TZ})::date) AS today,
             (SELECT coalesce(sum(r.approved_min), 0)::int FROM shift_reports r WHERE r.staff_id = s.id AND NOT r.team AND r.status = 'approved'
                AND to_char(r.day, 'YYYY-MM') = to_char(now() AT TIME ZONE ${TZ}, 'YYYY-MM')) AS mins,
             (SELECT count(*)::int FROM events e JOIN leads d ON d.tg_id = e.tg_id WHERE d.owner_id = s.id AND e.type = 'ftd'
                AND to_char(e.created_at AT TIME ZONE ${TZ}, 'YYYY-MM') = to_char(now() AT TIME ZONE ${TZ}, 'YYYY-MM')) AS ftd
-       FROM link_pool lp JOIN staff s ON s.id = lp.staff_id
-      WHERE lp.link_id = $1 AND s.active AND s.deleted_at IS NULL
+       FROM staff s
+      WHERE s.id IN (${poolSql}) AND s.active AND s.deleted_at IS NULL
       ORDER BY today ASC, mins DESC, ftd DESC, s.id ASC LIMIT 1`,
-    [rootLinkId],
+    [key],
   );
-  const id = r.rows[0]?.id as number | undefined;
-  if (!id) return null;
-  await db.query('INSERT INTO link_assign (link_id, staff_id, tg_id) VALUES ($1,$2,$3)', [rootLinkId, id, tgId]);
-  return id;
+  return (r.rows[0]?.id as number | undefined) ?? null;
 }
