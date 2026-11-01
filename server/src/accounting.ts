@@ -835,7 +835,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
 
   // Окупаемость сотрудников за месяц: сколько стоил компании (начислено, а если выплатили больше — выплаченное) и сколько комиссии
   // принесли его клиенты; прибыль, маржа и цена одного FTD
-  // Тимлидеру — только стримеры его команды и без комментария/комиссии (её тимлидер не видит): стоимость, FTD, цена FTD, депозиты
+  // Тимлидеру — только стримеры его команды: стоимость, FTD, цена FTD и комиссия их клиентов
   app.get<{ Querystring: { period?: string } }>('/kpi/payback', { preHandler: reviewer }, async (req) => {
     const period = PERIOD.test(String(req.query.period)) ? String(req.query.period) : await currentPeriod();
     const plan = await planFor(period);
@@ -867,7 +867,8 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
         margin: comm > 0 ? Math.round(((comm - cost) / comm) * 100) : null, ftdCost: k.ftdCount ? r2(cost / k.ftdCount) : null });
     }
     rows.sort((a, b) => b.profit - a.profit);
-    if (lead) return { period, lead: true, rows: rows.map((r) => ({ ...r, commission: null, profit: null, margin: null })).sort((a, b) => (a.ftdCost ?? 1e9) - (b.ftdCost ?? 1e9)) };
+    // Тимлидеру по решению владельца видна комиссия клиентов его команды (прибыль компании считается с комиссии, а не с депозитов)
+    if (lead) return { period, lead: true, rows: rows.map((r) => ({ ...r, deposits: null, profit: null, margin: null })).sort((a, b) => (a.ftdCost ?? 1e9) - (b.ftdCost ?? 1e9)) };
     return { period, rows };
   });
 
