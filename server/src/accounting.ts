@@ -835,13 +835,17 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
 
   // Окупаемость сотрудников за месяц: сколько стоил компании (начислено, а если выплатили больше — выплаченное) и сколько комиссии
   // принесли его клиенты; прибыль, маржа и цена одного FTD
-  app.get<{ Querystring: { period?: string } }>('/kpi/payback', { preHandler: admin }, async (req) => {
+  // Тимлидеру — только стримеры его команды и без комментария/комиссии (её тимлидер не видит): стоимость, FTD, цена FTD, депозиты
+  app.get<{ Querystring: { period?: string } }>('/kpi/payback', { preHandler: reviewer }, async (req) => {
     const period = PERIOD.test(String(req.query.period)) ? String(req.query.period) : await currentPeriod();
     const plan = await planFor(period);
+    const lead = teamScope(req);
     const staff = (await db.query(
       `SELECT id, name, role, streams, active FROM staff
-        WHERE deleted_at IS NULL AND (role = 'streamer' OR streams OR role = 'teamlead' OR id IN (SELECT staff_id FROM team_pay WHERE amount > 0))
+        WHERE deleted_at IS NULL AND ($1::int IS NULL AND (role = 'streamer' OR streams OR role = 'teamlead' OR id IN (SELECT staff_id FROM team_pay WHERE amount > 0))
+                                  OR parent_id = $1 AND (role = 'streamer' OR streams))
         ORDER BY name`,
+      [lead],
     )).rows as { id: number; name: string; role: string; streams: boolean; active: boolean }[];
     const money = new Map(
       ((await db.query(
@@ -863,6 +867,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
         margin: comm > 0 ? Math.round(((comm - cost) / comm) * 100) : null, ftdCost: k.ftdCount ? r2(cost / k.ftdCount) : null });
     }
     rows.sort((a, b) => b.profit - a.profit);
+    if (lead) return { period, lead: true, rows: rows.map((r) => ({ ...r, commission: null, profit: null, margin: null })).sort((a, b) => (a.ftdCost ?? 1e9) - (b.ftdCost ?? 1e9)) };
     return { period, rows };
   });
 
@@ -1235,18 +1240,19 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
   });
 
   // ----- Расходы компании (админ) -----
-  app.get<{ Querystring: { period?: string } }>('/expenses', { preHandler: admin }, async (req) => {
+  // Расходы: админ видит все, тимлидер — только записанные им самим (они тоже идут в расходы компании на дашборде)
+  app.get<{ Querystring: { period?: string } }>('/expenses', { preHandler: reviewer }, async (req) => {
     const period = PERIOD.test(String(req.query.period)) ? String(req.query.period) : await currentPeriod();
     const rows = (
       await db.query(
-        `SELECT e.id, to_char(e.day, 'YYYY-MM-DD') AS day, e.amount::float AS amount, e.comment, c.name AS by
-           FROM expenses e LEFT JOIN staff c ON c.id = e.created_by WHERE to_char(e.day, 'YYYY-MM') = $1 ORDER BY e.day DESC, e.id DESC`,
-        [period],
+        `SELECT e.id, to_char(e.day, 'YYYY-MM-DD') AS day, e.amount::float AS amount, e.comment, c.name AS by, c.role AS by_role
+           FROM expenses e LEFT JOIN staff c ON c.id = e.created_by WHERE to_char(e.day, 'YYYY-MM') = $1 AND ($2::int IS NULL OR e.created_by = $2) ORDER BY e.day DESC, e.id DESC`,
+        [period, teamScope(req)],
       )
     ).rows;
     return { period, total: r2(rows.reduce((a: number, x: any) => a + x.amount, 0)), rows };
   });
-  app.post('/expenses', { preHandler: admin }, async (req, reply) => {
+  app.post('/expenses', { preHandler: reviewer }, async (req, reply) => {
     const b = (req.body ?? {}) as Record<string, any>;
     const amount = Math.abs(Number(String(b.amount).replace(',', '.')));
     const comment = str(b.comment, 300);
@@ -1256,8 +1262,8 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     await db.query('INSERT INTO expenses (day, amount, comment, created_by) VALUES ($1::date, $2, $3, $4)', [day, r2(amount), comment, req.staff!.id]);
     return { ok: true };
   });
-  app.delete<{ Params: { id: string } }>('/expenses/:id', { preHandler: admin }, async (req) => {
-    await db.query('DELETE FROM expenses WHERE id = $1', [Number(req.params.id)]);
+  app.delete<{ Params: { id: string } }>('/expenses/:id', { preHandler: reviewer }, async (req) => {
+    await db.query('DELETE FROM expenses WHERE id = $1 AND ($2::int IS NULL OR created_by = $2)', [Number(req.params.id), teamScope(req)]);
     return { ok: true };
   });
 

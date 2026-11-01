@@ -535,7 +535,7 @@ const ROLE={admin:'Админ',teamlead:'Тимлидер',streamer:'Стрим�
 const STATUS={new:['Новый','p-pur'],registered:['Регистрация','ev-reg'],ftd:['FTD','ev-ftd'],active:['Активный','ev-dep'],churned:['Отвал','p-bad']};
 let me=null,tab='home';
 /* Адрес страницы: у каждого раздела своя ссылка (#/leads, #/acc/review), при обновлении остаёмся на месте */
-const STAFF_TABS=['team','links','tasks','review','why','depb','bonus'];
+const STAFF_TABS=['team','links','tasks','review','why','depb','bonus','roi','exp'];
 const ACC_TABS=['sum','roi','review','bonus','depb','pay','exp','why','plan','team','form'];
 function hashPath(){return '/'+tab+(tab==='acc'?'/'+accState.tab:tab==='plans'?'/'+plansState.tab:tab==='staff'?'/'+staffState.tab:'')}
 function pushHash(){const h='#'+hashPath();if(location.hash!==h)history.pushState(null,'',h)}
@@ -2144,16 +2144,16 @@ async function viewStaff(){
   const root=el('div',{style:'display:grid;gap:14px'}),body=el('div',{style:'display:grid;gap:14px'}),bar=el('div',{class:'lc-tabs',role:'tablist'});
   const canLinks=isAdmin||me.role==='teamlead';
   const lead=me.role==='teamlead';
-  if(!canLinks||(!lead&&['tasks','review','why','depb','bonus'].includes(staffState.tab)))staffState.tab='team';
+  if(!canLinks||(!lead&&['tasks','review','why','depb','bonus','roi','exp'].includes(staffState.tab)))staffState.tab='team';
   // Тимлид: после ссылок отчёты своей команды и причины по сменам (с числом причин без решения)
   // Цифры у вкладок тимлида: задачи (свои открытые + выполненные командой), отчёты на проверке, причины без решения
   const countWhy=refreshLeadPending,countTasks=refreshLeadPending;
   await refreshLeadPending();
-  const tabsList=()=>[['team',isAdmin?'Сотрудники':'Моя команда'],...(canLinks?[['links','Ссылки']]:[]),...(lead?[['tasks','Задачи'],['review','Отчёты'],['why','Причины по сменам'],['depb','Бонусы за додепы'],['bonus','Бонусы и штрафы']]:[])];
+  const tabsList=()=>[['team',isAdmin?'Сотрудники':'Моя команда'],...(canLinks?[['links','Ссылки']]:[]),...(lead?[['tasks','Задачи'],['review','Отчёты'],['why','Причины по сменам'],['depb','Бонусы за додепы'],['bonus','Бонусы и штрафы'],['roi','Окупаемость'],['exp','Расходы']]:[])];
   let TABS=tabsList();
   const drawBar=()=>(TABS=tabsList(),bar).replaceChildren(...TABS.map(([k,t])=>el('button',{type:'button',role:'tab','aria-selected':String(k===staffState.tab),class:'lc-tab'+(k===staffState.tab?' on':''),onclick:()=>{staffState.tab=k;drawBar();drawBody();pushHash()}},t,lead&&leadPend[k]>0?el('span',{class:'nbadge pulse tb',title:'Ждут вашего решения'},String(leadPend[k])):null)));
   window.__staffTabsRedraw=()=>{if(bar.isConnected)drawBar()};
-  const drawBody=async soft=>{if(!soft)body.replaceChildren(el('div',{class:'mut'},'Загрузка…'));try{const t=staffState.tab;body.replaceChildren(...(t==='links'?(await viewLinks()).slice(1):t==='tasks'?await leadTasksBody(async()=>{await countTasks();drawBar();await drawBody(true)}):t==='bonus'?await accBonus(async()=>{await drawBody(true)}):t==='depb'?await accDepBonus(async()=>{await refreshLeadPending();drawBar();await drawBody(true)}):['review','why'].includes(t)?await leadReviewBody(t,async()=>{await countWhy();drawBar();await drawBody(true)}):(await staffTeam()).slice(1)).filter(Boolean))}catch(x){if(x.message!=='auth')body.replaceChildren(el('div',{class:'err'},x.message))}};
+  const drawBody=async soft=>{if(!soft)body.replaceChildren(el('div',{class:'mut'},'Загрузка…'));try{const t=staffState.tab;body.replaceChildren(...(t==='links'?(await viewLinks()).slice(1):t==='tasks'?await leadTasksBody(async()=>{await countTasks();drawBar();await drawBody(true)}):t==='bonus'?await accBonus(async()=>{await drawBody(true)}):['roi','exp'].includes(t)?await leadMonthBody(t==='roi'?accRoi:accExp,async()=>{await drawBody(true)}):t==='depb'?await accDepBonus(async()=>{await refreshLeadPending();drawBar();await drawBody(true)}):['review','why'].includes(t)?await leadReviewBody(t,async()=>{await countWhy();drawBar();await drawBody(true)}):(await staffTeam()).slice(1)).filter(Boolean))}catch(x){if(x.message!=='auth')body.replaceChildren(el('div',{class:'err'},x.message))}};
   drawBar();root.append(...(canLinks?[bar]:[]),body);await drawBody();
   return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},isAdmin?'Сотрудники':'Моя команда')),root];
 }
@@ -3037,6 +3037,11 @@ let accRefresh=()=>{};
 async function accRoi(){
   const d=await api('/kpi/payback?period='+accState.period);
   const R=d.rows,sum=f=>R.reduce((a,r)=>a+(r[f]||0),0);
+  // Тимлидер комиссию не видит: стоимость стримеров его команды, FTD, цена одного FTD и депозиты клиентов
+  if(d.lead){const cost=sum('cost'),ftd=sum('ftd');
+    const tiles=el('div',{class:'kpis'},...[['Команда стоила',usd2(cost)],['FTD',String(ftd)],['Цена одного FTD',ftd?usd2(cost/ftd):'—'],['Депозиты клиентов',usd2(sum('deposits'))]].map(([a,b])=>el('div',{class:'kpi'},el('small',{},a),el('b',{},b))));
+    return[tiles,ctrT(table(['Стример','Стоил','FTD','Цена FTD','Депозиты клиентов'],R.map(r=>[td(r.name),td(usd2(r.cost),'n'),td(String(r.ftd),'n'),td(r.ftdCost!==null?usd2(r.ftdCost):'—','n'),td(usd2(r.deposits),'n')]),'Данных за месяц пока нет.')),
+      el('div',{class:'mut sm'},'«Стоил» — начислено стримеру за месяц (смены, лиды, бонусы), а если выплатили больше — выплаченное. Чем ниже цена одного FTD, тем выгоднее стример. Сверху самые выгодные.')]}
   const cost=sum('cost'),comm=sum('commission'),prof=comm-cost,ftd=sum('ftd');
   const pc=v=>v===null?'—':v+'%';
   const col=v=>v>0?'var(--ok)':v<0?'var(--bad)':'';
@@ -3298,8 +3303,9 @@ async function accExp(){
   const form=el('div',{class:'card',style:'display:grid;gap:10px'},el('h3',{style:'font-size:14px'},'Записать расход'),
     el('div',{class:'lc-two'},el('label',{},'Сумма, $',amount),el('label',{},'Комментарий',comment),el('label',{},'Дата',day)),err,
     el('div',{},el('button',{class:'btn s',type:'button',onclick:add},'Добавить')));
-  const rows=d.rows.map(x=>[td(dmy(x.day).slice(0,5)),el('td',{style:'white-space:normal;text-align:left;min-width:220px'},x.comment),td('−'+usd2(x.amount),'n'),td(x.by||'—'),el('td',{},el('button',{class:'btn o s',type:'button',onclick:async()=>{try{await api('/expenses/'+x.id,{method:'DELETE'});accRefresh()}catch(e){toast(e.message)}}},'Удалить'))]);
-  return[el('div',{class:'head'},el('h3',{style:'font-size:15px'},'Расходы за '+perLabel(accState.period)),el('span',{class:'pill p-bad'},'всего −'+usd2(d.total))),
+  const rows=d.rows.map(x=>[td(dmy(x.day).slice(0,5)),el('td',{style:'white-space:normal;text-align:left;min-width:220px'},x.comment),td('−'+usd2(x.amount),'n'),td(x.by?x.by+(x.by_role==='teamlead'?' (тимлидер)':''):'—'),el('td',{},el('button',{class:'btn o s',type:'button',onclick:async()=>{try{await api('/expenses/'+x.id,{method:'DELETE'});accRefresh()}catch(e){toast(e.message)}}},'Удалить'))]);
+  const leadNote=me.role==='teamlead'?el('div',{class:'mut sm'},'Здесь только расходы, которые записали вы. Они попадают в общие расходы компании, их видит админ.'):null;
+  return[el('div',{class:'head'},el('h3',{style:'font-size:15px'},'Расходы за '+perLabel(accState.period)),el('span',{class:'pill p-bad'},'всего −'+usd2(d.total))),leadNote,
     form,ctrT(table(['Дата','На что','Сумма','Записал',''],rows,'За этот месяц расходов нет.')),
     el('div',{class:'mut sm'},'Расходы вычитаются из чистой прибыли на дашборде. Зарплаты сюда вносить не нужно, они считаются сами.')];
 }
@@ -3387,6 +3393,14 @@ async function leadTasksBody(refresh){
   return[el('h3',{style:'font-size:16px'},'Мои задачи от руководителя'),...mine,el('h3',{style:'font-size:16px;margin-top:10px'},'Задачи команде'),...await plansTasks()];
 }
 /** Отчёты команды (тимлид, вкладки в «Моя команда»): отчёты своих стримеров и причины по сменам за месяц */
+/** Вкладка тимлидера с выбором месяца (Окупаемость, Расходы) */
+async function leadMonthBody(fn,refresh){
+  if(!accState.period)accState.period=kyivToday().slice(0,7);
+  accRefresh=refresh;
+  const go=d=>()=>{accState.period=perShift(accState.period,d);refresh()};
+  const nav=el('div',{class:'mon2'},el('button',{type:'button','aria-label':'Предыдущий месяц',onclick:go(-1)},'‹'),el('b',{},perLabel(accState.period)),el('button',{type:'button','aria-label':'Следующий месяц',onclick:go(1)},'›'));
+  return[el('div',{style:'display:flex;justify-content:flex-end'},nav),...await fn()];
+}
 async function leadReviewBody(kind,refresh){
   if(!accState.period)accState.period=kyivToday().slice(0,7);
   accRefresh=refresh;
