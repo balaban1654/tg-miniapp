@@ -1415,8 +1415,9 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
       let paid = 0;
       for (const mm of months) {
         const k = await kpi(s.id, mm.m);
-        // Расход компании: начислено по полным ставкам, а если выплатили ещё больше — сколько выплатили (переплата не долг стримера)
-        salary += Math.max(k.fullTotal, k.paid) * mm.w;
+        // Расход компании: начислено по полным ставкам, а если выплатили ещё больше — сколько выплатили (переплата не долг стримера).
+        // У админов и тимлидов, которые стримят, выплаты общие со ставкой «ЗП (команда)»: переплату считаем там, один раз на человека
+        salary += (s.role === 'streamer' ? Math.max(k.fullTotal, k.paid) : k.fullTotal) * mm.w;
         paid += k.paid * mm.w;
       }
       const a = evRange.get(s.id) ?? emptyAgg();
@@ -1508,8 +1509,9 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
           const bonus = t.role === 'teamlead' ? (await teamleadPay(t.id, mm.m, await planFor(mm.m))).bonus : 0;
           const adj = t.streams ? 0 : Number((await db.query(`SELECT coalesce(sum(CASE WHEN kind = 'bonus' THEN amount ELSE -amount END), 0)::float AS s FROM staff_adjustments WHERE staff_id = $1 AND period = $2`, [t.id, mm.m])).rows[0].s);
           const pm = Number((await db.query(`SELECT coalesce(sum(amount), 0)::float AS s FROM staff_payouts WHERE staff_id = $1 AND period = $2`, [t.id, mm.m])).rows[0].s);
-          // У стримящих выплаты уже учтены в их строке стримера; у остальных переплата — тоже расход
-          salary += (t.streams ? base + bonus + adj : Math.max(base + bonus + adj, pm)) * mm.w;
+          // Переплата — тоже расход, но один раз на человека: у стримящих из выплат сначала вычитаем начисленное за смены и лиды
+          const streamFull = t.streams ? (await kpi(t.id, mm.m)).fullTotal : 0;
+          salary += Math.max(base + bonus + adj, pm - streamFull) * mm.w;
           paid += pm * mm.w;
         }
         if (salary > 0 || paid > 0) teamSal.push({ ...t, salary: r2(salary), paid: r2(paid) });
