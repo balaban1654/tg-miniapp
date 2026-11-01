@@ -342,9 +342,11 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // Ссылка кнопки «Попробовать демо» в Тренажёре (админ задаёт в кабинете, «Медиа»). Пусто: кнопки нет
-  app.get('/trainer/demo', { preHandler: auth }, async () => {
+  // Ссылка «Попробовать демо» общая для всех, но с меткой click_id = Telegram ID: если клиент зарегистрируется через демо,
+  // постбек найдёт его в боте (владелец остаётся тот, что был; без владельца — по настройкам органики)
+  app.get('/trainer/demo', { preHandler: auth }, async (req) => {
     const r = (await db.query(`SELECT value FROM app_settings WHERE key = 'demo_url'`)).rows[0];
-    return { url: r?.value || null };
+    return { url: r?.value ? withClickId(r.value, req.tg!.id) ?? r.value : null };
   });
   app.get('/trainer', { preHandler: auth }, async (req) => {
     const done = new Set((await db.query('SELECT lesson FROM lesson_progress WHERE tg_id = $1', [req.tg!.id])).rows.map((x) => x.lesson));

@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { markLeadBlocked } from './leadblock.js';
 import { createHash, timingSafeEqual } from 'node:crypto';
-import { db } from './db.js';
+import { db, pickOrganicOwner } from './db.js';
 import { config } from './config.js';
 import { processLead } from './push.js';
 import { requiredFor, markConnected, TOL } from './connect.js';
@@ -72,10 +72,14 @@ export async function postbackRoutes(app: FastifyInstance): Promise<void> {
     if (traderId && !lead.rows[0].trader_id) {
       await db.query('UPDATE leads SET trader_id = $2 WHERE tg_id = $1 AND trader_id IS NULL', [tgId, traderId]);
     }
-    // Лид без владельца (пришёл не через нашу ссылку): закрепляем по коду кампании {ac}
-    if (!lead.rows[0].owner_id && q.ac) {
-      const o = await db.query('SELECT id FROM staff WHERE lower(po_campaign) = lower($1) AND active', [q.ac]);
-      if (o.rowCount) await db.query('UPDATE leads SET owner_id = $2 WHERE tg_id = $1 AND owner_id IS NULL', [tgId, o.rows[0].id]);
+    // Лид без владельца. Пришёл по ссылке стримера — у него уже есть владелец, его не трогаем (в том числе при регистрации через общую демо-ссылку).
+    // Органика (сам нашёл бота или с сайта): владелец по настройкам «Органика» (например, «Случайно»); если там «Не закреплять» — по коду кампании {ac}
+    if (!lead.rows[0].owner_id) {
+      const meta = (await db.query('SELECT link_id, origin FROM leads WHERE tg_id = $1', [tgId])).rows[0];
+      const org = meta && !meta.link_id ? await pickOrganicOwner(meta.origin === 'site' ? 'site' : 'org', tgId) : null;
+      const byAc = !org && q.ac ? (await db.query('SELECT id FROM staff WHERE lower(po_campaign) = lower($1) AND active', [q.ac])).rows[0]?.id : null;
+      const owner = org ?? byAc;
+      if (owner) await db.query('UPDATE leads SET owner_id = $2 WHERE tg_id = $1 AND owner_id IS NULL', [tgId, owner]);
     }
     const amount = Math.abs(Number(pick(q, AMOUNT_KEYS))) || null;
 
