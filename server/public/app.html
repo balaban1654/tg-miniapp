@@ -1860,7 +1860,10 @@ function viewProfile(){
     el('button',{class:'back',type:'button',onclick:()=>go('home')},'‹ На главную')]);
 }
 /** Реферальная программа: пока в разработке, отсчёт до запуска 1-го числа в 22:00 по Киеву (ближайшее, ещё не прошедшее) */
+// Запуск перенесён на сутки: 2 ноября 2026, 22:00 по Киеву (20:00 UTC). Когда пройдёт — отсчёт до 1-го числа следующего месяца
+const REF_LAUNCH=Date.UTC(2026,10,2,20,0,0);
 function referralLaunch(){
+  if(REF_LAUNCH>nowMs())return REF_LAUNCH;
   const kyivParts=d=>Object.fromEntries(new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Kyiv',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(d).map(p=>[p.type,p.value]));
   // Киевское время в UTC: подбираем смещение (зимой +2, летом +3)
   const at=(y,m)=>{for(const off of [2,3]){const t=Date.UTC(y,m-1,1,22-off,0,0);const k=kyivParts(new Date(t));if(+k.day===1&&+k.hour===22)return t}return Date.UTC(y,m-1,1,20,0,0)};
