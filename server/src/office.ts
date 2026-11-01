@@ -2518,7 +2518,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     const DT = depTypes(me);
     const r = await db.query(
       `SELECT d.tg_id, d.trader_id, d.is_tester, d.lead_role, d.origin, d.username, d.first_name, d.status, d.access, d.created_at, d.owner_id, (d.banned_at IS NOT NULL) AS banned, ${leadListDate('d')} AS status_at,
-              s.name AS owner_name, coalesce(l.slug, (SELECT slug FROM links WHERE owner_id = d.owner_id ORDER BY id LIMIT 1)) AS link_slug,
+              s.name AS owner_name, l.slug AS link_slug,
               (SELECT amount FROM events e WHERE e.tg_id = d.tg_id AND e.type = 'ftd' ORDER BY e.created_at, e.id LIMIT 1) AS ftd_amount,
               coalesce((SELECT sum(amount) FROM events e WHERE e.tg_id = d.tg_id AND e.type IN ${DT}),0) AS deposits,
               coalesce((SELECT sum(amount) FROM events e WHERE e.tg_id = d.tg_id AND e.type = 'comm' AND ${me.role === 'streamer' || me.role === 'teamlead' ? 'false' : 'true'}),0) AS commission
