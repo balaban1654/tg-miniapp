@@ -9,6 +9,7 @@
 (function(){function f(){try{var sa=navigator.standalone===true||matchMedia('(display-mode:standalone)').matches;var d=document.documentElement.style;
 if(sa&&innerHeight<screen.height-20&&innerWidth<=screen.width)d.setProperty('--sat','0px');else d.removeProperty('--sat')}catch(e){}}
 f();addEventListener('resize',f);addEventListener('orientationchange',f)})();
+
 </script>
 <meta name="theme-color" content="#0d0817">
 <title>Hunter Office</title>
@@ -486,6 +487,7 @@ textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10
 .org-row{display:grid;grid-template-columns:minmax(200px,1fr) 2fr;gap:12px;align-items:start;padding-top:12px;border-top:1px solid var(--line)}.org-row>*{min-width:0}.org-row select{flex:1 1 220px;width:auto;min-width:0;max-width:420px}@media(max-width:700px){.org-row{grid-template-columns:1fr}}
 .mc-ava{width:56px;height:56px;border-radius:50%;background:var(--card2);border:2px solid var(--acc);overflow:hidden;flex:none}.mc-ava img{width:100%;height:100%;object-fit:cover;display:block}
 .me-cont{display:flex;gap:8px}.me-ci{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;background:var(--card2);border:1px solid var(--line);color:var(--acc2);transition:background .15s,color .15s}.me-ci:hover{background:var(--acc);color:#fff}
+.pw-wrap{position:relative;display:block}.pw-wrap input{padding-right:44px;width:100%}.pw-eye{position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:0;padding:6px;color:var(--mut);cursor:pointer;display:grid;place-items:center;border-radius:8px}.pw-eye:hover{color:var(--fg)}
 </style>
 </head>
 <body>
@@ -495,7 +497,7 @@ textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10
   <form class="card" id="loginForm" autocomplete="on">
     <div class="brand"><div class="logo"><img src="/img/logo-256.webp" alt="H" draggable="false"></div><div><h1 style="font-size:18px">Hunter Office</h1><div class="hint">Кабинет команды Hunter AI</div></div></div>
     <label>Логин<input id="lLogin" name="username" autocomplete="username" required></label>
-    <label>Пароль<input id="lPass" name="password" type="password" autocomplete="current-password" required></label>
+    <label>Пароль<span class="pw-wrap"><input id="lPass" name="password" type="password" autocomplete="current-password" required><button type="button" class="pw-eye" id="lPassEye" aria-label="Показать пароль" title="Показать пароль" aria-pressed="false"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s4-6 10-6 10 6 10 6-4 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button></span></label>
     <div id="lCodeW" class="lc-field" hidden><label id="lCodeL">Код из приложения-аутентификатора</label>
       <div class="otp" id="otp"><input inputmode="numeric" maxlength="1" aria-label="Цифра 1" autocomplete="one-time-code"><input inputmode="numeric" maxlength="1" aria-label="Цифра 2" autocomplete="off"><input inputmode="numeric" maxlength="1" aria-label="Цифра 3" autocomplete="off"><input inputmode="numeric" maxlength="1" aria-label="Цифра 4" autocomplete="off"><input inputmode="numeric" maxlength="1" aria-label="Цифра 5" autocomplete="off"><input inputmode="numeric" maxlength="1" aria-label="Цифра 6" autocomplete="off"></div>
       <input id="lCode" name="otp" maxlength="11" placeholder="Резервный код" autocomplete="off" hidden>
@@ -521,6 +523,13 @@ textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10
 </div>
 
 <script>
+/* Глазик в поле пароля на входе: показать/скрыть введённый пароль */
+(()=>{const b=document.getElementById('lPassEye'),i=document.getElementById('lPass');if(!b||!i)return;
+  const ON='<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s4-6 10-6 10 6 10 6-4 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+  const OFF='<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 6.1A10.6 10.6 0 0 1 12 6c6 0 10 6 10 6a17 17 0 0 1-3.2 3.8M6.5 7.6A17 17 0 0 0 2 12s4 6 10 6a9.7 9.7 0 0 0 4.4-1"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>';
+  b.addEventListener('click',()=>{const show=i.type==='password';i.type=show?'text':'password';b.innerHTML=show?OFF:ON;const t=show?'Скрыть пароль':'Показать пароль';b.title=t;b.setAttribute('aria-label',t);b.setAttribute('aria-pressed',String(show));i.focus()});
+})();
+
 const $=s=>document.querySelector(s);
 const ROLE={admin:'Админ',teamlead:'Тимлидер',streamer:'Стример',buyer:'Медиабайер',analyst:'Аналитик'};
 const STATUS={new:['Новый','p-pur'],registered:['Регистрация','ev-reg'],ftd:['FTD','ev-ftd'],active:['Активный','ev-dep'],churned:['Отвал','p-bad']};
