@@ -868,8 +868,9 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     }
     rows.sort((a, b) => b.profit - a.profit);
     // Тимлидеру по решению владельца видна комиссия клиентов его команды (прибыль компании считается с комиссии, а не с депозитов)
+    const expenses = r2(Number((await db.query(`SELECT coalesce(sum(amount), 0)::float AS s FROM expenses WHERE to_char(day, 'YYYY-MM') = $1`, [period])).rows[0].s));
     if (lead) return { period, lead: true, rows: rows.map((r) => ({ ...r, deposits: null, profit: null, margin: null })).sort((a, b) => (a.ftdCost ?? 1e9) - (b.ftdCost ?? 1e9)) };
-    return { period, rows };
+    return { period, rows, expenses };
   });
 
   app.get<{ Params: { id: string }; Querystring: { period?: string } }>('/kpi/:id', { preHandler: admin }, async (req, reply) => {

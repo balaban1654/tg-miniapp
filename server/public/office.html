@@ -3057,14 +3057,15 @@ async function accRoi(){
     const tiles=el('div',{class:'kpis'},...[['Команда стоила',usd2(cost)],['FTD',String(ftd)],['Цена одного FTD',ftd?usd2(cost/ftd):'—'],['Комиссия клиентов',usd2(sum('commission'))]].map(([a,b])=>el('div',{class:'kpi'},el('small',{},a),el('b',{},b))));
     return[tiles,ctrT(table(['Стример','Стоил','FTD','Цена FTD','Комиссия клиентов'],R.map(r=>[td(r.name),td(usd2(r.cost),'n'),td(String(r.ftd),'n'),td(r.ftdCost!==null?usd2(r.ftdCost):'—','n'),td(usd2(r.commission),'n')]),'Данных за месяц пока нет.')),
       el('div',{class:'mut sm'},'«Стоил» — начислено стримеру за месяц (смены, лиды, бонусы), а если выплатили больше — выплаченное. Чем ниже цена одного FTD, тем выгоднее стример. Сверху самые выгодные.')]}
-  const cost=sum('cost'),comm=sum('commission'),prof=comm-cost,ftd=sum('ftd');
+  // Прибыль и маржа в плитках — как на дашборде: комиссия − зарплаты − расходы компании. В таблице по людям — без расходов
+  const cost=sum('cost'),comm=sum('commission'),exp=d.expenses||0,prof=comm-cost-exp,ftd=sum('ftd');
   const pc=v=>v===null?'—':v+'%';
   const col=v=>v>0?'var(--ok)':v<0?'var(--bad)':'';
-  const tiles=el('div',{class:'kpis'},...[['Стоили компании',usd2(cost)],['Комиссия их клиентов',usd2(comm)],['Цена одного FTD',ftd?usd2(cost/ftd):'—'],['Прибыль',el('span',{style:'color:'+col(prof)},usd2(prof))],['Маржа',pc(comm>0?Math.round(prof/comm*100):null)]].map(([a,b])=>el('div',{class:'kpi'},el('small',{},a),el('b',{},b))));
+  const tiles=el('div',{class:'kpis'},...[['Стоили компании',usd2(cost)],['Расходы',exp?'−'+usd2(exp):usd2(0)],['Комиссия их клиентов',usd2(comm)],['Цена одного FTD',ftd?usd2(cost/ftd):'—'],['Чистая прибыль',el('span',{style:'color:'+col(prof)},usd2(prof))],['Маржа',pc(comm>0?Math.round(prof/comm*100):null)]].map(([a,b])=>el('div',{class:'kpi'},el('small',{},a),el('b',{},b))));
   const rows=R.map(r=>[td(r.name),td(usd2(r.cost),'n'),td(String(r.ftd),'n'),td(r.ftdCost!==null?usd2(r.ftdCost):'—','n'),td(usd2(r.commission),'n'),
     el('td',{class:'n'},el('b',{style:'color:'+col(r.profit)},usd2(r.profit))),el('td',{class:'n',style:'color:'+col(r.margin===null?0:r.margin)},pc(r.margin))]);
   return[tiles,ctrT(table(['Сотрудник','Стоил','FTD','Цена FTD','Комиссия клиентов','Прибыль','Маржа'],rows,'Данных за месяц пока нет.')),
-    el('div',{class:'mut sm'},'«Стоил» — начислено за месяц (смены, лиды, бонусы, ставка из «ЗП (команда)»), а если выплатили больше — выплаченное. «Комиссия клиентов» — комиссия партнёрки с лидов этого сотрудника за месяц. Прибыль = комиссия − стоил. Комиссия с клиента приходит и в следующие месяцы, поэтому у новых стримеров маржа сначала ниже. Расходы компании (реклама и т. п.) сюда не входят.')];
+    el('div',{class:'mut sm'},'«Стоил» — начислено за месяц (смены, лиды, бонусы, ставка из «ЗП (команда)»), а если выплатили больше — выплаченное. «Комиссия клиентов» — комиссия партнёрки с лидов этого сотрудника за месяц. Прибыль в таблице = комиссия − стоил. Чистая прибыль сверху = комиссия − все зарплаты − расходы, маржа = чистая прибыль ÷ комиссия. Комиссия с клиента приходит и в следующие месяцы, поэтому у новых стримеров маржа сначала ниже. Расходы в таблице по людям не делятся.')];
 }
 async function accSum(){
   const d=await api('/kpi/summary?period='+accState.period);
