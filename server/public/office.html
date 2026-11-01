@@ -1961,6 +1961,8 @@ async function viewLeads(){
     let list=src().filter(r=>(!F.status||(r.status===F.status&&!isStaff(r)))&&(!F.link||r.link_slug===F.link)&&(!F.owner||(F.owner==='none'?!r.owner_id:String(r.owner_id)===F.owner))
       &&(!qq||[r.username,r.first_name,r.tg_id,r.trader_id].some(v=>v!=null&&String(v).toLowerCase().includes(qq))));
     const flat=F.q||F.status||F.link||F.owner||F.sort!=='new';
+    // С фильтрами список общий: сотрудников (админ состав) показываем только при поиске — у них нет даты в периоде
+    if(flat&&!F.q.trim())list=list.filter(r=>!isStaff(r));
     const by={dep:(a,b)=>b.deposits-a.deposits,depAsc:(a,b)=>a.deposits-b.deposits,comm:(a,b)=>b.commission-a.commission,old:(a,b)=>new Date(a.status_at||a.created_at)-new Date(b.status_at||b.created_at),new:(a,b)=>new Date(b.status_at||b.created_at)-new Date(a.status_at||a.created_at)}[F.sort];
     list=[...list].sort(by);
     // @r1654 (создатель компании) всегда самый первый в админ составе
