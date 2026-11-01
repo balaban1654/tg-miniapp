@@ -1032,7 +1032,7 @@ function rangeBar(onApply){
   const pillText=el('span',{});
   const pill=el('button',{type:'button',class:'rb-pill','aria-haspopup':'dialog','aria-expanded':'false'},svgIcon(IC_CAL,18),pillText,(()=>{const c=svgIcon(IC_CHEVD,16);c.classList.add('chv');return c})());
   const pop=el('div',{class:'rb-pop',hidden:'',role:'dialog','aria-label':'Выбор периода'});
-  const go=el('button',{type:'button',class:'rb-go',onclick:()=>{dxRange={...sel};anchor=null;pop.hidden=true;pill.classList.remove('on');onApply(dxRange)}},'Найти');
+  const go=el('button',{type:'button',class:'rb-go',onclick:()=>{dxRange={...sel};anchor=null;pop.hidden=true;pill.classList.remove('on');onApply(dxRange);try{updateBadge()}catch{}}},'Найти');
   const days=[];
   const monthEl=(m,side)=>{
     const first=m+'-01',dow=(new Date(first+'T00:00:00Z').getUTCDay()+6)%7,start=addDay(first,-dow);
@@ -2279,8 +2279,8 @@ function navLblNodes(k){
   const base=k==='chats'?'Чаты':'Лиды',c=navCnt[k];
   if(!c)return[base];
   const out=[base];
-  if(c.total!==null&&c.total!==undefined)out.push(' ',el('span',{class:'nb-t'},String(c.total)));
-  if(c.reg)out.push(' (',el('span',{class:'nb-r',title:'В статусе «Регистрация»'},String(c.reg)),')');
+  if(c.total!==null&&c.total!==undefined)out.push(' ',el('span',{class:'nb-t',title:k==='chats'?'':'Лидов пришло за выбранный период (по умолчанию текущий месяц)'},String(c.total)));
+  if(c.reg||(k==='leads'&&c.reg===0))out.push(' (',el('span',{class:'nb-r',title:k==='chats'?'':'Регистраций за выбранный период'},String(c.reg)),')');
   if(c.fresh)out.push(' ',el('span',{class:'nb-n',title:k==='chats'?'Ждут ответа':'Новые лиды за сегодня (сбрасывается в 00:00 по Киеву)'},String(c.fresh)));
   return out;
 }
@@ -2322,7 +2322,7 @@ async function updateBadge(){
   if(['admin','teamlead','streamer'].includes(me.role)){
     try{const c=await api('/chats');navLblSet('chats',{total:c.length,reg:0,fresh:c.filter(x=>x.waiting).length})}catch{}
   }
-  try{const t=await api('/leads/today');navLblSet('leads',{total:t.total,reg:t.reg,fresh:t.fresh})}catch{}
+  try{const r=dxCur(),t=await api('/leads/today?from='+r.from+'&to='+r.to);navLblSet('leads',{total:t.total,reg:t.reg,fresh:t.fresh})}catch{}
   if(me.role==='streamer'){await setTasksBadge();try{const c=await api('/lead-notices/count');if(c.n!==noticeN){noticeN=c.n;drawNav()}}catch{}}
 
   await refreshAccPending();
@@ -3892,7 +3892,8 @@ async function viewPush(){
       el('button',{class:'btn o s',type:'button',onclick:async e=>{const b=e.currentTarget;if(b.dataset.s){await api('/push/rules/'+r.id,{method:'DELETE'});render()}else{b.dataset.s='1';b.textContent='Точно удалить?'}}},'Удалить')))]),'Правил пока нет.');
 
   // --- рассылка
-  const SEGL={all:'Все',new:'Не зарегистрировались',registered:'Зарегистрировались, без депозита',ftd:'С депозитом',access:'С открытым доступом',churned:'Отвалились',withdrew:'Выводили средства'};
+  // Кому можно написать сейчас (заблокировавшие бота не входят): все и по статусам
+  const SEGL={all:'Всем',new:'Статус «Новый»',registered:'Зарегистрированы',ftd_only:'Есть только FTD',active:'Статус «Активный»'};
   const sel=el('select',{},Object.entries(SEGL).map(([k,v])=>el('option',{value:k},v+' ('+seg[k]+')')));
   const owner=el('select',{},el('option',{value:''},'Все стримеры'),...staff.filter(x=>(x.streams||['streamer','teamlead','buyer'].includes(x.role))).map(x=>el('option',{value:x.id},x.name)));
   owner.addEventListener('change',async()=>{const c=await api('/push/segments'+(owner.value?'?owner_id='+owner.value:''));[...sel.options].forEach(o=>o.textContent=SEGL[o.value]+' ('+c[o.value]+')')});

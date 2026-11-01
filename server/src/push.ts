@@ -287,6 +287,8 @@ export const SEGMENTS: Record<string, string> = {
   ftd: `d.status IN ('ftd','active')`,
   access: 'd.access',
   churned: `d.status = 'churned'`,
+  ftd_only: `d.status = 'ftd'`,
+  active: `d.status = 'active'`,
   withdrew: `EXISTS (SELECT 1 FROM events e WHERE e.tg_id = d.tg_id AND e.type = 'wd')`,
 };
 

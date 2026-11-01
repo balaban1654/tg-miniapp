@@ -2417,13 +2417,25 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // Цифры у пункта «Лиды»: всего, регистрации и (фиолетовая) сколько лидов пришло сегодня по Киеву, счётчик обнуляется в 00:00
-  app.get('/leads/today', { preHandler: auth }, async (req) => {
+  // Цифры у пункта «Лиды»: сколько пришло за выбранный в календаре период (по умолчанию текущий месяц), (регистраций за период),
+  // мигающая — сколько новых пришло сегодня (по Киеву, обнуляется в 00:00)
+  app.get<{ Querystring: { from?: string; to?: string } }>('/leads/today', { preHandler: auth }, async (req) => {
     const me = req.staff!;
+    const D = /^\d{4}-\d{2}-\d{2}$/;
+    const from = D.test(String(req.query.from)) ? String(req.query.from) : null;
+    const to = D.test(String(req.query.to)) ? String(req.query.to) : null;
+    const KY = "'Europe/Kyiv'";
+    const inR = (col: string) => `(($1::date IS NULL OR (${col} AT TIME ZONE ${KY})::date >= $1::date) AND ($2::date IS NULL OR (${col} AT TIME ZONE ${KY})::date <= $2::date))`;
+    const def = from || to ? [from, to] : [null, null];
+    const range = from || to ? def : (await db.query(`SELECT to_char(date_trunc('month', now() AT TIME ZONE ${KY}), 'YYYY-MM-DD') AS a, to_char((date_trunc('month', now() AT TIME ZONE ${KY}) + interval '1 month - 1 day'), 'YYYY-MM-DD') AS b`)).rows.map((x) => [x.a, x.b])[0];
     const r = await db.query(
-      `SELECT count(*)::int AS total, count(*) FILTER (WHERE coalesce(status_before_block, status) IN ('ftd','active'))::int AS paid, count(*) FILTER (WHERE coalesce(status_before_block, status) = 'registered')::int AS reg,
-              count(*) FILTER (WHERE (d.created_at AT TIME ZONE 'Europe/Kyiv')::date = (now() AT TIME ZONE 'Europe/Kyiv')::date)::int AS fresh
+      `SELECT count(*) FILTER (WHERE ${inR('d.created_at')})::int AS total,
+              (SELECT count(DISTINCT e.tg_id)::int FROM events e JOIN leads d2 ON d2.tg_id = e.tg_id
+                WHERE e.type = 'reg' AND ${inR('e.created_at')} AND d2.removed_at IS NULL AND coalesce(d2.lead_role, 'lead') = 'lead' AND ${ownerScope(me, 'd2.owner_id')}) AS reg,
+              count(*) FILTER (WHERE (d.created_at AT TIME ZONE ${KY})::date = (now() AT TIME ZONE ${KY})::date)::int AS fresh
          FROM leads d
         WHERE d.removed_at IS NULL AND coalesce(d.lead_role, 'lead') = 'lead' AND ${ownerScope(me, 'd.owner_id')}`,
+      range,
     );
     return r.rows[0];
   });
