@@ -13,6 +13,7 @@ export interface KpiPlan {
   leads: number; // план по лидам (FTD)
   base: number; // ставка за смены при выполнении
   baseLow: number; // ставка, если смены не выполнены
+  baseMinFtd: number; // полная ставка за часы только при стольких FTD за месяц и больше; иначе минимальная (0 — без условия)
   price: number; // цена за лида
   priceLow: number; // цена за лида, если план по лидам не выполнен
   tiers: { from: number; price: number }[]; // повышенные цены за всех лидов месяца
@@ -44,6 +45,7 @@ export const DEFAULT_PLAN: KpiPlan = {
   leads: 30,
   base: 500,
   baseLow: 300,
+  baseMinFtd: 15,
   price: 8,
   priceLow: 3,
   tiers: [
@@ -91,6 +93,7 @@ export interface KpiResult {
   shifts: number; // смен = часы ÷ длина смены
   ftdCount: number;
   shiftsDone: boolean;
+  hoursDone?: boolean; // часы по плану набраны (полная ставка ещё требует FTD не меньше plan.baseMinFtd)
   leadsDone: boolean;
   overtimeMin: number;
   act: { base: number; baseRate: number; price: number; leadsPay: number };
@@ -121,7 +124,7 @@ export async function teamleadPay(leadId: number, period: string, plan: KpiPlan)
   const members = [];
   for (const m of team) {
     const k = await kpiFor(m.id, period, plan);
-    const bonus = (k.shiftsDone ? plan.leadShift : 0) + (k.leadsDone ? plan.leadLeads : 0);
+    const bonus = ((k.hoursDone ?? k.shiftsDone) ? plan.leadShift : 0) + (k.leadsDone ? plan.leadLeads : 0);
     members.push({ id: m.id, name: m.name, hoursMin: k.hoursMin, planMin: k.planMin, ftd: k.ftdCount, planLeads: plan.leads, shiftsDone: k.shiftsDone, leadsDone: k.leadsDone, bonus });
   }
   const bonus = members.reduce((a, x) => a + x.bonus, 0);
@@ -170,7 +173,9 @@ async function kpiCompute(staffId: number, period: string, plan: KpiPlan): Promi
 
   const planMin = plan.hours * 60;
   const n = ftd.length;
-  const shiftsDone = hoursMin >= planMin;
+  // План по часам выполнен, только если ещё и FTD не меньше baseMinFtd: иначе часы оплачиваются по минимальной ставке
+  const hoursDone = hoursMin >= planMin;
+  const shiftsDone = hoursDone && n >= (plan.baseMinFtd || 0);
   const leadsDone = n >= plan.leads;
   const tierPrice = () => plan.tiers.slice().sort((a, b) => b.from - a.from).find((t) => n >= t.from)?.price ?? plan.price;
   const mode = (m: 'full' | 'min' | 'actual') => {
@@ -222,6 +227,7 @@ async function kpiCompute(staffId: number, period: string, plan: KpiPlan): Promi
     shifts: Math.floor(hoursMin / (plan.shiftH * 60)),
     ftdCount: n,
     shiftsDone,
+    hoursDone,
     leadsDone,
     overtimeMin: Math.max(0, hoursMin - planMin),
     act,
@@ -257,7 +263,8 @@ export async function planFor(period: string): Promise<KpiPlan> {
   const row = (await db.query('SELECT plan FROM month_closes WHERE period = $1', [period])).rows[0];
   if (!row) return getPlan();
   const d = row.plan as Partial<KpiPlan>;
-  return { ...DEFAULT_PLAN, ...d, depTiers: normTiers(d.depTiers), depStart: d.depStart ?? null, day: { ...DEFAULT_PLAN.day, ...(d.day ?? {}) }, goals: { ...DEFAULT_PLAN.goals, ...(d.goals ?? {}) } };
+  // Закрытые месяцы до появления условия по FTD считаются без него
+  return { ...DEFAULT_PLAN, baseMinFtd: 0, ...d, depTiers: normTiers(d.depTiers), depStart: d.depStart ?? null, day: { ...DEFAULT_PLAN.day, ...(d.day ?? {}) }, goals: { ...DEFAULT_PLAN.goals, ...(d.goals ?? {}) } };
 }
 
 export const prevPeriod = (p: string): string => {
@@ -360,6 +367,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
       leads: n(b.leads, cur.leads, 0, 10000),
       base: n(b.base, cur.base),
       baseLow: n(b.baseLow, cur.baseLow),
+      baseMinFtd: n(b.baseMinFtd, cur.baseMinFtd, 0, 10000),
       price: n(b.price, cur.price),
       priceLow: n(b.priceLow, cur.priceLow),
       tiers: Array.isArray(b.tiers) ? b.tiers.map((t: any) => ({ from: n(t.from, 0), price: n(t.price, 0) })).filter((t: any) => t.from > 0) : cur.tiers,
@@ -817,6 +825,39 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
       rows.push({ staff: s, kpi: withTeam(k, team) });
     }
     return { plan, period, rows };
+  });
+
+  // Окупаемость сотрудников за месяц: сколько стоил компании (начислено, а если выплатили больше — выплаченное) и сколько комиссии
+  // принесли его клиенты; прибыль, маржа и цена одного FTD
+  app.get<{ Querystring: { period?: string } }>('/kpi/payback', { preHandler: admin }, async (req) => {
+    const period = PERIOD.test(String(req.query.period)) ? String(req.query.period) : await currentPeriod();
+    const plan = await planFor(period);
+    const staff = (await db.query(
+      `SELECT id, name, role, streams, active FROM staff
+        WHERE deleted_at IS NULL AND (role = 'streamer' OR streams OR role = 'teamlead' OR id IN (SELECT staff_id FROM team_pay WHERE amount > 0))
+        ORDER BY name`,
+    )).rows as { id: number; name: string; role: string; streams: boolean; active: boolean }[];
+    const money = new Map(
+      ((await db.query(
+        `SELECT d.owner_id, coalesce(sum(e.amount) FILTER (WHERE e.type = 'comm'), 0)::float AS comm,
+                coalesce(sum(e.amount) FILTER (WHERE e.type IN ('ftd','dep')), 0)::float AS deps
+           FROM events e JOIN leads d ON d.tg_id = e.tg_id
+          WHERE d.lead_role = 'lead' AND to_char(e.created_at AT TIME ZONE '${TZ}', 'YYYY-MM') = $1 GROUP BY d.owner_id`,
+        [period],
+      )).rows as { owner_id: number; comm: number; deps: number }[]).map((r) => [r.owner_id, r]),
+    );
+    const rows = [];
+    for (const s of staff) {
+      const k = withTeam(await kpiFor(s.id, period, plan), await teamPayFor(s, period, plan));
+      const m = money.get(s.id);
+      const comm = m?.comm ?? 0, deps = m?.deps ?? 0;
+      const cost = r2(Math.max(k.total, k.paid));
+      if (!s.active && !cost && !comm) continue;
+      rows.push({ id: s.id, name: s.name, role: s.role, cost, paid: k.paid, ftd: k.ftdCount, deposits: r2(deps), commission: r2(comm), profit: r2(comm - cost),
+        margin: comm > 0 ? Math.round(((comm - cost) / comm) * 100) : null, ftdCost: k.ftdCount ? r2(cost / k.ftdCount) : null });
+    }
+    rows.sort((a, b) => b.profit - a.profit);
+    return { period, rows };
   });
 
   app.get<{ Params: { id: string }; Querystring: { period?: string } }>('/kpi/:id', { preHandler: admin }, async (req, reply) => {
