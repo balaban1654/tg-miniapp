@@ -3351,7 +3351,7 @@ async function accDepBonus(refresh){
       return el('td',{style:'white-space:nowrap'},el('button',{class:'btn s',type:'button',onclick:act(()=>api('/dep-bonus/'+r.id+'/decide',{method:'POST',body:{approve:true}}))},'Принять'),rej,reason)})():td(r.status==='approved'?(r.period||''):(r.reject_reason||''));
     return[el('td',{},el('span',{class:'pill '+st[1]},st[0]),by(r)),td(r.staff_name),el('td',{},el('a',{href:'#',onclick:e=>{e.preventDefault();openLeadCard(r.tg_id)},style:'color:var(--acc2)'},r.lead_name)),td(r.tier_name),td(usd2(r.amount),'n'),
       el('td',{style:'white-space:normal;max-width:340px;line-height:1.45'},r.message),
-      r.has_shot?el('td',{},el('a',{href:'/api/office/dep-bonus/'+r.id+'/screenshot',target:'_blank',rel:'noopener',class:'shotc',style:'width:64px;height:64px'},el('img',{src:'/api/office/dep-bonus/'+r.id+'/screenshot',alt:''}))):td('—'),
+      r.has_shot?el('td',{},(()=>{const u='/api/office/dep-bonus/'+r.id+'/screenshot',a=shotThumb(u,{class:'shotc',style:'width:64px;height:64px'});a.append(el('img',{src:u,alt:''}));return a})()):td('—'),
       td(fmtDT(r.created_at)),actions]}),'Запросов пока нет. Когда лид стримера достигнет градации, стример запросит бонус, и запрос появится здесь.');
   return[el('div',{class:'head'},el('h3',{style:'font-size:15px'},'Бонусы за додепы лидов')),ctrT(tbl),err,
     el('div',{class:'mut sm'},'Принятый бонус попадает в зарплату стримера за текущий месяц.')];
@@ -4359,7 +4359,7 @@ async function reviewsAdmin(){
   const tb=(t,fn,extra)=>el('button',{class:'btn o s',type:'button',style:BS+';padding:0 12px'+(extra||''),onclick:fn},t);
   const act=fn=>async()=>{rowErr.textContent='';try{await fn();await updateBadge();render({soft:true})}catch(x){rowErr.textContent=x.message}};
   const delBtn=r=>{const b=tb('Удалить',()=>{});let armed=false;b.onclick=()=>{if(!armed){armed=true;b.textContent='Точно?';setTimeout(()=>{armed=false;b.textContent='Удалить'},3000);return}act(()=>api('/reviews/'+r.id,{method:'DELETE'}))()};return b};
-  const photoCell=r=>r.has_photo?el('a',{href:'/api/office/reviews/'+r.id+'/photo',target:'_blank',rel:'noopener',class:'shotc',style:'width:64px;height:64px',title:'Открыть фото'},el('img',{src:'/api/office/reviews/'+r.id+'/photo',alt:''})):'—';
+  const photoCell=r=>r.has_photo?(()=>{const u='/api/office/reviews/'+r.id+'/photo',a=shotThumb(u,{class:'shotc',style:'width:64px;height:64px',title:'Открыть фото'});a.append(el('img',{src:'/api/office/reviews/'+r.id+'/photo',alt:''}));return a})():'—';
   const statusPill=r=>el('span',{class:'pill '+(r.status==='published'?'p-ok':r.status==='pending'?'p-warn':'p-bad')},RV_STATUS[r.status]||r.status);
   function editRow(r){
     const e={author:el('input',{value:r.author,maxlength:'60','aria-label':'Автор'}),rating:ratingSel(r.rating),body:el('textarea',{class:'big',rows:'3',maxlength:'1500','aria-label':'Текст',style:'min-width:240px;resize:vertical'}),status:el('select',{'aria-label':'Статус'},...Object.entries(RV_STATUS).map(([v,t])=>el('option',{value:v},t)))};
