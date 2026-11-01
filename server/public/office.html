@@ -483,7 +483,7 @@ textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10
 .dx-tk .dx-tx{text-align:left}
 .seen-by{color:var(--warn)}
 .pool-box{grid-column:1/-1;display:grid;gap:8px}.pool-pick{display:flex;flex-wrap:wrap;gap:8px 16px}.pool-pick label{display:inline-flex!important;flex-direction:row!important;align-items:center;gap:6px;cursor:pointer;font-size:14px}.pool-pick input{width:16px;height:16px;margin:0}
-.org-row{display:grid;grid-template-columns:minmax(200px,1fr) 2fr;gap:12px;align-items:start;padding-top:12px;border-top:1px solid var(--line)}.org-row select{width:auto;min-width:260px;max-width:100%}@media(max-width:700px){.org-row{grid-template-columns:1fr}}
+.org-row{display:grid;grid-template-columns:minmax(200px,1fr) 2fr;gap:12px;align-items:start;padding-top:12px;border-top:1px solid var(--line)}.org-row>*{min-width:0}.org-row select{flex:1 1 220px;width:auto;min-width:0;max-width:420px}@media(max-width:700px){.org-row{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -2061,7 +2061,7 @@ async function viewLinks(){
   const slug=el('input',{id:'nSlug',placeholder:'ivan-instagram',required:'',pattern:'[a-z0-9][a-z0-9_\\-]{1,39}',title:'a-z, 0-9, - и _'});
   const src=el('input',{id:'nSrc',placeholder:'Instagram'});
   const owner=me.role==='admin'
-    ?el('select',{id:'nOwner',onchange:()=>{poolBox.hidden=owner.value!=='random'}},...staff.filter(s=>s.active!==false).map(s=>el('option',{value:s.id,selected:s.id===me.id?'':null},s.name+' · '+(ROLE[s.role]||s.role))),el('option',{value:'random'},'🎲 Случайно (по очереди)'))
+    ?el('select',{id:'nOwner',onchange:()=>{poolBox.hidden=owner.value!=='random'}},...staff.filter(s=>s.active!==false).map(s=>el('option',{value:s.id,selected:s.id===me.id?'':null},s.name+' · '+(ROLE[s.role]||s.role))),el('option',{value:'random'},'🎲 Случайно'))
     :el('select',{id:'nOwner'},el('option',{value:''},'Я сам'),...staff.filter(s=>s.id!==me.id&&['streamer','buyer'].includes(s.role)).map(s=>el('option',{value:s.id},s.name+' · '+ROLE[s.role])));
   // «Случайно»: галочками выбираем, между кем раздавать лидов с этой ссылки
   const poolPick=sel=>{const set=new Set(sel);return el('div',{class:'pool-pick'},...staff.filter(x=>x.active!==false&&(x.role==='streamer'||x.streams)).map(x=>{const c=el('input',{type:'checkbox',value:x.id});c.checked=set.has(x.id);return el('label',{},c,x.name)}))};
@@ -2080,7 +2080,7 @@ async function viewLinks(){
       try{const x=await api('/links/random',{method:'POST',body:{source:src.value,...ownerBody()}});const nu=goUrl(x.slug);try{await navigator.clipboard.writeText(nu);toast('Создана и скопирована: '+nu)}catch{toast('Создана: '+nu)}render({soft:true})}catch(x){err.textContent=x.message}}},'Создать случайную'):null,err);
   // Выбор владельца: сотрудник, «Случайно» (галочки) или, для органики, «Не закреплять»
   const ownerPicker=(val,pool,withNone)=>{
-    const sel=el('select',{},...(withNone?[el('option',{value:'none'},'Не закреплять: заберёт первый ответивший')]:[]),...staff.filter(x=>x.active!==false).map(x=>el('option',{value:x.id},x.name+' · '+(ROLE[x.role]||x.role))),el('option',{value:'random'},'🎲 Случайно (по очереди)'));
+    const sel=el('select',{},...(withNone?[el('option',{value:'none'},'Не закреплять')]:[]),...staff.filter(x=>x.active!==false).map(x=>el('option',{value:x.id},x.name+' · '+(ROLE[x.role]||x.role))),el('option',{value:'random'},'🎲 Случайно'));
     sel.value=String(val);const pk=poolPick(pool&&pool.length?pool:staff.filter(x=>x.role==='streamer'&&x.active!==false).map(x=>x.id));
     const box=el('div',{class:'pool-box'},el('div',{class:'mut sm'},'Кому раздавать: за день каждому по одному, от лучшего (больше часов в эфире за месяц, потом больше FTD) к остальным; с 00:00 по Киеву заново.'),pk);
     const sync=()=>{box.hidden=sel.value!=='random'};sel.addEventListener('change',sync);sync();
@@ -2106,19 +2106,11 @@ async function viewLinks(){
     return el('div',{class:'card',style:'display:grid;gap:14px'},el('h3',{style:'font-size:15px'},'Органика: кому отдавать лидов без ссылки стримера'),
       ...st.map(x=>{const op=ownerPicker(x.mode==='random'?'random':x.mode==='owner'?x.owner_id:'none',x.pool,true);const e3=el('div',{class:'err',role:'alert'});
         return el('div',{class:'org-row'},el('div',{},el('b',{},KIND[x.kind][0]),el('div',{class:'mut sm'},KIND[x.kind][1])),
-          el('div',{style:'display:grid;gap:8px'},el('div',{style:'display:flex;gap:8px;flex-wrap:wrap;align-items:center'},op.sel,el('button',{type:'button',class:'btn s',onclick:async()=>{e3.textContent='';const o=op.get();
+          el('div',{style:'display:grid;grid-template-columns:minmax(0,1fr);gap:8px'},el('div',{style:'display:flex;gap:8px;flex-wrap:wrap;align-items:center;min-width:0'},op.sel,el('button',{type:'button',class:'btn s',onclick:async()=>{e3.textContent='';const o=op.get();
             try{await api('/organic/'+x.kind,{method:'PUT',body:{mode:o.mode,owner_id:o.owner_id,pool:o.pool}});toast('Сохранено: '+KIND[x.kind][0])}catch(err){e3.textContent=err.message}}},'Сохранить')),op.box,e3))}),
       el('div',{class:'mut sm'},'Касается только новых лидов. «Не закреплять» — как сейчас: лида забирает стример, который первым ответит в чате.'))};
   // Владелец ссылки: у «Случайно» — список, между кем раздаются лиды; админ меняет его у основной ссылки
-  const ownerTd=r=>{
-    if(!r.rotate)return td(r.owner_name);
-    const cell=el('td',{style:'white-space:normal;min-width:160px'});
-    const show=()=>cell.replaceChildren(el('span',{},'🎲 Случайно: '+(r.pool.map(x=>x.name).join(', ')||'никого')),adm&&!r.parent_id?el('button',{type:'button',class:'own-btn',style:'margin-left:6px',onclick:edit},'изменить'):null);
-    const edit=()=>{const pk=poolPick(r.pool.map(x=>x.id));
-      cell.replaceChildren(el('div',{style:'display:grid;gap:8px;text-align:left'},pk,el('div',{style:'display:flex;gap:6px;flex-wrap:wrap'},
-        el('button',{type:'button',class:'btn s',onclick:async()=>{try{await api('/links/'+r.id+'/pool',{method:'PATCH',body:{pool:poolIds(pk)}});toast('Список сохранён');render({soft:true})}catch(x){toast(x.message)}}},'Сохранить'),
-        el('button',{type:'button',class:'btn o s',onclick:show},'Отмена'))))};
-    show();return cell};
+  const ownerTd=r=>r.rotate?el('td',{title:'Кому раздаются лиды — в окне «Изменить» (карандаш у ссылки)'},'🎲 Случайно'):td(r.owner_name);
   const copyBtn=u=>{const b=el('button',{type:'button',class:'cp-btn',title:'Скопировать ссылку','aria-label':'Скопировать ссылку',style:'background:none;border:0;color:var(--mut);cursor:pointer;padding:2px 4px;margin-left:6px;vertical-align:middle;display:inline-grid'},svgIcon(COPYI,15));
     b.addEventListener('click',async()=>{try{await navigator.clipboard.writeText(u);b.replaceChildren(svgIcon('<path d="M5 12.5l4.5 4.5L19 7.5"/>',15));b.style.color='var(--ok)';toast('Ссылка скопирована')}catch{toast('Выделите ссылку и скопируйте вручную')}setTimeout(()=>{b.replaceChildren(svgIcon(COPYI,15));b.style.color=''},1500)});return b};
   const srcTable=ctrT(table(['Источник','Ссылок','Клики','Старты','Регистрации','FTD','Депозиты',...(adm?['Комиссия']:[])],sources.map(x=>[el('td',{},x.source,adm?el('button',{type:'button',title:'Обнулить статистику источника','aria-label':'Обнулить статистику источника',style:'background:none;border:0;color:var(--mut);cursor:pointer;padding:2px 4px;margin-left:6px;vertical-align:middle;display:inline-grid',onclick:async()=>{if(!await askC('Обнулить статистику источника «'+x.source+'»?\nКлики и счётчики по его ссылкам начнутся с нуля. Лиды и деньги не удаляются.'))return;try{await api('/links/reset',{method:'POST',body:{source:x.source}});toast('Статистика источника обнулена');render({soft:true})}catch(e){toast(e.message)}}},svgIcon('<path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5"/>',14)):null),td(x.links,'n'),td(x.clicks,'n'),td(x.starts,'n'),td(x.regs,'n'),td(x.ftds,'n'),td(money(x.deposits),'n'),...(adm?[td(money(x.commission),'n')]:[])]),'Данные по источникам появятся, когда придут первые лиды.'));
