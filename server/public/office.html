@@ -4180,7 +4180,7 @@ async function viewMedia(){
   const drawTeams=()=>tBar.replaceChildren(...teams.map(t=>{
     const on=t.id===team.id;
     const b=el('button',{type:'button',role:'tab','aria-selected':String(on),class:'lc-tab'+(on?' on':''),onclick:()=>{if(on)return;mediaSetTeam(t.id);mediaEdit=null;reviewEdit=null;render({soft:true})}},t.title,t.pending?el('span',{class:'nbadge vio pulse tb',title:'Отзывы ждут проверки'},String(t.pending)):null);
-    if(!on)return b;
+    return b; // добавлять и переименовывать команды из Office больше нельзя, только переключаться
     const ren=el('button',{type:'button',title:'Переименовать команду','aria-label':'Переименовать команду',style:'background:none;border:0;color:var(--mut);cursor:pointer;padding:2px 4px;margin-left:2px;display:inline-grid;vertical-align:middle',onclick:e=>{e.stopPropagation();
       const inp=el('input',{value:t.title,maxlength:'40','aria-label':'Название команды',style:'width:170px;padding:6px 8px'});
       let fin=false;const done=async ok=>{if(fin)return;fin=true;const v=inp.value.trim();if(ok&&v&&v!==t.title){try{await api('/media/teams/'+t.id,{method:'PATCH',body:{title:v}});t.title=v;toast('Команда переименована')}catch(x){toast(x.message)}}drawTeams()};
@@ -4246,7 +4246,7 @@ async function viewMedia(){
     try{mBody.replaceChildren(...(mediaTab==='news'?await newsAdmin():await reviewsAdmin()))}catch(x){mBody.replaceChildren(el('div',{class:'err'},x.message))}
   };
   drawM();
-  return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Медиа в Mini App')),el('div',{style:'display:flex;gap:10px;align-items:center'},tBar,addTeam),teamInfo,showOpts,mBar,mBody];
+  return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Медиа в Mini App')),el('div',{style:'display:flex;gap:10px;align-items:center'},tBar),teamInfo,showOpts,mBar,mBody];
 }
 
 let reviewEdit=null;
