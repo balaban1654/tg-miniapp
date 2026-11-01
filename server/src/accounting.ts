@@ -25,6 +25,7 @@ export interface KpiPlan {
   birthday: number; // бонус на день рождения сотрудника, $ (0 — не начислять)
   leadShift: number; // тимлиду за каждого члена команды, выполнившего план смен за месяц, $
   leadLeads: number; // тимлиду за каждого члена команды, выполнившего план лидов за месяц, $
+  leadAll: number; // тимлиду, если все активные стримеры команды выполнили и план часов, и план FTD за месяц, $
   depTiers: DepTier[]; // градации додепов лида и бонус стримеру за каждую
   depStart: string | null; // с какой даты действуют бонусы за додепы
   goals: Goals; // цели месяца для дашборда админа
@@ -65,6 +66,7 @@ export const DEFAULT_PLAN: KpiPlan = {
   birthday: 0,
   leadShift: 50,
   leadLeads: 50,
+  leadAll: 200,
   depTiers: DEFAULT_DEP_TIERS,
   depStart: null,
   goals: { ftd: 50, ftdSum: 4500, deposits: 9500, commission: 6000, net: 3900 },
@@ -125,10 +127,13 @@ export async function teamleadPay(leadId: number, period: string, plan: KpiPlan)
   for (const m of team) {
     const k = await kpiFor(m.id, period, plan);
     const bonus = ((k.hoursDone ?? k.shiftsDone) ? plan.leadShift : 0) + (k.leadsDone ? plan.leadLeads : 0);
-    members.push({ id: m.id, name: m.name, hoursMin: k.hoursMin, planMin: k.planMin, ftd: k.ftdCount, planLeads: plan.leads, shiftsDone: k.shiftsDone, leadsDone: k.leadsDone, bonus });
+    members.push({ id: m.id, name: m.name, hoursMin: k.hoursMin, planMin: k.planMin, ftd: k.ftdCount, planLeads: plan.leads, shiftsDone: k.shiftsDone, leadsDone: k.leadsDone, hoursDone: k.hoursDone ?? k.shiftsDone, bonus });
   }
-  const bonus = members.reduce((a, x) => a + x.bonus, 0);
-  return { period, mode: p.mode as 'month' | 'shift', amount: p.amount as number, shifts, rate, members, bonus, perShift: plan.leadShift, perLeads: plan.leadLeads, total: r2(rate + bonus) };
+  // Вся команда выполнила план: каждый активный стример набрал часы и план FTD — тимлиду ещё plan.leadAll
+  const allDone = members.length > 0 && members.every((x) => x.hoursDone && x.leadsDone);
+  const allBonus = allDone ? plan.leadAll || 0 : 0;
+  const bonus = members.reduce((a, x) => a + x.bonus, 0) + allBonus;
+  return { period, mode: p.mode as 'month' | 'shift', amount: p.amount as number, shifts, rate, members, bonus, allDone, allBonus, perAll: plan.leadAll || 0, perShift: plan.leadShift, perLeads: plan.leadLeads, total: r2(rate + bonus) };
 }
 
 /** Бонус на день рождения: в месяц рождения, начиная с самого дня (по Киеву), один раз попадает в «Бонусы и штрафы».
@@ -263,8 +268,8 @@ export async function planFor(period: string): Promise<KpiPlan> {
   const row = (await db.query('SELECT plan FROM month_closes WHERE period = $1', [period])).rows[0];
   if (!row) return getPlan();
   const d = row.plan as Partial<KpiPlan>;
-  // Закрытые месяцы до появления условия по FTD считаются без него
-  return { ...DEFAULT_PLAN, baseMinFtd: 0, ...d, depTiers: normTiers(d.depTiers), depStart: d.depStart ?? null, day: { ...DEFAULT_PLAN.day, ...(d.day ?? {}) }, goals: { ...DEFAULT_PLAN.goals, ...(d.goals ?? {}) } };
+  // Закрытые месяцы до появления условия по FTD и бонуса тимлиду за всю команду считаются без них
+  return { ...DEFAULT_PLAN, baseMinFtd: 0, leadAll: 0, ...d, depTiers: normTiers(d.depTiers), depStart: d.depStart ?? null, day: { ...DEFAULT_PLAN.day, ...(d.day ?? {}) }, goals: { ...DEFAULT_PLAN.goals, ...(d.goals ?? {}) } };
 }
 
 export const prevPeriod = (p: string): string => {
@@ -379,6 +384,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
       birthday: n(b.birthday, cur.birthday),
       leadShift: n(b.leadShift, cur.leadShift),
       leadLeads: n(b.leadLeads, cur.leadLeads),
+      leadAll: n(b.leadAll, cur.leadAll),
       depTiers: cur.depTiers,
       depStart: cur.depStart,
       goals: {
