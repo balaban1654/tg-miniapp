@@ -1173,6 +1173,9 @@ function dxModal(btn,s,d,skew,mode){
     md.addEventListener('mouseleave',()=>{if(md.dataset.pin)return;clearTimeout(dxHoverT);dxHoverT=setTimeout(dxCloseModal,260)});
   }else ov.addEventListener('click',e=>{if(e.target===ov)dxCloseModal()});
   document.body.append(ov);btn.classList.add('on');
+  // Карточка целиком в окне: снизу от имени, если не влезает — над ним, иначе прижимаем к краю (длинная прокручивается внутри)
+  if(mode==='hover'){const r=btn.getBoundingClientRect(),h=md.offsetHeight;
+    md.style.top=(r.bottom+10+h<=innerHeight-12?r.bottom+10:r.top-10-h>=12?r.top-10-h:Math.max(12,innerHeight-12-h))+'px'}
   if(mode!=='hover')x.focus();
 }
 function dxGo(t,sub,period){tab=t;if(period&&t==='acc')accState.period=period;if(sub&&t==='acc')accState.tab=sub;if(sub&&t==='plans')plansState.tab=sub;showApp()}
