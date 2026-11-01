@@ -1529,10 +1529,18 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
 
   // Закрепление лида за стримером (или снятие). Меняется только владелец: «Откуда пришёл» и ссылка остаются как были (органика остаётся органикой),
   // а ссылки на регистрацию, промокод и имя менеджера в боте и Mini App берутся у нового владельца
-  app.patch<{ Params: { tgId: string } }>('/leads/:tgId/owner', { preHandler: need('admin') }, async (req, reply) => {
+  // Тимлидер меняет владельца только у лидов своей команды (или незакреплённых) и только на своих стримеров
+  app.patch<{ Params: { tgId: string } }>('/leads/:tgId/owner', { preHandler: need('admin', 'teamlead') }, async (req, reply) => {
+    const me = req.staff!;
     const raw = (req.body as any)?.owner_id;
     const owner = raw === null || raw === '' || raw === undefined ? null : Number(raw);
     if (owner !== null && !(await db.query(`SELECT 1 FROM staff WHERE id = $1 AND active`, [owner])).rowCount) return reply.code(404).send({ error: 'Сотрудник не найден' });
+    if (me.role === 'teamlead') {
+      const cur = (await db.query(`SELECT owner_id, coalesce(lead_role, 'lead') AS lr FROM leads WHERE tg_id = $1`, [Number(req.params.tgId)])).rows[0];
+      const mine = async (id: number | null) => id === null || id === me.id || ((await db.query('SELECT 1 FROM staff WHERE id = $1 AND parent_id = $2', [id, me.id])).rowCount ?? 0) > 0;
+      if (!cur || cur.lr !== 'lead' || !(await mine(cur.owner_id))) return reply.code(403).send({ error: 'Это лид не вашей команды' });
+      if (!(await mine(owner))) return reply.code(403).send({ error: 'Закрепить можно только за стримером своей команды' });
+    }
     const r = await db.query('UPDATE leads SET owner_id = $2, taken_from = NULL WHERE tg_id = $1 RETURNING tg_id', [Number(req.params.tgId), owner]);
     if (!r.rowCount) return reply.code(404).send({ error: 'Лид не найден' });
     return { ok: true };
