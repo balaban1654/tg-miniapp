@@ -2428,15 +2428,19 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     return r.rows[0];
   });
 
-  // Блокировка лида (только админ): за поведение или второй аккаунт. Причина видна в карточке и самому лиду в Mini App
-  app.post<{ Params: { tgId: string } }>('/leads/:tgId/ban', { preHandler: need('admin') }, async (req, reply) => {
+  // Блокировка лида: админ любого, тимлидер — лидов своей команды. За поведение или второй аккаунт. Причина видна в карточке и самому лиду в Mini App
+  const banAllowed = async (me: Staff, tgId: number) =>
+    me.role === 'admin' || ((await db.query(`SELECT 1 FROM leads d WHERE d.tg_id = $1 AND coalesce(d.lead_role, 'lead') = 'lead' AND ${ownerScope(me, 'd.owner_id')}`, [tgId])).rowCount ?? 0) > 0;
+  app.post<{ Params: { tgId: string } }>('/leads/:tgId/ban', { preHandler: need('admin', 'teamlead') }, async (req, reply) => {
     const reason = str((req.body as any)?.reason, 300);
     if (!reason) return reply.code(400).send({ error: 'Укажите причину блокировки' });
+    if (!(await banAllowed(req.staff!, Number(req.params.tgId)))) return reply.code(403).send({ error: 'Это лид не вашей команды' });
     const r = await db.query('UPDATE leads SET banned_at = now(), ban_reason = $2, banned_by = $3 WHERE tg_id = $1 RETURNING tg_id', [Number(req.params.tgId), reason, req.staff!.id]);
     if (!r.rowCount) return reply.code(404).send({ error: 'Лид не найден' });
     return { ok: true };
   });
-  app.delete<{ Params: { tgId: string } }>('/leads/:tgId/ban', { preHandler: need('admin') }, async (req) => {
+  app.delete<{ Params: { tgId: string } }>('/leads/:tgId/ban', { preHandler: need('admin', 'teamlead') }, async (req, reply) => {
+    if (!(await banAllowed(req.staff!, Number(req.params.tgId)))) return reply.code(403).send({ error: 'Это лид не вашей команды' });
     await db.query('UPDATE leads SET banned_at = NULL, ban_reason = NULL, banned_by = NULL WHERE tg_id = $1', [Number(req.params.tgId)]);
     return { ok: true };
   });

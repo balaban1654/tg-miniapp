@@ -526,7 +526,7 @@ const ROLE={admin:'Админ',teamlead:'Тимлидер',streamer:'Стрим�
 const STATUS={new:['Новый','p-pur'],registered:['Регистрация','ev-reg'],ftd:['FTD','ev-ftd'],active:['Активный','ev-dep'],churned:['Отвал','p-bad']};
 let me=null,tab='home';
 /* Адрес страницы: у каждого раздела своя ссылка (#/leads, #/acc/review), при обновлении остаёмся на месте */
-const STAFF_TABS=['team','links','tasks','review','why'];
+const STAFF_TABS=['team','links','tasks','review','why','depb'];
 const ACC_TABS=['sum','roi','review','bonus','depb','pay','exp','why','plan','team','form'];
 function hashPath(){return '/'+tab+(tab==='acc'?'/'+accState.tab:tab==='plans'?'/'+plansState.tab:tab==='staff'?'/'+staffState.tab:'')}
 function pushHash(){const h='#'+hashPath();if(location.hash!==h)history.pushState(null,'',h)}
@@ -2135,16 +2135,16 @@ async function viewStaff(){
   const root=el('div',{style:'display:grid;gap:14px'}),body=el('div',{style:'display:grid;gap:14px'}),bar=el('div',{class:'lc-tabs',role:'tablist'});
   const canLinks=isAdmin||me.role==='teamlead';
   const lead=me.role==='teamlead';
-  if(!canLinks||(!lead&&['tasks','review','why'].includes(staffState.tab)))staffState.tab='team';
+  if(!canLinks||(!lead&&['tasks','review','why','depb'].includes(staffState.tab)))staffState.tab='team';
   // Тимлид: после ссылок отчёты своей команды и причины по сменам (с числом причин без решения)
   // Цифры у вкладок тимлида: задачи (свои открытые + выполненные командой), отчёты на проверке, причины без решения
   const countWhy=refreshLeadPending,countTasks=refreshLeadPending;
   await refreshLeadPending();
-  const tabsList=()=>[['team',isAdmin?'Сотрудники':'Моя команда'],...(canLinks?[['links','Ссылки']]:[]),...(lead?[['tasks','Задачи'],['review','Отчёты'],['why','Причины по сменам']]:[])];
+  const tabsList=()=>[['team',isAdmin?'Сотрудники':'Моя команда'],...(canLinks?[['links','Ссылки']]:[]),...(lead?[['tasks','Задачи'],['review','Отчёты'],['why','Причины по сменам'],['depb','Бонусы за додепы']]:[])];
   let TABS=tabsList();
   const drawBar=()=>(TABS=tabsList(),bar).replaceChildren(...TABS.map(([k,t])=>el('button',{type:'button',role:'tab','aria-selected':String(k===staffState.tab),class:'lc-tab'+(k===staffState.tab?' on':''),onclick:()=>{staffState.tab=k;drawBar();drawBody();pushHash()}},t,lead&&leadPend[k]>0?el('span',{class:'nbadge pulse tb',title:'Ждут вашего решения'},String(leadPend[k])):null)));
   window.__staffTabsRedraw=()=>{if(bar.isConnected)drawBar()};
-  const drawBody=async soft=>{if(!soft)body.replaceChildren(el('div',{class:'mut'},'Загрузка…'));try{const t=staffState.tab;body.replaceChildren(...(t==='links'?(await viewLinks()).slice(1):t==='tasks'?await leadTasksBody(async()=>{await countTasks();drawBar();await drawBody(true)}):['review','why'].includes(t)?await leadReviewBody(t,async()=>{await countWhy();drawBar();await drawBody(true)}):(await staffTeam()).slice(1)).filter(Boolean))}catch(x){if(x.message!=='auth')body.replaceChildren(el('div',{class:'err'},x.message))}};
+  const drawBody=async soft=>{if(!soft)body.replaceChildren(el('div',{class:'mut'},'Загрузка…'));try{const t=staffState.tab;body.replaceChildren(...(t==='links'?(await viewLinks()).slice(1):t==='tasks'?await leadTasksBody(async()=>{await countTasks();drawBar();await drawBody(true)}):t==='depb'?await accDepBonus(async()=>{await refreshLeadPending();drawBar();await drawBody(true)}):['review','why'].includes(t)?await leadReviewBody(t,async()=>{await countWhy();drawBar();await drawBody(true)}):(await staffTeam()).slice(1)).filter(Boolean))}catch(x){if(x.message!=='auth')body.replaceChildren(el('div',{class:'err'},x.message))}};
   drawBar();root.append(...(canLinks?[bar]:[]),body);await drawBody();
   return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},isAdmin?'Сотрудники':'Моя команда')),root];
 }
@@ -2273,7 +2273,7 @@ function navLblSet(k,c){
 /** Что в Бухгалтерии ждёт решения админа: цифры у вкладок и общая у пункта меню */
 let accPend={review:0,why:0,pay:0,total:0};
 /** Тимлид: цифры у «Моей команды» и её вкладок (отчёты на проверке, причины по сменам, задачи) */
-let leadPend={review:0,why:0,tasks:0,total:0};
+let leadPend={review:0,why:0,tasks:0,depb:0,total:0};
 async function refreshLeadPending(){
   if(!me||me.role!=='teamlead')return;
   try{
@@ -2478,7 +2478,7 @@ async function openLeadCard(tgId){
     el('div',{class:'lc-actions'},
       ['admin','teamlead','streamer'].includes(me.role)?el('button',{class:'btn',type:'button',onclick:()=>{close();pendingChat=L.tg_id;tab='chats';showApp()}},'Открыть чат'):null,
       el('a',{class:'btn o',href:profileUrl(L),target:'_blank',rel:'noopener',style:'text-decoration:none;display:inline-flex;align-items:center'},'Профиль в Telegram'),
-      me.role==='admin'?(L.banned_at
+      me.role==='admin'||me.role==='teamlead'?(L.banned_at
         ?el('button',{class:'btn o',type:'button',onclick:async()=>{if(!await askC('Разблокировать лида? Ему снова станут доступны Mini App, пуши и сигналы.'))return;try{await api('/leads/'+L.tg_id+'/ban',{method:'DELETE'});toast('Лид разблокирован');close();openLeadCard(L.tg_id)}catch(x){toast(x.message)}}},'Разблокировать')
         :el('button',{class:'btn o',type:'button',style:'color:var(--bad);border-color:var(--bad)',onclick:()=>banDialog(L,()=>{close();openLeadCard(L.tg_id)})},'Заблокировать')):null)].flat().filter(Boolean));
   box.classList.add('wide');
@@ -3326,10 +3326,12 @@ async function accWhy(pre){
     el('div',{class:'mut sm'},'Если за день не набралось 3 часов, стример должен написать причину. Главное: 66 часов за месяц. '+(me.role==='admin'?'Штраф можно удалить во вкладке «Бонусы и штрафы».':'Причину можно принять или выписать штраф: его сумму и причину увидит стример. Отменить штраф может админ.'))];
 }
 
-async function accDepBonus(){
+async function accDepBonus(refresh){
   const rows=await api('/dep-bonus');
   const err=el('div',{class:'err',role:'alert'});
-  const act=fn=>async()=>{err.textContent='';try{await fn();render({soft:true});refreshAccPending()}catch(x){err.textContent=x.message}};
+  const act=fn=>async()=>{err.textContent='';try{await fn();if(refresh)await refresh();else{render({soft:true});refreshAccPending()}}catch(x){err.textContent=x.message}};
+  // Кто решил: «принял Александр (тимлидер)» / «отклонил Николай»
+  const by=r=>r.decided_by_name&&r.status!=='pending'?el('div',{class:'mut sm',style:'margin-top:3px'},(r.status==='approved'?'принял ':'отклонил ')+r.decided_by_name+(r.decided_by_role==='teamlead'?' (тимлидер)':'')):null;
   const ST={pending:['На проверке','p-warn'],approved:['Принят','p-ok'],rejected:['Отклонён','p-bad']};
   const tbl=table(['Статус','Стример','Лид','Градация','Бонус','Сообщение стримера','Скрин','Когда',''],rows.map(r=>{
     const st=ST[r.status];
@@ -3338,7 +3340,7 @@ async function accDepBonus(){
       const rej=el('button',{class:'btn o s',type:'button',style:'margin-left:6px'},'Отклонить');
       rej.addEventListener('click',()=>{if(reason.hidden){reason.hidden=false;reason.focus();rej.textContent='Отправить отказ';return}act(()=>api('/dep-bonus/'+r.id+'/decide',{method:'POST',body:{approve:false,reason:reason.value}}))()});
       return el('td',{style:'white-space:nowrap'},el('button',{class:'btn s',type:'button',onclick:act(()=>api('/dep-bonus/'+r.id+'/decide',{method:'POST',body:{approve:true}}))},'Принять'),rej,reason)})():td(r.status==='approved'?(r.period||''):(r.reject_reason||''));
-    return[el('td',{},el('span',{class:'pill '+st[1]},st[0])),td(r.staff_name),el('td',{},el('a',{href:'#',onclick:e=>{e.preventDefault();openLeadCard(r.tg_id)},style:'color:var(--acc2)'},r.lead_name)),td(r.tier_name),td(usd2(r.amount),'n'),
+    return[el('td',{},el('span',{class:'pill '+st[1]},st[0]),by(r)),td(r.staff_name),el('td',{},el('a',{href:'#',onclick:e=>{e.preventDefault();openLeadCard(r.tg_id)},style:'color:var(--acc2)'},r.lead_name)),td(r.tier_name),td(usd2(r.amount),'n'),
       el('td',{style:'white-space:normal;max-width:340px;line-height:1.45'},r.message),
       r.has_shot?el('td',{},el('a',{href:'/api/office/dep-bonus/'+r.id+'/screenshot',target:'_blank',rel:'noopener',class:'shotc',style:'width:64px;height:64px'},el('img',{src:'/api/office/dep-bonus/'+r.id+'/screenshot',alt:''}))):td('—'),
       td(fmtDT(r.created_at)),actions]}),'Запросов пока нет. Когда лид стримера достигнет градации, стример запросит бонус, и запрос появится здесь.');

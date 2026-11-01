@@ -1024,14 +1024,18 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
   // Цифра у «Дашборда» стримера: сколько строк новых событий его клиентов ждёт в «Требует внимания»
   app.get('/lead-notices/count', { preHandler: stream }, async (req) => ({ n: (await leadNoticesMine(req.staff!)).length }));
   app.get('/dep-bonus/mine', { preHandler: stream }, async (req) => depBonusMine(req.staff!));
-  app.get('/dep-bonus', { preHandler: admin }, async () => {
+  // Бонусы за додепы: админ видит все, тимлидер — своей команды. Кто принял или отклонил — decided_by_name
+  app.get('/dep-bonus', { preHandler: reviewer }, async (req) => {
     const cfg = await loadDepConfig();
     const rows = (
       await db.query(
         `SELECT r.id, r.tg_id, r.tier, r.amount::float AS amount, r.message, r.status, r.period, r.reject_reason, r.created_at, r.decided_at,
-                (r.screenshot IS NOT NULL) AS has_shot, s.name AS staff_name, coalesce('@' || d.username, d.first_name, r.tg_id::text) AS lead_name
-           FROM dep_bonus_requests r JOIN staff s ON s.id = r.staff_id JOIN leads d ON d.tg_id = r.tg_id
+                (r.screenshot IS NOT NULL) AS has_shot, s.name AS staff_name, coalesce('@' || d.username, d.first_name, r.tg_id::text) AS lead_name,
+                db.name AS decided_by_name, db.role AS decided_by_role
+           FROM dep_bonus_requests r JOIN staff s ON s.id = r.staff_id JOIN leads d ON d.tg_id = r.tg_id LEFT JOIN staff db ON db.id = r.decided_by
+          WHERE ($1::int IS NULL OR s.parent_id = $1)
           ORDER BY (r.status = 'pending') DESC, coalesce(r.decided_at, r.created_at) DESC LIMIT 100`,
+        [teamScope(req)],
       )
     ).rows as any[];
     return rows.map((r) => ({ ...r, tier_name: cfg.tiers[r.tier - 1]?.name ?? '' }));
@@ -1039,13 +1043,14 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
   app.get<{ Params: { id: string } }>('/dep-bonus/:id/screenshot', { preHandler: anyStaff }, async (req, reply) => {
     const me = req.staff!;
     const r = (await db.query('SELECT screenshot, screenshot_type, staff_id FROM dep_bonus_requests WHERE id = $1', [Number(req.params.id)])).rows[0];
-    if (!r || !r.screenshot || (me.role !== 'admin' && r.staff_id !== me.id)) return reply.code(404).send({ error: 'Не найдено' });
+    const teamOk = me.role === 'teamlead' && ((await db.query('SELECT 1 FROM staff WHERE id = $1 AND parent_id = $2', [r?.staff_id, me.id])).rowCount ?? 0) > 0;
+    if (!r || !r.screenshot || (me.role !== 'admin' && r.staff_id !== me.id && !teamOk)) return reply.code(404).send({ error: 'Не найдено' });
     return reply.type(r.screenshot_type).header('Cache-Control', 'private, max-age=3600').send(r.screenshot);
   });
-  app.post<{ Params: { id: string } }>('/dep-bonus/:id/decide', { preHandler: admin }, async (req, reply) => {
+  app.post<{ Params: { id: string } }>('/dep-bonus/:id/decide', { preHandler: reviewer }, async (req, reply) => {
     const me = req.staff!;
     const b = (req.body ?? {}) as Record<string, unknown>;
-    const r = (await db.query(`SELECT id, staff_id, status FROM dep_bonus_requests WHERE id = $1`, [Number(req.params.id)])).rows[0];
+    const r = (await db.query(`SELECT r.id, r.staff_id, r.status FROM dep_bonus_requests r JOIN staff s ON s.id = r.staff_id WHERE r.id = $1 AND ($2::int IS NULL OR s.parent_id = $2)`, [Number(req.params.id), teamScope(req)])).rows[0];
     if (!r) return reply.code(404).send({ error: 'Запрос не найден' });
     if (r.status !== 'pending') return reply.code(409).send({ error: 'Запрос уже обработан' });
     if (b.approve === true) {
@@ -1070,7 +1075,8 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
       `SELECT ((SELECT count(*) FROM staff_tasks t JOIN staff s ON s.id = t.staff_id WHERE s.parent_id = $1 AND t.status = 'done')
              + (SELECT count(*) FROM staff_tasks WHERE staff_id = $1 AND status = 'open'))::int AS n`,
     );
-    return { review, why, tasks, total: review + why + tasks };
+    const depb = await n(`SELECT count(*)::int AS n FROM dep_bonus_requests r JOIN staff s ON s.id = r.staff_id WHERE s.parent_id = $1 AND r.status = 'pending'`);
+    return { review, why, tasks, depb, total: review + why + tasks + depb };
   });
   // Сколько всего ждёт решения админа: отчёты на проверке, причины по сменам без решения, запросы авансов
   app.get('/accounting/pending', { preHandler: admin }, async () => {
