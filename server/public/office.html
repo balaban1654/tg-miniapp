@@ -1120,7 +1120,7 @@ function dxModal(btn,s,d,skew,mode){
   const col=({ok:'var(--ok)',warn:'var(--warn)',bad:'var(--bad)'})[dxLvl(hrs,pace)];
   const pct=Math.round(hrs/plan.planMin*100),pp=Math.round(pace/plan.planMin*100);
   const tot=i=>[m.baseMin,m.baseFull][i]+[m.leadsMin,m.leadsFull][i]+m.ftdBonus+m.dayBonus+(m.depBonus||0)+m.bonus-m.penalty;
-  const pay=[tot(0)-m.paid,tot(1)-m.paid];
+  const pay=[Math.max(0,tot(0)-m.paid),Math.max(0,tot(1)-m.paid)];
   const cost=tot(1),profit=m.commission-cost,ratio=cost>0?m.commission/cost:99;
   let vcls='g',vt='Выгоден',vx='приносит $'+ratio.toFixed(1).replace('.',',')+' комиссии на каждый $1 зарплаты';
   if(ratio<1){vcls='r';vt='Убыточен';vx='зарплата больше комиссии'}else if(ratio<2){vcls='y';vt='На грани';vx='комиссия лишь в '+ratio.toFixed(1).replace('.',',')+' раза больше зарплаты'}
@@ -1720,7 +1720,7 @@ function smLeads(d){
     el('div',{class:'dx-row',style:'flex-wrap:wrap;gap:8px 18px;justify-content:space-between'},el('span',{},'Всего лидов ',el('b',{},String(total))),el('span',{},'RTD ',el('b',{},pc(f.regs?f.ftd/f.regs*100:null))),el('span',{title:'Доля ушедших из FTD: заблокировали бота после первого депозита'},'Отвал ',el('b',{},pc((b.ftd||0)+(b.active||0)+(b.churned||0)?(b.churned||0)/((b.ftd||0)+(b.active||0)+(b.churned||0))*100:null)))));
 }
 function smSalary(d){
-  const s=d.salary,tot=i=>s.base[i]+s.leads[i]+s.ftdBonus+s.dayBonus+(s.depBonus||0)+s.bonus-s.penalty,pay=[tot(0)-s.paid,tot(1)-s.paid];
+  const s=d.salary,tot=i=>s.base[i]+s.leads[i]+s.ftdBonus+s.dayBonus+(s.depBonus||0)+s.bonus-s.penalty,pay=[Math.max(0,tot(0)-s.paid),Math.max(0,tot(1)-s.paid)]; // выплатили больше начисленного — это не долг стримера, «к выплате» не уходит в минус
   const pr=(a,b)=>el('span',{},el('span',{class:'dx-dm'},usd0(a)),el('span',{class:'dx-sl'},'/'),el('span',{},usd0(b)));
   const row=(a,v)=>el('div',{class:'dx-row'},el('span',{},a),v);
   const sg=n=>n?sgn0(n):'$0';
@@ -3071,7 +3071,7 @@ async function accDetail(box,id){
   ];
   const tierTbl=ctrT(table(['Депозит FTD','Кол-во','С запасом','Бонус','Сумма'],[...k.tiers.map(t=>[td('>$'+t.over),td(t.n,'n'),td(t.tol||'—','n'),td('$'+t.bonus,'n'),td(t.n?'+'+usd2(t.n*t.bonus):'—','n')]),[td('ниже порога'),td(k.belowTier,'n'),td('—'),td('—'),td('—')]],''));
   const dayTbl=k.dayRows.length?ctrT(table(['День (до 03:00)','FTD от $'+plan.day.min,'Бонус'],k.dayRows.map(x=>[td(new Date(x.d+'T12:00:00').toLocaleDateString('ru-RU',{day:'numeric',month:'short'})),td(x.n+' из '+plan.day.count+(x.all>x.n?' (всего '+x.all+')':''),'n'),td(x.hit?'+$'+plan.day.bonus:'—','n')]),'')):el('div',{class:'mut sm'},'Дней с тремя и более FTD от $'+plan.day.min+' не было.');
-  const pays=d.payouts.length?ctrT(table(['Выплата','Сумма','Заметка',''],d.payouts.map(p=>[td({advance:'Аванс',final:'Итоговая',extra:'Доплата'}[p.kind]+' · '+date(p.created_at)),td(usd2(p.amount),'n'),td(p.note||'—'),el('td',{},el('button',{class:'btn o s',type:'button',onclick:async()=>{await api('/payouts/'+p.id,{method:'DELETE'});accRefresh()}},'Удалить'))]),'')):null;
+  const pays=d.payouts.length?ctrT(table(['Выплата','Сумма','Заметка',''],d.payouts.map(p=>[td({advance:'Аванс',final:'Итоговая',extra:'Доплата'}[p.kind]+' · '+date(p.created_at)),td(usd2(p.amount),'n'),td(p.note||'—'),el('td',{style:'white-space:nowrap'},el('button',{class:'btn o s',type:'button',title:'Эта выплата за прошлый месяц: перенести её туда',onclick:async()=>{try{await api('/payouts/'+p.id,{method:'PATCH',body:{period:perShift(d.period,-1)}});toast('Выплата перенесена в '+perLabel(perShift(d.period,-1)));accRefresh()}catch(x){toast(x.message)}}},'← в '+perLabel(perShift(d.period,-1))),' ',el('button',{class:'btn o s',type:'button',onclick:async()=>{await api('/payouts/'+p.id,{method:'DELETE'});accRefresh()}},'Удалить'))]),'')):null;
   box.replaceChildren(el('div',{class:'detailc'},
     el('div',{class:'head'},el('h3',{style:'font-size:15px'},'Разбор начисления: '+d.staff.name+', '+perLabel(d.period)),el('div',{style:'display:flex;gap:6px;align-items:center'},el('span',{class:'mut sm'},'смены'),planPill(k.shiftsDone),el('span',{class:'mut sm'},'лиды'),planPill(k.leadsDone))),
     el('div',{class:'steps2'},steps),
@@ -3216,10 +3216,15 @@ async function accPay(){
   const kind=el('select',{},el('option',{value:'final'},'Итоговая выплата'),el('option',{value:'advance'},'Аванс (вручную)'),el('option',{value:'extra'},'Доплата'));
   const amount=el('input',{type:'number',min:'0',step:'0.01',placeholder:'Сумма, $'});
   const note=el('input',{placeholder:'Заметка (необязательно)',maxlength:'300'});
+  // За какой месяц выплата: с 1 по 10 число итоговую обычно платят за прошлый месяц
+  const curP=kyivToday().slice(0,7),months=[perShift(accState.period,-1),accState.period,perShift(accState.period,1)].filter(m=>m<=curP);
+  const forP=el('select',{},...months.map(m=>el('option',{value:m},perLabel(m))));
+  const pickDefault=()=>{forP.value=kind.value!=='advance'&&accState.period===curP&&Number(kyivToday().slice(8))<=10?perShift(curP,-1):accState.period};
+  pickDefault();kind.addEventListener('change',pickDefault);
   const err=el('div',{class:'err',role:'alert'});
   const form=el('div',{class:'card',style:'display:grid;gap:10px'},el('h3',{style:'font-size:14px'},'Записать выплату'),
-    el('div',{class:'lc-two'},el('label',{},'Сотрудник',who),el('label',{},'Тип',kind),el('label',{},'Сумма',amount),el('label',{},'Заметка',note)),err,
-    el('div',{},el('button',{class:'btn s',type:'button',onclick:async()=>{err.textContent='';try{await api('/payouts',{method:'POST',body:{staff_id:Number(who.value),kind:kind.value,amount:Number(amount.value),note:note.value,period:accState.period}});toast('Выплата записана');accRefresh()}catch(x){err.textContent=x.message}}},'Записать')));
+    el('div',{class:'lc-two'},el('label',{},'Сотрудник',who),el('label',{},'Тип',kind),el('label',{},'За месяц',forP),el('label',{},'Сумма',amount),el('label',{},'Заметка',note)),err,
+    el('div',{},el('button',{class:'btn s',type:'button',onclick:async()=>{err.textContent='';try{await api('/payouts',{method:'POST',body:{staff_id:Number(who.value),kind:kind.value,amount:Number(amount.value),note:note.value,period:forP.value}});toast('Выплата записана');accRefresh()}catch(x){err.textContent=x.message}}},'Записать')));
   return[el('div',{class:'head'},el('h3',{style:'font-size:15px'},'Выплаты за '+perLabel(accState.period)),el('span',{class:'pill p-pur'},'выплаты с 5 по 10 число следующего месяца')),
     advBox,ctrT(table(['Сотрудник','Должность','Итого','Выплачено','К выплате','Куда','Реквизиты'],rows,'Сотрудников пока нет.')),form,
     el('div',{class:'mut sm'},'Реквизиты берутся из карточки сотрудника (раздел «Сотрудники»). Запрошенный аванс не больше $'+sum.plan.advance+', вручную можно выплатить больше. Аванс вычитается из итога.')];

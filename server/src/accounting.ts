@@ -236,7 +236,7 @@ async function kpiCompute(staffId: number, period: string, plan: KpiPlan): Promi
     fullTotal: r2(full.base + full.leadsPay + extraPaid),
     minTotal: r2(min.base + min.leadsPay + extraPaid),
     paid,
-    due: r2(total - paid),
+    due: r2(Math.max(0, total - paid)), // переплата не долг сотрудника: «к выплате» не меньше нуля
     tiers: tierStats,
     belowTier,
     dayRows: dayRows.filter((x) => x.hit || x.n >= 3),
@@ -249,7 +249,7 @@ export async function kpiFor(staffId: number, period: string, plan: KpiPlan): Pr
   if (!snap) return kpiCompute(staffId, period, plan);
   const k = snap.data as KpiResult;
   const paid = Number((await db.query(`SELECT coalesce(sum(amount), 0)::float AS s FROM staff_payouts WHERE staff_id = $1 AND period = $2`, [staffId, period])).rows[0].s);
-  return { ...k, paid, due: r2(k.total - paid) };
+  return { ...k, paid, due: r2(Math.max(0, k.total - paid)) };
 }
 
 /** План, по которому месяц был закрыт (для закрытого месяца), иначе текущий */
@@ -795,7 +795,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
   const withTeam = (k: KpiResult, team: Awaited<ReturnType<typeof teamPayFor>>) => {
     if (!team) return { ...k, team: null };
     const total = r2(k.total + team.accrued);
-    return { ...k, team, total, due: r2(total - k.paid) };
+    return { ...k, team, total, due: r2(Math.max(0, total - k.paid)) };
   };
 
   app.get<{ Querystring: { period?: string; all?: string } }>('/kpi/summary', { preHandler: admin }, async (req) => {
@@ -1057,6 +1057,14 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     if (!(await db.query(`SELECT 1 FROM staff WHERE id = $1 AND deleted_at IS NULL`, [sid])).rowCount) return reply.code(404).send({ error: 'Сотрудник не найден' });
     const period = PERIOD.test(String(b.period)) ? String(b.period) : await currentPeriod();
     await db.query('INSERT INTO staff_payouts (staff_id, period, kind, amount, note, created_by) VALUES ($1,$2,$3,$4,$5,$6)', [sid, period, kind, amount, str(b.note, 300) || null, req.staff!.id]);
+    return { ok: true };
+  });
+  // Перенести выплату в другой месяц (например, итоговую за октябрь записали в ноябре)
+  app.patch<{ Params: { id: string } }>('/payouts/:id', { preHandler: admin }, async (req, reply) => {
+    const period = String(((req.body ?? {}) as Record<string, unknown>).period ?? '');
+    if (!PERIOD.test(period)) return reply.code(400).send({ error: 'Укажите месяц' });
+    const r = await db.query('UPDATE staff_payouts SET period = $2 WHERE id = $1', [Number(req.params.id), period]);
+    if (!r.rowCount) return reply.code(404).send({ error: 'Выплата не найдена' });
     return { ok: true };
   });
   app.delete<{ Params: { id: string } }>('/payouts/:id', { preHandler: admin }, async (req) => {
@@ -1407,7 +1415,8 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
       let paid = 0;
       for (const mm of months) {
         const k = await kpi(s.id, mm.m);
-        salary += k.fullTotal * mm.w;
+        // Расход компании: начислено по полным ставкам, а если выплатили ещё больше — сколько выплатили (переплата не долг стримера)
+        salary += Math.max(k.fullTotal, k.paid) * mm.w;
         paid += k.paid * mm.w;
       }
       const a = evRange.get(s.id) ?? emptyAgg();
@@ -1498,8 +1507,10 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
           const base = !p ? 0 : p.mode === 'shift' ? n * p.amount : p.amount;
           const bonus = t.role === 'teamlead' ? (await teamleadPay(t.id, mm.m, await planFor(mm.m))).bonus : 0;
           const adj = t.streams ? 0 : Number((await db.query(`SELECT coalesce(sum(CASE WHEN kind = 'bonus' THEN amount ELSE -amount END), 0)::float AS s FROM staff_adjustments WHERE staff_id = $1 AND period = $2`, [t.id, mm.m])).rows[0].s);
-          salary += (base + bonus + adj) * mm.w;
-          paid += Number((await db.query(`SELECT coalesce(sum(amount), 0)::float AS s FROM staff_payouts WHERE staff_id = $1 AND period = $2`, [t.id, mm.m])).rows[0].s) * mm.w;
+          const pm = Number((await db.query(`SELECT coalesce(sum(amount), 0)::float AS s FROM staff_payouts WHERE staff_id = $1 AND period = $2`, [t.id, mm.m])).rows[0].s);
+          // У стримящих выплаты уже учтены в их строке стримера; у остальных переплата — тоже расход
+          salary += (t.streams ? base + bonus + adj : Math.max(base + bonus + adj, pm)) * mm.w;
+          paid += pm * mm.w;
         }
         if (salary > 0 || paid > 0) teamSal.push({ ...t, salary: r2(salary), paid: r2(paid) });
       }
