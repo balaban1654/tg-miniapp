@@ -131,6 +131,13 @@ export function clearTgCaches(): void {
   tgInfoCache.clear();
   photoCache.clear();
 }
+/** «Обновить из Telegram» для основного канала: свежие название и подписчики прямо сейчас (кэш сброшен) */
+export async function freshChannelInfo(url: string): Promise<{ handle: string | null; title: string | null; members: number | null }> {
+  const handle = tgHandle(url);
+  if (!handle) return { handle: null, title: null, members: null };
+  const i = await tgInfo(handle);
+  return { handle, title: i.title, members: i.members };
+}
 /** Фото профиля, если бот его не видит (личные аккаунты): берём картинку со страницы t.me/имя */
 async function scrapeTgPhoto(handle: string): Promise<{ data: Buffer; type: string } | null> {
   const page = await fetch(`https://t.me/${handle}`, { signal: AbortSignal.timeout(5000) });
@@ -571,7 +578,8 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
       }),
     );
     // Настройки команды в Office: блок трейдеров можно скрыть, уведомления об эфирах (LIVE) отключить
-    const ts = (await db.query('SELECT show_traders, show_live FROM media_teams WHERE id = $1', [team])).rows[0] ?? { show_traders: true, show_live: true };
+    // Трейдеров в Mini App больше нет: только каналы (основной канал). Записи трейдеров в базе остаются, но не показываются
+    const ts = { show_traders: false, show_live: false };
     const out = ts.show_live ? rows : rows.map((x) => ({ ...x, live: null }));
     return { traders: ts.show_traders ? out.filter((x) => x.kind === 'trader') : [], channels: out.filter((x) => x.kind === 'channel'), showTraders: ts.show_traders };
   });

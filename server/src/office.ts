@@ -1,4 +1,4 @@
-import { clearTgCaches, onlineNow } from './app.js';
+import { clearTgCaches, onlineNow, freshChannelInfo } from './app.js';
 import QRCode from 'qrcode';
 import { newSecret, otpUri, verifyTotp, newRecoveryCodes } from './totp.js';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
@@ -1721,9 +1721,12 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     return { ok: true };
   });
   // Сразу перечитать из Telegram названия каналов, подписчиков и аватарки (иначе обновятся сами через 5 минут)
-  app.post('/media/refresh', { preHandler: need('admin') }, async () => {
+  // Сбросить кэш Telegram и сразу подтянуть название и подписчиков основного канала (первого канала команды)
+  app.post('/media/refresh', { preHandler: need('admin') }, async (req) => {
     clearTgCaches();
-    return { ok: true };
+    const team = await teamParam(((req.body ?? {}) as Record<string, unknown>).team_id);
+    const ch = team ? (await db.query(`SELECT id, url FROM media_items WHERE team_id = $1 AND kind = 'channel' ORDER BY sort, id LIMIT 1`, [team])).rows[0] : null;
+    return { ok: true, channel: ch ? { id: ch.id, ...(await freshChannelInfo(ch.url)) } : null };
   });
   app.post('/media', { preHandler: need('admin') }, async (req, reply) => {
     const m = cleanMedia((req.body ?? {}) as Record<string, unknown>);

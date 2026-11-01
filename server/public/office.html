@@ -484,6 +484,7 @@ textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10
 .seen-by{color:var(--warn)}
 .pool-box{grid-column:1/-1;display:grid;gap:8px}.pool-pick{display:flex;flex-wrap:wrap;gap:8px 16px}.pool-pick label{display:inline-flex!important;flex-direction:row!important;align-items:center;gap:6px;cursor:pointer;font-size:14px}.pool-pick input{width:16px;height:16px;margin:0}
 .org-row{display:grid;grid-template-columns:minmax(200px,1fr) 2fr;gap:12px;align-items:start;padding-top:12px;border-top:1px solid var(--line)}.org-row>*{min-width:0}.org-row select{flex:1 1 220px;width:auto;min-width:0;max-width:420px}@media(max-width:700px){.org-row{grid-template-columns:1fr}}
+.mc-ava{width:56px;height:56px;border-radius:50%;background:var(--card2);border:2px solid var(--acc);overflow:hidden;flex:none}.mc-ava img{width:100%;height:100%;object-fit:cover;display:block}
 </style>
 </head>
 <body>
@@ -4226,8 +4227,8 @@ async function viewMedia(){
     return[el('td',{},e.kind),el('td',{},el('div',{style:'display:grid;gap:6px;min-width:170px'},e.title,e.country,e.contact,e.staff)),el('td',{},e.sub),el('td',{},e.url),el('td',{style:'white-space:nowrap'},e.sort,iconBtn('ok','Сохранить',save),txtBtn('Отмена',()=>{mediaEdit=null;render({soft:true})}))];
   }
   const viewRow=r=>[td((r.kind==='trader'?'Трейдер':'Канал')+(r.active?'':' · скрыт')),td(r.title+(r.country?', '+r.country:'')+(r.contact_url?' · '+r.contact_url.replace('https://t.me/','@'):'')+(r.staff_id?' · эфир: '+((streamers.find(x=>x.id===r.staff_id)||{}).name||'стример'):'')),td(r.subtitle||'—'),el('td',{},el('code',{},r.url)),el('td',{style:'white-space:nowrap'},iconBtn(r.active?'eye':'eyeOff',r.active?'Показывается в Mini App. Нажмите, чтобы скрыть':'Скрыто из Mini App. Нажмите, чтобы показать',async()=>{try{await api('/media/'+r.id+'/visible',{method:'PATCH',body:{visible:!r.active}});toast(r.active?'Скрыто из Mini App':'Снова показывается в Mini App');render({soft:true})}catch(x){toast(x.message)}}),iconBtn('pen','Изменить',()=>{mediaEdit=r.id;render({soft:true})}),txtBtn('Удалить',async()=>{await api('/media/'+r.id,{method:'DELETE'});render({soft:true})}))];
-  // Вкладки: «Каналы и трейдеры», «Новости», «Отзывы»
-  const MT=[['ch','Каналы и трейдеры'],['news','Новости'],['rev','Отзывы']];
+  // Вкладки: «Основной канал», «Новости», «Отзывы»
+  const MT=[['ch','Основной канал'],['news','Новости'],['rev','Отзывы']];
   const mBar=el('div',{class:'lc-tabs',role:'tablist'}),mBody=el('div',{style:'display:grid;gap:14px'});
   const drawM=async()=>{
     // На «Отзывах» мигает число отзывов, ждущих проверки (как у пункта «Медиа» в меню)
@@ -4240,15 +4241,36 @@ async function viewMedia(){
     const demoCard=el('div',{class:'card',style:'display:grid;gap:10px'},el('h3',{style:'font-size:14px'},'Кнопка «Попробовать демо» в Тренажёре (общая для всех команд)'),
       el('div',{style:'display:flex;gap:10px;flex-wrap:wrap;align-items:center'},demoIn,el('button',{class:'btn s',type:'button',onclick:async e=>{const b=e.currentTarget;b.disabled=true;try{await api('/app-settings/demo',{method:'PUT',body:{url:demoIn.value.trim()}});toast(demoIn.value.trim()?'Ссылка сохранена: кнопка появилась в Тренажёре':'Ссылка очищена: кнопки в Тренажёре нет')}catch(x){toast(x.message)}b.disabled=false}},'Сохранить')),
       el('div',{class:'mut sm'},'Клиент нажимает «Попробовать демо» во вкладке «Тренажёр» и попадает по этой ссылке. Ссылка на t.me откроется внутри Telegram, остальные в браузере.'));
-    if(mediaTab==='ch'){mBody.replaceChildren(form,refreshTg,demoCard,
-    table(['Тип','Имя, страна','Подпись','Ссылка',''],rows.map(r=>r.id===mediaEdit?editRow(r):viewRow(r)),'Пока пусто. Добавьте трейдеров и каналы, они появятся во вкладке «Медиа» в Mini App.'),rowErr);return}
+    if(mediaTab==='ch'){mBody.replaceChildren(await mainChannelCard(team,rows),demoCard);return}
     mBody.replaceChildren(el('div',{class:'mut'},'Загрузка…'));
     try{mBody.replaceChildren(...(mediaTab==='news'?await newsAdmin():await reviewsAdmin()))}catch(x){mBody.replaceChildren(el('div',{class:'err'},x.message))}
   };
   drawM();
-  return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Медиа в Mini App')),el('div',{style:'display:flex;gap:10px;align-items:center'},tBar),teamInfo,showOpts,mBar,mBody];
+  return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Медиа в Mini App')),el('div',{style:'display:flex;gap:10px;align-items:center'},tBar),teamInfo,mBar,mBody];
 }
 
+/** Основной канал команды в «Медиа» Mini App: название и ссылка; «Обновить из Telegram» сразу подтягивает фото, название и подписчиков */
+async function mainChannelCard(team,rows){
+  const ch=rows.find(r=>r.kind==='channel')||null;
+  const title=el('input',{value:ch?ch.title:'Основной канал',maxlength:'80',placeholder:'Основной канал'});
+  const url=el('input',{value:ch?ch.url:'',maxlength:'300',inputmode:'url',placeholder:'https://t.me/имя_канала'});
+  const err=el('div',{class:'err',role:'alert'});
+  const ava=el('div',{class:'mc-ava'}),info=el('div',{style:'display:grid;gap:4px;min-width:0'});
+  const paint=(t,members)=>{
+    ava.replaceChildren(ch?el('img',{src:'/api/app/media/'+ch.id+'/photo?v='+Date.now(),alt:'',onerror:e=>{e.target.remove()}}):null);
+    info.replaceChildren(el('b',{},ch?ch.title:'Канал не добавлен'),el('div',{class:'mut sm'},ch?[t||'название из Telegram ещё не подтянулось',members!=null?' · '+Number(members).toLocaleString('ru-RU')+' подписчиков':''].join(''):'Укажите ссылку и сохраните'))};
+  paint(null,null);
+  const refresh=async(btn,quiet)=>{if(btn)btn.disabled=true;try{const r=await api('/media/refresh',{method:'POST',body:{team_id:team.id}});if(r.channel){paint(r.channel.title,r.channel.members);if(!quiet)toast(r.channel.title?'Обновлено: '+r.channel.title:'Telegram не отдал данные: бот должен видеть канал (публичный @канал или бот админ)')}else if(!quiet)toast('Сначала добавьте канал')}catch(x){if(!quiet)toast(x.message)}if(btn)btn.disabled=false};
+  const save=el('button',{class:'btn',type:'button',onclick:async()=>{err.textContent='';save.disabled=true;
+    try{const body={team_id:team.id,kind:'channel',title:title.value.trim()||'Основной канал',url:url.value.trim(),subtitle:ch?ch.subtitle:'',country:ch?ch.country:'',sort:ch?ch.sort:0};
+      await api(ch?'/media/'+ch.id:'/media',{method:ch?'PUT':'POST',body});toast('Канал сохранён');render({soft:true})}catch(x){err.textContent=x.message;save.disabled=false}}},'Сохранить');
+  const rb=el('button',{class:'btn o s',type:'button',onclick:e=>refresh(e.currentTarget)},'Обновить из Telegram');
+  if(ch)refresh(null,true);
+  return el('div',{class:'card',style:'display:grid;gap:14px'},
+    el('div',{style:'display:flex;gap:14px;align-items:center'},ava,info),
+    el('div',{class:'lc-two'},el('label',{},'Название (в Mini App)',title),el('label',{},'Ссылка на канал',url)),err,
+    el('div',{style:'display:flex;gap:10px;flex-wrap:wrap;align-items:center'},save,rb,el('span',{class:'mut sm'},'Фото, название и подписчики подтягиваются сами раз в 5 минут; кнопка обновит сразу. Бот должен видеть канал: публичная ссылка t.me/имя или бот в админах канала.')));
+}
 let reviewEdit=null;
 const RV_STATUS={pending:'На проверке',published:'Опубликован',hidden:'Скрыт'};
 const starsTxt=n=>el('span',{style:'color:var(--warn);letter-spacing:1px;white-space:nowrap',title:n+' из 5'},'★'.repeat(n),el('span',{style:'color:#ffffff30'},'★'.repeat(5-n)));
