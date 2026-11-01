@@ -2064,7 +2064,7 @@ async function viewLinks(){
     ?el('select',{id:'nOwner',onchange:()=>{poolBox.hidden=owner.value!=='random'}},...staff.filter(s=>s.active!==false).map(s=>el('option',{value:s.id,selected:s.id===me.id?'':null},s.name+' · '+(ROLE[s.role]||s.role))),el('option',{value:'random'},'🎲 Случайно'))
     :el('select',{id:'nOwner'},el('option',{value:''},'Я сам'),...staff.filter(s=>s.id!==me.id&&['streamer','buyer'].includes(s.role)).map(s=>el('option',{value:s.id},s.name+' · '+ROLE[s.role])));
   // «Случайно»: галочками выбираем, между кем раздавать лидов с этой ссылки
-  const poolPick=sel=>{const set=new Set(sel);return el('div',{class:'pool-pick'},...staff.filter(x=>x.active!==false&&(x.role==='streamer'||x.streams)).map(x=>{const c=el('input',{type:'checkbox',value:x.id});c.checked=set.has(x.id);return el('label',{},c,x.name)}))};
+  const poolPick=sel=>{const set=new Set(sel);return el('div',{class:'pool-pick'},...staff.filter(x=>x.active!==false&&x.role==='streamer').map(x=>{const c=el('input',{type:'checkbox',value:x.id});c.checked=set.has(x.id);return el('label',{},c,x.name)}))};
   const poolIds=box=>[...box.querySelectorAll('input:checked')].map(c=>Number(c.value));
   const poolList=poolPick(staff.filter(x=>x.role==='streamer'&&x.active!==false).map(x=>x.id));
   const poolBox=el('div',{class:'pool-box',hidden:''},el('div',{class:'mut sm'},'Кому раздавать лидов. За день каждый получает по одному: сначала тот, у кого больше часов в эфире за месяц (потом больше FTD), и дальше по убыванию; когда все получили, круг повторяется. С 00:00 по Киеву очередь начинается заново.'),poolList);

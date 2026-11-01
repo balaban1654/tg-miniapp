@@ -692,8 +692,8 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
   const readPool = async (v: unknown): Promise<number[] | string> => {
     const ids = [...new Set((Array.isArray(v) ? v : []).map(Number).filter((n) => Number.isInteger(n) && n > 0))];
     if (!ids.length) return 'Отметьте хотя бы одного сотрудника, кому раздавать лидов';
-    const ok = (await db.query('SELECT id FROM staff WHERE id = ANY($1::int[]) AND active AND deleted_at IS NULL', [ids])).rows.map((x) => x.id as number);
-    return ok.length ? ok : 'Сотрудники не найдены';
+    const ok = (await db.query('SELECT id FROM staff WHERE id = ANY($1::int[]) AND role = 'streamer' AND active AND deleted_at IS NULL', [ids])).rows.map((x) => x.id as number);
+    return ok.length ? ok : 'Отметьте хотя бы одного активного стримера';
   };
   const savePool = async (linkId: number, ids: number[]) => {
     await db.query('DELETE FROM link_pool WHERE link_id = $1', [linkId]);

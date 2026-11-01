@@ -95,7 +95,7 @@ async function rankPool(poolSql: string, todaySql: string, key: unknown): Promis
             (SELECT count(*)::int FROM events e JOIN leads d ON d.tg_id = e.tg_id WHERE d.owner_id = s.id AND e.type = 'ftd'
                AND to_char(e.created_at AT TIME ZONE ${TZ}, 'YYYY-MM') = to_char(now() AT TIME ZONE ${TZ}, 'YYYY-MM')) AS ftd
        FROM staff s
-      WHERE s.id IN (${poolSql}) AND s.active AND s.deleted_at IS NULL
+      WHERE s.id IN (${poolSql}) AND s.role = 'streamer' AND s.active AND s.deleted_at IS NULL
       ORDER BY today ASC, mins DESC, ftd DESC, s.id ASC LIMIT 1`,
     [key],
   );
