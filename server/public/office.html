@@ -2806,7 +2806,7 @@ async function fieldStatsBlock(qs=''){
   const tot={};d.rows.forEach(r=>d.fields.forEach(f=>{tot[f]=(tot[f]||0)+(r.sums[f]||0)}));
   const rows=d.rows.map(r=>[td(r.name),td(r.reports,'n'),td(hmin(r.minutes)),...d.fields.map(f=>td((r.sums[f]||0).toLocaleString('ru-RU'),'n'))]);
   if(d.rows.length)rows.push([el('td',{},el('b',{},'Всего')),td(d.rows.reduce((a,r)=>a+r.reports,0),'n'),td(hmin(d.rows.reduce((a,r)=>a+r.minutes,0))),...d.fields.map(f=>el('td',{class:'n'},el('b',{},(tot[f]||0).toLocaleString('ru-RU'))))]);
-  const label=d.from?(d.from.slice(0,7)===d.to.slice(0,7)&&d.from.endsWith('-01')&&d.to===lastDayOf(d.from.slice(0,7))?perLabel(d.period||d.from.slice(0,7)):dmy(d.from)+' — '+dmy(d.to)):perLabel(d.period);
+  const label=d.from?(d.from.slice(0,7)===d.to.slice(0,7)&&d.from.endsWith('-01')&&d.to===lastDayOf(d.from.slice(0,7))?perLabel(d.from.slice(0,7)):dmy(d.from)+' — '+dmy(d.to)):perLabel(d.period);
   return el('div',{style:'display:grid;gap:8px'},el('h3',{style:'font-size:15px'},'Эфиры за '+label),ctrT(totalRow(table(cols,rows,'Зачтённых отчётов за период пока нет.'),d.rows.length>0)));
 }
 const totalRow=(t,on)=>{if(on){const tr=t.querySelector('tbody tr:last-child');if(tr)tr.classList.add('sum-row')}return t};
