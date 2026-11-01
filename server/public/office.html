@@ -485,6 +485,7 @@ textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10
 .pool-box{grid-column:1/-1;display:grid;gap:8px}.pool-pick{display:flex;flex-wrap:wrap;gap:8px 16px}.pool-pick label{display:inline-flex!important;flex-direction:row!important;align-items:center;gap:6px;cursor:pointer;font-size:14px}.pool-pick input{width:16px;height:16px;margin:0}
 .org-row{display:grid;grid-template-columns:minmax(200px,1fr) 2fr;gap:12px;align-items:start;padding-top:12px;border-top:1px solid var(--line)}.org-row>*{min-width:0}.org-row select{flex:1 1 220px;width:auto;min-width:0;max-width:420px}@media(max-width:700px){.org-row{grid-template-columns:1fr}}
 .mc-ava{width:56px;height:56px;border-radius:50%;background:var(--card2);border:2px solid var(--acc);overflow:hidden;flex:none}.mc-ava img{width:100%;height:100%;object-fit:cover;display:block}
+.me-cont{display:flex;gap:8px}.me-ci{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;background:var(--card2);border:1px solid var(--line);color:var(--acc2);transition:background .15s,color .15s}.me-ci:hover{background:var(--acc);color:#fff}
 </style>
 </head>
 <body>
@@ -513,7 +514,7 @@ textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10
     <button class="burger" id="burger" type="button" aria-label="Меню" aria-expanded="false" aria-controls="sideMenu"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
     <div class="side-menu" id="sideMenu">
     <nav class="nav" id="nav"></nav>
-    <div class="me"><div class="me-row"><span id="meName"></span><button class="gear" id="meGear" type="button" title="Моя карточка" aria-label="Моя карточка"></button><button class="gear" id="meNav" type="button" title="Настроить меню" aria-label="Настроить меню" hidden></button></div><button class="btn o s" id="installBtn" type="button" hidden title="Установить приложение" aria-label="Установить приложение"><svg class="iic" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg><span class="ilbl">Установить приложение</span></button><button class="btn o s" id="logout" type="button">Выйти</button></div>
+    <div class="me"><div class="me-cont" id="meCont" hidden></div><div class="me-row"><span id="meName"></span><button class="gear" id="meGear" type="button" title="Моя карточка" aria-label="Моя карточка"></button><button class="gear" id="meNav" type="button" title="Настроить меню" aria-label="Настроить меню" hidden></button></div><button class="btn o s" id="installBtn" type="button" hidden title="Установить приложение" aria-label="Установить приложение"><svg class="iic" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg><span class="ilbl">Установить приложение</span></button><button class="btn o s" id="logout" type="button">Выйти</button></div>
       </div>
   </aside>
   <main id="main"></main>
@@ -621,6 +622,7 @@ function showApp(){
   $('#login').hidden=true;$('#app').hidden=false;
   $('#meName').replaceChildren(me.name,el('span',{class:'mrole'},' · '+ROLE[me.role]));
   const gb=$('#meGear');if(gb&&!gb.firstChild){gb.append(svgIcon(GEAR,16));gb.onclick=()=>openStaffCard(null)}
+  drawContacts();
   const nb=$('#meNav');if(nb){if(!nb.firstChild){nb.append(svgIcon('<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><path d="M14 17.5h7M17.5 14v7"/>',16));nb.onclick=openNavEditor}nb.hidden=me.role!=='admin'}
   const items=navItemsFor(me.role);
   if(me.role==='analyst'&&!['signals','newsig','tshift'].includes(tab))tab='signals';
@@ -2690,6 +2692,16 @@ function shotThumb(url,props={}){
 }
 const GEAR='<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/>';
 /** Карточка сотрудника: id=null это своя (шестерёнка внизу), иначе карточка другого сотрудника для админа */
+/* Контакты команды в меню над именем: значки Telegram и Discord (ссылки задаёт админ в шестерёнке → «Контакты») */
+const TG_SVG='<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M21.9 3.6 2.6 11c-1.3.5-1.3 1.3-.2 1.6l4.9 1.5 1.9 5.8c.2.6.1.8.7.8.5 0 .7-.2 1-.5l2.4-2.3 4.9 3.6c.9.5 1.5.2 1.7-.8l3.2-15.2c.3-1.3-.5-1.9-1.4-1.5ZM8.4 13.5 18.8 7c.5-.3.9-.1.6.2l-8.7 7.8-.3 3.8z"/></svg>';
+const DC_SVG='<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M19.6 5.3A17.6 17.6 0 0 0 15.3 4l-.5 1.1a16.3 16.3 0 0 0-5.6 0L8.7 4a17.5 17.5 0 0 0-4.3 1.3C1.7 9.4 1 13.4 1.3 17.3a17.7 17.7 0 0 0 5.4 2.7l1.1-1.8a11.4 11.4 0 0 1-1.8-.9l.4-.3a12.6 12.6 0 0 0 11.2 0l.4.3c-.6.4-1.2.7-1.8.9l1.1 1.8a17.6 17.6 0 0 0 5.4-2.7c.4-4.5-.7-8.5-3.1-12ZM8.6 14.9c-1.1 0-2-1-2-2.2s.9-2.2 2-2.2 2 1 2 2.2-.9 2.2-2 2.2Zm6.8 0c-1.1 0-2-1-2-2.2s.9-2.2 2-2.2 2 1 2 2.2-.9 2.2-2 2.2Z"/></svg>';
+async function drawContacts(){
+  const box=$('#meCont');if(!box)return;
+  let c;try{c=await api('/contacts')}catch{return}
+  const a=(u,label,icon)=>u?(()=>{const x=el('a',{href:u,target:'_blank',rel:'noopener',class:'me-ci',title:label,'aria-label':label});x.innerHTML=icon;return x})():null;
+  const items=[a(c.telegram,'Telegram команды',TG_SVG),a(c.discord,'Discord команды',DC_SVG)].filter(Boolean);
+  box.replaceChildren(...items);box.hidden=!items.length;
+}
 async function openStaffCard(id){
   document.querySelectorAll('.lc-overlay').forEach(x=>x.remove());
   const self=id===null;
@@ -2747,7 +2759,13 @@ async function openStaffCard(id){
       el('div',{class:'lc-actions'},el('button',{class:'btn o',type:'button',onclick:changePw},self?'Сменить пароль':'Сбросить пароль'),pmsg),
       tf]
   };
-  const TABS=[['personal','Личные данные'],['payout','Выплаты'],['security','Безопасность']];
+  // Контакты команды (только админ, в своей карточке): ссылки значков Telegram и Discord в меню у всех сотрудников
+  const ct={tg:inp('text','','https://t.me/...'),dc:inp('text','','https://discord.gg/...')};const cmsg=el('div',{class:'err',role:'alert'});
+  if(self&&me.role==='admin')api('/contacts').then(c=>{ct.tg.value=c.telegram||'';ct.dc.value=c.discord||''}).catch(()=>{});
+  panes.contacts=()=>[el('div',{class:'mut sm'},'Значки Telegram и Discord появятся в меню над именем у всех сотрудников: админов, тимлидеров и стримеров. Пустая ссылка — значка нет.'),
+    el('div',{class:'lc-two'},fld('Telegram',ct.tg),fld('Discord',ct.dc)),
+    el('div',{class:'lc-actions'},el('button',{class:'btn',type:'button',onclick:async()=>{cmsg.textContent='';try{await api('/contacts',{method:'PUT',body:{telegram:ct.tg.value,discord:ct.dc.value}});toast('Контакты сохранены');drawContacts()}catch(x){cmsg.textContent=x.message}}},'Сохранить'),cmsg)];
+  const TABS=[['personal','Личные данные'],['payout','Выплаты'],['security','Безопасность'],...(self&&me.role==='admin'?[['contacts','Контакты']]:[])];
   let cur='personal';
   const body=el('div',{class:'lc-pane'});
   const bar=el('div',{class:'lc-tabs',role:'tablist'});

@@ -1706,6 +1706,26 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     const staffId = Number(b.staff_id);
     return { kind, title, url, subtitle: str(b.subtitle, 80) || null, country: country || null, contact_url: contact || null, staff_id: Number.isInteger(staffId) && staffId > 0 ? staffId : null, sort: Math.trunc(num(b.sort)) };
   }
+  // Контакты команды для всех сотрудников: значки Telegram и Discord в меню над именем. Ссылки меняет админ (шестерёнка → «Контакты»)
+  app.get('/contacts', { preHandler: auth }, async () => {
+    const r = (await db.query(`SELECT key, value FROM app_settings WHERE key IN ('contact_tg','contact_discord')`)).rows as { key: string; value: string }[];
+    const v = (k: string) => r.find((x) => x.key === k)?.value || '';
+    return { telegram: v('contact_tg'), discord: v('contact_discord') };
+  });
+  app.put('/contacts', { preHandler: need('admin') }, async (req, reply) => {
+    const b = (req.body ?? {}) as Record<string, unknown>;
+    const out: [string, string][] = [];
+    for (const [key, field, name] of [['contact_tg', 'telegram', 'Telegram'], ['contact_discord', 'discord', 'Discord']] as const) {
+      let u = str(b[field], 300).trim();
+      if (u && /^(t\.me|discord\.gg|discord\.com)\//i.test(u)) u = 'https://' + u;
+      if (u && !/^https:\/\/\S+$/i.test(u)) return reply.code(400).send({ error: `${name}: ссылка должна начинаться с https://` });
+      out.push([key, u]);
+    }
+    for (const [key, u] of out)
+      await db.query(`INSERT INTO app_settings (key, value, updated_at) VALUES ($1,$2,now()) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()`, [key, u]);
+    return { ok: true };
+  });
+
   // Ссылка кнопки «Попробовать демо» в Тренажёре Mini App
   app.get('/app-settings/demo', { preHandler: need('admin') }, async () => {
     const r = (await db.query(`SELECT value FROM app_settings WHERE key = 'demo_url'`)).rows[0];
