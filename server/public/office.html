@@ -3256,15 +3256,15 @@ async function accBonus(refresh){
   const who=el('select',{},...st.filter(s=>s.id!==me.id).sort((a,b)=>(RO[a.role]??9)-(RO[b.role]??9)||a.name.localeCompare(b.name,'ru')).map(s=>el('option',{value:s.id},s.name+(RLB[s.role]?' · '+RLB[s.role]:''))));
   const kind=el('select',{},el('option',{value:'bonus'},'Бонус'),el('option',{value:'penalty'},'Штраф'));
   const amount=el('input',{type:'number',min:'0',step:'0.01',placeholder:'Сумма, $'});
-  const comment=el('input',{placeholder:'За что (видите только вы)',maxlength:'500'});
+  const comment=el('input',{placeholder:'За что (стример не видит)',maxlength:'500'});
   const err=el('div',{class:'err',role:'alert'});
   const form=el('div',{class:'card',style:'display:grid;gap:10px'},el('h3',{style:'font-size:14px'},'Добавить'),
     el('div',{class:'lc-two'},el('label',{},'Сотрудник',who),el('label',{},'Тип',kind),el('label',{},'Сумма',amount),el('label',{},'Комментарий',comment)),err,
     el('div',{},el('button',{class:'btn s',type:'button',onclick:async()=>{err.textContent='';try{await api('/adjustments',{method:'POST',body:{staff_id:Number(who.value),kind:kind.value,amount:Number(amount.value),comment:comment.value,period:accState.period}});toast('Добавлено');accRefresh()}catch(x){err.textContent=x.message}}},'Добавить')));
   const byTd=a=>td(a.by_name?a.by_name+(a.by_role==='teamlead'?' (тимлидер)':a.by_role==='admin'?' (админ)':''):'—');
-  const rows=list.map(a=>[td(a.d),td(a.staff_name),byTd(a),el('td',{},el('span',{class:'pill '+(a.kind==='bonus'?'p-ok':'p-bad')},a.kind==='bonus'?'бонус':'штраф')),td(usd2(a.kind==='bonus'?a.amount:-a.amount),'n'),el('td',{style:'white-space:normal;text-align:left'},a.comment||'—'),el('td',{},ms.closed||(lead&&a.created_by!==me.id)?'':el('button',{class:'btn o s',type:'button',onclick:async()=>{try{await api('/adjustments/'+a.id,{method:'DELETE'});accRefresh()}catch(x){toast(x.message)}}},'Удалить'))]);
+  const rows=list.map(a=>[td(a.d),td(a.staff_name),byTd(a),el('td',{},el('span',{class:'pill '+(a.kind==='bonus'?'p-ok':'p-bad')},a.kind==='bonus'?'бонус':'штраф')),td(usd2(a.kind==='bonus'?a.amount:-a.amount),'n'),el('td',{style:'white-space:normal;text-align:center'},a.comment||'—'),el('td',{},ms.closed||(lead&&a.created_by!==me.id)?'':el('button',{class:'btn o s',type:'button',onclick:async()=>{try{await api('/adjustments/'+a.id,{method:'DELETE'});accRefresh()}catch(x){toast(x.message)}}},'Удалить'))]);
   const lockNote=el('div',{class:'card warn-card'},el('b',{},'🔒 Месяц закрыт'),el('div',{class:'mut sm'},'Бонусы и штрафы за закрытый месяц менять нельзя. Откройте месяц заново (кнопка вверху), внесите изменения и закройте снова.'));
-  return[ms.closed?lockNote:form,ctrT(table(['Дата','Сотрудник','Выписал','Тип','Сумма','Комментарий (видите только вы)',''],rows,'За этот месяц бонусов и штрафов нет.')),
+  return[ms.closed?lockNote:form,ctrT(table(['Дата','Сотрудник','Выписал','Тип','Сумма','Комментарий (стример не видит)',''],rows,'За этот месяц бонусов и штрафов нет.')),
     el('div',{class:'mut sm'},'Стример видит бонусы и штрафы суммами, без вашего комментария. Переработку тоже можно оплатить здесь.')];
 }
 

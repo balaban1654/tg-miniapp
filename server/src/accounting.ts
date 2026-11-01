@@ -931,7 +931,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
           WHERE a.period = $1 AND ($2::int IS NULL OR s.parent_id = $2) ORDER BY a.id DESC`,
         [period, teamScope(req)],
       )
-    ).rows.map((a) => (req.staff!.role === 'teamlead' && a.created_by !== req.staff!.id ? { ...a, comment: null } : a)); // чужой комментарий тимлидеру не показываем
+    ).rows; // комментарии видят админ и тимлидер (стример — нет)
   });
   app.post('/adjustments', { preHandler: reviewer }, async (req, reply) => {
     const b = (req.body ?? {}) as Record<string, any>;
