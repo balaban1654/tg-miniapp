@@ -1414,6 +1414,8 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     const refStart = `${refMonth}-01`;
     const evMonth = refStart === from && lastOfMonth(refMonth) === to ? evRange : await aggEvents(refStart, lastOfMonth(refMonth));
     // Тимлид комиссию не видит
+    // Комиссия за месяц по стримеру — только для блока «Выгоден ли сотрудник» в карточке (тимлиду тоже); в остальных цифрах тимлид её не видит
+    const commMonth = new Map([...evMonth.entries()].map(([id, a]) => [id, a.comm]));
     if (lead) for (const m of [evRange, evMonth]) for (const a of m.values()) a.comm = 0;
 
     const clicksRows = (
@@ -1513,6 +1515,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
           ftdSum: am.ftdSum,
           deposits: am.ftdSum + am.depSum,
           commission: am.comm,
+          commissionCard: commMonth.get(s.id) ?? 0,
           hoursMin: k.hoursMin,
           planMin: k.planMin,
           shifts: k.shifts,

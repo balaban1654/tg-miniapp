@@ -543,7 +543,7 @@ const ROLE={admin:'Админ',teamlead:'Тимлидер',streamer:'Стрим�
 const STATUS={new:['Новый','p-pur'],registered:['Регистрация','ev-reg'],ftd:['FTD','ev-ftd'],active:['Активный','ev-dep'],churned:['Отвал','p-bad']};
 let me=null,tab='home';
 /* Адрес страницы: у каждого раздела своя ссылка (#/leads, #/acc/review), при обновлении остаёмся на месте */
-const STAFF_TABS=['team','links','tasks','review','why','depb','bonus','roi','exp'];
+const STAFF_TABS=['team','links','tasks','review','why','depb','bonus','exp'];
 const ACC_TABS=['sum','roi','review','bonus','depb','pay','exp','why','plan','team','form'];
 function hashPath(){return '/'+tab+(tab==='acc'?'/'+accState.tab:tab==='plans'?'/'+plansState.tab:tab==='staff'?'/'+staffState.tab:'')}
 function pushHash(){const h='#'+hashPath();if(location.hash!==h)history.pushState(null,'',h)}
@@ -1142,7 +1142,8 @@ function dxModal(btn,s,d,skew,mode){
   const pct=Math.round(hrs/plan.planMin*100),pp=Math.round(pace/plan.planMin*100);
   const tot=i=>[m.baseMin,m.baseFull][i]+[m.leadsMin,m.leadsFull][i]+m.ftdBonus+m.dayBonus+(m.depBonus||0)+m.bonus-m.penalty;
   const pay=[Math.max(0,tot(0)-m.paid),Math.max(0,tot(1)-m.paid)];
-  const cost=tot(1),profit=m.commission-cost,ratio=cost>0?m.commission/cost:99;
+  const comm=m.commissionCard??m.commission;
+  const cost=tot(1),profit=comm-cost,ratio=cost>0?comm/cost:99;
   let vcls='g',vt='Выгоден',vx='приносит $'+ratio.toFixed(1).replace('.',',')+' комиссии на каждый $1 зарплаты';
   if(ratio<1){vcls='r';vt='Убыточен';vx='зарплата больше комиссии'}else if(ratio<2){vcls='y';vt='На грани';vx='комиссия лишь в '+ratio.toFixed(1).replace('.',',')+' раза больше зарплаты'}
   if(hrs<pace*.85&&vcls==='g')vx+='. Но сильно отстаёт по часам, '+hw(hrs)+' из '+plan.hours+' ч';
@@ -1178,7 +1179,7 @@ function dxModal(btn,s,d,skew,mode){
         el('div',{class:'dx-scol'},el('div',{class:'dx-sh'},'Удержания'),row('Штрафы',hv(m.penalty?sgn0(-m.penalty):'$0',m.penalty?'dx-neg':'')),row('Выплачено (аванс)',hv(m.paid?sgn0(-m.paid):'$0'))),
         el('div',{class:'dx-scol'},el('div',{class:'dx-sh'},'Бонусы'),row('FTD (суммы больше)',hv(m.ftdBonus?sgn0(m.ftdBonus):'$0')),row('Дневной ('+(d.plan.dayCount||4)+' FTD)',hv(m.dayBonus?sgn0(m.dayBonus):'$0')),row('Додепы (градации)',hv(m.depBonus?sgn0(m.depBonus):'$0')),row('Премии',hv(m.bonus?sgn0(m.bonus):'$0'))),
         el('div',{class:'dx-topay'},el('span',{},'К выплате'),el('b',{},el('span',{class:'dx-dm'},usd0(pay[0])),el('span',{class:'dx-sl'},'/'),el('span',{},usd0(pay[1])))))),
-    el('div',{class:'dx-prof',hidden:me.role==='admin'?null:''},el('div',{class:'dx-sec'},'Выгоден ли сотрудник'),row('Комиссия с лидов',hv(usd0(m.commission))),row('Зарплата по полным ставкам',hv('−'+usd0(cost),'dx-neg')),
+    el('div',{class:'dx-prof',hidden:me.role==='admin'||me.role==='teamlead'?null:''},el('div',{class:'dx-sec'},'Выгоден ли сотрудник'),row('Комиссия с лидов',hv(usd0(comm))),row('Зарплата по полным ставкам',hv('−'+usd0(cost),'dx-neg')),
       el('div',{class:'dx-row res'},el('span',{},'Прибыль с сотрудника'),el('b',{style:'color:'+(profit<0?'var(--bad)':'var(--fg)')},sgn0(profit))),
       el('div',{class:'dx-vd '+vcls},el('b',{},vt+'. '),vx+'.')),
     el('div',{class:'dx-hd'},el('span',{class:'mut sm'},'Данные за '+perLabel(m.period)),me.role!=='admin'?null:el('a',{href:'#/acc/sum',style:'color:var(--acc2);font-weight:700;font-size:12px',onclick:e=>{e.preventDefault();dxCloseModal();dxGo('acc','sum')}},'Открыть в Бухгалтерии →')));
@@ -2157,7 +2158,7 @@ async function viewStaff(){
   // Цифры у вкладок тимлида: задачи (свои открытые + выполненные командой), отчёты на проверке, причины без решения
   const countWhy=refreshLeadPending,countTasks=refreshLeadPending;
   await refreshLeadPending();
-  const tabsList=()=>[['team',isAdmin?'Сотрудники':'Моя команда'],...(canLinks?[['links','Ссылки']]:[]),...(lead?[['tasks','Задачи'],['review','Отчёты'],['why','Причины по сменам'],['depb','Бонусы за додепы'],['bonus','Бонусы и штрафы'],['roi','Окупаемость'],['exp','Расходы']]:[])];
+  const tabsList=()=>[['team',isAdmin?'Сотрудники':'Моя команда'],...(canLinks?[['links','Ссылки']]:[]),...(lead?[['tasks','Задачи'],['review','Отчёты'],['why','Причины по сменам'],['depb','Бонусы за додепы'],['bonus','Бонусы и штрафы'],['exp','Расходы']]:[])];
   let TABS=tabsList();
   const drawBar=()=>(TABS=tabsList(),bar).replaceChildren(...TABS.map(([k,t])=>el('button',{type:'button',role:'tab','aria-selected':String(k===staffState.tab),class:'lc-tab'+(k===staffState.tab?' on':''),onclick:()=>{staffState.tab=k;drawBar();drawBody();pushHash()}},t,lead&&leadPend[k]>0?el('span',{class:'nbadge pulse tb',title:'Ждут вашего решения'},String(leadPend[k])):null)));
   window.__staffTabsRedraw=()=>{if(bar.isConnected)drawBar()};
