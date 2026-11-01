@@ -800,15 +800,18 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     const me = req.staff!;
     const r = await db.query(
       `SELECT d.tg_id, d.username, d.first_name, d.owner_id, o.name AS owner_name, tf.name AS taken_from_name,
-              m.direction AS last_dir, m.kind AS last_kind, m.text AS last_text, m.created_at AS last_at
+              m.direction AS last_dir, m.kind AS last_kind, m.text AS last_text, m.created_at AS last_at,
+              (d.chat_seen_at IS NOT NULL AND d.chat_seen_at >= m.created_at) AS seen, sb.name AS seen_by_name
          FROM leads d
+         LEFT JOIN staff sb ON sb.id = d.chat_seen_by
          JOIN LATERAL (SELECT direction, kind, text, created_at FROM messages WHERE tg_id = d.tg_id ORDER BY id DESC LIMIT 1) m ON TRUE
          LEFT JOIN staff o ON o.id = d.owner_id
          LEFT JOIN staff tf ON tf.id = d.taken_from
         WHERE d.removed_at IS NULL AND ${chatScope(me, 'd.owner_id')}${me.role === 'admin' ? '' : " AND coalesce(d.lead_role, 'lead') = 'lead'"} AND (d.chat_closed_at IS NULL OR m.created_at > d.chat_closed_at)
         ORDER BY (m.direction = 'in') DESC, m.created_at DESC LIMIT 200`,
     );
-    return r.rows.map((x) => ({ ...x, waiting: x.last_dir === 'in' }));
+    // Ждёт ответа (мигает): последнее сообщение от клиента и его ещё никто из команды не открыл. Открыли, но не ответили: метка «Просмотрел(а)»
+    return r.rows.map((x) => ({ ...x, waiting: x.last_dir === 'in' && !x.seen, seenBy: x.last_dir === 'in' && x.seen ? x.seen_by_name : null }));
   });
 
   app.get<{ Params: { tgId: string } }>('/chats/:tgId', { preHandler: auth }, async (req, reply) => {
@@ -820,6 +823,10 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
       [tgId],
     );
     if (!lead.rowCount) return reply.code(404).send({ error: 'Чат не найден' });
+    // Отметка «просмотрено»: стример или тимлид открыл чат; админ — только в чатах своих лидов (чтобы его проверка не гасила новое у стримера)
+    if (me.role !== 'admin' || lead.rows[0].owner_id === me.id) {
+      await db.query('UPDATE leads SET chat_seen_at = now(), chat_seen_by = $2 WHERE tg_id = $1', [tgId, me.id]);
+    }
     const msgs = await db.query(
       `SELECT m.id, m.direction, m.kind, m.text, m.created_at, (m.file_id IS NOT NULL) AS has_file, m.file_name, s.name AS staff_name,
               m.staff_id, s.parent_id AS staff_parent, m.edited_at, (m.tg_message_id IS NOT NULL) AS editable

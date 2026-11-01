@@ -934,3 +934,7 @@ ALTER TABLE staff ADD COLUMN IF NOT EXISTS tg_link TEXT;
 
 -- Новость может вести на полный пост (ссылка необязательная): в Mini App под текстом «…читать продолжение»
 ALTER TABLE news ADD COLUMN IF NOT EXISTS url TEXT;
+
+-- Чат просмотрен: когда и кто из команды (стример, тимлид или владелец лида) последним открыл переписку
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS chat_seen_at TIMESTAMPTZ;
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS chat_seen_by INT REFERENCES staff(id) ON DELETE SET NULL;

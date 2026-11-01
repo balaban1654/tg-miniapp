@@ -481,6 +481,7 @@ textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10
 .sm-adv{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 14px;border-radius:12px;background:#3ddc9722}.sm-adv.off{background:#ffffff0f}.sm-adv .tx{flex:1;min-width:180px;font-size:13px;color:var(--mut)}.sm-adv .tx b{color:var(--fg)}
 @media(max-width:560px){.sm-pay .cols{grid-template-columns:minmax(0,1fr)}}
 .dx-tk .dx-tx{text-align:left}
+.seen-by{color:var(--warn)}
 </style>
 </head>
 <body>
@@ -3462,7 +3463,8 @@ async function viewChats(){
     list.replaceChildren(...(rows.length?rows.map(r=>el('button',{type:'button',class:'chat-item'+(r.tg_id==active?' on':''),onclick:()=>openChat(r.tg_id)},
       el('div',{class:'row2'},el('b',{},cname(r),r.first_name&&r.username?el('span',{class:'mut sm',style:'font-weight:400'},' @'+r.username):null),r.waiting?el('span',{class:'dot',title:'Ждёт ответа'}):null),
       el('div',{class:'mut sm t'},preview(r)),
-      el('div',{class:'mut sm'},r.owner_name?(r.taken_from_name?'Забрал: '+r.owner_name+' (у '+r.taken_from_name+')':'Ведёт: '+r.owner_name):'Не закреплён: ответит первый, тот и заберёт'))):[el('div',{class:'empty'},'Сообщений пока нет. Когда клиент напишет боту, чат появится здесь.')]));
+      el('div',{class:'mut sm'},r.owner_name?(r.taken_from_name?'Забрал: '+r.owner_name+' (у '+r.taken_from_name+')':'Ведёт: '+r.owner_name):'Не закреплён: ответит первый, тот и заберёт'),
+      r.seenBy?el('div',{class:'sm seen-by',title:'Открыл(а) чат, но ещё не ответил(а)'},'👁 Просмотрел(а): '+r.seenBy+' · без ответа'):null)):[el('div',{class:'empty'},'Сообщений пока нет. Когда клиент напишет боту, чат появится здесь.')]));
     updateBadge();
   }
   async function loadThread(){
