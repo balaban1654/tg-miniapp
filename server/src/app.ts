@@ -312,28 +312,9 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // Перенос из старого бота: клиент вводит свой Pocket ID из загруженного списка. Доступ откроется не сразу, а после постбека с пополнением (от $10)
-  const claimTries = new Map<number, { n: number; at: number }>();
-  app.post('/legacy/claim', { preHandler: auth }, async (req, reply) => {
-    const tgId = req.tg!.id;
-    const t = claimTries.get(tgId);
-    const fresh = t && Date.now() - t.at < 3_600_000 ? t : { n: 0, at: Date.now() };
-    if (fresh.n >= 8) return reply.code(429).send({ error: 'Слишком много попыток. Попробуйте через час или напишите в поддержку' });
-    const id = String((req.body as any)?.trader_id ?? '').trim();
-    if (!/^[A-Za-z0-9_-]{1,40}$/.test(id)) return reply.code(400).send({ error: 'Введите Pocket ID: только буквы и цифры' });
-    const fail = (code: number, error: string) => {
-      claimTries.set(tgId, { n: fresh.n + 1, at: fresh.at });
-      return reply.code(code).send({ error });
-    };
-    const row = (await db.query('SELECT claimed_by FROM legacy_ids WHERE trader_id = $1', [id])).rows[0];
-    if (!row) return fail(404, 'Этого Pocket ID нет в списке старого бота. Проверьте номер или напишите в поддержку');
-    if (row.claimed_by && Number(row.claimed_by) !== tgId) return fail(409, 'Этот Pocket ID уже подключён к другому аккаунту');
-    const other = await db.query('SELECT 1 FROM leads WHERE trader_id = $1 AND tg_id <> $2 AND access LIMIT 1', [id, tgId]);
-    if (other.rowCount) return fail(409, 'Этот Pocket ID уже подключён к другому аккаунту');
-    await db.query('UPDATE legacy_ids SET claimed_by = $2, claimed_at = coalesce(claimed_at, now()) WHERE trader_id = $1', [id, tgId]);
-    await db.query(`UPDATE leads SET trader_id = $2, status = CASE WHEN status = 'new' THEN 'registered' ELSE status END WHERE tg_id = $1`, [tgId, id]);
-    claimTries.delete(tgId);
-    return { ok: true };
-  });
+  // Перенос из старого бота закончен: Pocket ID вручную больше не вводится, он приходит постбеком при регистрации
+  app.post('/legacy/claim', { preHandler: auth }, async (_req, reply) =>
+    reply.code(410).send({ error: 'Pocket ID добавляется автоматически после регистрации по ссылке' }));
 
   // Очистка истории сделок: за выбранный период (from/to) или за всё время (all=1, либо без параметров). Статистика клиента пересчитывается
   app.delete<{ Querystring: { from?: string; to?: string; all?: string; tz?: string } }>('/deals', { preHandler: auth }, async (req, reply) => {

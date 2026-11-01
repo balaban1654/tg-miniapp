@@ -1906,7 +1906,7 @@ function ownerCell(r){
 async function viewLeads(){
   dxReg.length=0;
   const rg=dxCur();
-  const [rows,legacy,owners0]=await Promise.all([api('/leads?from='+rg.from+'&to='+rg.to),me.role==='admin'?api('/legacy').catch(()=>null):Promise.resolve(null),me.role==='admin'?streamersList().catch(()=>[]):Promise.resolve([])]);
+  const [rows,legacy,owners0]=await Promise.all([api('/leads?from='+rg.from+'&to='+rg.to),Promise.resolve(null),me.role==='admin'?streamersList().catch(()=>[]):Promise.resolve([])]);
   leadsStaff=owners0;
   const showOwner=me.role==='admin'||me.role==='teamlead';
   const showComm=me.role==='admin';
@@ -1964,14 +1964,8 @@ async function viewLeads(){
     tots.replaceChildren(...Object.entries(STATUS).map(([k,v])=>[k,v,base.filter(r=>r.status===k).length]).filter(x=>x[2]).map(([k,v,n])=>el('span',{class:'pb-tot'},el('span',{class:'pill '+v[1]},v[0]),el('b',{},n+' шт'))));
   };
   leadsRows=rows;leadsRedraw=draw;draw();if(F.q.trim())onSearch();
-  let legacyCard=null;
-  if(me.role==='admin'){
-    const ta=el('textarea',{class:'big',rows:'4',placeholder:'Pocket ID из старого бота, по одному в строке'});
-    legacyCard=el('div',{class:'card',style:'display:grid;gap:8px'},el('b',{style:'font-size:13px'},'Пользователи из старого бота'),
-      el('div',{class:'mut sm'},'Загрузите список Pocket ID. Человек вводит свой ID в мини-приложении, ID привяжется к его Telegram ID, и он отметится в лидах. Доступ откроется после пополнения счёта (от $10): когда придёт постбек.'),
-      legacy?el('div',{class:'sm'},'В списке: '+legacy.total+' · подключились: '+legacy.claimed):null,ta,
-      el('div',{},el('button',{class:'btn o s',type:'button',onclick:async()=>{try{const r=await api('/legacy/bulk',{method:'POST',body:{text:ta.value}});ta.value='';toast('Добавлено: '+r.added+(r.skipped?', уже были: '+r.skipped:''));setTimeout(render,700)}catch(x){toast(x.message)}}},'Загрузить')));
-  }
+  // Блок «Пользователи из старого бота» убран: перенос закончен
+  const legacyCard=null;
   return[el('div',{class:'head'},el('div',{style:'display:flex;align-items:center;gap:16px;flex-wrap:wrap;min-width:0'},el('h2',{style:'font-size:20px'},'Лиды'),tots),el('div',{style:'display:flex;align-items:center;gap:12px;flex-wrap:wrap'},cnt,rangeBar(()=>render({soft:true})))),bar,holder,legacyCard].filter(Boolean);
 }
 
