@@ -1854,7 +1854,7 @@ async function viewHome(){
     el('div',{class:'kpis'},k('Депозиты',money(s.deposits)),k('Выводы',money(s.withdrawals))))];
 }
 
-const LROLES=[['lead','Лид'],['moder','Модер'],['admin','Админ'],['streamer','Стример'],['analyst','Аналитик'],['buyer','Медиабайер']];
+const LROLES=[['lead','Лид'],['test','Тест'],['moder','Модер'],['admin','Админ'],['streamer','Стример'],['analyst','Аналитик'],['buyer','Медиабайер']];
 const lroleName=k=>(LROLES.find(x=>x[0]===k)||LROLES[0])[1];
 /** Ячейка «Выдать доступ»: при выдаче спрашиваем роль, при повторном нажатии доступ снимается */
 function accessCell(r){
@@ -1872,6 +1872,26 @@ function accessCell(r){
       el('button',{class:'btn o s',type:'button','aria-label':'Отмена',onclick:idle},'✕')));
   };
   idle();return td;
+}
+/** Тестовый аккаунт: админ меняет дату, ссылку, FTD и депозиты нажатием на ячейку. Статус и доступ пересчитывает сервер */
+function tstCell(r,key,cell){
+  if(me.role!=='admin'||r.lead_role!=='test')return cell;
+  const orig=[...cell.childNodes];
+  const save=async v=>{try{await api('/leads/'+r.tg_id+'/testdata',{method:'PATCH',body:{[key]:v}});render({soft:true})}catch(x){toast(x.message)}};
+  const idle=()=>{cell.replaceChildren(el('button',{type:'button',class:'own-btn',title:'Нажмите, чтобы изменить',style:'border-bottom:1px dashed var(--acc2)',onclick:edit},...orig))};
+  const edit=async()=>{
+    let inp;
+    if(key==='date'){const d=new Date(r.created_at).toLocaleDateString('sv-SE',{timeZone:'Europe/Kyiv'});inp=el('input',{type:'date',value:d,style:'width:auto'})}
+    else if(key==='link_id'){let L=[];try{L=await api('/links')}catch{}
+      inp=el('select',{style:'width:auto'},el('option',{value:''},'Без ссылки'),...L.map(l=>el('option',{value:l.id},l.slug)));const curL=L.find(l=>l.slug===r.link_slug);inp.value=curL?String(curL.id):''}
+    else inp=el('input',{type:'number',min:'0',step:'0.01',style:'width:90px',value:String(key==='ftd'?(r.ftd_amount??0):(r.deposits??0))});
+    const ok=()=>save(key==='link_id'?(inp.value||null):inp.value);
+    inp.addEventListener('keydown',e=>{if(e.key==='Enter')ok();if(e.key==='Escape')idle()});
+    cell.replaceChildren(el('span',{style:'display:inline-flex;gap:6px;align-items:center'},inp,
+      el('button',{class:'btn s',type:'button',onclick:ok},'OK'),el('button',{class:'btn o s',type:'button','aria-label':'Отмена',onclick:idle},'✕')));
+    inp.focus();
+  };
+  idle();return cell;
 }
 const PENCIL='<path d="M4 20h4L19 9a2.8 2.8 0 00-4-4L4 16z"/><path d="M13.5 6.5l4 4"/>';
 /** Pocket ID с карандашом: админ может присвоить или поправить номер сам */
@@ -1943,7 +1963,7 @@ async function viewLeads(){
   const cols=['Пришёл','Имя','Лид','Telegram ID','Pocket ID','Статус',...(me.role==='admin'?['Доступ']:[]),...(showOwner?['Владелец']:[]),'Ссылка',...(me.role==='streamer'?[]:['FTD']),me.role==='streamer'?'Депозит':'Депозиты',...(showComm?['Комиссия']:[]),...(me.role==='admin'?['']:[])];
   // Админ состав сверху: админ, модер, затем остальные роли; потом обычные лиды. При фильтре или своей сортировке показываем общим списком
   const ORDER={admin:0,moder:1,streamer:2,analyst:3,buyer:4};
-  const isStaff=r=>r.lead_role&&r.lead_role!=='lead';
+  const isStaff=r=>r.lead_role&&r.lead_role!=='lead'&&r.lead_role!=='test';
   const F=leadsState;
   // Поиск идёт по всем лидам, независимо от выбранного периода: результат берём с сервера
   let found=null,srchT=null;
@@ -1973,7 +1993,7 @@ async function viewLeads(){
     const leadRows=flat?list:list.filter(r=>!isStaff(r));
     const sorted=[...(F.staffOpen?staffRows:[]),...leadRows];
     const cutTd=v=>el('td',{class:'cut',title:v},v);
-    const tbl=table(cols,sorted.map(r=>[td(date(r.status_at||r.created_at)),cutTd(r.first_name||'—'),cutTd(r.username?'@'+r.username:'—'),el('td',{class:'n'},el('button',{type:'button',class:'own-btn',title:'Открыть карточку лида','aria-label':'Открыть карточку лида',onclick:()=>openLeadCard(r.tg_id)},String(r.tg_id))),pocketCell(r),el('td',{},isStaff(r)?el('span',{class:'pill p-pur'},({admin:'Админ',moder:'Модер',streamer:'Стример',analyst:'Аналитик',buyer:'Медиабайер',teamlead:'Тимлидер'})[r.lead_role]||r.lead_role):[pill(r.status),r.banned?el('span',{class:'pill p-bad',style:'margin-left:4px',title:'Лид заблокирован'},'⛔'):null]),...(me.role==='admin'?[accessCell(r)]:[]),...(showOwner?[me.role==='admin'||(me.role==='teamlead'&&!isStaff(r))?ownerCell(r):td(r.owner_name||'не закреплён')]:[]),td(r.link_slug||'—'),...(me.role==='streamer'?[]:[td(r.ftd_amount!=null&&!isStaff(r)?money(r.ftd_amount):'—','n')]),td(money(r.deposits),'n'),...(showComm?[td(money(r.commission),'n')]:[]),...(me.role==='admin'?[delLeadCell(r)]:[])]),
+    const tbl=table(cols,sorted.map(r=>[tstCell(r,'date',td(date(r.status_at||r.created_at))),cutTd(r.first_name||'—'),cutTd(r.username?'@'+r.username:'—'),el('td',{class:'n'},el('button',{type:'button',class:'own-btn',title:'Открыть карточку лида','aria-label':'Открыть карточку лида',onclick:()=>openLeadCard(r.tg_id)},String(r.tg_id))),pocketCell(r),el('td',{},isStaff(r)?el('span',{class:'pill p-pur'},({admin:'Админ',moder:'Модер',streamer:'Стример',analyst:'Аналитик',buyer:'Медиабайер',teamlead:'Тимлидер'})[r.lead_role]||r.lead_role):[r.lead_role==='test'?el('span',{class:'pill p-warn',style:'margin-right:4px',title:'Тестовый аккаунт: в статистику и зарплаты не попадает. Дату, ссылку, FTD и депозиты можно менять нажатием'},'Тест'):null,pill(r.status),r.banned?el('span',{class:'pill p-bad',style:'margin-left:4px',title:'Лид заблокирован'},'⛔'):null]),...(me.role==='admin'?[accessCell(r)]:[]),...(showOwner?[me.role==='admin'||(me.role==='teamlead'&&!isStaff(r))?ownerCell(r):td(r.owner_name||'не закреплён')]:[]),tstCell(r,'link_id',td(r.link_slug||'—')),...(me.role==='streamer'?[]:[tstCell(r,'ftd',td(r.ftd_amount!=null&&!isStaff(r)?money(r.ftd_amount):'—','n'))]),tstCell(r,'deposits',td(money(r.deposits),'n')),...(showComm?[td(money(r.commission),'n')]:[]),...(me.role==='admin'?[delLeadCell(r)]:[])]),
       src().length?'Ничего не найдено. Измените фильтры.':'Лидов пока нет. Они появятся, когда люди перейдут по вашим ссылкам и нажмут «Старт» в боте.');
     tbl.classList.add('ctr');
     const body=tbl.querySelector('tbody');

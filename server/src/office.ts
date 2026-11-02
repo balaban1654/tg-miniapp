@@ -14,7 +14,7 @@ import { accountingRoutes } from './accounting.js';
 import { monoRoutes } from './mono.js';
 import { mainMediaTeam } from './mediaTeams.js';
 import { leadStatusDate, leadListDate, funnelStage, funnelStageDate, churnedAfterFtd } from './leaddate.js';
-import { connectRoutes, connectInfo, requiredFor, TOL } from './connect.js';
+import { connectRoutes, connectInfo, requiredFor, markConnected, TOL } from './connect.js';
 import { toVoice, toVideoNote } from './media.js';
 import { parseReviewPhoto, cleanReviewText, cleanRating } from './reviews.js';
 import { loadDepConfig, leadTierState } from './depbonus.js';
@@ -2376,9 +2376,59 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
   app.patch<{ Params: { tgId: string } }>('/leads/:tgId/tester', { preHandler: need('admin') }, async (req, reply) => {
     const on = Boolean((req.body as any)?.value);
     const role = String((req.body as any)?.role ?? 'lead');
-    if (on && !['lead', 'moder', 'admin', 'streamer', 'analyst', 'buyer'].includes(role)) return reply.code(400).send({ error: 'Неизвестная роль' });
+    if (on && !['lead', 'test', 'moder', 'admin', 'streamer', 'analyst', 'buyer'].includes(role)) return reply.code(400).send({ error: 'Неизвестная роль' });
     const r = await db.query('UPDATE leads SET is_tester = $2, lead_role = $3 WHERE tg_id = $1 RETURNING tg_id', [Number(req.params.tgId), on, on ? role : 'lead']);
     if (!r.rowCount) return reply.code(404).send({ error: 'Лид не найден' });
+    // Тест ведёт себя как обычный лид: доступ открывается депозитом, а не ролью. Снятие роли тест возвращает аккаунт к обычному лиду без доступа
+    if (role === 'test' || !on) await db.query(`UPDATE leads SET access = FALSE WHERE tg_id = $1 AND NOT EXISTS (SELECT 1 FROM events e WHERE e.tg_id = leads.tg_id AND e.type IN ('ftd','dep'))`, [Number(req.params.tgId)]);
+    return { ok: true };
+  });
+
+  // Тестовый аккаунт: админ сам задаёт сумму FTD, сумму всех депозитов, ссылку и дату прихода.
+  // Статус и доступ пересчитываются как по настоящему постбеку. В статистику и зарплаты тест не попадает (роль не «лид»)
+  app.patch<{ Params: { tgId: string } }>('/leads/:tgId/testdata', { preHandler: need('admin') }, async (req, reply) => {
+    const tgId = Number(req.params.tgId);
+    const b = (req.body ?? {}) as Record<string, unknown>;
+    const cur = (await db.query(`SELECT tg_id FROM leads WHERE tg_id = $1 AND lead_role = 'test'`, [tgId])).rows[0];
+    if (!cur) return reply.code(404).send({ error: 'Менять данные можно только у тестового аккаунта' });
+    const money = (v: unknown) => (v === null || v === '' ? 0 : Math.round(Number(v) * 100) / 100);
+    const tag = (t: string) => `test:${tgId}:${t}:${Date.now()}`;
+    if ('date' in b) {
+      const d = String(b.date ?? '');
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return reply.code(400).send({ error: 'Неверная дата' });
+      // Сдвигаем и лида, и его события, чтобы фильтр по периоду и воронка видели одну дату
+      await db.query(
+        `WITH x AS (SELECT (($2::date + (created_at AT TIME ZONE 'Europe/Kyiv')::time) AT TIME ZONE 'Europe/Kyiv') - created_at AS dt FROM leads WHERE tg_id = $1)
+         UPDATE events SET created_at = created_at + (SELECT dt FROM x) WHERE tg_id = $1`,
+        [tgId, d],
+      );
+      await db.query(`UPDATE leads SET created_at = ($2::date + (created_at AT TIME ZONE 'Europe/Kyiv')::time) AT TIME ZONE 'Europe/Kyiv' WHERE tg_id = $1`, [tgId, d]);
+    }
+    if ('link_id' in b) {
+      const id = b.link_id ? Number(b.link_id) : null;
+      if (id && !(await db.query('SELECT 1 FROM links WHERE id = $1', [id])).rowCount) return reply.code(404).send({ error: 'Ссылка не найдена' });
+      await db.query('UPDATE leads SET link_id = $2 WHERE tg_id = $1', [tgId, id]);
+    }
+    if ('ftd' in b || 'deposits' in b) {
+      const old = (await db.query(`SELECT coalesce(sum(amount) FILTER (WHERE type = 'ftd'), 0)::float AS ftd, coalesce(sum(amount) FILTER (WHERE type IN ('ftd','dep')), 0)::float AS dep FROM events WHERE tg_id = $1`, [tgId])).rows[0];
+      const ftd = 'ftd' in b ? money(b.ftd) : old.ftd;
+      let total = 'deposits' in b ? money(b.deposits) : Math.max(old.dep, ftd);
+      if (!(ftd >= 0 && ftd <= 1e6 && total >= 0 && total <= 1e6)) return reply.code(400).send({ error: 'Сумма от $0 до $1 000 000' });
+      if (total < ftd) total = ftd;
+      const at = (await db.query(`SELECT coalesce((SELECT min(created_at) FROM events WHERE tg_id = $1 AND type IN ('ftd','dep')), now()) AS at`, [tgId])).rows[0].at;
+      await db.query(`DELETE FROM events WHERE tg_id = $1 AND type IN ('ftd','dep')`, [tgId]);
+      // Депозит без регистрации не бывает: если её не было, добавляем
+      if (total > 0 && !(await db.query(`SELECT 1 FROM events WHERE tg_id = $1 AND type = 'reg'`, [tgId])).rowCount)
+        await db.query(`INSERT INTO events (tg_id, type, external_id, created_at) VALUES ($1,'reg',$2,$3)`, [tgId, tag('reg'), at]);
+      if (ftd > 0) await db.query(`INSERT INTO events (tg_id, type, amount, external_id, created_at) VALUES ($1,'ftd',$2,$3,$4)`, [tgId, ftd, tag('ftd'), at]);
+      if (total - ftd > 0) await db.query(`INSERT INTO events (tg_id, type, amount, external_id, created_at) VALUES ($1,'dep',$2,$3,$4::timestamptz + interval '1 minute')`, [tgId, Math.round((total - ftd) * 100) / 100, tag('dep'), at]);
+      // Статус и доступ как у настоящего лида: доступ открывается, когда внесено не меньше нужной суммы (с учётом акции)
+      const reg = (await db.query(`SELECT 1 FROM events WHERE tg_id = $1 AND type = 'reg'`, [tgId])).rowCount;
+      const enough = total > 0 && total >= (await requiredFor(tgId)).required * TOL;
+      const status = enough ? (total - ftd > 0 ? 'active' : 'ftd') : reg ? 'registered' : 'new';
+      await db.query(`UPDATE leads SET status = $2, status_before_block = NULL, access = $3 WHERE tg_id = $1`, [tgId, status, enough]);
+      if (enough) await markConnected(tgId, total).catch(() => {});
+    }
     return { ok: true };
   });
 
@@ -2500,7 +2550,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     fin.bonus = { sum: gb.reduce((a, x) => a + Number(x.amount), 0), count: gb.length, dates: gb.map((x) => ({ at: x.claimed_at, amount: Number(x.amount) })) };
     // Градации додепов (без порогов) и состояние запроса бонуса
     let tier: unknown = null;
-    if (!r.rows[0].lead_role || r.rows[0].lead_role === 'lead') {
+    if (!r.rows[0].lead_role || r.rows[0].lead_role === 'lead' || r.rows[0].lead_role === 'test') {
       const cfg = await loadDepConfig();
       const st = await leadTierState(tgId, cfg);
       const reqs = (await db.query(`SELECT tier, status, reject_reason FROM dep_bonus_requests WHERE tg_id = $1 ORDER BY id`, [tgId])).rows as { tier: number; status: string; reject_reason: string | null }[];
@@ -2523,7 +2573,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     // Скидку предлагают: админ любому; стример своим лидам; тимлид своим и лидам своей команды
     const connectOk = me.role === 'admin' || (me.role === 'streamer' && ownerId === me.id)
       || (me.role === 'teamlead' && ownerId !== null && (ownerId === me.id || (await db.query('SELECT 1 FROM staff WHERE id = $1 AND parent_id = $2', [ownerId, me.id])).rowCount! > 0));
-    const connect = connectOk && (!r.rows[0].lead_role || r.rows[0].lead_role === 'lead') ? await connectInfo(tgId, me.role !== 'admin') : null;
+    const connect = connectOk && (!r.rows[0].lead_role || r.rows[0].lead_role === 'lead' || r.rows[0].lead_role === 'test') ? await connectInfo(tgId, me.role !== 'admin') : null;
     return {
       fin,
       tier,
@@ -2587,7 +2637,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     ).rows[0];
     // Лид без ссылки пришёл сам: с кнопки на сайте — метка site, иначе (поиск по нику в Telegram) органика miniapp-org
     return r.rows.map((x) =>
-      x.lead_role && x.lead_role !== 'lead' ? { ...x, deposits: 0, commission: 0, owner_id: x.owner_id ?? main?.id ?? null, owner_name: x.owner_id ? x.owner_name : main?.name ?? null, link_slug: x.link_slug ?? main?.slug ?? null } : x.link_slug ? x : { ...x, link_slug: x.origin || 'miniapp-org' },
+      x.lead_role && x.lead_role !== 'lead' && x.lead_role !== 'test' ? { ...x, deposits: 0, commission: 0, owner_id: x.owner_id ?? main?.id ?? null, owner_name: x.owner_id ? x.owner_name : main?.name ?? null, link_slug: x.link_slug ?? main?.slug ?? null } : x.link_slug ? x : { ...x, link_slug: x.origin || 'miniapp-org' },
     );
   });
 

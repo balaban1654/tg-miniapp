@@ -92,7 +92,7 @@ async function sendOffer(o: Offer, tgId: string, by: number | null): Promise<{ o
   return res.ok ? { ok: true } : { ok: false, error: res.error, blocked: res.blocked };
 }
 
-const NOT_CONNECTED = `d.removed_at IS NULL AND coalesce(d.lead_role, 'lead') = 'lead' AND d.status IN ('new','registered') AND NOT d.access AND d.banned_at IS NULL`;
+const NOT_CONNECTED = `d.removed_at IS NULL AND coalesce(d.lead_role, 'lead') IN ('lead','test') AND d.status IN ('new','registered') AND NOT d.access AND d.banned_at IS NULL`;
 /** Повторно акцию можно дать, когда прошлая закончилась: срок вышел, отменена или не дошла */
 const LIVE = `s.delivery <> 'failed' AND s.reverted_at IS NULL AND s.connected_at IS NULL AND s.expires_at > now()`;
 const GAP = `NOT EXISTS (SELECT 1 FROM connect_sends s WHERE s.tg_id = d.tg_id AND ${LIVE})`;

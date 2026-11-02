@@ -198,7 +198,7 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
 
   // Онлайн: Mini App открыт на экране (отметка раз в 30 с). Храним в памяти: tg_id → время и сотрудник ли это
   app.post('/ping', { preHandler: auth }, async (req) => {
-    const r = (await db.query(`SELECT coalesce(lead_role, 'lead') <> 'lead' AS staff FROM leads WHERE tg_id = $1`, [req.tg!.id])).rows[0];
+    const r = (await db.query(`SELECT coalesce(lead_role, 'lead') NOT IN ('lead','test') AS staff FROM leads WHERE tg_id = $1`, [req.tg!.id])).rows[0];
     appOnline.set(req.tg!.id, { at: Date.now(), staff: Boolean(r?.staff) });
     return { ok: true };
   });
@@ -224,7 +224,7 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
     const s = st.rows[0];
     // Статус клиента в профиле: градация по сумме всех его депозитов (Бронза, Серебро, Золото, Платина)
     let tier: { name: string; idx: number } | null = null;
-    if (!l.lead_role || l.lead_role === 'lead') {
+    if (!l.lead_role || l.lead_role === 'lead' || l.lead_role === 'test') {
       const ts = await leadTierState(u.id, await loadDepConfig());
       tier = ts.reached ? { name: ts.tiers[ts.reached - 1].name, idx: ts.reached } : null;
     }
@@ -236,7 +236,7 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
       username: u.username ?? null,
       since: l.created_at,
       status: l.status,
-      access: Boolean(l.access || l.is_tester), // тестовый аккаунт: доступ как у обычного клиента
+      access: Boolean(l.access || (l.is_tester && l.lead_role !== 'test')), // сотрудник с доступом: как у клиента; тест открывает доступ депозитом, как обычный лид
       isTester: Boolean(l.is_tester),
       leadRole: l.lead_role || 'lead',
       tier,
@@ -443,8 +443,8 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
   });
   const requestRules = async (tgId: number) => {
     const set = (await db.query('SELECT * FROM signal_settings WHERE id = 1')).rows[0];
-    const lead = (await db.query('SELECT access, is_tester FROM leads WHERE tg_id = $1', [tgId])).rows[0];
-    const allowed = Boolean(lead && (lead.access || lead.is_tester) && set.enabled);
+    const lead = (await db.query('SELECT access, is_tester, lead_role FROM leads WHERE tg_id = $1', [tgId])).rows[0];
+    const allowed = Boolean(lead && (lead.access || (lead.is_tester && lead.lead_role !== 'test')) && set.enabled);
     // Пропущенный сигнал паузу не включает: можно сразу запросить новый
     const last = (await db.query(`SELECT extract(epoch FROM now() - created_at)::int AS ago FROM signals s WHERE requested_by = $1 AND NOT EXISTS (SELECT 1 FROM signal_steps t WHERE t.signal_id = s.id AND t.tg_id = $1 AND t.result = 'skip') ORDER BY id DESC LIMIT 1`, [tgId])).rows[0];
     const cooldownLeft = last ? Math.max(0, set.cooldown_sec - last.ago) : 0;
