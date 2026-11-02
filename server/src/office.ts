@@ -2413,11 +2413,21 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
       if (id && !(await db.query('SELECT 1 FROM links WHERE id = $1', [id])).rowCount) return reply.code(404).send({ error: 'Ссылка не найдена' });
       await db.query('UPDATE leads SET link_id = $2 WHERE tg_id = $1', [tgId, id]);
     }
+    // Комиссия и выводы: одна запись на сумму, 0 убирает
+    for (const [k, type] of [['commission', 'comm'], ['wd', 'wd']] as const) {
+      if (!(k in b)) continue;
+      const v = money(b[k]);
+      if (!(v >= 0 && v <= 1e6)) return reply.code(400).send({ error: 'Сумма от $0 до $1 000 000' });
+      await db.query(`DELETE FROM events WHERE tg_id = $1 AND type = $2`, [tgId, type]);
+      if (v > 0) await db.query(`INSERT INTO events (tg_id, type, amount, external_id) VALUES ($1,$2,$3,$4)`, [tgId, type, v, tag(type)]);
+    }
     if ('ftd' in b || 'deposits' in b) {
       const old = (await db.query(`SELECT coalesce(sum(amount) FILTER (WHERE type = 'ftd'), 0)::float AS ftd, coalesce(sum(amount) FILTER (WHERE type IN ('ftd','dep')), 0)::float AS dep FROM events WHERE tg_id = $1`, [tgId])).rows[0];
-      const ftd = 'ftd' in b ? money(b.ftd) : old.ftd;
+      let ftd = 'ftd' in b ? money(b.ftd) : old.ftd;
       let total = 'deposits' in b ? money(b.deposits) : Math.max(old.dep, ftd);
       if (!(ftd >= 0 && ftd <= 1e6 && total >= 0 && total <= 1e6)) return reply.code(400).send({ error: 'Сумма от $0 до $1 000 000' });
+      // Депозиты меньше FTD: значит FTD тоже уменьшили (например, всё в 0)
+      if ('deposits' in b && total < ftd) ftd = total;
       if (total < ftd) total = ftd;
       const at = (await db.query(`SELECT coalesce((SELECT min(created_at) FROM events WHERE tg_id = $1 AND type IN ('ftd','dep')), now()) AS at`, [tgId])).rows[0].at;
       await db.query(`DELETE FROM events WHERE tg_id = $1 AND type IN ('ftd','dep')`, [tgId]);

@@ -1886,12 +1886,12 @@ function tstCell(r,key,cell){
     if(key==='date'){const d=new Date(r.created_at).toLocaleDateString('sv-SE',{timeZone:'Europe/Kyiv'});inp=el('input',{type:'date',value:d,style:'width:auto'})}
     else if(key==='link_id'){let L=[];try{L=await api('/links')}catch{}
       inp=el('select',{style:'width:auto'},el('option',{value:''},'Без ссылки'),...L.map(l=>el('option',{value:l.id},l.slug)));const curL=L.find(l=>l.slug===r.link_slug);inp.value=curL?String(curL.id):''}
-    else inp=el('input',{type:'number',min:'0',step:'0.01',style:'width:90px',value:String(key==='ftd'?(r.ftd_amount??0):(r.deposits??0))});
-    const ok=()=>save(key==='link_id'?(inp.value||null):inp.value);
+    else inp=el('input',{type:'text',inputmode:'decimal',style:'width:90px',value:String(key==='ftd'?(r.ftd_amount??0):key==='commission'?(r.commission??0):(r.deposits??0))});
+    const ok=()=>save(key==='link_id'?(inp.value||null):key==='date'?inp.value:(Number(String(inp.value).replace(',','.'))||0));
     inp.addEventListener('keydown',e=>{if(e.key==='Enter')ok();if(e.key==='Escape')idle()});
     cell.replaceChildren(el('span',{style:'display:inline-flex;gap:6px;align-items:center'},inp,
       el('button',{class:'btn s',type:'button',onclick:ok},'OK'),el('button',{class:'btn o s',type:'button','aria-label':'Отмена',onclick:idle},'✕')));
-    inp.focus();
+    inp.focus();if(inp.select)inp.select();
   };
   idle();return cell;
 }
@@ -2000,7 +2000,7 @@ async function viewLeads(){
     const leadRows=flat?list:list.filter(r=>!isStaff(r));
     const sorted=[...(F.staffOpen?staffRows:[]),...leadRows];
     const cutTd=v=>el('td',{class:'cut',title:v},v);
-    const tbl=table(cols,sorted.map(r=>[tstCell(r,'date',td(date(r.status_at||r.created_at))),cutTd(r.first_name||'—'),cutTd(r.username?'@'+r.username:'—'),el('td',{class:'n'},el('button',{type:'button',class:'own-btn',title:'Открыть карточку лида','aria-label':'Открыть карточку лида',onclick:()=>openLeadCard(r.tg_id)},String(r.tg_id))),pocketCell(r),el('td',{},isStaff(r)?el('span',{class:'pill p-pur'},({admin:'Админ',moder:'Модер',streamer:'Стример',analyst:'Аналитик',buyer:'Медиабайер',teamlead:'Тимлидер'})[r.lead_role]||r.lead_role):[r.lead_role==='test'?el('span',{class:'pill p-warn',style:'margin-right:4px',title:'Тестовый аккаунт: в статистику и зарплаты не попадает. Дату, ссылку, FTD и депозиты можно менять нажатием'},'Тест'):null,pill(r.status),r.banned?el('span',{class:'pill p-bad',style:'margin-left:4px',title:'Лид заблокирован'},'⛔'):null]),...(me.role==='admin'?[accessCell(r)]:[]),...(showOwner?[me.role==='admin'||(me.role==='teamlead'&&!isStaff(r))?ownerCell(r):td(r.owner_name||'не закреплён')]:[]),tstCell(r,'link_id',td(r.link_slug||'—')),...(me.role==='streamer'?[]:[tstCell(r,'ftd',td(r.ftd_amount!=null&&!isStaff(r)?money(r.ftd_amount):'—','n'))]),tstCell(r,'deposits',td(money(r.deposits),'n')),...(showComm?[td(money(r.commission),'n')]:[]),...(me.role==='admin'?[delLeadCell(r)]:[])]),
+    const tbl=table(cols,sorted.map(r=>[tstCell(r,'date',td(date(r.status_at||r.created_at))),cutTd(r.first_name||'—'),cutTd(r.username?'@'+r.username:'—'),el('td',{class:'n'},el('button',{type:'button',class:'own-btn',title:'Открыть карточку лида','aria-label':'Открыть карточку лида',onclick:()=>openLeadCard(r.tg_id)},String(r.tg_id))),pocketCell(r),el('td',{},isStaff(r)?el('span',{class:'pill p-pur'},({admin:'Админ',moder:'Модер',streamer:'Стример',analyst:'Аналитик',buyer:'Медиабайер',teamlead:'Тимлидер'})[r.lead_role]||r.lead_role):[r.lead_role==='test'?el('span',{class:'pill p-warn',style:'margin-right:4px',title:'Тестовый аккаунт: в статистику и зарплаты не попадает. Дату, ссылку, FTD и депозиты можно менять нажатием'},'Тест'):null,pill(r.status),r.banned?el('span',{class:'pill p-bad',style:'margin-left:4px',title:'Лид заблокирован'},'⛔'):null]),...(me.role==='admin'?[accessCell(r)]:[]),...(showOwner?[me.role==='admin'||(me.role==='teamlead'&&!isStaff(r))?ownerCell(r):td(r.owner_name||'не закреплён')]:[]),tstCell(r,'link_id',td(r.link_slug||'—')),...(me.role==='streamer'?[]:[tstCell(r,'ftd',td(r.ftd_amount!=null&&!isStaff(r)?money(r.ftd_amount):'—','n'))]),tstCell(r,'deposits',td(money(r.deposits),'n')),...(showComm?[tstCell(r,'commission',td(money(r.commission),'n'))]:[]),...(me.role==='admin'?[delLeadCell(r)]:[])]),
       src().length?'Ничего не найдено. Измените фильтры.':'Лидов пока нет. Они появятся, когда люди перейдут по вашим ссылкам и нажмут «Старт» в боте.');
     tbl.classList.add('ctr');
     const body=tbl.querySelector('tbody');
@@ -2491,7 +2491,19 @@ async function openLeadCard(tgId){
     cnt.addEventListener('mouseenter',()=>{if(matchMedia('(hover:hover)').matches)pop(cnt,f.dates)});
     cnt.addEventListener('mouseleave',()=>{if(matchMedia('(hover:hover)').matches)setTimeout(()=>{const p=document.querySelector('.fc-pop');if(p&&!p.matches(':hover'))p.remove()},150)});
     cnt.addEventListener('click',()=>pop(cnt,f.dates));
-    return el('div',{class:'fc-row'},el('span',{class:'pill ev-'+t},t),f.sum===null?el('span',{class:'mut'},'—'):el('b',{class:'fc-sum'},money(f.sum)),cnt)};
+    // Тестовый аккаунт: админ меняет сумму нажатием (dep — сумма додепов, wd — выводы, comm — комиссия), 0 убирает
+    const sumEl=f.sum===null?el('span',{class:'mut'},'—'):el('b',{class:'fc-sum'},money(f.sum));
+    if(me.role==='admin'&&L.lead_role==='test'&&['ftd','dep','wd','comm'].includes(t)){
+      const key={ftd:'ftd',dep:'deposits',wd:'wd',comm:'commission'}[t];
+      const edit=()=>{const inp=el('input',{type:'text',inputmode:'decimal',value:String(f.sum||0),style:'width:84px;padding:4px 6px'});
+        const go=async()=>{const v=Number(String(inp.value).replace(',','.'))||0;const body={[key]:t==='dep'?((F.ftd&&F.ftd.sum)||0)+v:v};
+          try{await api('/leads/'+L.tg_id+'/testdata',{method:'PATCH',body});document.querySelectorAll('.lc-overlay').forEach(x=>x.remove());openLeadCard(L.tg_id)}catch(x){toast(x.message)}};
+        inp.addEventListener('keydown',e=>{if(e.key==='Enter')go();if(e.key==='Escape')wrap.replaceChildren(btn)});
+        wrap.replaceChildren(el('span',{style:'display:inline-flex;gap:4px;align-items:center'},inp,el('button',{class:'btn s',type:'button',onclick:go},'OK')));inp.focus();inp.select()};
+      const btn=el('button',{type:'button',class:'own-btn',title:'Изменить сумму',style:'border-bottom:1px dashed var(--acc2);font-weight:700',onclick:edit},money(f.sum||0));
+      const wrap=el('span',{},btn);
+      return el('div',{class:'fc-row'},el('span',{class:'pill ev-'+t},t),wrap,cnt)}
+    return el('div',{class:'fc-row'},el('span',{class:'pill ev-'+t},t),sumEl,cnt)};
   // Комиссию в карточке видит только админ (тимлиду и стримеру она не показывается)
   // Рефералы клиента: по наведению список с датой первого депозита и ID (открывает карточку), комиссия у админа и тимлида
   const refRow=()=>{const R=d.refs||[];
