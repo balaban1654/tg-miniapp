@@ -3413,12 +3413,12 @@ async function cnRef(){
   const copy=v=>el('button',{class:'btn o s',type:'button',title:'Копировать',onclick:async()=>{try{await navigator.clipboard.writeText(v);toast('Скопировано')}catch{toast(v)}}},'⧉');
   const reload=()=>{refreshRefPending();if(connRedraw)connRedraw()};
   // Ставки
-  const inL=el('input',{type:'number',min:'0',step:'0.5',value:String(d.perFriend),style:'width:110px'}),inS=el('input',{type:'number',min:'0',step:'0.5',value:String(d.perStaff),style:'width:110px'});
+  const inL=el('input',{type:'number',min:'0',step:'0.5',value:String(d.perFriend),style:'width:110px'}),inS=el('input',{type:'number',min:'0',step:'0.5',value:String(d.perStaff),style:'width:110px'}),inM=el('input',{type:'number',min:'0',step:'1',value:String(d.minPayout??50),style:'width:110px'});
   const sErr=el('div',{class:'err',role:'alert'});
   const sets=el('div',{class:'card',style:'display:grid;gap:12px;align-content:start'},el('b',{},'Ставка за друга с первым депозитом'),
-    el('div',{class:'cn-row'},el('div',{class:'lc-field'},el('label',{},'Клиенту (пригласившему), $'),inL),el('div',{class:'lc-field'},el('label',{},'Трейдеру, $'),inS)),
-    el('div',{class:'mut sm'},'Клиенту на реферальный баланс (выводит на счёт Pocket Option или USDT BEP20), трейдеру бонусом в зарплату («Бонусы и штрафы»). Новая ставка действует для следующих начислений, уже начисленное не меняется.'),
-    sErr,el('div',{},el('button',{class:'btn',type:'button',onclick:async()=>{sErr.textContent='';try{await api('/referral/settings',{method:'PUT',body:{lead:inL.value,staff:inS.value}});toast('Ставки сохранены')}catch(x){sErr.textContent=x.message}}},'Сохранить')));
+    el('div',{class:'cn-row'},el('div',{class:'lc-field'},el('label',{},'Клиенту (пригласившему), $'),inL),el('div',{class:'lc-field'},el('label',{},'Трейдеру, $'),inS),el('div',{class:'lc-field'},el('label',{},'Минимальный вывод, $'),inM)),
+    el('div',{class:'mut sm'},'Клиенту на реферальный баланс (выводит на счёт Pocket Option или USDT BEP20, когда накопит минимальный вывод), трейдеру бонусом в зарплату («Бонусы и штрафы»). Новая ставка действует для следующих начислений, уже начисленное не меняется.'),
+    sErr,el('div',{},el('button',{class:'btn',type:'button',onclick:async()=>{sErr.textContent='';try{await api('/referral/settings',{method:'PUT',body:{lead:inL.value,staff:inS.value,minPayout:inM.value}});toast('Сохранено')}catch(x){sErr.textContent=x.message}}},'Сохранить')));
   const pend=d.payouts.filter(r=>r.status==='pending');
   const act=r=>{
     if(r.status!=='pending')return el('td',{class:'mut sm'},(r.decided_name||'')+(r.decided_at?' · '+fmt(r.decided_at):'')+(r.reject_reason?' · '+r.reject_reason:''));

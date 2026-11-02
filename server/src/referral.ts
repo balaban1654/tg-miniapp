@@ -9,9 +9,10 @@ type Need = (...roles: Role[]) => (req: FastifyRequest, reply: FastifyReply) => 
 /** Ставки по умолчанию: пригласившему за друга с первым депозитом и трейдеру (бонусом в зарплату). Меняются в Подключение → Рефералы */
 export const REF_LEAD_USD = 5;
 export const REF_STAFF_USD = 3;
-export async function refRates(): Promise<{ lead: number; staff: number }> {
-  const r = (await db.query('SELECT ref_lead::float AS lead, ref_staff::float AS staff FROM connect_settings WHERE id = 1')).rows[0];
-  return { lead: r && r.lead >= 0 ? Number(r.lead) : REF_LEAD_USD, staff: r && r.staff >= 0 ? Number(r.staff) : REF_STAFF_USD };
+export const REF_MIN_PAYOUT = 50;
+export async function refRates(): Promise<{ lead: number; staff: number; minPayout: number }> {
+  const r = (await db.query('SELECT ref_lead::float AS lead, ref_staff::float AS staff, ref_min_payout::float AS min FROM connect_settings WHERE id = 1')).rows[0];
+  return { lead: r && r.lead >= 0 ? Number(r.lead) : REF_LEAD_USD, staff: r && r.staff >= 0 ? Number(r.staff) : REF_STAFF_USD, minPayout: r && r.min >= 0 ? Number(r.min) : REF_MIN_PAYOUT };
 }
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
@@ -100,6 +101,7 @@ export async function referralAppRoutes(app: FastifyInstance, auth: (req: Fastif
     return {
       link: refLink(tgId),
       perFriend: (await refRates()).lead,
+      minPayout: (await refRates()).minPayout,
       invited: friends.length,
       deposited: friends.filter((f) => f.reward != null).length,
       ...(await balanceOf(tgId)),
@@ -121,6 +123,8 @@ export async function referralAppRoutes(app: FastifyInstance, auth: (req: Fastif
     if ((await db.query(`SELECT 1 FROM referral_payouts WHERE tg_id = $1 AND status = 'pending'`, [tgId])).rowCount) return reply.code(409).send({ error: 'Заявка уже на рассмотрении. Дождитесь выплаты' });
     const { balance } = await balanceOf(tgId);
     if (!(balance > 0)) return reply.code(409).send({ error: 'На балансе пока нет средств' });
+    const { minPayout } = await refRates();
+    if (balance < minPayout) return reply.code(409).send({ error: `Минимальная сумма вывода ${usd(minPayout)}. Сейчас на балансе ${usd(balance)}` });
     const r = await db.query(`INSERT INTO referral_payouts (tg_id, amount, method, wallet) VALUES ($1,$2,$3,$4) RETURNING id`, [tgId, balance, method, wallet]);
     return { ok: true, id: r.rows[0].id, amount: balance };
   });
@@ -165,14 +169,15 @@ export async function referralOfficeRoutes(app: FastifyInstance, h: { need: Need
       )
     ).rows;
     const rate = await refRates();
-    return { perFriend: rate.lead, perStaff: rate.staff, invited, payouts, rewards, all };
+    return { perFriend: rate.lead, perStaff: rate.staff, minPayout: rate.minPayout, invited, payouts, rewards, all };
   });
 
   app.put('/referral/settings', { preHandler: admin }, async (req, reply) => {
     const b = (req.body ?? {}) as Record<string, unknown>;
-    const lead = Math.round(Number(b.lead) * 100) / 100, staff = Math.round(Number(b.staff) * 100) / 100;
+    const lead = Math.round(Number(b.lead) * 100) / 100, staff = Math.round(Number(b.staff) * 100) / 100, min = Math.round(Number(b.minPayout) * 100) / 100;
     if (!(lead >= 0 && lead <= 1000 && staff >= 0 && staff <= 1000)) return reply.code(400).send({ error: 'Суммы от $0 до $1000' });
-    await db.query('UPDATE connect_settings SET ref_lead = $1, ref_staff = $2 WHERE id = 1', [lead, staff]);
+    if (!(min >= 0 && min <= 10000)) return reply.code(400).send({ error: 'Минимальный вывод от $0 до $10 000' });
+    await db.query('UPDATE connect_settings SET ref_lead = $1, ref_staff = $2, ref_min_payout = $3 WHERE id = 1', [lead, staff, min]);
     return { ok: true };
   });
 

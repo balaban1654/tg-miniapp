@@ -2000,7 +2000,8 @@ async function viewReferral(){
     wallet.value=method==='pocket'?(d.pocketId||''):'';err.textContent='';
     hint.textContent=method==='pocket'?'Зачислим на ваш торговый счёт Pocket Option.':'Только сеть BNB Smart Chain (BEP20). Перевод в другой сети потеряется.'};
   drawSeg();
-  const send=el('button',{class:'btn',type:'button',disabled:(d.balance>0&&!pend)?null:'',onclick:async()=>{err.textContent='';send.disabled=true;
+  const minP=Number(d.minPayout||0),enough=d.balance>0&&d.balance>=minP;
+  const send=el('button',{class:'btn',type:'button',disabled:(enough&&!pend)?null:'',onclick:async()=>{err.textContent='';send.disabled=true;
     try{const r=await api('/referral/payout',{method:'POST',body:{method,wallet:wallet.value.trim()}});toast('Заявка на '+money(r.amount)+' отправлена');viewReferral()}catch(x){err.textContent=x.message;send.disabled=false}}},'Вывести '+money(d.balance));
   const ST={pending:['на рассмотрении','#ffb84d'],paid:['выплачено','#3ddc97'],rejected:['отклонено','#ff6b8a']};
   shell('Рефералы',[
@@ -2018,6 +2019,8 @@ async function viewReferral(){
         el('div',{},'3. После его первого депозита вам ',el('b',{},money(d.perFriend)),' на баланс.'))),
     el('div',{class:'card',id:'rfOut',style:'display:grid;gap:10px;scroll-margin-top:70px'},el('b',{style:'font:700 15px var(--fd)'},'Вывод средств'),
       pend?el('div',{class:'sm'},'Заявка на ',el('b',{},money(pend.amount)),' на рассмотрении. Новую можно отправить после выплаты.'):null,
+      // Минимальная сумма вывода: пока не накоплено, показываем сколько осталось
+      !pend&&minP>0?el('div',{class:'sm'},'Минимальная сумма вывода ',el('b',{},money(minP)),enough?'.':'. Осталось накопить '+money(Math.max(0,minP-d.balance))+'.'):null,
       seg,wallet,hint,err,send),
     d.payouts.length?el('div',{class:'card',style:'display:grid;gap:0'},el('b',{style:'font:700 15px var(--fd);margin-bottom:6px'},'История выплат'),
       ...d.payouts.map(p=>el('div',{class:'rf-li'},el('span',{},dt(p.created_at)+' · '+(p.method==='usdt'?'USDT BEP20':'Pocket Option'),p.status==='rejected'&&p.reject_reason?el('div',{class:'sm'},p.reject_reason):null),
