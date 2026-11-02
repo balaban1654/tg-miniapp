@@ -1287,8 +1287,10 @@ function smSocial(d){
 }
 function dxColorOf(d){const ids=d.streamers.map(s=>s.id).sort((a,b)=>a-b);return id=>DXC[ids.indexOf(id)%DXC.length]}
 function dxFunnel(d){
-  const C=dxColorOf(d),t=d.totals;
   const stages=[['Клики','clicks'],['Регистрации','regs'],['FTD','ftd'],['Додепы','dep'],['Отвал','churned']];
+  // Воронка только по стримерам: админы и тимлиды не показываются, итоги и CTR/RTD/Churn считаются по стримерам
+  const C=dxColorOf(d),S=d.streamers.filter(s=>s.role==='streamer'),t={};stages.forEach(([,k])=>t[k]=S.reduce((a,s)=>a+(Number(s.range[k])||0),0));
+  d={...d,streamers:S};
   const ctr=t.clicks?t.regs/t.clicks*100:null,rtd=t.regs?t.ftd/t.regs*100:null,churn=t.ftd?(t.churned||0)/t.ftd*100:null;
   const pc=v=>v===null?'—':v.toFixed(1).replace('.',',')+'%';
   const note=!d.range.all&&d.clicksSince&&d.range.from<d.clicksSince?el('div',{class:'mut sm'},'Клики считаются с '+dmy(d.clicksSince)+': раньше их время не записывалось.'):null;
