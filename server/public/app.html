@@ -2017,7 +2017,7 @@ async function viewReferral(){
     el('div',{class:'card',style:'display:grid;gap:10px'},el('b',{style:'font:700 15px var(--fd)'},'Ваша ссылка'),refLinkRow(d.link),
       el('div',{class:'sm',style:'display:grid;gap:4px'},
         el('div',{},'1. Отправьте ссылку другу.'),
-        el('div',{},'2. Друг запускает бота и подключается к вашему трейдеру.'),
+        el('div',{},'2. Друг запускает бота и подключается.'),
         el('div',{},'3. После его первого депозита вам ',el('b',{},money(d.perFriend)),' на баланс.'))),
     el('div',{class:'card',id:'rfOut',style:'display:grid;gap:10px;scroll-margin-top:70px'},el('b',{style:'font:700 15px var(--fd)'},'Вывод средств'),
       pend?el('div',{class:'sm'},'Заявка на ',el('b',{},money(pend.amount)),' на рассмотрении. Новую можно отправить после выплаты.'):null,
