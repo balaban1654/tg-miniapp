@@ -1996,9 +1996,11 @@ async function viewReferral(){
   const hint=el('div',{class:'sm'});const err=el('div',{class:'sm',role:'alert',style:'color:#ff6b8a'});
   const seg=el('div',{class:'seg'});
   const drawSeg=()=>{seg.replaceChildren(...[['pocket','Счёт Pocket Option'],['usdt','USDT BEP20']].map(([k,t])=>el('button',{type:'button',class:k===method?'on':'','aria-pressed':String(k===method),onclick:()=>{method=k;drawSeg()}},t)));
-    wallet.placeholder=method==='pocket'?'ID торгового счёта':'Адрес кошелька 0x…';wallet.inputMode=method==='pocket'?'numeric':'text';
-    wallet.value=method==='pocket'?(d.pocketId||''):'';err.textContent='';
-    hint.textContent=method==='pocket'?'Зачислим на ваш торговый счёт Pocket Option.':'Только сеть BNB Smart Chain (BEP20). Перевод в другой сети потеряется.'};
+    // Pocket Option: только счёт, привязанный к боту, поменять нельзя
+    const pk=method==='pocket';
+    wallet.placeholder=pk?'Счёт не привязан':'Адрес кошелька 0x…';wallet.inputMode='text';
+    wallet.value=pk?(d.pocketId||''):'';wallet.readOnly=pk;wallet.style.opacity=pk?'.75':'';err.textContent='';
+    hint.textContent=pk?(d.pocketId?'Зачислим на торговый счёт, привязанный к боту. Другой номер указать нельзя.':'К боту не привязан счёт Pocket Option. Выберите USDT BEP20.'):'Только сеть BNB Smart Chain (BEP20). Перевод в другой сети потеряется.'};
   drawSeg();
   const minP=Number(d.minPayout||0),enough=d.balance>0&&d.balance>=minP;
   const send=el('button',{class:'btn',type:'button',disabled:(enough&&!pend)?null:'',onclick:async()=>{err.textContent='';send.disabled=true;

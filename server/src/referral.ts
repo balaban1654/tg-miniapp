@@ -80,7 +80,6 @@ async function balanceOf(tgId: number) {
   return { earned: r2(e), paid: r2(p.paid), pending: r2(p.pending), balance: r2(e - p.paid - p.pending) };
 }
 
-const POCKET_RE = /^\d{5,12}$/;
 const BEP20_RE = /^0x[a-fA-F0-9]{40}$/;
 const mask = (name: string) => (name.length <= 2 ? name[0] + '•' : name.slice(0, 2) + '•'.repeat(Math.min(4, name.length - 2)));
 
@@ -115,9 +114,14 @@ export async function referralAppRoutes(app: FastifyInstance, auth: (req: Fastif
     const tgId = req.tg!.id;
     const b = (req.body ?? {}) as Record<string, unknown>;
     const method = b.method === 'usdt' ? 'usdt' : b.method === 'pocket' ? 'pocket' : null;
-    const wallet = String(b.wallet ?? '').trim();
+    let wallet = String(b.wallet ?? '').trim();
     if (!method) return reply.code(400).send({ error: 'Выберите, куда вывести' });
-    if (method === 'pocket' && !POCKET_RE.test(wallet)) return reply.code(400).send({ error: 'ID торгового счёта Pocket Option: только цифры, 5–12 знаков' });
+    // На Pocket Option только на счёт, привязанный к боту: свой номер вписать нельзя
+    if (method === 'pocket') {
+      const pid = (await db.query('SELECT trader_id FROM leads WHERE tg_id = $1', [tgId])).rows[0]?.trader_id as string | null;
+      if (!pid) return reply.code(400).send({ error: 'К боту не привязан счёт Pocket Option. Выберите вывод на USDT BEP20' });
+      wallet = String(pid);
+    }
     if (method === 'usdt' && !BEP20_RE.test(wallet)) return reply.code(400).send({ error: 'Адрес USDT BEP20 начинается с 0x и содержит 42 символа' });
     if ((await db.query(`SELECT 1 FROM leads WHERE tg_id = $1 AND banned_at IS NULL`, [tgId])).rowCount === 0) return reply.code(403).send({ error: 'Выплата недоступна' });
     if ((await db.query(`SELECT 1 FROM referral_payouts WHERE tg_id = $1 AND status = 'pending'`, [tgId])).rowCount) return reply.code(409).send({ error: 'Заявка уже на рассмотрении. Дождитесь выплаты' });
