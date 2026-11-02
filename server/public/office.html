@@ -3958,7 +3958,7 @@ function replyCard(t){
     el('div',{style:'display:flex;gap:10px;align-items:center;flex-wrap:wrap'},save,reset,err));
 }
 
-let pushTab='auto';
+let pushTab='cast';
 async function viewPush(){
   const[rules,seg,casts,staff,tpls,replies]=await Promise.all([api('/push/rules'),api('/push/segments'),api('/push/broadcasts'),api('/staff'),api('/push/templates'),api('/bot-replies')]);
   // --- правила
@@ -4040,7 +4040,7 @@ async function viewPush(){
     el('div',{},sendBtn),berr);
   const castT=table(['Когда','Кому','Текст',['Всего','n'],['Отправлено','n'],['Ошибок','n'],['В очереди','n']],casts.map(c=>[td(new Date(c.created_at).toLocaleString('ru-RU',{timeZone:'Europe/Kyiv',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})),td(SEGL[c.segment]||c.segment),el('td',{style:'min-width:260px;max-width:460px;white-space:normal'},c.text.replace(/\{время:(\d{10,14})\}/g,(_m,ms)=>new Date(+ms).toLocaleTimeString('ru-RU',{timeZone:'Europe/Kyiv',hourCycle:'h23'})+' (Киев)').slice(0,110)),td(c.total,'n'),td(c.sent,'n'),td(c.failed,'n'),td(c.pending,'n')]),'Рассылок пока не было.');
   // Вкладки: автоматические пуши, рассылки и шаблон «Стример в прямом эфире»
-  const PT=[['auto','Автоматические пуши'],['replies','Ответы бота'],['cast','Рассылки'],['live','Прямой эфир']];
+  const PT=[['cast','Рассылки'],['auto','Автоматические пуши'],['replies','Ответы бота'],['live','Прямой эфир']];
   const pbar=el('div',{class:'lc-tabs',role:'tablist'}),pbody=el('div',{style:'display:grid;gap:14px'});
   const pdraw=()=>{
     pbar.replaceChildren(...PT.map(([k,t])=>el('button',{type:'button',role:'tab','aria-selected':String(k===pushTab),class:'lc-tab'+(k===pushTab?' on':''),onclick:()=>{pushTab=k;pdraw()}},t)));
