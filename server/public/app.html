@@ -1676,9 +1676,10 @@ function pocketAddRow(){
 }
 /** Статус игрока для клиента: по регистрации и сумме депозитов */
 function clientRank(){return me.tier?me.tier.name:'Новичок'}
-/** Значок градации справа в карточке профиля, без подписи. Пока только у тестового аккаунта */
+/** Значок градации справа в карточке профиля, без подписи */
 function tierBadge(){
-  if(me.leadRole!=='test')return null;
+  // Только у клиентов: у сотрудников вместо градации роль
+  if(me.leadRole&&me.leadRole!=='lead'&&me.leadRole!=='test')return null;
   const k=['novice','bronze','silver','gold','plat'][me.tier?me.tier.idx:0]||'gold';
   return el('span',{role:'img','aria-label':'Статус: '+clientRank(),title:clientRank(),style:'margin-left:auto;display:grid;filter:drop-shadow(0 6px 12px #0009)'},svgEl(medalSvg(k,56)));
 }
