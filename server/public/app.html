@@ -1679,9 +1679,31 @@ function clientRank(){return me.tier?me.tier.name:'Новичок'}
 /** Медаль градации справа в карточке профиля, без подписи. Пока только у тестового аккаунта */
 function tierBadge(){
   if(me.leadRole!=='test')return null;
-  const ic=['🌱','🥉','🥈','🥇','💎'][me.tier?me.tier.idx:0]||'🏅';
-  return el('span',{role:'img','aria-label':'Статус: '+clientRank(),title:clientRank(),style:'margin-left:auto;font-size:40px;line-height:1;filter:drop-shadow(0 4px 10px #0008)'},ic);
+  const k=['novice','bronze','silver','gold','plat'][me.tier?me.tier.idx:0]||'gold';
+  return el('span',{role:'img','aria-label':'Статус: '+clientRank(),title:clientRank(),style:'margin-left:auto;display:grid;filter:drop-shadow(0 6px 12px #0009)'},svgEl(medalSvg(k,56)));
 }
+/** Медаль градации (SVG): лента, металлический диск с гранью, звезда или кристалл, блик */
+function medalSvg(k,size){
+  const M={
+    novice:{a:'#b7f5c8',b:'#3fae6a',c:'#1f6b3f',r1:'#3fae6a',r2:'#2a7d4c',ic:'leaf'},
+    bronze:{a:'#ffd2a8',b:'#d0844b',c:'#7a3f17',r1:'#c2562e',r2:'#8e3a1c',ic:'star'},
+    silver:{a:'#ffffff',b:'#b9c3d3',c:'#5d6878',r1:'#5b7bd6',r2:'#34509e',ic:'star'},
+    gold:{a:'#fff3b0',b:'#f2b42b',c:'#8a5a00',r1:'#e04a5f',r2:'#9e2337',ic:'star'},
+    plat:{a:'#e9fbff',b:'#8fd8f0',c:'#3b6f9e',r1:'#9b5cff',r2:'#5b2dbd',ic:'gem'}}[k];
+  const id='md'+k+Math.random().toString(36).slice(2,7);
+  const ic=M.ic==='star'?'<path d="M32 30.5l3.6 7.3 8 1.2-5.8 5.6 1.4 8L32 48.8l-7.2 3.8 1.4-8-5.8-5.6 8-1.2z" fill="url(#'+id+'s)" stroke="'+M.c+'" stroke-width="1.2" stroke-linejoin="round"/>'
+    :M.ic==='gem'?'<path d="M24 37l4-5h8l4 5-8 11z" fill="url(#'+id+'s)" stroke="'+M.c+'" stroke-width="1.2" stroke-linejoin="round"/><path d="M24 37h16M28 32l4 16 4-16" fill="none" stroke="'+M.c+'" stroke-width="1" opacity=".55"/>'
+    :'<path d="M32 51V40M32 42c0-6-5-9-10-8 0 6 4 9 10 8zM32 40c0-6 4-10 10-10 0 7-4 10-10 10z" fill="url(#'+id+'s)" stroke="'+M.c+'" stroke-width="1.2" stroke-linejoin="round"/>';
+  return '<svg width="'+size+'" height="'+size+'" viewBox="0 0 64 64" aria-hidden="true"><defs>'+
+   '<linearGradient id="'+id+'d" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="'+M.a+'"/><stop offset=".45" stop-color="'+M.b+'"/><stop offset="1" stop-color="'+M.c+'"/></linearGradient>'+
+   '<linearGradient id="'+id+'i" x1="1" y1="1" x2="0" y2="0"><stop offset="0" stop-color="'+M.a+'"/><stop offset=".5" stop-color="'+M.b+'"/><stop offset="1" stop-color="'+M.c+'"/></linearGradient>'+
+   '<linearGradient id="'+id+'s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="'+M.a+'"/></linearGradient>'+
+   '<linearGradient id="'+id+'r" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="'+M.r1+'"/><stop offset="1" stop-color="'+M.r2+'"/></linearGradient></defs>'+
+   '<path d="M17 2h11l9 22h-11z" fill="url(#'+id+'r)"/><path d="M47 2H36l-9 22h11z" fill="url(#'+id+'r)" opacity=".85"/><path d="M28 2h8l-4 10z" fill="#0003"/>'+
+   '<circle cx="32" cy="41" r="19" fill="url(#'+id+'d)"/><circle cx="32" cy="41" r="14.5" fill="url(#'+id+'i)" stroke="'+M.a+'" stroke-opacity=".7" stroke-width="1"/>'+
+   ic+'<path d="M19 33a15 15 0 0 1 17-10" fill="none" stroke="#fff" stroke-opacity=".55" stroke-width="2" stroke-linecap="round"/></svg>';
+}
+
 /** Розыгрыш (только админ): выбор групп и призов, барабан 15–20 секунд, сообщение победителю и 15 секунд на «Забрать бонус» */
 const GW_GROUPS=[['newbie','Ещё не в команде'],['ftd','Новенький'],['active','Профессионал']];
 function viewGiveaway(){
