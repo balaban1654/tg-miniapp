@@ -293,7 +293,14 @@ svg{max-width:100%}
 .rf-link{display:flex;gap:8px;align-items:center;min-width:0}
 .rf-url{flex:1;min-width:0;padding:11px 12px;border-radius:12px;background:var(--bg2);border:1px solid var(--line);font:600 13px var(--fb);color:var(--fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;user-select:all}
 .rf-copy{flex:none;padding:11px 14px;border-radius:12px;border:0;background:var(--acc);color:#fff;font:700 13px var(--fd);cursor:pointer;display:inline-flex;gap:6px;align-items:center}
-.rf-kv{display:flex;align-items:baseline;gap:8px}.rf-kv b{font:700 16px var(--fd);font-variant-numeric:tabular-nums}
+.rf-bal{padding:0;overflow:hidden}
+.rf-bal-top{position:relative;overflow:hidden;padding:18px 18px 16px;background:radial-gradient(120% 140% at 100% 0%,#7b3cff 0%,#4a1fb0 45%,#24124f 100%);color:#fff}
+.rf-bal-glow{position:absolute;right:-30px;top:-30px;width:140px;height:140px;border-radius:50%;background:#ffffff14;pointer-events:none}
+.rf-bal-sum{font:800 36px/1.1 var(--fd);font-variant-numeric:tabular-nums}
+.rf-bal-btn{position:relative;border:0;background:#fff;color:#3b1a8f;font:800 13px var(--fd);padding:10px 16px;border-radius:12px;cursor:pointer}
+.rf-bal-st{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));text-align:center;padding:12px 4px}
+.rf-bal-st div{display:grid;gap:2px}.rf-bal-st div+div{border-left:1px solid var(--line)}
+.rf-bal-st b{font:800 18px var(--fd);font-variant-numeric:tabular-nums}.rf-bal-st span{font-size:12px;color:var(--mut)}
 .rf-st{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 .rf-st div{display:grid;gap:2px;padding:10px 6px;border-radius:12px;background:var(--bg2);border:1px solid var(--line);text-align:center}
 .rf-st b{font:800 18px var(--fd);font-variant-numeric:tabular-nums}.rf-st span{font-size:11px;color:var(--mut)}
@@ -1997,18 +2004,19 @@ async function viewReferral(){
     try{const r=await api('/referral/payout',{method:'POST',body:{method,wallet:wallet.value.trim()}});toast('Заявка на '+money(r.amount)+' отправлена');viewReferral()}catch(x){err.textContent=x.message;send.disabled=false}}},'Вывести '+money(d.balance));
   const ST={pending:['на рассмотрении','#ffb84d'],paid:['выплачено','#3ddc97'],rejected:['отклонено','#ff6b8a']};
   shell('Рефералы',[
-    // Слева список: приглашено, подключено, всего заработано. Справа вверху сколько можно вывести сейчас
-    el('div',{class:'card',style:'display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:start'},
-      el('div',{style:'display:grid;gap:8px'},
-        ...[['Приглашено',String(d.invited)],['Подключено',String(d.deposited)]].map(([k,v])=>el('div',{class:'rf-kv'},el('span',{class:'sm'},k),el('b',{},v))),
-        el('div',{class:'rf-kv',style:'margin-top:6px'},el('span',{class:'sm'},'Всего заработано'),el('b',{},money(d.earned)))),
-      el('div',{style:'display:grid;gap:2px;justify-items:end;text-align:right'},el('span',{class:'sm'},'Доступно к выводу'),el('b',{style:'font:800 28px var(--fd);font-variant-numeric:tabular-nums;color:var(--ok,#3ddc97)'},money(d.balance)))),
+    // Карта баланса: сверху доступно к выводу и кнопка «Вывести» (прокручивает к форме), снизу три цифры через разделители
+    el('div',{class:'card rf-bal'},
+      el('div',{class:'rf-bal-top'},el('div',{class:'rf-bal-glow'}),
+        el('div',{style:'font-size:12px;opacity:.8'},'Доступно к выводу'),
+        el('div',{style:'display:flex;justify-content:space-between;align-items:flex-end;gap:10px;margin-top:4px'},el('b',{class:'rf-bal-sum'},money(d.balance)),
+          el('button',{class:'rf-bal-btn',type:'button',onclick:()=>{const w=document.getElementById('rfOut');if(w)w.scrollIntoView({behavior:'smooth',block:'start'})}},'Вывести'))),
+      el('div',{class:'rf-bal-st'},...[[String(d.invited),'приглашено'],[String(d.deposited),'подключено'],[money(d.earned),'всего']].map(([v,l])=>el('div',{},el('b',{},v),el('span',{},l))))),
     el('div',{class:'card',style:'display:grid;gap:10px'},el('b',{style:'font:700 15px var(--fd)'},'Ваша ссылка'),refLinkRow(d.link),
       el('div',{class:'sm',style:'display:grid;gap:4px'},
         el('div',{},'1. Отправьте ссылку другу.'),
         el('div',{},'2. Друг запускает бота и подключается к вашему трейдеру.'),
         el('div',{},'3. После его первого депозита вам ',el('b',{},money(d.perFriend)),' на баланс.'))),
-    el('div',{class:'card',style:'display:grid;gap:10px'},el('b',{style:'font:700 15px var(--fd)'},'Вывод средств'),
+    el('div',{class:'card',id:'rfOut',style:'display:grid;gap:10px;scroll-margin-top:70px'},el('b',{style:'font:700 15px var(--fd)'},'Вывод средств'),
       pend?el('div',{class:'sm'},'Заявка на ',el('b',{},money(pend.amount)),' на рассмотрении. Новую можно отправить после выплаты.'):null,
       seg,wallet,hint,err,send),
     d.payouts.length?el('div',{class:'card',style:'display:grid;gap:0'},el('b',{style:'font:700 15px var(--fd);margin-bottom:6px'},'История выплат'),
