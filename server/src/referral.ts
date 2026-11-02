@@ -81,7 +81,6 @@ async function balanceOf(tgId: number) {
 }
 
 const BEP20_RE = /^0x[a-fA-F0-9]{40}$/;
-const mask = (name: string) => (name.length <= 2 ? name[0] + '•' : name.slice(0, 2) + '•'.repeat(Math.min(4, name.length - 2)));
 
 /** Mini App: ссылка, статистика, друзья, заявка на выплату */
 export async function referralAppRoutes(app: FastifyInstance, auth: (req: FastifyRequest, reply: FastifyReply) => Promise<unknown>): Promise<void> {
@@ -104,7 +103,7 @@ export async function referralAppRoutes(app: FastifyInstance, auth: (req: Fastif
       invited: friends.length,
       deposited: friends.filter((f) => f.reward != null).length,
       ...(await balanceOf(tgId)),
-      friends: friends.map((f) => ({ name: mask(String(f.first_name || f.username || 'Друг')), at: f.created_at, reward: f.reward, rewardedAt: f.rewarded_at })),
+      friends: friends.map((f) => ({ name: String(f.first_name || (f.username ? '@' + f.username : 'Друг')), at: f.created_at, reward: f.reward, rewardedAt: f.rewarded_at })),
       payouts,
       pocketId,
     };
