@@ -25,7 +25,7 @@ export async function recordIncoming(m: Incoming): Promise<boolean> {
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const KIND: Record<string, string> = { photo: '📷 фото', video: '🎬 видео', voice: '🎤 голосовое', audio: '🎵 аудио', document: '📎 файл', video_note: '⭕ кружок', sticker: 'стикер' };
 
-/** Новое сообщение клиента: одно уведомление в ветку команды с @ его трейдера. Следующее от того же клиента
+/** Новое сообщение в поддержку (от любого: клиента, теста или сотрудника): одно уведомление в ветку команды с @ трейдера. Следующее от того же клиента
  *  только после того, как чат закрыли кнопкой «Закрыть» в Office, чтобы не было уведомления на каждое сообщение */
 async function notifySupport(m: Incoming): Promise<void> {
   // Куда слать: группа и ветка, назначенные командой /notify; иначе из настроек сервера
@@ -36,7 +36,7 @@ async function notifySupport(m: Incoming): Promise<void> {
   const r = (
     await db.query(
       `UPDATE leads d SET chat_notified_at = now()
-        WHERE d.tg_id = $1 AND coalesce(d.lead_role, 'lead') IN ('lead','test')
+        WHERE d.tg_id = $1
           AND (d.chat_notified_at IS NULL OR (d.chat_closed_at IS NOT NULL AND d.chat_notified_at < d.chat_closed_at))
         RETURNING d.first_name, d.username, d.owner_id`,
       [m.tgId],
