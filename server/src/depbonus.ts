@@ -7,12 +7,12 @@ export interface DepTier {
   bonus: number; // бонус стримеру, $
 }
 
-export const DEP_TIER_NAMES = ['Бронза', 'Серебро', 'Золото', 'Платина'];
+export const DEP_TIER_NAMES = ['Бронза', 'Серебро', 'Золото', 'Диамант'];
 export const DEFAULT_DEP_TIERS: DepTier[] = [
   { name: 'Бронза', from: 50, bonus: 0 },
   { name: 'Серебро', from: 150, bonus: 0 },
   { name: 'Золото', from: 500, bonus: 0 },
-  { name: 'Платина', from: 1500, bonus: 0 },
+  { name: 'Диамант', from: 1500, bonus: 0 },
 ];
 
 export interface DepConfig {

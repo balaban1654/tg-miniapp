@@ -222,7 +222,7 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
       [u.id],
     );
     const s = st.rows[0];
-    // Статус клиента в профиле: градация по сумме всех его депозитов (Бронза, Серебро, Золото, Платина)
+    // Статус клиента в профиле: градация по сумме всех его депозитов (Бронза, Серебро, Золото, Диамант)
     let tier: { name: string; idx: number } | null = null;
     if (!l.lead_role || l.lead_role === 'lead' || l.lead_role === 'test') {
       const ts = await leadTierState(u.id, await loadDepConfig());
