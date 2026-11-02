@@ -1001,3 +1001,6 @@ CREATE TABLE IF NOT EXISTS referral_payouts (
   created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS referral_payouts_lead ON referral_payouts (tg_id);
+-- Ставки реферальной программы (Подключение → Рефералы): сколько пригласившему и сколько трейдеру за друга с первым депозитом
+ALTER TABLE connect_settings ADD COLUMN IF NOT EXISTS ref_lead NUMERIC(12,2) NOT NULL DEFAULT 5;
+ALTER TABLE connect_settings ADD COLUMN IF NOT EXISTS ref_staff NUMERIC(12,2) NOT NULL DEFAULT 3;

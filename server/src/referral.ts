@@ -6,10 +6,13 @@ import type { Role } from './auth.js';
 
 type Need = (...roles: Role[]) => (req: FastifyRequest, reply: FastifyReply) => Promise<unknown>;
 
-/** Пригласившему за друга, сделавшего первый депозит */
+/** Ставки по умолчанию: пригласившему за друга с первым депозитом и трейдеру (бонусом в зарплату). Меняются в Подключение → Рефералы */
 export const REF_LEAD_USD = 5;
-/** Трейдеру (владельцу друга) за такого друга: бонусом в зарплату */
 export const REF_STAFF_USD = 3;
+export async function refRates(): Promise<{ lead: number; staff: number }> {
+  const r = (await db.query('SELECT ref_lead::float AS lead, ref_staff::float AS staff FROM connect_settings WHERE id = 1')).rows[0];
+  return { lead: r && r.lead >= 0 ? Number(r.lead) : REF_LEAD_USD, staff: r && r.staff >= 0 ? Number(r.staff) : REF_STAFF_USD };
+}
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
 const usd = (n: number) => '$' + String(r2(n)).replace('.', ',');
@@ -49,10 +52,11 @@ export async function accrueReferral(tgId: number | string): Promise<void> {
   ).rows[0];
   if (!d) return;
   const test = d.lead_role === 'test' || d.ref_role === 'test';
-  const staffPay = !test && d.owner_id && d.owner_role !== 'admin' ? REF_STAFF_USD : 0;
+  const rate = await refRates();
+  const staffPay = !test && d.owner_id && d.owner_role !== 'admin' && rate.staff > 0 ? rate.staff : 0;
   const ins = await db.query(
     `INSERT INTO referral_rewards (tg_id, referrer_id, owner_id, lead_amount, staff_amount) VALUES ($1,$2,$3,$4,$5) ON CONFLICT (tg_id) DO NOTHING RETURNING tg_id`,
-    [d.tg_id, d.referrer_id, d.owner_id, REF_LEAD_USD, staffPay],
+    [d.tg_id, d.referrer_id, d.owner_id, rate.lead, staffPay],
   );
   if (!ins.rowCount) return;
   if (staffPay) {
@@ -65,7 +69,7 @@ export async function accrueReferral(tgId: number | string): Promise<void> {
     await db.query('UPDATE referral_rewards SET adjustment_id = $2 WHERE tg_id = $1', [d.tg_id, a.rows[0].id]);
   }
   const friend = d.first_name || (d.username ? '@' + d.username : 'Ваш друг');
-  await deliver(String(d.referrer_id), `🎉 ${friend} сделал первый депозит по вашей ссылке. На реферальный баланс начислено **${usd(REF_LEAD_USD)}**.`).catch(() => {});
+  if (rate.lead > 0) await deliver(String(d.referrer_id), `🎉 ${friend} сделал первый депозит по вашей ссылке. На реферальный баланс начислено **${usd(rate.lead)}**.`).catch(() => {});
 }
 
 /** Баланс пригласившего: начислено минус выплаченное и ждущее выплаты */
@@ -95,7 +99,7 @@ export async function referralAppRoutes(app: FastifyInstance, auth: (req: Fastif
     const pocketId = (await db.query('SELECT trader_id FROM leads WHERE tg_id = $1', [tgId])).rows[0]?.trader_id ?? null;
     return {
       link: refLink(tgId),
-      perFriend: REF_LEAD_USD,
+      perFriend: (await refRates()).lead,
       invited: friends.length,
       deposited: friends.filter((f) => f.reward != null).length,
       ...(await balanceOf(tgId)),
@@ -150,7 +154,30 @@ export async function referralOfficeRoutes(app: FastifyInstance, h: { need: Need
       )
     ).rows;
     const invited = Number((await db.query(`SELECT count(*)::int AS n FROM leads WHERE referrer_id IS NOT NULL AND ($1::text IS NULL OR to_char(created_at AT TIME ZONE 'Europe/Kyiv', 'YYYY-MM') = $1)`, [period])).rows[0].n);
-    return { perFriend: REF_LEAD_USD, perStaff: REF_STAFF_USD, invited, payouts, rewards };
+    // Все рефералы: кто пришёл, кто пригласил, за каким трейдером закреплён, был ли первый депозит и сколько начислено
+    const all = (
+      await db.query(
+        `SELECT d.tg_id, ${name('d')} AS friend_name, d.username, d.created_at, d.referrer_id, ${name('r')} AS referrer_name, s.name AS owner_name,
+                (SELECT min(e.created_at) FROM events e WHERE e.tg_id = d.tg_id AND e.type = 'ftd') AS ftd_at,
+                w.lead_amount::float AS lead_amount, w.staff_amount::float AS staff_amount
+           FROM leads d JOIN leads r ON r.tg_id = d.referrer_id LEFT JOIN staff s ON s.id = d.owner_id LEFT JOIN referral_rewards w ON w.tg_id = d.tg_id
+          WHERE d.referrer_id IS NOT NULL AND d.removed_at IS NULL ORDER BY d.created_at DESC LIMIT 2000`,
+      )
+    ).rows;
+    const rate = await refRates();
+    return { perFriend: rate.lead, perStaff: rate.staff, invited, payouts, rewards, all };
+  });
+
+  app.put('/referral/settings', { preHandler: admin }, async (req, reply) => {
+    const b = (req.body ?? {}) as Record<string, unknown>;
+    const lead = Math.round(Number(b.lead) * 100) / 100, staff = Math.round(Number(b.staff) * 100) / 100;
+    if (!(lead >= 0 && lead <= 1000 && staff >= 0 && staff <= 1000)) return reply.code(400).send({ error: 'Суммы от $0 до $1000' });
+    await db.query('UPDATE connect_settings SET ref_lead = $1, ref_staff = $2 WHERE id = 1', [lead, staff]);
+    return { ok: true };
+  });
+
+  app.get('/referral/pending', { preHandler: admin }, async () => {
+    return { n: Number((await db.query(`SELECT count(*)::int AS n FROM referral_payouts WHERE status = 'pending'`)).rows[0].n) };
   });
 
   app.post<{ Params: { id: string } }>('/referral/payouts/:id/decide', { preHandler: admin }, async (req, reply) => {
