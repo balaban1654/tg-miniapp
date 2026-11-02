@@ -23,9 +23,9 @@ export const config = {
   pushDayTo: Number(process.env.PUSH_DAY_TO ?? 22),
   postbackSecret: process.env.POSTBACK_SECRET ?? '',
   disableBot: process.env.DISABLE_BOT === '1',
-  /** Куда сообщать о новых сообщениях в поддержку: группа команды и ветка (t.me/c/3388644445/9289) */
+  /** Куда сообщать о новых сообщениях в поддержку: группа команды и ветка (t.me/c/3388644445/14995) */
   supportNotifyChat: process.env.SUPPORT_NOTIFY_CHAT ?? '-1003388644445',
-  supportNotifyThread: Number(process.env.SUPPORT_NOTIFY_THREAD ?? 9289) || undefined,
+  supportNotifyThread: Number(process.env.SUPPORT_NOTIFY_THREAD ?? 14995) || undefined,
   adminLogin: process.env.ADMIN_LOGIN ?? '',
   adminPassword: process.env.ADMIN_PASSWORD ?? '',
   secureCookies: process.env.NODE_ENV === 'production',
