@@ -105,6 +105,8 @@ export interface KpiResult {
   dayBonus: number;
   depBonus: number; // принятые бонусы за додепы лидов
   adjBonus: number;
+  refBonus?: number; // часть adjBonus: бонусы за рефералов
+  refN?: number;
   adjPenalty: number;
   total: number; // начислено по текущему состоянию планов
   fullTotal: number;
@@ -173,6 +175,8 @@ async function kpiCompute(staffId: number, period: string, plan: KpiPlan): Promi
   const adj = (await db.query(`SELECT kind, coalesce(sum(amount), 0)::float AS s FROM staff_adjustments WHERE staff_id = $1 AND period = $2 GROUP BY kind`, [staffId, period])).rows;
   const adjBonus = Number(adj.find((x) => x.kind === 'bonus')?.s ?? 0);
   const adjPenalty = Number(adj.find((x) => x.kind === 'penalty')?.s ?? 0);
+  // Из премий: бонусы за рефералов (друг клиента сделал первый депозит). Уже входят в adjBonus, отдельно только для показа
+  const refRow = (await db.query(`SELECT coalesce(sum(a.amount), 0)::float AS s, count(*)::int AS n FROM referral_rewards w JOIN staff_adjustments a ON a.id = w.adjustment_id WHERE a.staff_id = $1 AND a.period = $2`, [staffId, period])).rows[0];
   const depBonusRaw = Number((await db.query(`SELECT coalesce(sum(amount), 0)::float AS s FROM dep_bonus_requests WHERE staff_id = $1 AND period = $2 AND status = 'approved'`, [staffId, period])).rows[0].s);
   const paid = Number((await db.query(`SELECT coalesce(sum(amount), 0)::float AS s FROM staff_payouts WHERE staff_id = $1 AND period = $2`, [staffId, period])).rows[0].s);
 
@@ -242,6 +246,8 @@ async function kpiCompute(staffId: number, period: string, plan: KpiPlan): Promi
     dayBonus: dayBonusPaid,
     depBonus: noPay ? 0 : depBonusRaw,
     adjBonus: noPay ? 0 : adjBonus,
+    refBonus: noPay ? 0 : Number(refRow.s),
+    refN: Number(refRow.n),
     adjPenalty: noPay ? 0 : adjPenalty,
     total,
     fullTotal: r2(full.base + full.leadsPay + extraPaid),
@@ -1528,6 +1534,8 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
           dayBonus: k.dayBonus,
           depBonus: k.depBonus ?? 0,
           bonus: k.adjBonus,
+          refBonus: k.refBonus ?? 0,
+          refN: k.refN ?? 0,
           penalty: k.adjPenalty,
           paid: k.paid,
           totalMin: k.minTotal,

@@ -1177,8 +1177,10 @@ function dxModal(btn,s,d,skew,mode){
       el('div',{class:'dx-sal'},
         el('div',{class:'dx-scol'},el('div',{class:'dx-sh'},'База'),row('Ставка ('+m.shifts+' смен)',hv(dxPair([m.baseMin,m.baseFull]))),row('Лиды ('+m.ftd+')',hv(dxPair([m.leadsMin,m.leadsFull])))),
         el('div',{class:'dx-scol'},el('div',{class:'dx-sh'},'Удержания'),row('Штрафы',hv(m.penalty?sgn0(-m.penalty):'$0',m.penalty?'dx-neg':'')),row('Выплачено (аванс)',hv(m.paid?sgn0(-m.paid):'$0'))),
-        el('div',{class:'dx-scol'},el('div',{class:'dx-sh'},'Бонусы'),row('FTD (суммы больше)',hv(m.ftdBonus?sgn0(m.ftdBonus):'$0')),row('Дневной ('+(d.plan.dayCount||4)+' FTD)',hv(m.dayBonus?sgn0(m.dayBonus):'$0')),row('Додепы (градации)',hv(m.depBonus?sgn0(m.depBonus):'$0')),row('Премии',hv(m.bonus?sgn0(m.bonus):'$0'))),
-        el('div',{class:'dx-topay'},el('span',{},'К выплате'),el('b',{},el('span',{class:'dx-dm'},usd0(pay[0])),el('span',{class:'dx-sl'},'/'),el('span',{},usd0(pay[1])))))),
+        el('div',{class:'dx-scol'},el('div',{class:'dx-sh'},'Бонусы'),row('FTD (суммы больше)',hv(m.ftdBonus?sgn0(m.ftdBonus):'$0')),row('Дневной ('+(d.plan.dayCount||4)+' FTD)',hv(m.dayBonus?sgn0(m.dayBonus):'$0')),row('Додепы (градации)',hv(m.depBonus?sgn0(m.depBonus):'$0')),row('Премии',hv(m.bonus-(m.refBonus||0)?sgn0(m.bonus-(m.refBonus||0)):'$0'))),
+        // Бонусы за рефералов (друг клиента сделал первый депозит): отдельной строкой над «К выплате», из «Премий» вычтены
+        el('div',{class:'dx-scol'},el('div',{style:'flex:1'}),row('Рефералы'+(m.refN?' ('+m.refN+')':''),hv(m.refBonus?sgn0(m.refBonus):'$0')),
+        el('div',{class:'dx-topay'},el('span',{},'К выплате'),el('b',{},el('span',{class:'dx-dm'},usd0(pay[0])),el('span',{class:'dx-sl'},'/'),el('span',{},usd0(pay[1]))))))),
     el('div',{class:'dx-prof',hidden:me.role==='admin'||me.role==='teamlead'?null:''},el('div',{class:'dx-sec'},'Выгоден ли сотрудник'),row('Комиссия с лидов',hv(usd0(comm))),row('Зарплата по полным ставкам',hv('−'+usd0(cost),'dx-neg')),
       el('div',{class:'dx-row res'},el('span',{},'Прибыль с сотрудника'),el('b',{style:'color:'+(profit<0?'var(--bad)':'var(--fg)')},sgn0(profit))),
       el('div',{class:'dx-vd '+vcls},el('b',{},vt+'. '),vx+'.')),
