@@ -2554,6 +2554,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     const refs = (
       await db.query(
         `SELECT d.tg_id, (SELECT min(e.created_at) FROM events e WHERE e.tg_id = d.tg_id AND e.type = 'ftd') AS ftd_at,
+                coalesce((SELECT min(e.created_at) FROM events e WHERE e.tg_id = d.tg_id AND e.type = 'start'), d.created_at) AS start_at,
                 ${showRefComm ? `(SELECT coalesce(sum(e.amount), 0)::float FROM events e WHERE e.tg_id = d.tg_id AND e.type = 'comm')` : 'NULL'} AS commission
            FROM leads d WHERE d.referrer_id = $1 ORDER BY d.created_at DESC LIMIT 500`,
         [tgId],

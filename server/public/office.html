@@ -2492,7 +2492,7 @@ async function openLeadCard(tgId){
   const refRow=()=>{const R=d.refs||[];
     const cnt=el('button',{type:'button',class:'fc-cnt',title:'Показать рефералов'},R.length+' шт');
     const show=()=>{document.querySelectorAll('.fc-pop').forEach(x=>x.remove());const r=cnt.getBoundingClientRect();
-      const p=el('div',{class:'fc-pop'},R.length?R.map(x=>el('div',{},el('span',{class:'mut'},x.ftd_at?fmtDT(x.ftd_at):'без FTD'),
+      const p=el('div',{class:'fc-pop'},R.length?R.map(x=>el('div',{},el('span',{class:'mut',title:x.ftd_at?'Дата первого депозита':'Открыл бота, первого депозита ещё нет'},fmtDT(x.ftd_at||x.start_at)),
         el('span',{style:'display:inline-flex;gap:10px;align-items:center'},el('a',{href:'#',style:'color:var(--acc2);font-weight:700',onclick:e=>{e.preventDefault();p.remove();openLeadCard(x.tg_id)}},String(x.tg_id)),x.commission!==null&&x.commission!==undefined?el('b',{},money(x.commission)):null))):el('div',{class:'mut'},'Рефералов нет'));
       document.body.append(p);const w=p.offsetWidth,h=p.offsetHeight;
       p.style.left=Math.max(8,Math.min(innerWidth-w-8,r.right-w))+'px';p.style.top=(r.bottom+8+h>innerHeight?Math.max(8,r.top-h-8):r.bottom+8)+'px';
