@@ -1676,11 +1676,11 @@ function pocketAddRow(){
 }
 /** Статус игрока для клиента: по регистрации и сумме депозитов */
 function clientRank(){return me.tier?me.tier.name:'Новичок'}
-/** Значок градации рядом с именем: медаль и название. Пока только у тестового аккаунта */
+/** Медаль градации справа в карточке профиля, без подписи. Пока только у тестового аккаунта */
 function tierBadge(){
   if(me.leadRole!=='test')return null;
-  const T=[['🌱','#8fd18f'],['🥉','#e0975a'],['🥈','#cfd6e4'],['🥇','#ffd54d'],['💎','#7fd8ff']][me.tier?me.tier.idx:0]||['🏅','var(--acc2)'];
-  return el('span',{style:'display:inline-flex;align-items:center;gap:4px;padding:2px 9px 2px 6px;border-radius:999px;font:700 12px var(--fd);color:'+T[1]+';background:color-mix(in srgb,'+T[1]+' 16%,transparent);border:1px solid color-mix(in srgb,'+T[1]+' 45%,transparent)'},el('span',{'aria-hidden':'true'},T[0]),clientRank());
+  const ic=['🌱','🥉','🥈','🥇','💎'][me.tier?me.tier.idx:0]||'🏅';
+  return el('span',{role:'img','aria-label':'Статус: '+clientRank(),title:clientRank(),style:'margin-left:auto;font-size:40px;line-height:1;filter:drop-shadow(0 4px 10px #0008)'},ic);
 }
 /** Розыгрыш (только админ): выбор групп и призов, барабан 15–20 секунд, сообщение победителю и 15 секунд на «Забрать бонус» */
 const GW_GROUPS=[['newbie','Ещё не в команде'],['ftd','Новенький'],['active','Профессионал']];
@@ -1856,7 +1856,7 @@ function mgrProfileLink(){const u=me.managerLink||'https://t.me/'+me.managerTg;r
 function viewProfile(){
   const rows=[...([['Ваш трейдер',me.manager?(me.managerTg?el('a',{href:mgrProfileLink(),style:'color:var(--acc2);text-decoration:none',onclick:e=>{e.preventDefault();openLink(mgrProfileLink())}},'@'+me.managerTg):me.manager):'не назначен']]),['Telegram ID',me.tgId,true],['Pocket ID',me.pocketId||null,true],...(me.leadRole&&me.leadRole!=='lead'&&me.leadRole!=='test'?[['Роль',ROLE_NAME[me.leadRole]||me.leadRole]]:[['Статус',clientRank()]]),['Доступ',me.access?'Открыт':'Закрыт']];
   const copyBtn=v=>el('button',{type:'button','aria-label':'Копировать',title:'Копировать',style:'background:none;border:0;padding:2px;color:var(--mut);cursor:pointer;display:grid;place-items:center',onclick:()=>copyText(v)},svgEl(COPY_ICON));
-  shell('Профиль',[el('div',{class:'card row',style:'justify-content:flex-start;gap:12px'},withPhoto(el('div',{class:'ava'},(me.name||'?').trim().slice(0,1).toUpperCase())),el('div',{},el('div',{style:'display:flex;align-items:center;gap:8px;flex-wrap:wrap'},el('b',{style:'font:700 16px var(--fd)'},me.name),tierBadge()),el('div',{class:'sm'},me.username?'@'+me.username:''))),
+  shell('Профиль',[el('div',{class:'card row',style:'justify-content:flex-start;gap:12px'},withPhoto(el('div',{class:'ava'},(me.name||'?').trim().slice(0,1).toUpperCase())),el('div',{style:'min-width:0'},el('b',{style:'font:700 16px var(--fd)'},me.name),el('div',{class:'sm'},me.username?'@'+me.username:'')),tierBadge()),
     el('div',{class:'card',style:'display:grid;grid-template-columns:minmax(0,1fr);gap:10px'},rows.filter(([k,v])=>!(k==='Pocket ID'&&!v)).map(([k,v,cp])=>el('div',{class:'row'},el('span',{class:'sm'},k),
       el('span',{style:'display:inline-flex;align-items:center;gap:8px'},cp?hiddenId(v):el('b',{class:'mono'},v instanceof Node?v:String(v)),cp?copyBtn(v):null)))),
     me.leadRole==='admin'?el('button',{class:'btn gw-open',type:'button',onclick:()=>viewGiveaway()},'🎁 Провести розыгрыш'):
