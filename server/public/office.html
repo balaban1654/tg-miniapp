@@ -544,7 +544,7 @@ const STATUS={new:['Новый','p-pur'],registered:['Регистрация','e
 let me=null,tab='home';
 /* Адрес страницы: у каждого раздела своя ссылка (#/leads, #/acc/review), при обновлении остаёмся на месте */
 const STAFF_TABS=['team','links','tasks','review','why','depb','bonus','exp'];
-const ACC_TABS=['sum','roi','review','bonus','depb','pay','exp','why','plan','team','form'];
+const ACC_TABS=['sum','roi','review','bonus','depb','ref','pay','exp','why','plan','team','form'];
 function hashPath(){return '/'+tab+(tab==='acc'?'/'+accState.tab:tab==='plans'?'/'+plansState.tab:tab==='staff'?'/'+staffState.tab:'')}
 function pushHash(){const h='#'+hashPath();if(location.hash!==h)history.pushState(null,'',h)}
 function readHash(){const[,t,sub]=(location.hash||'').split('/');if(!t)return;tab=t;if(t==='acc'&&ACC_TABS.includes(sub))accState.tab=sub;if(t==='plans'&&PLANS_TABS.includes(sub))plansState.tab=sub;if(t==='staff'&&STAFF_TABS.includes(sub))staffState.tab=sub}
@@ -3036,7 +3036,7 @@ async function viewAcc(){
   // minmax(0,1fr): длинные реквизиты (кошелёк) не раздвигают страницу на телефоне шире экрана
   const root=el('div',{style:'display:grid;grid-template-columns:minmax(0,1fr);gap:14px'}),body=el('div',{style:'display:grid;grid-template-columns:minmax(0,1fr);gap:14px'});
   const monthBar=el('div',{class:'mon2'}),tabBar=el('div',{class:'lc-tabs',role:'tablist'});
-  const TABS=[['sum','Сводка'],['roi','Окупаемость'],['review','Отчёты на проверке'],['bonus','Бонусы и штрафы'],['depb','Бонусы за додепы'],['pay','Выплаты и авансы'],['exp','Расходы'],['why','Причины по сменам'],['plan','KPI-план'],['team','ЗП (команда)'],['form','Форма отчёта']];
+  const TABS=[['sum','Сводка'],['roi','Окупаемость'],['review','Отчёты на проверке'],['bonus','Бонусы и штрафы'],['depb','Бонусы за додепы'],['ref','Рефералы'],['pay','Выплаты и авансы'],['exp','Расходы'],['why','Причины по сменам'],['plan','KPI-план'],['team','ЗП (команда)'],['form','Форма отчёта']];
   const drawBar=()=>{
     monthBar.replaceChildren(el('button',{type:'button','aria-label':'Предыдущий месяц',onclick:()=>{accState.period=perShift(accState.period,-1);accState.sel=null;drawBar();drawBody();drawStatus()}},'‹'),el('b',{},perLabel(accState.period)),el('button',{type:'button','aria-label':'Следующий месяц',onclick:()=>{accState.period=perShift(accState.period,1);accState.sel=null;drawBar();drawBody();drawStatus()}},'›'));
     tabBar.replaceChildren(...TABS.map(([k,t])=>el('button',{type:'button',role:'tab','aria-selected':k===accState.tab?'true':'false',class:'lc-tab'+(k===accState.tab?' on':''),onclick:()=>{accState.tab=k;drawBar();drawBody();pushHash()}},t,(accPend[k]>0)?el('span',{class:'nbadge tb',title:'Ждёт вашего решения'},String(accPend[k])):null)));
@@ -3062,7 +3062,7 @@ async function viewAcc(){
     else stat.replaceChildren(el('span',{class:'mut sm'},'Идёт текущий месяц. Он закроется сам в 03:00 первого числа, начисления тогда зафиксируются.'));
   };
   window.__accTabsRedraw=()=>{if(tabBar.isConnected)drawBar()};
-  const drawBody=async()=>{refreshAccPending();body.replaceChildren(el('div',{class:'mut'},'Загрузка…'));try{body.replaceChildren(...(await ({sum:accSum,roi:accRoi,review:accReview,bonus:accBonus,depb:accDepBonus,pay:accPay,exp:accExp,why:accWhy,plan:accPlan,team:accTeam,form:accForm})[accState.tab]()).filter(Boolean))}catch(x){if(x.message!=='auth')body.replaceChildren(el('div',{class:'err'},x.message))}};
+  const drawBody=async()=>{refreshAccPending();body.replaceChildren(el('div',{class:'mut'},'Загрузка…'));try{body.replaceChildren(...(await ({sum:accSum,roi:accRoi,review:accReview,bonus:accBonus,depb:accDepBonus,ref:accRef,pay:accPay,exp:accExp,why:accWhy,plan:accPlan,team:accTeam,form:accForm})[accState.tab]()).filter(Boolean))}catch(x){if(x.message!=='auth')body.replaceChildren(el('div',{class:'err'},x.message))}};
   if(!accState.period)accState.period=(await api('/kpi/summary')).period;
   drawBar();root.append(stat,tabBar,body);drawStatus();await drawBody();
   accRefresh=drawBody;
@@ -3387,6 +3387,30 @@ async function accWhy(pre){
     el('div',{class:'mut sm'},'Если за день не набралось 3 часов, стример должен написать причину. Главное: 66 часов за месяц. '+(me.role==='admin'?'Штраф можно удалить во вкладке «Бонусы и штрафы».':'Причину можно принять или выписать штраф: его сумму и причину увидит стример. Отменить штраф может админ.'))];
 }
 
+/** Рефералы: заявки клиентов на выплату (Pocket Option или USDT BEP20) и начисления за друзей с первым депозитом */
+async function accRef(){
+  const d=await api('/referral/overview?period='+accState.period);
+  const fmt=v=>new Date(v).toLocaleString('ru-RU',{timeZone:'Europe/Kyiv',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
+  const ST={pending:['ждёт выплаты','p-warn'],paid:['выплачено','p-ok'],rejected:['отклонено','p-bad']};
+  const lead=(id,n)=>el('a',{href:'#',style:'color:var(--acc2)',onclick:e=>{e.preventDefault();openLeadCard(id)}},n);
+  const copy=v=>el('button',{class:'btn o s',type:'button',title:'Копировать',onclick:async()=>{try{await navigator.clipboard.writeText(v);toast('Скопировано')}catch{toast(v)}}},'⧉');
+  const act=r=>{
+    if(r.status!=='pending')return el('td',{class:'mut sm'},(r.decided_name||'')+(r.decided_at?' · '+fmt(r.decided_at):'')+(r.reject_reason?' · '+r.reject_reason:''));
+    const c=el('td',{style:'white-space:nowrap'});
+    const go=async(action,reason)=>{try{await api('/referral/payouts/'+r.id+'/decide',{method:'POST',body:{action,reason}});toast(action==='paid'?'Отмечено: выплачено, клиенту ушло сообщение':'Заявка отклонена');refreshAccPending();accRefresh&&accRefresh()}catch(x){toast(x.message)}};
+    const rej=()=>{const i=el('input',{placeholder:'Причина (её увидит клиент)',style:'width:200px'});
+      c.replaceChildren(el('span',{style:'display:inline-flex;gap:6px'},i,el('button',{class:'btn s',type:'button',style:'background:var(--bad)',onclick:()=>go('reject',i.value)},'Отклонить'),el('button',{class:'btn o s',type:'button',onclick:()=>c.replaceChildren(...btns())},'✕')));i.focus()};
+    const btns=()=>[el('button',{class:'btn s',type:'button',onclick:async()=>{if(await askC('Отметить выплату '+usd2(r.amount)+' как отправленную? Клиенту придёт сообщение в бота.'))go('paid')}},'Выплачено'),el('button',{class:'btn o s',type:'button',style:'margin-left:6px',onclick:rej},'Отклонить')];
+    c.append(...btns());return c;
+  };
+  const pays=table(['Клиент','Сумма','Куда','Реквизиты','Заявка','Статус',''],d.payouts.map(r=>[el('td',{},lead(r.tg_id,r.lead_name)),td(usd2(r.amount),'n'),td(r.method==='usdt'?'USDT BEP20':'Pocket Option'),
+    el('td',{style:'white-space:nowrap'},el('span',{class:'mono',style:'font-size:12px;word-break:break-all'},r.wallet),' ',copy(r.wallet)),td(fmt(r.created_at)),el('td',{},el('span',{class:'pill '+ST[r.status][1]},ST[r.status][0])),act(r)]),'Заявок на выплату нет');
+  const sumL=d.rewards.reduce((a,x)=>a+x.lead_amount,0),sumS=d.rewards.reduce((a,x)=>a+x.staff_amount,0);
+  const rews=table(['Когда','Друг','Пригласил','Трейдер','Клиенту','Трейдеру'],d.rewards.map(r=>[td(fmt(r.created_at)),el('td',{},lead(r.tg_id,r.friend_name)),el('td',{},lead(r.referrer_id,r.referrer_name)),td(r.owner_name||'—'),td(usd2(r.lead_amount),'n'),td(r.staff_amount?usd2(r.staff_amount):'—','n')]),'За этот месяц начислений нет');
+  return[el('div',{class:'mut sm'},'Клиент получает '+usd2(d.perFriend)+' за друга, пришедшего по его ссылке, после первого депозита друга (когда открылся доступ). Трейдеру '+usd2(d.perStaff)+' за такого друга бонусом в зарплату (видно в «Бонусы и штрафы»). Тестовые аккаунты трейдеру не начисляют.'),
+    el('div',{class:'pb-tots'},el('span',{},'Пришло по ссылкам: ',el('b',{},String(d.invited))),el('span',{},'С депозитом: ',el('b',{},String(d.rewards.length))),el('span',{},'Клиентам: ',el('b',{},usd2(sumL))),el('span',{},'Трейдерам: ',el('b',{},usd2(sumS)))),
+    el('h4',{},'Заявки на выплату'),ctrT(pays),el('h4',{},'Начисления'),ctrT(rews)];
+}
 async function accDepBonus(refresh){
   const rows=await api('/dep-bonus');
   const err=el('div',{class:'err',role:'alert'});

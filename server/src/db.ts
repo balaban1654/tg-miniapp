@@ -1,4 +1,5 @@
 import pg from 'pg';
+import { referrerOf } from './referral.js';
 import { config } from './config.js';
 
 export const db = new pg.Pool({ connectionString: config.databaseUrl });
@@ -19,10 +20,17 @@ export async function attachLead(
   username: string | undefined,
   firstName: string | undefined,
   slug: string | null,
-  origin: 'site' | null = null,
+  origin: 'site' | 'ref' | null = null,
+  refId: number | null = null,
 ): Promise<{ lead: Lead; isNew: boolean }> {
   let linkId: number | null = null;
   let ownerId: number | null = null;
+  // Реферальная ссылка: новый лид закрепляется за трейдером пригласившего
+  let referrer: number | null = null;
+  if (refId && !slug && !(await db.query('SELECT 1 FROM leads WHERE tg_id = $1', [tgId])).rowCount) {
+    const r = await referrerOf(refId, tgId);
+    if (r) { referrer = refId; ownerId = r.owner_id; origin = 'ref'; }
+  }
   if (slug) {
     const r = await db.query(
       `SELECT l.id, l.owner_id, coalesce(p.rotate, l.rotate) AS rotate, coalesce(l.parent_id, l.id) AS root
@@ -40,13 +48,13 @@ export async function attachLead(
     }
   }
   // Органика: новый лид без ссылки (сам нашёл бота или пришёл с сайта) — владелец по настройкам «Органика» в Office
-  if (!linkId && !(await db.query('SELECT 1 FROM leads WHERE tg_id = $1', [tgId])).rowCount) ownerId = await pickOrganicOwner(origin === 'site' ? 'site' : 'org', tgId);
+  if (!linkId && !referrer && !(await db.query('SELECT 1 FROM leads WHERE tg_id = $1', [tgId])).rowCount) ownerId = await pickOrganicOwner(origin === 'site' ? 'site' : 'org', tgId);
   const ins = await db.query(
-    `INSERT INTO leads (tg_id, username, first_name, link_id, owner_id, origin)
-     VALUES ($1,$2,$3,$4,$5,$6)
+    `INSERT INTO leads (tg_id, username, first_name, link_id, owner_id, origin, referrer_id)
+     VALUES ($1,$2,$3,$4,$5,$6,$7)
      ON CONFLICT (tg_id) DO NOTHING
      RETURNING *`,
-    [tgId, username ?? null, firstName ?? null, linkId, ownerId, linkId ? null : origin],
+    [tgId, username ?? null, firstName ?? null, linkId, ownerId, linkId ? null : origin, referrer],
   );
   if (ins.rows[0]) {
     await db.query(`INSERT INTO events (tg_id, type) VALUES ($1,'start')`, [tgId]);

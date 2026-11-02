@@ -1096,7 +1096,8 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     const why = await n(`SELECT count(*)::int AS n FROM shift_shortfalls f JOIN staff s ON s.id = f.staff_id WHERE s.role <> 'admin' AND f.dismissed_at IS NULL AND f.reason IS NOT NULL AND f.accepted_at IS NULL AND f.penalty_id IS NULL`);
     const pay = await n(`SELECT count(*)::int AS n FROM advance_requests WHERE status = 'pending'`);
     const depb = await n(`SELECT count(*)::int AS n FROM dep_bonus_requests WHERE status = 'pending'`);
-    return { review, why, pay, depb, total: review + why + pay + depb };
+    const ref = await n(`SELECT count(*)::int AS n FROM referral_payouts WHERE status = 'pending'`);
+    return { review, why, pay, depb, ref, total: review + why + pay + depb + ref };
   });
   app.get('/advances', { preHandler: admin }, async () =>
     (await db.query(`SELECT r.id, r.staff_id, s.name AS staff_name, r.period, r.amount::float AS amount, r.status, r.created_at FROM advance_requests r JOIN staff s ON s.id = r.staff_id WHERE r.status = 'pending' ORDER BY r.id`)).rows,

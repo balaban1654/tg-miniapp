@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify';
+import { accrueReferral } from './referral.js';
 import { markLeadBlocked } from './leadblock.js';
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { db, pickOrganicOwner } from './db.js';
@@ -140,6 +141,8 @@ export async function postbackRoutes(app: FastifyInstance): Promise<void> {
           await db.query(`UPDATE leads SET status = 'active' WHERE tg_id = $1 AND status = 'ftd'`, [tgId]);
         }
         await markConnected(tgId, tot).catch(() => {});
+        // Друг по реферальной ссылке получил доступ первым депозитом: бонус пригласившему и трейдеру
+        await accrueReferral(tgId).catch((e) => console.error('Реферальный бонус: сбой', e));
       } else if (cur.status === 'new') {
         await db.query(`UPDATE leads SET status = 'registered' WHERE tg_id = $1`, [tgId]);
       }

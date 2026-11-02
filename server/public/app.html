@@ -290,6 +290,14 @@ svg{max-width:100%}
 .rf-c{display:grid;gap:4px;padding:12px 4px;border-radius:14px;background:var(--card2,#251847);border:1px solid var(--line,#34255c)}
 .rf-c b{font:800 24px var(--fd,Montserrat),sans-serif;font-variant-numeric:tabular-nums;color:var(--acc2,#c9a6ff)}
 .rf-c span{font-size:11px;opacity:.7}
+.rf-link{display:flex;gap:8px;align-items:center;min-width:0}
+.rf-url{flex:1;min-width:0;padding:11px 12px;border-radius:12px;background:var(--bg2);border:1px solid var(--line);font:600 13px var(--fb);color:var(--fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;user-select:all}
+.rf-copy{flex:none;padding:11px 14px;border-radius:12px;border:0;background:var(--acc);color:#fff;font:700 13px var(--fd);cursor:pointer;display:inline-flex;gap:6px;align-items:center}
+.rf-st{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.rf-st div{display:grid;gap:2px;padding:10px 6px;border-radius:12px;background:var(--bg2);border:1px solid var(--line);text-align:center}
+.rf-st b{font:800 18px var(--fd);font-variant-numeric:tabular-nums}.rf-st span{font-size:11px;color:var(--mut)}
+.rf-in{width:100%;box-sizing:border-box;padding:11px 12px;border-radius:12px;background:var(--bg2);border:1px solid var(--line);color:var(--fg);font:14px var(--fb)}
+.rf-li{display:flex;justify-content:space-between;gap:10px;align-items:center;font-size:13px;padding:8px 0;border-top:1px solid var(--line)}.rf-li:first-child{border-top:0}
 .rf-p{background:#ffb84d22;color:#ffb84d;padding:4px 12px;border-radius:999px;font-size:12px;font-weight:700}
 
 .nw-more{color:inherit;font:inherit;text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:3px;text-decoration-color:currentColor;transition:color .15s}.nw-more:hover,.nw-more:active,.nw-more:focus-visible{color:var(--acc2,#c9a6ff)}
@@ -1910,7 +1918,7 @@ function viewProfile(){
     me.leadRole==='admin'?el('button',{class:'btn gw-open',type:'button',onclick:()=>viewGiveaway()},'🎁 Провести розыгрыш'):
     null,
     el('button',{class:'btn o',type:'button',onclick:support},'Написать в поддержку'),
-    el('button',{class:'btn',type:'button',onclick:()=>go('referral')},'Реферальная программа'),
+    refTile(),
     el('button',{class:'back',type:'button',onclick:()=>go('home')},'‹ На главную')]);
 }
 /** Реферальная программа: пока в разработке, отсчёт до запуска 1-го числа в 22:00 по Киеву (ближайшее, ещё не прошедшее) */
@@ -1925,12 +1933,34 @@ function referralLaunch(){
   let t=at(y,m);if(t<=nowMs()){m++;if(m>12){m=1;y++}t=at(y,m)}
   return t;
 }
-function viewReferral(){
+/** Реферальная программа открыта: после запуска для всех клиентов, тестовому аккаунту сразу */
+function refOpen(){return (!me.leadRole||me.leadRole==='lead'||me.leadRole==='test')&&(me.leadRole==='test'||nowMs()>=REF_LAUNCH)}
+function refLinkRow(link){
+  return el('div',{class:'rf-link'},el('div',{class:'rf-url',title:link},link.replace(/^https:\/\//,'')),
+    el('button',{class:'rf-copy',type:'button',onclick:async()=>{try{await navigator.clipboard.writeText(link);toast('Ссылка скопирована')}catch{copyText(link)}}},svgEl(COPY_ICON),'Копировать'));
+}
+let refCache=null;
+/** Плитка в профиле: личная ссылка и кнопка «Копировать». Сотрудникам не показывается */
+function refTile(){
+  if(me.leadRole&&me.leadRole!=='lead'&&me.leadRole!=='test')return null;
+  if(!refOpen())return el('button',{class:'btn',type:'button',onclick:()=>go('referral')},'Реферальная программа');
+  const box=el('div',{class:'card',style:'display:grid;gap:10px'});
+  const draw=d=>box.replaceChildren(
+    el('div',{class:'row'},el('b',{style:'font:700 15px var(--fd)'},'🎁 Реферальная программа'),el('button',{type:'button',style:'background:none;border:0;color:var(--acc2);font:600 13px var(--fb);cursor:pointer;padding:0',onclick:()=>go('referral')},'Подробнее ›')),
+    el('div',{class:'sm'},'Приглашайте друзей и получайте ',el('b',{},'$'+(d?d.perFriend:5)),' за каждого после его первого депозита.'),
+    d?refLinkRow(d.link):el('div',{class:'rf-url',style:'opacity:.5'},'Загрузка…'),
+    d?el('div',{class:'sm',style:'display:flex;justify-content:space-between'},el('span',{},'Приглашено: '+d.invited),el('span',{},'Баланс: ',el('b',{},'$'+String(d.balance).replace('.',',')))):null);
+  draw(refCache);
+  api('/referral').then(d=>{refCache=d;if(box.isConnected)draw(d)}).catch(()=>{});
+  return box;
+}
+function viewRefCountdown(){
   const target=referralLaunch();
   const cell=(v,l)=>el('div',{class:'rf-c'},el('b',{},v),el('span',{},l));
   const box=el('div',{class:'rf-cd',role:'timer','aria-live':'off'});
   const two=n=>String(n).padStart(2,'0');
   const paint=()=>{const left=Math.max(0,target-nowMs()),s=Math.floor(left/1000);
+    if(left<=0&&refOpen()){viewReferral();return}
     box.replaceChildren(cell(Math.floor(s/86400),'дн'),cell(two(Math.floor(s%86400/3600)),'ч'),cell(two(Math.floor(s%3600/60)),'мин'),cell(two(s%60),'сек'))};
   paint();timers.push(setInterval(paint,1000));
   const when=new Date(target).toLocaleString('ru-RU',{timeZone:'Europe/Kyiv',day:'numeric',month:'long',hour:'2-digit',minute:'2-digit'});
@@ -1938,10 +1968,52 @@ function viewReferral(){
     el('div',{class:'card rf',style:'text-align:center;display:grid;gap:14px;justify-items:center'},
       el('div',{style:'font-size:44px;line-height:1'},'🎁'),
       el('h2',{style:'font-size:20px;margin:0'},'Реферальная программа'),
-      el('span',{class:'pill rf-p'},'В разработке'),
+      el('span',{class:'pill rf-p'},'Скоро запуск'),
       el('p',{class:'sm',style:'margin:0;max-width:300px'},'Скоро вы сможете приглашать друзей и получать бонусы. Запуск '+when+' по Киеву.'),
       el('div',{class:'sm',style:'opacity:.7'},'До запуска осталось'),
       box),
+    el('button',{class:'back',type:'button',onclick:()=>go('profile')},'‹ В профиль')]);
+}
+async function viewReferral(){
+  clearTimers();
+  if(!refOpen()){viewRefCountdown();return}
+  shell('Рефералы',[el('div',{class:'card sm'},'Загрузка…')]);
+  let d;try{d=await api('/referral');refCache=d}catch(x){shell('Рефералы',[el('div',{class:'card sm'},x.message),el('button',{class:'back',type:'button',onclick:()=>go('profile')},'‹ В профиль')]);return}
+  if(tab!=='referral')return;
+  const money=v=>'$'+String(Math.round(v*100)/100).replace('.',',');
+  const dt=v=>new Date(v).toLocaleDateString('ru-RU',{day:'numeric',month:'short'});
+  const pend=d.payouts.find(p=>p.status==='pending');
+  // Вывод: на торговый счёт Pocket Option (по умолчанию свой Pocket ID) или на кошелёк USDT BEP20
+  let method='pocket';
+  const wallet=el('input',{class:'rf-in',inputmode:'numeric',autocomplete:'off',spellcheck:'false'});
+  const hint=el('div',{class:'sm'});const err=el('div',{class:'sm',role:'alert',style:'color:#ff6b8a'});
+  const seg=el('div',{class:'seg'});
+  const drawSeg=()=>{seg.replaceChildren(...[['pocket','Счёт Pocket Option'],['usdt','USDT BEP20']].map(([k,t])=>el('button',{type:'button',class:k===method?'on':'','aria-pressed':String(k===method),onclick:()=>{method=k;drawSeg()}},t)));
+    wallet.placeholder=method==='pocket'?'ID торгового счёта':'Адрес кошелька 0x…';wallet.inputMode=method==='pocket'?'numeric':'text';
+    wallet.value=method==='pocket'?(d.pocketId||''):'';err.textContent='';
+    hint.textContent=method==='pocket'?'Зачислим на ваш торговый счёт Pocket Option.':'Только сеть BNB Smart Chain (BEP20). Перевод в другой сети потеряется.'};
+  drawSeg();
+  const send=el('button',{class:'btn',type:'button',disabled:(d.balance>0&&!pend)?null:'',onclick:async()=>{err.textContent='';send.disabled=true;
+    try{const r=await api('/referral/payout',{method:'POST',body:{method,wallet:wallet.value.trim()}});toast('Заявка на '+money(r.amount)+' отправлена');viewReferral()}catch(x){err.textContent=x.message;send.disabled=false}}},'Вывести '+money(d.balance));
+  const ST={pending:['на рассмотрении','#ffb84d'],paid:['выплачено','#3ddc97'],rejected:['отклонено','#ff6b8a']};
+  shell('Рефералы',[
+    el('div',{class:'card',style:'display:grid;gap:12px'},
+      el('div',{style:'display:grid;gap:2px'},el('span',{class:'sm'},'Доступно к выводу'),el('b',{style:'font:800 30px var(--fd);font-variant-numeric:tabular-nums'},money(d.balance))),
+      el('div',{class:'rf-st'},el('div',{},el('b',{},String(d.invited)),el('span',{},'Приглашено')),el('div',{},el('b',{},String(d.deposited)),el('span',{},'С депозитом')),el('div',{},el('b',{},money(d.earned)),el('span',{},'Заработано')))),
+    el('div',{class:'card',style:'display:grid;gap:10px'},el('b',{style:'font:700 15px var(--fd)'},'Ваша ссылка'),refLinkRow(d.link),
+      el('div',{class:'sm',style:'display:grid;gap:4px'},
+        el('div',{},'1. Отправьте ссылку другу.'),
+        el('div',{},'2. Друг запускает бота и подключается к вашему трейдеру.'),
+        el('div',{},'3. После его первого депозита вам ',el('b',{},money(d.perFriend)),' на баланс.'))),
+    el('div',{class:'card',style:'display:grid;gap:10px'},el('b',{style:'font:700 15px var(--fd)'},'Вывод средств'),
+      pend?el('div',{class:'sm'},'Заявка на ',el('b',{},money(pend.amount)),' на рассмотрении. Новую можно отправить после выплаты.'):null,
+      seg,wallet,hint,err,send),
+    d.payouts.length?el('div',{class:'card',style:'display:grid;gap:0'},el('b',{style:'font:700 15px var(--fd);margin-bottom:6px'},'История выплат'),
+      ...d.payouts.map(p=>el('div',{class:'rf-li'},el('span',{},dt(p.created_at)+' · '+(p.method==='usdt'?'USDT BEP20':'Pocket Option'),p.status==='rejected'&&p.reject_reason?el('div',{class:'sm'},p.reject_reason):null),
+        el('span',{style:'text-align:right;white-space:nowrap'},el('b',{},money(p.amount)),el('div',{style:'font-size:11px;color:'+ST[p.status][1]},ST[p.status][0]))))):null,
+    el('div',{class:'card',style:'display:grid;gap:0'},el('b',{style:'font:700 15px var(--fd);margin-bottom:6px'},'Ваши друзья'),
+      ...(d.friends.length?d.friends.map(f=>el('div',{class:'rf-li'},el('span',{},f.name,el('span',{class:'sm'},' · '+dt(f.at))),
+        f.reward!=null?el('b',{style:'color:#3ddc97'},'+'+money(f.reward)):el('span',{class:'sm'},'ждём депозит'))):[el('div',{class:'sm'},'Пока никого. Отправьте ссылку другу.')])),
     el('button',{class:'back',type:'button',onclick:()=>go('profile')},'‹ В профиль')]);
 }
 

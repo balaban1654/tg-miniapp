@@ -973,3 +973,31 @@ CREATE TABLE IF NOT EXISTS organic_assign (
   at       TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS organic_assign_day ON organic_assign (kind, at);
+
+-- Реферальная программа: лид приглашает друзей по своей ссылке (t.me/<бот>?start=ref_<код>).
+-- Друг закрепляется за тем же трейдером. После первого депозита друга (открылся доступ) пригласившему $5 на баланс, трейдеру $3 бонусом в зарплату
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS referrer_id BIGINT;
+CREATE INDEX IF NOT EXISTS leads_referrer ON leads (referrer_id) WHERE referrer_id IS NOT NULL;
+CREATE TABLE IF NOT EXISTS referral_rewards (
+  tg_id         BIGINT PRIMARY KEY REFERENCES leads(tg_id) ON DELETE CASCADE, -- приглашённый друг
+  referrer_id   BIGINT NOT NULL,                                             -- кто пригласил
+  owner_id      INT REFERENCES staff(id) ON DELETE SET NULL,                 -- трейдер, которому бонус
+  lead_amount   NUMERIC(12,2) NOT NULL,
+  staff_amount  NUMERIC(12,2) NOT NULL DEFAULT 0,
+  adjustment_id INT REFERENCES staff_adjustments(id) ON DELETE SET NULL,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS referral_rewards_ref ON referral_rewards (referrer_id);
+CREATE TABLE IF NOT EXISTS referral_payouts (
+  id            SERIAL PRIMARY KEY,
+  tg_id         BIGINT NOT NULL REFERENCES leads(tg_id) ON DELETE CASCADE,
+  amount        NUMERIC(12,2) NOT NULL CHECK (amount > 0),
+  method        TEXT NOT NULL CHECK (method IN ('pocket','usdt')),           -- торговый счёт Pocket Option или USDT BEP20
+  wallet        TEXT NOT NULL,
+  status        TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','paid','rejected')),
+  reject_reason TEXT,
+  decided_by    INT REFERENCES staff(id) ON DELETE SET NULL,
+  decided_at    TIMESTAMPTZ,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS referral_payouts_lead ON referral_payouts (tg_id);

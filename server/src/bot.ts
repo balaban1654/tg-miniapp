@@ -1,6 +1,7 @@
 import { InlineKeyboard } from 'grammy';
 import { config } from './config.js';
 import { attachLead, db } from './db.js';
+import { parseRefPayload } from './referral.js';
 import { processLead } from './push.js';
 import { recordIncoming } from './chat.js';
 import { sendReply } from './replies.js';
@@ -31,7 +32,7 @@ bot.command('start', async (ctx) => {
   const payload = (ctx.match ?? '').trim();
   const slug = parseStartPayload(payload);
   // Новый лид с кнопки «Открыть бота» на сайте (?start=site): метка «site» вместо органики и свои настройки владельца
-  const { lead } = await attachLead(from.id, from.username, from.first_name, slug, payload === 'site' ? 'site' : null);
+  const { lead } = await attachLead(from.id, from.username, from.first_name, slug, payload === 'site' ? 'site' : null, parseRefPayload(payload));
 
   // Заблокированный лид: воронки нет, только сообщение (написать в поддержку он может)
   if (await isBanned(from.id) && payload !== 'support') {

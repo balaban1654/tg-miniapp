@@ -1,4 +1,5 @@
 import { fraudCheck } from './fraud.js';
+import { referralAppRoutes } from './referral.js';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { createHash, createHmac, timingSafeEqual, randomBytes } from 'node:crypto';
 import { db, attachLead } from './db.js';
@@ -197,6 +198,8 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
   };
 
   // Онлайн: Mini App открыт на экране (отметка раз в 30 с). Храним в памяти: tg_id → время и сотрудник ли это
+  await referralAppRoutes(app, auth);
+
   app.post('/ping', { preHandler: auth }, async (req) => {
     const r = (await db.query(`SELECT coalesce(lead_role, 'lead') NOT IN ('lead','test') AS staff FROM leads WHERE tg_id = $1`, [req.tg!.id])).rows[0];
     appOnline.set(req.tg!.id, { at: Date.now(), staff: Boolean(r?.staff) });

@@ -14,6 +14,7 @@ import { accountingRoutes } from './accounting.js';
 import { monoRoutes } from './mono.js';
 import { mainMediaTeam } from './mediaTeams.js';
 import { leadStatusDate, leadListDate, funnelStage, funnelStageDate, churnedAfterFtd } from './leaddate.js';
+import { referralOfficeRoutes, accrueReferral } from './referral.js';
 import { connectRoutes, connectInfo, requiredFor, markConnected, TOL } from './connect.js';
 import { toVoice, toVideoNote } from './media.js';
 import { parseReviewPhoto, cleanReviewText, cleanRating } from './reviews.js';
@@ -2427,7 +2428,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
       const enough = total > 0 && total >= (await requiredFor(tgId)).required * TOL;
       const status = enough ? (total - ftd > 0 ? 'active' : 'ftd') : reg ? 'registered' : 'new';
       await db.query(`UPDATE leads SET status = $2, status_before_block = NULL, access = $3 WHERE tg_id = $1`, [tgId, status, enough]);
-      if (enough) await markConnected(tgId, total).catch(() => {});
+      if (enough) { await markConnected(tgId, total).catch(() => {}); await accrueReferral(tgId).catch(() => {}); }
     }
     return { ok: true };
   });
@@ -2675,6 +2676,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
   await accountingRoutes(app, { need, str, num });
   await monoRoutes(app, { need, str });
   await connectRoutes(app, { need, str });
+  await referralOfficeRoutes(app, { need, str });
 }
 
 /** После полного удаления события пересчитываем то, что оно меняло у лида: уведомление стримеру, статус, доступ */
