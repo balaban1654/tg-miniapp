@@ -1917,7 +1917,6 @@ function viewProfile(){
       el('span',{style:'display:inline-flex;align-items:center;gap:8px'},cp?hiddenId(v):el('b',{class:'mono'},v instanceof Node?v:String(v)),cp?copyBtn(v):null)))),
     me.leadRole==='admin'?el('button',{class:'btn gw-open',type:'button',onclick:()=>viewGiveaway()},'🎁 Провести розыгрыш'):
     null,
-    el('button',{class:'btn o',type:'button',onclick:support},'Написать в поддержку'),
     refTile(),
     el('button',{class:'back',type:'button',onclick:()=>go('home')},'‹ На главную')]);
 }
@@ -1946,7 +1945,7 @@ function refTile(){
   if(!refOpen())return el('button',{class:'btn',type:'button',onclick:()=>go('referral')},'Реферальная программа');
   const box=el('div',{class:'card',style:'display:grid;gap:10px'});
   const draw=d=>box.replaceChildren(
-    el('div',{class:'row'},el('b',{style:'font:700 15px var(--fd)'},'🎁 Реферальная программа'),el('button',{type:'button',style:'background:none;border:0;color:var(--acc2);font:600 13px var(--fb);cursor:pointer;padding:0',onclick:()=>go('referral')},'Подробнее ›')),
+    el('div',{class:'row',style:'gap:10px;align-items:center'},el('b',{style:'font:700 15px var(--fd);min-width:0'},'🎁 Реферальная программа'),el('button',{type:'button',style:'background:none;border:0;color:var(--acc2);font:600 11px var(--fb);cursor:pointer;padding:0;white-space:nowrap;flex:none',onclick:()=>go('referral')},'Подробнее ›')),
     el('div',{class:'sm'},'Приглашайте друзей и получайте ',el('b',{},'$'+(d?d.perFriend:5)),' за каждого после его первого депозита.'),
     d?refLinkRow(d.link):el('div',{class:'rf-url',style:'opacity:.5'},'Загрузка…'),
     d?el('div',{class:'sm',style:'display:flex;justify-content:space-between'},el('span',{},'Приглашено: '+d.invited),el('span',{},'Баланс: ',el('b',{},'$'+String(d.balance).replace('.',',')))):null);
