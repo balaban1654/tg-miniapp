@@ -293,6 +293,7 @@ svg{max-width:100%}
 .rf-link{display:flex;gap:8px;align-items:center;min-width:0}
 .rf-url{flex:1;min-width:0;padding:11px 12px;border-radius:12px;background:var(--bg2);border:1px solid var(--line);font:600 13px var(--fb);color:var(--fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;user-select:all}
 .rf-copy{flex:none;padding:11px 14px;border-radius:12px;border:0;background:var(--acc);color:#fff;font:700 13px var(--fd);cursor:pointer;display:inline-flex;gap:6px;align-items:center}
+.rf-kv{display:flex;align-items:baseline;gap:8px}.rf-kv b{font:700 16px var(--fd);font-variant-numeric:tabular-nums}
 .rf-st{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 .rf-st div{display:grid;gap:2px;padding:10px 6px;border-radius:12px;background:var(--bg2);border:1px solid var(--line);text-align:center}
 .rf-st b{font:800 18px var(--fd);font-variant-numeric:tabular-nums}.rf-st span{font-size:11px;color:var(--mut)}
@@ -1996,9 +1997,12 @@ async function viewReferral(){
     try{const r=await api('/referral/payout',{method:'POST',body:{method,wallet:wallet.value.trim()}});toast('Заявка на '+money(r.amount)+' отправлена');viewReferral()}catch(x){err.textContent=x.message;send.disabled=false}}},'Вывести '+money(d.balance));
   const ST={pending:['на рассмотрении','#ffb84d'],paid:['выплачено','#3ddc97'],rejected:['отклонено','#ff6b8a']};
   shell('Рефералы',[
-    el('div',{class:'card',style:'display:grid;gap:12px'},
-      el('div',{style:'display:grid;gap:2px'},el('span',{class:'sm'},'Доступно к выводу'),el('b',{style:'font:800 30px var(--fd);font-variant-numeric:tabular-nums'},money(d.balance))),
-      el('div',{class:'rf-st'},el('div',{},el('b',{},String(d.invited)),el('span',{},'Приглашено')),el('div',{},el('b',{},String(d.deposited)),el('span',{},'С депозитом')),el('div',{},el('b',{},money(d.earned)),el('span',{},'Заработано')))),
+    // Слева список: приглашено, подключено, всего заработано. Справа вверху сколько можно вывести сейчас
+    el('div',{class:'card',style:'display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:start'},
+      el('div',{style:'display:grid;gap:8px'},
+        ...[['Приглашено',String(d.invited)],['Подключено',String(d.deposited)]].map(([k,v])=>el('div',{class:'rf-kv'},el('span',{class:'sm'},k),el('b',{},v))),
+        el('div',{class:'rf-kv',style:'margin-top:6px'},el('span',{class:'sm'},'Всего заработано'),el('b',{},money(d.earned)))),
+      el('div',{style:'display:grid;gap:2px;justify-items:end;text-align:right'},el('span',{class:'sm'},'Доступно к выводу'),el('b',{style:'font:800 28px var(--fd);font-variant-numeric:tabular-nums;color:var(--ok,#3ddc97)'},money(d.balance)))),
     el('div',{class:'card',style:'display:grid;gap:10px'},el('b',{style:'font:700 15px var(--fd)'},'Ваша ссылка'),refLinkRow(d.link),
       el('div',{class:'sm',style:'display:grid;gap:4px'},
         el('div',{},'1. Отправьте ссылку другу.'),
