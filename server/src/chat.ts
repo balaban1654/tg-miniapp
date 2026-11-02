@@ -28,7 +28,11 @@ const KIND: Record<string, string> = { photo: '📷 фото', video: '🎬 ви
 /** Новое сообщение клиента: одно уведомление в ветку команды с @ его трейдера. Следующее от того же клиента
  *  только после того, как чат закрыли кнопкой «Закрыть» в Office, чтобы не было уведомления на каждое сообщение */
 async function notifySupport(m: Incoming): Promise<void> {
-  if (!config.supportNotifyChat || config.disableBot) return;
+  // Куда слать: группа и ветка, назначенные командой /notify; иначе из настроек сервера
+  const st = Object.fromEntries((await db.query(`SELECT key, value FROM app_settings WHERE key IN ('support_notify_chat','support_notify_thread')`)).rows.map((r) => [r.key, r.value]));
+  const chat = st.support_notify_chat || config.supportNotifyChat;
+  const thread = st.support_notify_chat ? Number(st.support_notify_thread) || undefined : config.supportNotifyThread;
+  if (!chat || config.disableBot) return;
   const r = (
     await db.query(
       `UPDATE leads d SET chat_notified_at = now()
@@ -47,8 +51,11 @@ async function notifySupport(m: Incoming): Promise<void> {
   const site = /^https:\/\//.test(config.publicUrl) ? config.publicUrl.replace(/\/$/, '') : 'https://hunterai.space';
   const text = `💬 <b>Новое сообщение в поддержку</b>\nКлиент: ${who} · <code>${m.tgId}</code>\nТрейдер: ${trader}\n\n«${body}»\n\n<a href="${site}/crm#/chats">Открыть чаты</a>`;
   try {
-    await bot.api.sendMessage(config.supportNotifyChat, text, { parse_mode: 'HTML', link_preview_options: { is_disabled: true }, ...(config.supportNotifyThread ? { message_thread_id: config.supportNotifyThread } : {}) });
+    await bot.api.sendMessage(chat, text, { parse_mode: 'HTML', link_preview_options: { is_disabled: true }, ...(thread ? { message_thread_id: thread } : {}) });
   } catch (e) {
+    // Причину сохраняем: её видно в app_settings.support_notify_error
+    const why = (e as { description?: string }).description ?? String(e);
+    await db.query(`INSERT INTO app_settings (key, value, updated_at) VALUES ('support_notify_error', $1, now()) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()`, [why]).catch(() => {});
     // Не дошло (бот не в группе, нет прав): разрешаем повторить со следующим сообщением клиента
     await db.query('UPDATE leads SET chat_notified_at = NULL WHERE tg_id = $1', [m.tgId]);
     throw e;

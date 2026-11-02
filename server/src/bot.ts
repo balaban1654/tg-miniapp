@@ -21,6 +21,20 @@ export function parseStartPayload(payload: string): string | null {
   return m ? m[1] : null;
 }
 
+/** /notify в ветке группы команды: уведомления о новых сообщениях в поддержку будут приходить сюда.
+ *  Бот сам запоминает группу и ветку (номер ветки из ссылки легко перепутать с номером сообщения). Только админ группы */
+bot.command('notify', async (ctx) => {
+  if (ctx.chat.type === 'private') return ctx.reply('Отправьте /notify в нужной ветке группы команды.');
+  const m = await ctx.getChatMember(ctx.from!.id).catch(() => null);
+  if (!m || !['creator', 'administrator'].includes(m.status)) return ctx.reply('Назначить ветку для уведомлений может только админ группы.');
+  const thread = ctx.msg.is_topic_message ? ctx.msg.message_thread_id ?? null : null;
+  const save = (k: string, v: string) => db.query(`INSERT INTO app_settings (key, value, updated_at) VALUES ($1, $2, now()) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()`, [k, v]);
+  await save('support_notify_chat', String(ctx.chat.id));
+  await save('support_notify_thread', thread ? String(thread) : '');
+  await save('support_notify_error', '');
+  await ctx.reply('✅ Готово: уведомления о новых сообщениях в поддержку будут приходить сюда.');
+});
+
 /** Узнать id чата: нужно один раз, чтобы указать группу для копий базы (BACKUP_TG_CHAT_ID). Работает и в группе. */
 bot.command('chatid', async (ctx) => {
   await ctx.reply(`ID этого чата: ${ctx.chat.id}`);
