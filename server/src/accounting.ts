@@ -1849,6 +1849,8 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
         dayBonus: k.dayBonus,
         depBonus: k.depBonus ?? 0,
         bonus: k.adjBonus,
+        refBonus: k.refBonus ?? 0,
+        refN: k.refN ?? 0,
         penalty: k.adjPenalty,
         paid: k.paid,
         totalMin: k.minTotal,

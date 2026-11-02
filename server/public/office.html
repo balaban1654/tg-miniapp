@@ -1762,7 +1762,7 @@ function smSalary(d){
   return el('div',{class:'card sm-pay'},el('div',{class:'dx-lbl'},'Моя зарплата за месяц'),
     el('div',{style:'margin-top:8px'},el('div',{class:'big2'},pr(pay[0],pay[1])),el('div',{class:'cap'},'К выплате: план не выполнен / выполнен')),
     el('div',{class:'cols'},
-      el('div',{class:'col2'},el('div',{class:'h'},'База'),row('Ставка ('+s.shifts+' смен)',el('b',{},pr(s.base[0],s.base[1]))),row('Лиды ('+s.leadsN+')',el('b',{},pr(s.leads[0],s.leads[1]))),el('div',{class:'h'},'Бонусы'),row('FTD (суммы больше)',el('b',{},sg(s.ftdBonus))),row('Дневной ('+d.plan.dayCount+' FTD)',el('b',{},sg(s.dayBonus))),row('Додепы (градации)',el('b',{},sg(s.depBonus||0))),row('Премии',el('b',{},sg(s.bonus)))),
+      el('div',{class:'col2'},el('div',{class:'h'},'База'),row('Ставка ('+s.shifts+' смен)',el('b',{},pr(s.base[0],s.base[1]))),row('Лиды ('+s.leadsN+')',el('b',{},pr(s.leads[0],s.leads[1]))),el('div',{class:'h'},'Бонусы'),row('FTD (суммы больше)',el('b',{},sg(s.ftdBonus))),row('Дневной ('+d.plan.dayCount+' FTD)',el('b',{},sg(s.dayBonus))),row('Додепы (градации)',el('b',{},sg(s.depBonus||0))),row('Премии',el('b',{},sg(s.bonus-(s.refBonus||0)))),row('Рефералы'+(s.refN?' ('+s.refN+')':''),el('b',{},sg(s.refBonus||0)))),
       el('div',{class:'col2'},el('div',{class:'h'},'Итого начислено'),row('По минимальным',el('b',{},usd0(tot(0)))),row('По полным',el('b',{},usd0(tot(1)))),el('div',{class:'h push'},'Удержания'),row('Штрафы',el('b',{class:s.penalty?'dx-neg':''},s.penalty?sgn0(-s.penalty):'$0')),row('Выплачено (аванс)',el('b',{},s.paid?sgn0(-s.paid):'$0')))),
     adv);
 }
