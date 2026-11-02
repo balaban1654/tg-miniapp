@@ -1005,3 +1005,5 @@ CREATE INDEX IF NOT EXISTS referral_payouts_lead ON referral_payouts (tg_id);
 ALTER TABLE connect_settings ADD COLUMN IF NOT EXISTS ref_lead NUMERIC(12,2) NOT NULL DEFAULT 5;
 ALTER TABLE connect_settings ADD COLUMN IF NOT EXISTS ref_staff NUMERIC(12,2) NOT NULL DEFAULT 3;
 ALTER TABLE connect_settings ADD COLUMN IF NOT EXISTS ref_min_payout NUMERIC(12,2) NOT NULL DEFAULT 50; -- минимальная сумма реферальной выплаты
+-- Уведомление о новом сообщении в поддержку (группа команды, ветка): одно на лида, следующее только после «Закрыть чат»
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS chat_notified_at TIMESTAMPTZ;
