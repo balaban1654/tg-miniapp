@@ -1923,9 +1923,8 @@ function viewProfile(){
   shell('Профиль',[el('div',{class:'card row',style:'justify-content:flex-start;gap:12px'},withPhoto(el('div',{class:'ava'},(me.name||'?').trim().slice(0,1).toUpperCase())),el('div',{style:'min-width:0'},el('b',{style:'font:700 16px var(--fd)'},me.name),el('div',{class:'sm'},me.username?'@'+me.username:'')),tierBadge()),
     el('div',{class:'card',style:'display:grid;grid-template-columns:minmax(0,1fr);gap:10px'},rows.filter(([k,v])=>!(k==='Pocket ID'&&!v)).map(([k,v,cp])=>el('div',{class:'row'},el('span',{class:'sm'},k),
       el('span',{style:'display:inline-flex;align-items:center;gap:8px'},cp?hiddenId(v):el('b',{class:'mono'},v instanceof Node?v:String(v)),cp?copyBtn(v):null)))),
-    me.leadRole==='admin'?el('button',{class:'btn gw-open',type:'button',onclick:()=>viewGiveaway()},'🎁 Провести розыгрыш'):
-    null,
     refTile(),
+    me.leadRole==='admin'?el('button',{class:'btn gw-open',type:'button',onclick:()=>viewGiveaway()},'🎁 Провести розыгрыш'):null,
     el('button',{class:'back',type:'button',onclick:()=>go('home')},'‹ На главную')]);
 }
 /** Реферальная программа: пока в разработке, отсчёт до запуска 1-го числа в 22:00 по Киеву (ближайшее, ещё не прошедшее) */
