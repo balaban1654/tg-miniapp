@@ -8,8 +8,6 @@ type Need = (...roles: Role[]) => (req: FastifyRequest, reply: FastifyReply) => 
 
 /** Допуск: депозит засчитывается, если он не меньше 90% нужной суммы (курс брокера, округления) */
 export const TOL = 0.9;
-/** Одному лиду акцию не чаще, чем раз в столько дней */
-export const OFFER_GAP_DAYS = 3;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -95,7 +93,9 @@ async function sendOffer(o: Offer, tgId: string, by: number | null): Promise<{ o
 }
 
 const NOT_CONNECTED = `d.removed_at IS NULL AND coalesce(d.lead_role, 'lead') = 'lead' AND d.status IN ('new','registered') AND NOT d.access AND d.banned_at IS NULL`;
-const GAP = `NOT EXISTS (SELECT 1 FROM connect_sends s WHERE s.tg_id = d.tg_id AND s.delivery <> 'failed' AND s.reverted_at IS NULL AND s.sent_at > now() - interval '${OFFER_GAP_DAYS} days')`;
+/** Повторно акцию можно дать, когда прошлая закончилась: срок вышел, отменена или не дошла */
+const LIVE = `s.delivery <> 'failed' AND s.reverted_at IS NULL AND s.connected_at IS NULL AND s.expires_at > now()`;
+const GAP = `NOT EXISTS (SELECT 1 FROM connect_sends s WHERE s.tg_id = d.tg_id AND ${LIVE})`;
 
 /** Данные для карточки лида: сколько нужно, что внесено, действующая акция, прошлые отправки */
 export async function connectInfo(tgId: number, hideDeposit = false) {
@@ -109,7 +109,7 @@ export async function connectInfo(tgId: number, hideDeposit = false) {
       [tgId],
     )
   ).rows;
-  const gap = (await db.query(`SELECT 1 FROM connect_sends s WHERE s.tg_id = $1 AND s.delivery <> 'failed' AND s.reverted_at IS NULL AND s.sent_at > now() - interval '${OFFER_GAP_DAYS} days' LIMIT 1`, [tgId])).rowCount;
+  const live = (await db.query(`SELECT max(s.expires_at) AS until FROM connect_sends s WHERE s.tg_id = $1 AND ${LIVE}`, [tgId])).rows[0]?.until ?? null;
   return {
     required: rq.required,
     base: rq.base,
@@ -118,7 +118,7 @@ export async function connectInfo(tgId: number, hideDeposit = false) {
     deposited: hideDeposit ? null : r2(dep),
     offers: offers.map((o) => ({ id: o.id, name: o.name, pct: o.discount_pct, days: o.days, text: o.text, required: r2(rq.base * (1 - o.discount_pct / 100)) })),
     sends,
-    gapDays: gap ? OFFER_GAP_DAYS : 0,
+    liveUntil: live,
   };
 }
 
@@ -143,7 +143,6 @@ export async function connectRoutes(app: FastifyInstance, h: { need: Need; str: 
       minDeposit: base,
       tolerance: Math.round((1 - TOL) * 100),
       from: r2(base * TOL),
-      gapDays: OFFER_GAP_DAYS,
       offers: offers.map((o) => ({ ...o, required: r2(base * (1 - o.discount_pct / 100)) })),
       audience: aud,
       defaultText: DEFAULT_OFFER_TEXT,
@@ -226,8 +225,8 @@ export async function connectRoutes(app: FastifyInstance, h: { need: Need; str: 
       const d = (await db.query(`SELECT d.tg_id, d.bot_started, d.bot_blocked FROM leads d WHERE d.tg_id = $1 AND ${NOT_CONNECTED} AND ($2::int IS NULL OR d.owner_id = $2 OR ($3 AND d.owner_id IN (SELECT id FROM staff WHERE parent_id = $2)))`, [tgId, mine ? me.id : null, me.role === 'teamlead'])).rows[0];
       if (!d) return reply.code(409).send({ error: mine ? 'Лид не найден среди ваших или уже подключён: скидка ему не нужна' : 'Лид уже подключён или не найден: скидка ему не нужна' });
       if (!d.bot_started || d.bot_blocked) return reply.code(409).send({ error: 'Лид не запускал бота или заблокировал его: пуш не дойдёт' });
-      const gap = (await db.query(`SELECT 1 FROM connect_sends s WHERE s.tg_id = $1 AND s.delivery <> 'failed' AND s.reverted_at IS NULL AND s.sent_at > now() - interval '${OFFER_GAP_DAYS} days' LIMIT 1`, [tgId])).rowCount;
-      if (gap) return reply.code(409).send({ error: `Этому лиду акцию уже отправляли за последние ${OFFER_GAP_DAYS} дня. Подождите` });
+      const live = (await db.query(`SELECT 1 FROM connect_sends s WHERE s.tg_id = $1 AND ${LIVE} LIMIT 1`, [tgId])).rowCount;
+      if (live) return reply.code(409).send({ error: 'У лида уже действует акция. Новую можно дать, когда её срок закончится' });
       const res = await sendOffer(o, String(tgId), me.id);
       if (!res.ok) return reply.code(422).send({ error: 'Не удалось отправить: ' + (res.error ?? 'ошибка Telegram') });
       return { ok: true, total: 1 };

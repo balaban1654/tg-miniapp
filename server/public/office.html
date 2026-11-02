@@ -2477,7 +2477,7 @@ async function openLeadCard(tgId){
     el('div',{class:'lc-grid'},kv('Нужно пополнить',cnMoney(C.required)+' (от '+cnMoney(C.from)+')'),...(C.deposited!==null&&C.deposited!==undefined?[kv('Внесено',cnMoney(C.deposited))]:[]),
       C.offer?kv('Акция',C.offer.name+' до '+new Date(C.offer.until).toLocaleDateString('ru-RU',{day:'2-digit',month:'2-digit',timeZone:'Europe/Kyiv'})):kv('Акция','нет')),
     ...(C.sends||[]).slice(0,2).map(q=>el('div',{class:'mut sm'},fmtDT(q.sent_at)+' · '+q.offer_name+' · '+(q.delivery==='failed'?'не доставлено':q.reverted_at?'отменено (депозит удалён)':q.connected_at?'подключился':new Date(q.expires_at)<new Date()?'срок вышел':'ждём'))),
-    el('div',{},el('button',{class:'btn',type:'button',disabled:C.gapDays?'':null,title:C.gapDays?'Акцию уже отправляли за последние '+C.gapDays+' дня':'',onclick:()=>connectDialog(L,C,()=>{close();openLeadCard(tgId)})},'Предложить скидку'))):null;
+    el('div',{},el('button',{class:'btn',type:'button',disabled:C.liveUntil?'':null,title:C.liveUntil?'Акция ещё действует до '+fmtDT(C.liveUntil):'',onclick:()=>connectDialog(L,C,()=>{close();openLeadCard(tgId)})},'Предложить скидку'))):null;
   box.replaceChildren(...[
     el('div',{class:'lc-head'},el('div',{style:'min-width:0'},el('h3',{style:'font-size:21px;line-height:1.2;overflow:hidden;text-overflow:ellipsis'},fname),L.first_name&&L.username?el('div',{class:'mut',style:'font-size:13px;margin-top:2px'},'@'+L.username):null),
       el('div',{class:'lc-hr'},el('div',{class:'lc-pills'},pill(L.status),L.banned_at?el('span',{class:'pill p-bad'},'заблокирован'):L.access?el('span',{class:'pill p-ok'},'доступ открыт'):el('span',{class:'pill p-pur'},'доступ закрыт')),
@@ -4564,8 +4564,8 @@ function cnOf(d){
   const ready=()=>owner.value?(d.audience.find(a=>String(a.owner_id)===owner.value)||{ready:0}).ready:d.audience.reduce((s,a)=>s+a.ready,0);
   const sendAll=el('button',{class:'btn o',type:'button'});
   const label=()=>{sendAll.textContent='Отправить всем ('+ready()+')'};owner.addEventListener('change',label);label();
-  sendAll.onclick=async()=>{try{const id=await saveOffer();const n=ready();if(!n){toast('Некому отправлять: все подключены или уже получали акцию за последние '+d.gapDays+' дня');return}
-    if(!await askC('Отправить акцию «'+name.value+'» '+n+' лидам (Новый и Регистрация)?\nКаждому лиду акцию отправляют не чаще раза в '+d.gapDays+' дня.\nРассылка идёт в фоне, ход виден во вкладке «Отправленные».'))return;
+  sendAll.onclick=async()=>{try{const id=await saveOffer();const n=ready();if(!n){toast('Некому отправлять: все подключены или у них ещё действует акция');return}
+    if(!await askC('Отправить акцию «'+name.value+'» '+n+' лидам (Новый и Регистрация)?\nКому акция ещё действует, повторно не отправляется.\nРассылка идёт в фоне, ход виден во вкладке «Отправленные».'))return;
     const r=await api('/connect/offers/'+id+'/send',{method:'POST',body:{owner_id:owner.value||undefined}});toast('Отправляется: '+r.total+' лидам');connState.edit=null;connState.tab='sn';render({soft:true})}catch(x){err.textContent=x.message}};
   const list=d.offers.length?table(['Акция','Скидка','Нужно','Срок',''],d.offers.map(o=>[td(o.name),td('−'+o.discount_pct+'%','n'),td(cnMoney(o.required),'n'),td(o.days+' дн.','n'),
     el('td',{style:'white-space:nowrap'},el('button',{class:'btn o s',type:'button',onclick:()=>{connState.edit=o;render({soft:true})}},'Изменить'),el('button',{class:'btn o s',type:'button',style:'margin-left:6px',onclick:async()=>{if(!await askC('Удалить акцию «'+o.name+'»? Уже отправленные лидам останутся.'))return;try{await api('/connect/offers/'+o.id,{method:'DELETE'});if(connState.edit&&connState.edit.id===o.id)connState.edit=null;render({soft:true})}catch(x){toast(x.message)}}},'Удалить'))]),'Акций пока нет'):null;
