@@ -2549,6 +2549,16 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     // Бонусы из розыгрышей, которые клиент забрал: сумма, дата и время видны всем ролям
     const gb = (await db.query(`SELECT prize::float AS amount, claimed_at FROM giveaway_draws WHERE tg_id = $1 AND claimed_at IS NOT NULL ORDER BY claimed_at`, [tgId])).rows;
     fin.bonus = { sum: gb.reduce((a, x) => a + Number(x.amount), 0), count: gb.length, dates: gb.map((x) => ({ at: x.claimed_at, amount: Number(x.amount) })) };
+    // Рефералы: кого клиент привёл по своей ссылке. Дата первого депозита у всех ролей, комиссия только админу и тимлиду
+    const showRefComm = me.role === 'admin' || me.role === 'teamlead';
+    const refs = (
+      await db.query(
+        `SELECT d.tg_id, (SELECT min(e.created_at) FROM events e WHERE e.tg_id = d.tg_id AND e.type = 'ftd') AS ftd_at,
+                ${showRefComm ? `(SELECT coalesce(sum(e.amount), 0)::float FROM events e WHERE e.tg_id = d.tg_id AND e.type = 'comm')` : 'NULL'} AS commission
+           FROM leads d WHERE d.referrer_id = $1 ORDER BY d.created_at DESC LIMIT 500`,
+        [tgId],
+      )
+    ).rows;
     // Градации додепов (без порогов) и состояние запроса бонуса
     let tier: unknown = null;
     if (!r.rows[0].lead_role || r.rows[0].lead_role === 'lead' || r.rows[0].lead_role === 'test') {
@@ -2577,6 +2587,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     const connect = connectOk && (!r.rows[0].lead_role || r.rows[0].lead_role === 'lead' || r.rows[0].lead_role === 'test') ? await connectInfo(tgId, me.role !== 'admin') : null;
     return {
       fin,
+      refs,
       tier,
       connect,
       lead: r.rows[0],

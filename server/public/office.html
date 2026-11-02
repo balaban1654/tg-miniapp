@@ -2485,7 +2485,21 @@ async function openLeadCard(tgId){
     cnt.addEventListener('click',()=>pop(cnt,f.dates));
     return el('div',{class:'fc-row'},el('span',{class:'pill ev-'+t},t),f.sum===null?el('span',{class:'mut'},'—'):el('b',{class:'fc-sum'},money(f.sum)),cnt)};
   // Комиссию в карточке видит только админ (тимлиду и стримеру она не показывается)
-  const finTile=el('div',{class:'fc'},frow('ftd'),frow('dep'),frow('wd'),...(me.role==='admin'?[el('div',{class:'fc-sep'}),frow('comm')]:[]),...(F.bonus&&F.bonus.count?[el('div',{class:'fc-sep'}),frow('bonus')]:[]));
+  // Рефералы клиента: по наведению список с датой первого депозита и ID (открывает карточку), комиссия у админа и тимлида
+  const refRow=()=>{const R=d.refs||[];
+    const cnt=el('button',{type:'button',class:'fc-cnt',title:'Показать рефералов'},R.length+' шт');
+    const show=()=>{document.querySelectorAll('.fc-pop').forEach(x=>x.remove());const r=cnt.getBoundingClientRect();
+      const p=el('div',{class:'fc-pop'},R.length?R.map(x=>el('div',{},el('span',{class:'mut'},x.ftd_at?fmtDT(x.ftd_at):'без FTD'),
+        el('span',{style:'display:inline-flex;gap:10px;align-items:center'},el('a',{href:'#',style:'color:var(--acc2);font-weight:700',onclick:e=>{e.preventDefault();p.remove();openLeadCard(x.tg_id)}},String(x.tg_id)),x.commission!==null&&x.commission!==undefined?el('b',{},money(x.commission)):null))):el('div',{class:'mut'},'Рефералов нет'));
+      document.body.append(p);const w=p.offsetWidth,h=p.offsetHeight;
+      p.style.left=Math.max(8,Math.min(innerWidth-w-8,r.right-w))+'px';p.style.top=(r.bottom+8+h>innerHeight?Math.max(8,r.top-h-8):r.bottom+8)+'px';
+      p.addEventListener('mouseleave',()=>{if(matchMedia('(hover:hover)').matches)setTimeout(()=>{if(!p.matches(':hover')&&!cnt.matches(':hover'))p.remove()},150)});
+      const off=e=>{if(!p.contains(e.target)&&e.target!==cnt){p.remove();document.removeEventListener('mousedown',off,true)}};setTimeout(()=>document.addEventListener('mousedown',off,true),0)};
+    cnt.addEventListener('mouseenter',()=>{if(matchMedia('(hover:hover)').matches)show()});
+    cnt.addEventListener('mouseleave',()=>{if(matchMedia('(hover:hover)').matches)setTimeout(()=>{const p=document.querySelector('.fc-pop');if(p&&!p.matches(':hover'))p.remove()},150)});
+    cnt.addEventListener('click',show);
+    return el('div',{class:'fc-row'},el('span',{style:'grid-column:1/3;font-weight:600'},'Рефералов'),cnt)};
+  const finTile=el('div',{class:'fc'},frow('ftd'),frow('dep'),frow('wd'),...(me.role==='admin'?[el('div',{class:'fc-sep'}),frow('comm')]:[]),...(F.bonus&&F.bonus.count?[el('div',{class:'fc-sep'}),frow('bonus')]:[]),el('div',{class:'fc-sep'}),refRow());
   // Градации додепов (суммы не показываем)
   const T=d.tier;
   const TI=['🥉','🥈','🥇','💎'];
