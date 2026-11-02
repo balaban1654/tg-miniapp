@@ -1976,9 +1976,14 @@ async function viewLeads(){
   const q=el('input',{type:'search',placeholder:'Поиск: ник, Telegram ID, Pocket ID',value:F.q,oninput:()=>{F.q=q.value;onSearch()}});
   const links=[...new Set(rows.map(r=>r.link_slug).filter(Boolean))].sort();
   const owners=[...new Map(rows.filter(r=>r.owner_id).map(r=>[String(r.owner_id),r.owner_name])).entries()];
+  // Админ: раздать всех незакреплённых по очереди активным стримерам (новые закрепляются сами)
+  const unownedBtn=me.role==='admin'?el('button',{class:'btn s',type:'button',hidden:''}):null;
+  if(unownedBtn)api('/leads/unowned').then(u=>{if(!u.n)return;unownedBtn.hidden=false;unownedBtn.textContent='Раздать незакреплённых ('+u.n+')';
+    unownedBtn.onclick=async()=>{if(!await askC('Раздать '+u.n+' незакреплённых лидов по очереди активным стримерам?\nОчередь та же, что для новых: кто меньше получил сегодня, у кого больше часов и FTD за месяц.'))return;
+      unownedBtn.disabled=true;try{const r=await api('/leads/unowned/assign',{method:'POST'});toast('Раздано лидов: '+r.assigned);render({soft:true})}catch(x){toast(x.message);unownedBtn.disabled=false}}}).catch(()=>{});
   const bar=el('div',{class:'lf'},q,sel(Object.entries(STATUS).map(([k,v])=>[k,v[0]]),'status','Все статусы'),
     sel(links.map(x=>[x,x]),'link','Все ссылки'),showOwner?sel([['none','Не закреплён'],...owners],'owner','Все владельцы'):null,sel(SORTS,'sort'),
-    el('button',{class:'btn o s',type:'button',onclick:()=>{Object.assign(F,{q:'',status:'',link:'',owner:'',sort:'new'});render()}},'Сбросить'));
+    el('button',{class:'btn o s',type:'button',onclick:()=>{Object.assign(F,{q:'',status:'',link:'',owner:'',sort:'new'});render()}},'Сбросить'),unownedBtn);
   const holder=el('div',{});const cnt=el('span',{class:'mut'},'');const tots=el('div',{class:'pb-tots',style:'margin:0'});
   const draw=()=>{
     const qq=F.q.trim().toLowerCase().replace(/^@/,'');
@@ -3807,7 +3812,7 @@ async function viewChats(){
   head.replaceChildren(el('span',{class:'mut'},'Выберите чат слева'));
   if(pendingChat){const id=pendingChat;pendingChat=null;await openChat(id)}
   poll=setInterval(()=>{loadList().catch(()=>{});loadThread().catch(()=>{})},6000);
-  return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Чаты поддержки'),el('span',{class:'mut sm'},me.role==='admin'?'Вы видите все чаты':'Неразобранного клиента забирает тот, кто ответил первым. Новые клиенты другого стримера открываются всем, если у него закончилась смена больше 15 минут назад и никто не ответил')),wrap];
+  return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Чаты поддержки'),el('span',{class:'mut sm'},me.role==='admin'?'Вы видите все чаты':'Новый клиент другого стримера открывается всем, если тот не ответил: через 15 минут после конца эфира или через 5 минут, если он не в эфире. Кто ответит первым, тому клиент и переходит')),wrap];
 }
 
 const TRIG={start:'Нажал /start',no_reg:'Нет регистрации',no_deposit:'Регистрация без депозита',ftd:'Депозит получен',inactive:'Давно не заходил',withdrawal:'Успешный вывод средств'};

@@ -48,7 +48,10 @@ export async function attachLead(
     }
   }
   // Органика: новый лид без ссылки (сам нашёл бота или пришёл с сайта) — владелец по настройкам «Органика» в Office
-  if (!linkId && !referrer && !(await db.query('SELECT 1 FROM leads WHERE tg_id = $1', [tgId])).rowCount) ownerId = await pickOrganicOwner(origin === 'site' ? 'site' : 'org', tgId);
+  const fresh = !(await db.query('SELECT 1 FROM leads WHERE tg_id = $1', [tgId])).rowCount;
+  if (!linkId && !referrer && fresh) ownerId = await pickOrganicOwner(origin === 'site' ? 'site' : 'org', tgId);
+  // Никто не нашёлся (органика «Не закреплять», пустой пул, пригласивший без трейдера): по очереди всем активным стримерам
+  if (fresh && !ownerId) ownerId = await pickFallbackOwner(tgId);
   const ins = await db.query(
     `INSERT INTO leads (tg_id, username, first_name, link_id, owner_id, origin, referrer_id)
      VALUES ($1,$2,$3,$4,$5,$6,$7)
@@ -89,6 +92,14 @@ export async function pickOrganicOwner(kind: 'org' | 'site', tgId: number): Prom
   if (st.mode === 'owner') return (await db.query('SELECT id FROM staff WHERE id = $1 AND active AND deleted_at IS NULL', [st.owner_id])).rows[0]?.id ?? null;
   const id = await rankPool(`SELECT unnest(pool) FROM organic_settings WHERE kind = $1`, `SELECT count(*)::int FROM organic_assign a WHERE a.kind = $1 AND a.staff_id = s.id`, kind);
   if (id) await db.query('INSERT INTO organic_assign (kind, staff_id, tg_id) VALUES ($1,$2,$3)', [kind, id, tgId]);
+  return id;
+}
+
+/** Запасной владелец: если ни ссылка, ни «Органика», ни реферал не дали владельца, лид уходит по очереди всем активным стримерам
+ *  (кто меньше получил сегодня → больше часов → больше FTD за месяц). Так незакреплённых лидов не остаётся */
+export async function pickFallbackOwner(tgId: number): Promise<number | null> {
+  const id = await rankPool(`SELECT id FROM staff WHERE $1::text IS NOT NULL`, `SELECT count(*)::int FROM organic_assign a WHERE a.kind = $1 AND a.staff_id = s.id`, 'any');
+  if (id) await db.query('INSERT INTO organic_assign (kind, staff_id, tg_id) VALUES ($1,$2,$3)', ['any', id, tgId]);
   return id;
 }
 

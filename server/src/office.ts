@@ -3,7 +3,7 @@ import QRCode from 'qrcode';
 import { newSecret, otpUri, verifyTotp, newRecoveryCodes } from './totp.js';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { GrammyError, InputFile } from 'grammy';
-import { db } from './db.js';
+import { db, pickFallbackOwner } from './db.js';
 import { bot } from './bot.js';
 import { markLeadBlocked, BLOCKED_RE } from './leadblock.js';
 import { config } from './config.js';
@@ -86,10 +86,23 @@ function ownerScope(me: Staff, col: string): string {
 }
 
 /**
- * Чаты видят: админ все. Стример видит своих и неразобранных (без владельца, кто первым ответил, тот забирает).
- * Новые лиды другого стримера (ещё без регистрации) закрыты, пока у него идёт смена и ещё 15 минут после её конца.
- * Когда это время прошло и клиенту никто не ответил, чат открывается всем стримерам; кто из них ответит, тому клиент и переходит.
+ * Новый лид другого стримера открывается всем («кто первый ответит, тот заберёт»), только если клиент ждёт ответа и владелец не отреагировал:
+ *  - владелец в эфире: закрыто;
+ *  - клиент написал во время эфира (или незадолго до конца): открыто через 15 минут после конца эфира;
+ *  - владелец не стримил (выходной): открыто через 5 минут после первого неотвеченного сообщения (уведомление в группу уже ушло).
+ * Отсчёт идёт от первого сообщения клиента после последнего ответа ему.
  */
+function takeOpen(d: string, col: string): string {
+  return `${d}.status = 'new' AND coalesce(${d}.lead_role, 'lead') = 'lead'
+      AND (SELECT direction FROM messages WHERE tg_id = ${d}.tg_id ORDER BY id DESC LIMIT 1) = 'in'
+      AND NOT EXISTS (SELECT 1 FROM shift_reports r WHERE r.staff_id = ${col} AND r.status = 'live')
+      AND now() > GREATEST(
+        (SELECT min(m.created_at) FROM messages m WHERE m.tg_id = ${d}.tg_id AND m.direction = 'in'
+            AND m.id > coalesce((SELECT max(o.id) FROM messages o WHERE o.tg_id = ${d}.tg_id AND o.direction = 'out'), 0)) + interval '5 minutes',
+        coalesce((SELECT max(r.ended_at) FROM shift_reports r WHERE r.staff_id = ${col}), '-infinity'::timestamptz) + interval '15 minutes')`;
+}
+
+/** Чаты видят: админ все. Стример видит своих, неразобранных (без владельца) и чужих новых, открытых по правилам takeOpen */
 function chatScope(me: Staff, col: string): string {
   if (me.role === 'admin') return 'TRUE';
   const d = col.replace(/\.owner_id$/, '');
@@ -97,12 +110,7 @@ function chatScope(me: Staff, col: string): string {
     return `(${col} IS NULL OR ${col} = ${me.id} OR ${col} IN (SELECT id FROM staff WHERE parent_id = ${me.id}))`;
   }
   if (me.role === 'streamer') {
-    return `(${col} IS NULL OR ${col} = ${me.id} OR (
-      ${d}.status = 'new' AND coalesce(${d}.lead_role, 'lead') = 'lead'
-      AND (SELECT direction FROM messages WHERE tg_id = ${d}.tg_id ORDER BY id DESC LIMIT 1) = 'in'
-      AND NOT EXISTS (SELECT 1 FROM shift_reports r WHERE r.staff_id = ${col}
-        AND (r.status = 'live' OR (r.ended_at IS NOT NULL AND r.ended_at > now() - interval '15 minutes')))
-    ))`;
+    return `(${col} IS NULL OR ${col} = ${me.id} OR (${takeOpen(d, col)}))`;
   }
   return 'FALSE';
 }
@@ -1009,13 +1017,8 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
         if (o.rows[0]?.id !== me.id) return `Этого клиента уже взял ${o.rows[0]?.name ?? 'другой стример'}`;
       }
     } else if (ownerId !== null && ownerId !== me.id && me.role === 'streamer') {
-      // Чужой новый клиент, открытый всем, пока владелец не на смене: кто ответил, тот его и забирает (ссылка, по которой он пришёл, остаётся)
-      await db.query(
-        `UPDATE leads d SET owner_id = $2, taken_from = d.owner_id WHERE d.tg_id = $1 AND d.owner_id = $3 AND d.status = 'new' AND coalesce(d.lead_role, 'lead') = 'lead'
-           AND NOT EXISTS (SELECT 1 FROM shift_reports r WHERE r.staff_id = d.owner_id
-             AND (r.status = 'live' OR (r.ended_at IS NOT NULL AND r.ended_at > now() - interval '15 minutes')))`,
-        [tgId, me.id, ownerId],
-      );
+      // Чужой новый клиент, открытый всем (владелец не ответил вовремя, см. takeOpen): кто ответил, тот его и забирает (ссылка, по которой он пришёл, остаётся)
+      await db.query(`UPDATE leads d SET owner_id = $2, taken_from = d.owner_id WHERE d.tg_id = $1 AND d.owner_id = $3 AND ${takeOpen('d', 'd.owner_id')}`, [tgId, me.id, ownerId]);
     }
     return null;
   }
@@ -2470,6 +2473,20 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
   // Цифры у пункта «Лиды»: всего, регистрации и (фиолетовая) сколько лидов пришло сегодня по Киеву, счётчик обнуляется в 00:00
   // Цифры у пункта «Лиды»: сколько пришло за выбранный в календаре период (по умолчанию текущий месяц), (регистраций за период),
   // мигающая — сколько новых пришло сегодня (по Киеву, обнуляется в 00:00)
+  // Незакреплённые лиды (клиенты, не удалены): сколько их и раздать по очереди всем активным стримерам
+  const UNOWNED = `owner_id IS NULL AND coalesce(lead_role, 'lead') = 'lead' AND removed_at IS NULL`;
+  app.get('/leads/unowned', { preHandler: need('admin') }, async () => ({ n: Number((await db.query(`SELECT count(*)::int AS n FROM leads WHERE ${UNOWNED}`)).rows[0].n) }));
+  app.post('/leads/unowned/assign', { preHandler: need('admin') }, async (_req, reply) => {
+    const ids = (await db.query(`SELECT tg_id FROM leads WHERE ${UNOWNED} ORDER BY created_at LIMIT 5000`)).rows.map((r) => Number(r.tg_id));
+    let done = 0;
+    for (const id of ids) {
+      const owner = await pickFallbackOwner(id);
+      if (!owner) return reply.code(409).send({ error: done ? `Раздано ${done}, дальше некому: нет активных стримеров` : 'Нет активных стримеров, раздавать некому' });
+      done += (await db.query(`UPDATE leads SET owner_id = $2 WHERE tg_id = $1 AND owner_id IS NULL`, [id, owner])).rowCount ?? 0;
+    }
+    return { ok: true, assigned: done };
+  });
+
   app.get<{ Querystring: { from?: string; to?: string } }>('/leads/today', { preHandler: auth }, async (req) => {
     const me = req.staff!;
     const D = /^\d{4}-\d{2}-\d{2}$/;
