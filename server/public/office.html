@@ -3434,7 +3434,7 @@ async function cnRef(){
   // Новые заявки подсвечены
   pays.querySelectorAll('tbody tr').forEach((tr,i)=>{if(d.payouts[i]&&d.payouts[i].status==='pending')tr.style.background='#ffb84d14'});
   const sumL=d.all.reduce((a,x)=>a+(x.lead_amount||0),0),sumS=d.all.reduce((a,x)=>a+(x.staff_amount||0),0),dep=d.all.filter(x=>x.ftd_at).length;
-  const all=table(['Пришёл','Реферал','Пригласил','Трейдер','Первый депозит','Клиенту','Трейдеру'],d.all.map(r=>[td(fmt(r.created_at)),el('td',{},lead(r.tg_id,r.friend_name)),el('td',{},lead(r.referrer_id,r.referrer_name)),td(r.owner_name||'не закреплён'),
+  const all=table(['Пришёл','Реферал','Пригласил','Трейдер','Подключён','Клиенту','Трейдеру'],d.all.map(r=>[td(fmt(r.created_at)),el('td',{},lead(r.tg_id,r.friend_name)),el('td',{},lead(r.referrer_id,r.referrer_name)),td(r.owner_name||'не закреплён'),
     td(r.ftd_at?fmt(r.ftd_at):'—'),td(r.lead_amount!=null?usd2(r.lead_amount):'—','n'),td(r.staff_amount?usd2(r.staff_amount):'—','n')]),'Пока никто не пришёл по реферальным ссылкам');
   return[el('div',{class:'cn-two'},sets,el('div',{class:'card',style:'display:grid;gap:8px;align-content:start'},el('b',{},'Как это работает'),
       el('ul',{class:'mut sm',style:'margin:0;padding-left:18px;display:grid;gap:4px'},
@@ -3444,7 +3444,7 @@ async function cnRef(){
         el('li',{},'Тестовые аккаунты трейдеру не начисляют, трейдеру-админу тоже.')))),
     el('h4',{style:'display:flex;gap:8px;align-items:center'},'Заявки на выплату',pend.length?el('span',{class:'nbadge pulse',style:'margin-left:0'},String(pend.length)):null),ctrT(pays),
     el('h4',{},'Все рефералы'),
-    el('div',{class:'pb-tots'},el('span',{},'Пришло: ',el('b',{},String(d.all.length))),el('span',{},'С первым депозитом: ',el('b',{},String(dep))),el('span',{},'Клиентам: ',el('b',{},usd2(sumL))),el('span',{},'Трейдерам: ',el('b',{},usd2(sumS)))),
+    el('div',{class:'pb-tots'},el('span',{},'Пришло: ',el('b',{},String(d.all.length))),el('span',{},'Подключено: ',el('b',{},String(dep))),el('span',{},'Клиентам: ',el('b',{},usd2(sumL))),el('span',{},'Трейдерам: ',el('b',{},usd2(sumS)))),
     ctrT(all)];
 }
 let refPend=0,connRedraw=null;
