@@ -92,6 +92,9 @@ async function sendOffer(o: Offer, tgId: string, by: number | null): Promise<{ o
   return res.ok ? { ok: true } : { ok: false, error: res.error, blocked: res.blocked };
 }
 
+/** Лиды команды тимлида (его и его стримеров); админу все */
+export const teamOf = (me: { id: number; role: string }, d = 'd') =>
+  me.role === 'teamlead' ? `(${d}.owner_id = ${Number(me.id)} OR ${d}.owner_id IN (SELECT id FROM staff WHERE parent_id = ${Number(me.id)}))` : 'TRUE';
 const NOT_CONNECTED = `d.removed_at IS NULL AND coalesce(d.lead_role, 'lead') IN ('lead','test') AND d.status IN ('new','registered') AND NOT d.access AND d.banned_at IS NULL`;
 /** Повторно акцию можно дать, когда прошлая закончилась: срок вышел, отменена или не дошла */
 const LIVE = `s.delivery <> 'failed' AND s.reverted_at IS NULL AND s.connected_at IS NULL AND s.expires_at > now()`;
@@ -124,9 +127,12 @@ export async function connectInfo(tgId: number, hideDeposit = false) {
 
 export async function connectRoutes(app: FastifyInstance, h: { need: Need; str: (v: unknown, max: number) => string }): Promise<void> {
   const admin = h.need('admin');
+  // Тимлид видит «Подключение» в пределах своей команды: акции, рассылку своим, отправленные и рефералов. Порог меняет только админ
+  const lead = h.need('admin', 'teamlead');
   const { str } = h;
 
-  app.get('/connect', { preHandler: admin }, async () => {
+  app.get('/connect', { preHandler: lead }, async (req) => {
+    const me = (req as any).staff as { id: number; role: string };
     const base = await getMinDeposit();
     const offers = (await db.query(`SELECT id, name, discount_pct, days, text, active FROM connect_offers ORDER BY id`)).rows;
     const aud = (
@@ -136,7 +142,7 @@ export async function connectRoutes(app: FastifyInstance, h: { need: Need; str: 
                 count(*) FILTER (WHERE d.status = 'new')::int AS fresh,
                 count(*) FILTER (WHERE d.status = 'registered')::int AS reg
            FROM leads d LEFT JOIN staff o ON o.id = d.owner_id
-          WHERE ${NOT_CONNECTED} AND d.bot_started AND NOT d.bot_blocked GROUP BY 1, 2 ORDER BY n DESC`,
+          WHERE ${NOT_CONNECTED} AND d.bot_started AND NOT d.bot_blocked AND ${teamOf(me)} GROUP BY 1, 2 ORDER BY n DESC`,
       )
     ).rows;
     return {
@@ -146,6 +152,7 @@ export async function connectRoutes(app: FastifyInstance, h: { need: Need; str: 
       offers: offers.map((o) => ({ ...o, required: r2(base * (1 - o.discount_pct / 100)) })),
       audience: aud,
       defaultText: DEFAULT_OFFER_TEXT,
+      canEdit: me.role === 'admin',
     };
   });
 
@@ -168,14 +175,14 @@ export async function connectRoutes(app: FastifyInstance, h: { need: Need; str: 
     return { name, pct, days, text };
   };
 
-  app.post('/connect/offers', { preHandler: admin }, async (req, reply) => {
+  app.post('/connect/offers', { preHandler: lead }, async (req, reply) => {
     const o = readOffer((req.body ?? {}) as Record<string, unknown>);
     if ('error' in o) return reply.code(400).send({ error: o.error });
     const r = await db.query(`INSERT INTO connect_offers (name, discount_pct, days, text) VALUES ($1,$2,$3,$4) RETURNING id`, [o.name, o.pct, o.days, o.text]);
     return { id: r.rows[0].id };
   });
 
-  app.patch<{ Params: { id: string } }>('/connect/offers/:id', { preHandler: admin }, async (req, reply) => {
+  app.patch<{ Params: { id: string } }>('/connect/offers/:id', { preHandler: lead }, async (req, reply) => {
     const o = readOffer((req.body ?? {}) as Record<string, unknown>);
     if ('error' in o) return reply.code(400).send({ error: o.error });
     const r = await db.query(`UPDATE connect_offers SET name = $2, discount_pct = $3, days = $4, text = $5 WHERE id = $1 RETURNING id`, [Number(req.params.id), o.name, o.pct, o.days, o.text]);
@@ -183,7 +190,7 @@ export async function connectRoutes(app: FastifyInstance, h: { need: Need; str: 
     return { ok: true };
   });
 
-  app.delete<{ Params: { id: string } }>('/connect/offers/:id', { preHandler: admin }, async (req, reply) => {
+  app.delete<{ Params: { id: string } }>('/connect/offers/:id', { preHandler: lead }, async (req, reply) => {
     const r = await db.query('DELETE FROM connect_offers WHERE id = $1 RETURNING id', [Number(req.params.id)]);
     if (!r.rowCount) return reply.code(404).send({ error: 'Акция не найдена' });
     return { ok: true };
@@ -194,9 +201,9 @@ export async function connectRoutes(app: FastifyInstance, h: { need: Need; str: 
   app.post<{ Params: { id: string } }>('/connect/offers/:id/send', { preHandler: h.need('admin', 'streamer', 'teamlead') }, async (req, reply) => {
     const me = (req as any).staff as { id: number; role: string; tg_username?: string | null };
     const b = (req.body ?? {}) as Record<string, unknown>;
-    // Стример и тимлид предлагают скидку только из карточки лида: стример своим, тимлид своим и лидам своей команды
+    // Стример предлагает скидку только из карточки своего лида. Тимлид из карточки и рассылкой, но только своей команде
     const mine = me.role === 'streamer' || me.role === 'teamlead';
-    if (mine && (b.test === true || b.tg_id === undefined || b.tg_id === null || b.tg_id === '')) return reply.code(403).send({ error: 'Стример предлагает скидку из карточки своего лида' });
+    if (me.role === 'streamer' && (b.test === true || b.tg_id === undefined || b.tg_id === null || b.tg_id === '')) return reply.code(403).send({ error: 'Стример предлагает скидку из карточки своего лида' });
     const o = (await db.query(`SELECT id, name, discount_pct, days, text FROM connect_offers WHERE id = $1 AND active`, [Number(req.params.id)])).rows[0] as Offer | undefined;
     if (!o) return reply.code(404).send({ error: 'Акция не найдена' });
 
@@ -235,7 +242,7 @@ export async function connectRoutes(app: FastifyInstance, h: { need: Need; str: 
     const owner = b.owner_id ? Number(b.owner_id) : null;
     const rows = (
       await db.query(
-        `SELECT d.tg_id FROM leads d WHERE ${NOT_CONNECTED} AND d.bot_started AND NOT d.bot_blocked AND ${GAP}
+        `SELECT d.tg_id FROM leads d WHERE ${NOT_CONNECTED} AND d.bot_started AND NOT d.bot_blocked AND ${GAP} AND ${teamOf(me)}
             AND ($1::int IS NULL OR d.owner_id = $1) ORDER BY d.tg_id`,
         [owner],
       )
@@ -254,12 +261,14 @@ export async function connectRoutes(app: FastifyInstance, h: { need: Need; str: 
     return { ok: true, total: rows.length };
   });
 
-  app.get('/connect/sends', { preHandler: admin }, async () => {
+  app.get('/connect/sends', { preHandler: lead }, async (req) => {
+    const me = (req as any).staff as { id: number; role: string };
     const r = await db.query(
       `SELECT s.id, s.tg_id, s.offer_name, s.discount_pct, s.required::float AS required, s.sent_at, s.expires_at, s.delivery, s.error,
               s.connected_at, s.reverted_at, s.connected_amount::float AS connected_amount,
               coalesce(nullif(d.first_name,''), nullif(d.username,''), s.tg_id::text) AS lead_name, d.username, st.name AS by_name
          FROM connect_sends s LEFT JOIN leads d ON d.tg_id = s.tg_id LEFT JOIN staff st ON st.id = s.sent_by
+        WHERE ${teamOf(me)}
         ORDER BY s.id DESC LIMIT 300`,
     );
     return r.rows.map((x) => ({ ...x, state: x.delivery === 'failed' ? 'failed' : x.delivery === 'queued' ? 'queued' : x.reverted_at ? 'reverted' : x.connected_at ? 'connected' : new Date(x.expires_at) < new Date() ? 'expired' : 'pending' }));

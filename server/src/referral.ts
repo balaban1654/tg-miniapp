@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { db } from './db.js';
 import { config } from './config.js';
 import { deliver } from './push.js';
+import { teamOf } from './connect.js';
 import type { Role } from './auth.js';
 
 type Need = (...roles: Role[]) => (req: FastifyRequest, reply: FastifyReply) => Promise<unknown>;
@@ -138,14 +139,16 @@ export async function referralOfficeRoutes(app: FastifyInstance, h: { need: Need
   const admin = h.need('admin');
   const name = (a: string) => `coalesce(nullif(${a}.first_name, ''), '@' || ${a}.username, ${a}.tg_id::text)`;
 
-  app.get<{ Querystring: { period?: string } }>('/referral/overview', { preHandler: admin }, async (req) => {
+  app.get<{ Querystring: { period?: string } }>('/referral/overview', { preHandler: h.need('admin', 'teamlead') }, async (req) => {
+    const me = (req as any).staff as { id: number; role: string };
+    const tl = me.role === 'teamlead';
     const period = /^\d{4}-\d{2}$/.test(String(req.query.period ?? '')) ? String(req.query.period) : null;
     const payouts = (
       await db.query(
         `SELECT p.id, p.tg_id, ${name('d')} AS lead_name, d.username, p.amount::float AS amount, p.method, p.wallet, p.status, p.reject_reason,
                 p.created_at, p.decided_at, s.name AS decided_name
            FROM referral_payouts p JOIN leads d ON d.tg_id = p.tg_id LEFT JOIN staff s ON s.id = p.decided_by
-          WHERE p.status = 'pending' OR $1::text IS NULL OR to_char(p.created_at AT TIME ZONE 'Europe/Kyiv', 'YYYY-MM') = $1
+          WHERE NOT ${tl} AND (p.status = 'pending' OR $1::text IS NULL OR to_char(p.created_at AT TIME ZONE 'Europe/Kyiv', 'YYYY-MM') = $1)
           ORDER BY (p.status = 'pending') DESC, p.id DESC LIMIT 300`,
         [period],
       )
@@ -155,7 +158,7 @@ export async function referralOfficeRoutes(app: FastifyInstance, h: { need: Need
         `SELECT w.tg_id, ${name('d')} AS friend_name, w.referrer_id, ${name('r')} AS referrer_name, s.name AS owner_name,
                 w.lead_amount::float AS lead_amount, w.staff_amount::float AS staff_amount, w.created_at
            FROM referral_rewards w JOIN leads d ON d.tg_id = w.tg_id JOIN leads r ON r.tg_id = w.referrer_id LEFT JOIN staff s ON s.id = w.owner_id
-          WHERE $1::text IS NULL OR to_char(w.created_at AT TIME ZONE 'Europe/Kyiv', 'YYYY-MM') = $1
+          WHERE ($1::text IS NULL OR to_char(w.created_at AT TIME ZONE 'Europe/Kyiv', 'YYYY-MM') = $1) AND ${teamOf(me)}
           ORDER BY w.created_at DESC LIMIT 500`,
         [period],
       )
@@ -168,11 +171,11 @@ export async function referralOfficeRoutes(app: FastifyInstance, h: { need: Need
                 (SELECT min(e.created_at) FROM events e WHERE e.tg_id = d.tg_id AND e.type = 'ftd') AS ftd_at,
                 w.lead_amount::float AS lead_amount, w.staff_amount::float AS staff_amount
            FROM leads d JOIN leads r ON r.tg_id = d.referrer_id LEFT JOIN staff s ON s.id = d.owner_id LEFT JOIN referral_rewards w ON w.tg_id = d.tg_id
-          WHERE d.referrer_id IS NOT NULL AND d.removed_at IS NULL ORDER BY d.created_at DESC LIMIT 2000`,
+          WHERE d.referrer_id IS NOT NULL AND d.removed_at IS NULL AND ${teamOf(me)} ORDER BY d.created_at DESC LIMIT 2000`,
       )
     ).rows;
     const rate = await refRates();
-    return { perFriend: rate.lead, perStaff: rate.staff, minPayout: rate.minPayout, invited, payouts, rewards, all };
+    return { perFriend: rate.lead, perStaff: rate.staff, minPayout: rate.minPayout, invited, payouts, rewards, all, canEdit: !tl };
   });
 
   app.put('/referral/settings', { preHandler: admin }, async (req, reply) => {

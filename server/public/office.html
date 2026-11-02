@@ -691,7 +691,7 @@ function navItemsFor(role){
   if(role==='admin')items.push(['push','Пуши'],['media','Медиа'],['pb','Постбеки']);
   if(role==='streamer')items.splice(items.length,0,['signals','Сигналы'],['shifts','Смены и отчёты'],['mytasks','Мои задачи']);
   if(role==='admin'){items.splice(items.findIndex(x=>x[0]==='push'),0,['acc','Бухгалтерия']);items.splice(1,0,['plans','Планы и задачи'])}
-  if(role==='admin')items.splice(items.findIndex(x=>x[0]==='leads')+1,0,['connect','Подключение']);
+  if(role==='admin'||role==='teamlead')items.splice(items.findIndex(x=>x[0]==='leads')+1,0,['connect','Подключение']);
   if(role==='admin')items.splice(items.findIndex(x=>x[0]==='connect')+1,0,['newsig','Новый сигнал']);
   // Смена команды: админ, тимлидер, аналитик, медиабайер начинают смену и в конце пишут, что сделали
   if(['admin','teamlead','analyst','buyer'].includes(role))items.push(['tshift','Моя смена']);
@@ -3418,12 +3418,13 @@ async function cnRef(){
   const copy=v=>el('button',{class:'btn o s',type:'button',title:'Копировать',onclick:async()=>{try{await navigator.clipboard.writeText(v);toast('Скопировано')}catch{toast(v)}}},'⧉');
   const reload=()=>{refreshRefPending();if(connRedraw)connRedraw()};
   // Ставки
-  const inL=el('input',{type:'number',min:'0',step:'0.5',value:String(d.perFriend),style:'width:110px'}),inS=el('input',{type:'number',min:'0',step:'0.5',value:String(d.perStaff),style:'width:110px'}),inM=el('input',{type:'number',min:'0',step:'1',value:String(d.minPayout??50),style:'width:110px'});
+  const ro=d.canEdit?null:'';
+  const inL=el('input',{type:'number',min:'0',step:'0.5',value:String(d.perFriend),style:'width:110px',disabled:ro}),inS=el('input',{type:'number',min:'0',step:'0.5',value:String(d.perStaff),style:'width:110px',disabled:ro}),inM=el('input',{type:'number',min:'0',step:'1',value:String(d.minPayout??50),style:'width:110px',disabled:ro});
   const sErr=el('div',{class:'err',role:'alert'});
   const sets=el('div',{class:'card',style:'display:grid;gap:12px;align-content:start'},el('b',{},'Ставка за друга с первым депозитом'),
     el('div',{class:'cn-row'},el('div',{class:'lc-field'},el('label',{},'Клиенту (пригласившему), $'),inL),el('div',{class:'lc-field'},el('label',{},'Трейдеру, $'),inS),el('div',{class:'lc-field'},el('label',{},'Минимальный вывод, $'),inM)),
     el('div',{class:'mut sm'},'Клиенту на реферальный баланс (выводит на счёт Pocket Option или USDT BEP20, когда накопит минимальный вывод), трейдеру бонусом в зарплату («Бонусы и штрафы»). Новая ставка действует для следующих начислений, уже начисленное не меняется.'),
-    sErr,el('div',{},el('button',{class:'btn',type:'button',onclick:async()=>{sErr.textContent='';try{await api('/referral/settings',{method:'PUT',body:{lead:inL.value,staff:inS.value,minPayout:inM.value}});toast('Сохранено')}catch(x){sErr.textContent=x.message}}},'Сохранить')));
+    sErr,!d.canEdit?el('div',{class:'mut sm'},'Ставки меняет администратор. Вы видите рефералов своей команды.'):el('div',{},el('button',{class:'btn',type:'button',onclick:async()=>{sErr.textContent='';try{await api('/referral/settings',{method:'PUT',body:{lead:inL.value,staff:inS.value,minPayout:inM.value}});toast('Сохранено')}catch(x){sErr.textContent=x.message}}},'Сохранить')));
   const pend=d.payouts.filter(r=>r.status==='pending');
   const act=r=>{
     if(r.status!=='pending')return el('td',{class:'mut sm'},(r.decided_name||'')+(r.decided_at?' · '+fmt(r.decided_at):'')+(r.reject_reason?' · '+r.reject_reason:''));
@@ -3447,7 +3448,7 @@ async function cnRef(){
         el('li',{},'Новый человек по ссылке закрепляется за тем же трейдером, что и пригласивший.'),
         el('li',{},'Когда его первый депозит открывает доступ, клиенту и трейдеру начисляются ставки.'),
         el('li',{},'Тестовые аккаунты трейдеру не начисляют, трейдеру-админу тоже.')))),
-    el('h4',{style:'display:flex;gap:8px;align-items:center'},'Заявки на выплату',pend.length?el('span',{class:'nbadge pulse',style:'margin-left:0'},String(pend.length)):null),ctrT(pays),
+    ...(d.canEdit?[el('h4',{style:'display:flex;gap:8px;align-items:center'},'Заявки на выплату',pend.length?el('span',{class:'nbadge pulse',style:'margin-left:0'},String(pend.length)):null),ctrT(pays)]:[]),
     el('h4',{},'Все рефералы'),
     el('div',{class:'pb-tots'},el('span',{},'Пришло: ',el('b',{},String(d.all.length))),el('span',{},'Подключено: ',el('b',{},String(dep))),el('span',{},'Клиентам: ',el('b',{},usd2(sumL))),el('span',{},'Трейдерам: ',el('b',{},usd2(sumS)))),
     ctrT(all)];
@@ -4619,14 +4620,14 @@ async function viewConnect(){
   return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Подключение')),bar,body];
 }
 function cnTh(d){
-  const inp=el('input',{type:'number',min:'1',step:'1',value:String(d.minDeposit),style:'width:160px;font-size:22px;font-weight:700'});
+  const inp=el('input',{type:'number',min:'1',step:'1',value:String(d.minDeposit),style:'width:160px;font-size:22px;font-weight:700',disabled:d.canEdit?null:''});
   const hint=el('div',{class:'cn-ok'});
   const upd=()=>{const v=Number(inp.value);hint.replaceChildren(el('span',{class:'mut sm'},'Допуск '+d.tolerance+'% (всегда). Депозит засчитывается от '),el('b',{},v>0?cnMoney(v*(100-d.tolerance)/100):'—'))};
   inp.addEventListener('input',upd);upd();
   const err=el('div',{class:'err',role:'alert'});
   const save=el('button',{class:'btn',type:'button',onclick:async()=>{err.textContent='';save.disabled=true;try{const r=await api('/connect/settings',{method:'PUT',body:{min_deposit:Number(inp.value)}});toast('Порог сохранён: '+cnMoney(r.minDeposit)+', засчитывается от '+cnMoney(r.from));render({soft:true})}catch(x){err.textContent=x.message;save.disabled=false}}},'Сохранить');
   return[el('div',{class:'cn-two'},
-    el('div',{class:'card',style:'display:grid;gap:14px;align-content:start'},el('div',{class:'lc-field'},el('label',{},'Минимальный депозит для подключения, $'),inp),hint,err,el('div',{},save)),
+    el('div',{class:'card',style:'display:grid;gap:14px;align-content:start'},el('div',{class:'lc-field'},el('label',{},'Минимальный депозит для подключения, $'),inp),hint,err,d.canEdit?el('div',{},save):el('div',{class:'mut sm'},'Порог меняет администратор.')),
     el('div',{class:'card',style:'display:grid;gap:8px;align-content:start'},el('b',{},'Как это работает'),
       el('ul',{class:'mut',style:'margin:0;padding-left:18px;line-height:1.6'},
         el('li',{},'Лид получает доступ, когда сумма его депозитов (FTD и додепы) не меньше порога с допуском.'),
@@ -4656,7 +4657,7 @@ function cnOf(d){
     const r=await api('/connect/offers',{method:'POST',body:body()});cur.id=r.id;connState.edit={...body(),id:r.id};return r.id};
   const save=el('button',{class:'btn',type:'button',onclick:async()=>{save.disabled=true;try{const id=await saveOffer();connState.edit=null;toast('Акция сохранена');render({soft:true})}catch(x){err.textContent=x.message;save.disabled=false}}},cur.id?'Сохранить изменения':'Создать акцию');
   const test=el('button',{class:'btn o',type:'button',onclick:async()=>{try{const id=await saveOffer();await api('/connect/offers/'+id+'/send',{method:'POST',body:{test:true}});toast('Отправлено вам в бота')}catch(x){err.textContent=x.message}}},'Отправить мне');
-  const owner=el('select',{'aria-label':'Кому'},el('option',{value:''},'Все стримеры'),...d.audience.filter(a=>a.owner_id).map(a=>el('option',{value:a.owner_id},(a.owner_name||'Без владельца')+' · '+a.ready)));
+  const owner=el('select',{'aria-label':'Кому'},el('option',{value:''},me.role==='teamlead'?'Вся команда':'Все стримеры'),...d.audience.filter(a=>a.owner_id).map(a=>el('option',{value:a.owner_id},(a.owner_name||'Без владельца')+' · '+a.ready)));
   const ready=()=>owner.value?(d.audience.find(a=>String(a.owner_id)===owner.value)||{ready:0}).ready:d.audience.reduce((s,a)=>s+a.ready,0);
   const sendAll=el('button',{class:'btn o',type:'button'});
   const label=()=>{sendAll.textContent='Отправить всем ('+ready()+')'};owner.addEventListener('change',label);label();
