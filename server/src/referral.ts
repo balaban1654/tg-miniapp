@@ -29,16 +29,27 @@ export function parseRefPayload(payload: string): number | null {
 }
 export const refLink = (tgId: number | string) => `https://t.me/${config.botUsername}?start=${refCode(tgId)}`;
 
-/** Кто может пригласить: обычный клиент (или тест), не заблокирован и не удалён. Возвращает его трейдера */
+/** Кому доступна реферальная программа: подключённым клиентам (FTD, активные, с доступом), тесту и всему админ составу.
+ *  Новым и зарегистрированным без депозита недоступна */
+export const REF_ALLOWED = (d = 'd') =>
+  `(coalesce(${d}.lead_role, 'lead') <> 'lead' OR ${d}.access OR coalesce(${d}.status_before_block, ${d}.status) IN ('ftd','active'))`;
+
+/** Кто может пригласить: тот, кому программа доступна, не заблокирован и не удалён. Возвращает трейдера для друга:
+ *  у клиента это его трейдер; если пригласил сам стример или тимлид (его аккаунт в боте), друг закрепляется за ним */
 export async function referrerOf(refId: number, newTgId: number): Promise<{ owner_id: number | null } | null> {
   if (refId === newTgId) return null;
   const r = (
     await db.query(
-      `SELECT owner_id FROM leads WHERE tg_id = $1 AND coalesce(lead_role, 'lead') IN ('lead','test') AND banned_at IS NULL AND removed_at IS NULL`,
+      `SELECT d.owner_id, coalesce(d.lead_role, 'lead') AS role, d.username FROM leads d WHERE d.tg_id = $1 AND ${REF_ALLOWED()} AND d.banned_at IS NULL AND d.removed_at IS NULL`,
       [refId],
     )
   ).rows[0];
-  return r ? { owner_id: r.owner_id ?? null } : null;
+  if (!r) return null;
+  if (!['lead', 'test'].includes(r.role) && r.username) {
+    const s = (await db.query(`SELECT id FROM staff WHERE role IN ('streamer','teamlead') AND active AND deleted_at IS NULL AND lower(replace(replace(coalesce(tg_username, ''), 'https://t.me/', ''), '@', '')) = lower($1) LIMIT 1`, [r.username])).rows[0];
+    if (s) return { owner_id: s.id };
+  }
+  return { owner_id: r.owner_id ?? null };
 }
 
 /** Друг сделал первый депозит и получил доступ: начисляем пригласившему и трейдеру. Один раз на друга.
@@ -97,7 +108,9 @@ export async function referralAppRoutes(app: FastifyInstance, auth: (req: Fastif
     ).rows;
     const payouts = (await db.query(`SELECT id, amount::float AS amount, method, wallet, status, reject_reason, created_at, decided_at FROM referral_payouts WHERE tg_id = $1 ORDER BY id DESC LIMIT 50`, [tgId])).rows;
     const pocketId = (await db.query('SELECT trader_id FROM leads WHERE tg_id = $1', [tgId])).rows[0]?.trader_id ?? null;
+    const allowed = Boolean((await db.query(`SELECT 1 FROM leads d WHERE d.tg_id = $1 AND ${REF_ALLOWED()}`, [tgId])).rowCount);
     return {
+      allowed,
       link: refLink(tgId),
       perFriend: (await refRates()).lead,
       minPayout: (await refRates()).minPayout,
@@ -123,7 +136,7 @@ export async function referralAppRoutes(app: FastifyInstance, auth: (req: Fastif
       wallet = String(pid);
     }
     if (method === 'usdt' && !BEP20_RE.test(wallet)) return reply.code(400).send({ error: 'Адрес USDT BEP20 начинается с 0x и содержит 42 символа' });
-    if ((await db.query(`SELECT 1 FROM leads WHERE tg_id = $1 AND banned_at IS NULL`, [tgId])).rowCount === 0) return reply.code(403).send({ error: 'Выплата недоступна' });
+    if ((await db.query(`SELECT 1 FROM leads d WHERE d.tg_id = $1 AND d.banned_at IS NULL AND ${REF_ALLOWED()}`, [tgId])).rowCount === 0) return reply.code(403).send({ error: 'Выплата недоступна' });
     if ((await db.query(`SELECT 1 FROM referral_payouts WHERE tg_id = $1 AND status = 'pending'`, [tgId])).rowCount) return reply.code(409).send({ error: 'Заявка уже на рассмотрении. Дождитесь выплаты' });
     const { balance } = await balanceOf(tgId);
     if (!(balance > 0)) return reply.code(409).send({ error: 'На балансе пока нет средств' });

@@ -1941,7 +1941,18 @@ function referralLaunch(){
   return t;
 }
 /** Реферальная программа открыта: после запуска для всех клиентов, тестовому аккаунту сразу */
-function refOpen(){return (!me.leadRole||me.leadRole==='lead'||me.leadRole==='test')&&(me.leadRole==='test'||nowMs()>=REF_LAUNCH)}
+/** Программа запущена: после REF_LAUNCH для всех, тестовому аккаунту сразу */
+function refOpen(){return me.leadRole==='test'||nowMs()>=REF_LAUNCH}
+/** Кому доступна: подключённые клиенты (FTD, активные, с доступом), тест и весь админ состав. Новым и регистрациям нет */
+function refAllowed(){return (me.leadRole&&me.leadRole!=='lead')||me.access||['ftd','active'].includes(me.status)}
+/** Закрыто: подключиться к боту или написать в поддержку */
+function refLocked(compact){
+  return el('div',{class:'card',style:'display:grid;gap:10px;'+(compact?'':'text-align:center;justify-items:center;padding:22px 16px')},
+    compact?el('b',{style:'font:700 15px var(--fd)'},'🎁 Реферальная программа'):el('div',{style:'font-size:40px;line-height:1'},'🔒'),
+    compact?null:el('h2',{style:'font-size:19px;margin:0'},'Реферальная программа'),
+    el('div',{class:'sm',style:compact?'':'max-width:300px'},'Для доступа к реферальной программе необходимо подключиться к боту или написать в поддержку.'),
+    el('button',{class:'btn o',type:'button',onclick:support},'Написать в поддержку'));
+}
 function refLinkRow(link){
   return el('div',{class:'rf-link'},el('div',{class:'rf-url',title:link},link.replace(/^https:\/\//,'')),
     el('button',{class:'rf-copy',type:'button',onclick:async()=>{try{await navigator.clipboard.writeText(link);toast('Ссылка скопирована')}catch{copyText(link)}}},svgEl(COPY_ICON),'Копировать'));
@@ -1949,8 +1960,8 @@ function refLinkRow(link){
 let refCache=null;
 /** Плитка в профиле: личная ссылка и кнопка «Копировать». Сотрудникам не показывается */
 function refTile(){
-  if(me.leadRole&&me.leadRole!=='lead'&&me.leadRole!=='test')return null;
   if(!refOpen())return el('button',{class:'btn',type:'button',onclick:()=>go('referral')},'Реферальная программа');
+  if(!refAllowed())return refLocked(true);
   const box=el('div',{class:'card',style:'display:grid;gap:10px'});
   const draw=d=>box.replaceChildren(
     el('div',{class:'row',style:'gap:10px;align-items:center'},el('b',{style:'font:700 15px var(--fd);min-width:0'},'🎁 Реферальная программа'),el('button',{type:'button',style:'background:none;border:0;color:var(--acc2);font:600 11px var(--fb);cursor:pointer;padding:0;white-space:nowrap;flex:none',onclick:()=>go('referral')},'Подробнее ›')),
@@ -1984,6 +1995,7 @@ function viewRefCountdown(){
 async function viewReferral(){
   clearTimers();
   if(!refOpen()){viewRefCountdown();return}
+  if(!refAllowed()){shell('Рефералы',[refLocked(false),el('button',{class:'back',type:'button',onclick:()=>go('profile')},'‹ В профиль')]);return}
   shell('Рефералы',[el('div',{class:'card sm'},'Загрузка…')]);
   let d;try{d=await api('/referral');refCache=d}catch(x){shell('Рефералы',[el('div',{class:'card sm'},x.message),el('button',{class:'back',type:'button',onclick:()=>go('profile')},'‹ В профиль')]);return}
   if(tab!=='referral')return;
