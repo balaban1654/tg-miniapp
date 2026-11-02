@@ -1681,7 +1681,11 @@ function tierBadge(){
   // Только у клиентов: у сотрудников вместо градации роль
   if(me.leadRole&&me.leadRole!=='lead'&&me.leadRole!=='test')return null;
   const k=['novice','bronze','silver','gold','plat'][me.tier?me.tier.idx:0]||'gold';
-  return el('span',{role:'img','aria-label':'Статус: '+clientRank(),title:clientRank(),style:'margin-left:auto;display:grid;filter:drop-shadow(0 6px 12px #0009)'},svgEl(medalSvg(k,56)));
+  const col={novice:'#7fdc8a',bronze:'#e0a070',silver:'#cfd6e4',gold:'#ffd54d',plat:'#8fe3ff'}[k];
+  // Название градации маленькой подписью над значком
+  return el('div',{role:'img','aria-label':'Статус: '+clientRank(),style:'margin-left:auto;display:grid;justify-items:center;gap:4px;flex:none'},
+    el('span',{style:'font:700 10px var(--fd);letter-spacing:.08em;text-transform:uppercase;color:'+col+';opacity:.9;white-space:nowrap'},clientRank()),
+    el('span',{style:'display:grid;filter:drop-shadow(0 4px 8px #0008)'},svgEl(medalSvg(k,36))));
 }
 /** Значок градации (SVG): медаль с лентой, металлическим диском и бликом; у Диаманта просто кристалл */
 function medalSvg(k,size){
