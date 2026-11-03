@@ -19,68 +19,102 @@
 <link rel="icon" type="image/png" href="/img/office-192.png">
 <title>Hunter Office Lite</title>
 <!-- Облегчённая версия Office для старых устройств (iPad на iOS 9, Safari 9): без современного JavaScript и CSS Grid.
-     Только просмотр: эфир, прибыль, план/факт, воронка, стримеры, зарплаты, расходы и что требует внимания. Вход тем же логином, паролем и кодом -->
+     Дашборд как в Office: эфир, план/факт, воронка, чистая прибыль, зарплаты, расходы, требует внимания, эфиры за период. Только просмотр. Вход тем же логином, паролем и кодом -->
 <style>
-body{margin:0;background:#0d0817;color:#f1ebff;font-family:-apple-system,Helvetica,Arial,sans-serif;font-size:16px}
-.wrap{max-width:900px;margin:0 auto;padding:16px}
-h1{font-size:22px;margin:4px 0 14px}
-h2{font-size:15px;margin:0 0 10px;color:#c9a6ff;text-transform:uppercase;letter-spacing:1px}
-.card{background:#1c1233;border:1px solid #34255c;border-radius:14px;padding:16px;margin-bottom:14px}
-.mut{color:#a89cc8;font-size:13px}
-.big{font-size:40px;font-weight:bold;margin:4px 0}
-.pos{color:#3ddc97}.neg{color:#ff6b8a}
-table{width:100%;border-collapse:collapse}
-td,th{padding:9px 6px;border-bottom:1px solid #2a1d4a;text-align:left;font-size:15px}
-th{color:#a89cc8;font-size:12px;text-transform:uppercase;font-weight:normal}
-td.n,th.n{text-align:right;white-space:nowrap}
-.tiles td{width:33%;vertical-align:top;border:0;padding:6px}
-.tile{background:#150d26;border:1px solid #34255c;border-radius:12px;padding:12px}
-.tile b{display:block;font-size:24px;margin-top:4px}
-input{width:100%;box-sizing:border-box;padding:12px;margin:6px 0 12px;font-size:17px;border-radius:10px;border:1px solid #34255c;background:#150d26;color:#f1ebff;-webkit-appearance:none}
-button{padding:12px 16px;font-size:16px;font-weight:bold;border:0;border-radius:10px;background:#9b5cff;color:#fff;-webkit-appearance:none}
-button.o{background:transparent;border:1px solid #9b5cff;color:#c9a6ff}
-button.on{background:#9b5cff;color:#fff}
-.bar button{margin:0 6px 8px 0}
+body{margin:0;background:#0d0817;color:#f1ebff;font:14px/1.5 Montserrat,-apple-system,Helvetica,Arial,sans-serif}
+*{box-sizing:border-box}
+.wrap{max-width:1400px;margin:0 auto;padding:20px}
+.card{background:#1c1233;border:1px solid #34255c;border-radius:14px;padding:18px}
+.mut{color:#a89cc8}
+.pos{color:#3ddc97}.neg{color:#ff6b8a}.warn{color:#ffb84d}
+.hide{display:none!important}
+input{width:100%;padding:12px;margin:6px 0 12px;font-size:17px;border-radius:10px;border:1px solid #34255c;background:#150d26;color:#f1ebff;-webkit-appearance:none}
+.btn{padding:12px 16px;font-size:15px;font-weight:bold;border:0;border-radius:10px;background:#9b5cff;color:#fff;-webkit-appearance:none}
 .err{color:#ff6b8a;margin:6px 0}
-.bar2{position:relative;height:8px;border-radius:8px;background:#2a1d4a;margin:8px 0 4px;overflow:visible}
-.bar2 i{display:block;height:8px;border-radius:8px}
-.bar2 u{position:absolute;top:-4px;width:2px;height:16px;background:#f1ebff}
-.pf{padding:8px 0 12px;border-bottom:1px solid #2a1d4a}.pf .v{font-size:24px}
-.sm2{font-size:12px}
-.dot{display:inline-block;width:9px;height:9px;border-radius:9px;background:#3ddc97;margin-right:6px;vertical-align:middle}
-.live{padding:6px 0}
-.att{padding:8px 0;border-bottom:1px solid #2a1d4a}
+/* Шапка */
+.top{display:-webkit-flex;display:flex;-webkit-justify-content:space-between;justify-content:space-between;-webkit-align-items:center;align-items:center;-webkit-flex-wrap:wrap;flex-wrap:wrap;margin-bottom:16px}
+.ttl{display:-webkit-flex;display:flex;-webkit-align-items:baseline;align-items:baseline;-webkit-flex-wrap:wrap;flex-wrap:wrap}
+.ttl h2{font-size:24px;margin:0 12px 0 0}
+.onl{display:inline-block;padding:3px 10px;border-radius:99px;background:rgba(61,220,151,.1);border:1px solid rgba(61,220,151,.27);color:#3ddc97;font-size:12px;font-weight:600;margin-right:12px}
+.onl i{display:inline-block;width:7px;height:7px;border-radius:7px;background:#3ddc97;margin-right:6px;vertical-align:1px}
+.sub{color:#a89cc8;font-size:14px}
+.seg{display:inline-block;background:#1c1233;border:1px solid #34255c;border-radius:10px;padding:3px;margin-top:6px}
+.seg button{border:0;background:none;color:#a89cc8;padding:7px 12px;border-radius:7px;font-size:13px;font-family:inherit;-webkit-appearance:none}
+.seg button.on{background:#9b5cff;color:#fff;font-weight:700}
+/* Полоса стримеров */
+.live{display:-webkit-flex;display:flex;-webkit-flex-wrap:wrap;flex-wrap:wrap;padding:12px 14px 2px;margin-bottom:16px}
+.lc{padding:7px 12px;border:1px solid #34255c;border-radius:10px;background:#150d26;margin:0 10px 10px 0}
+.lc b{font-weight:600;font-size:14px}
+.lc .t{display:block;font-size:18px;font-weight:700;color:#3ddc97}.lc .t.off{color:#a89cc8;font-size:14px;font-weight:500}
+.lc .liv{font-size:9px;font-weight:800;letter-spacing:2px;color:#ff6b8a;margin-left:8px;vertical-align:2px}
+.hp{font-size:12px;font-weight:500;margin-left:4px}.fc{margin-left:6px;font-size:12px;font-weight:700;color:#3ddc97}
+.more{color:#c9a6ff;font-weight:700;font-size:13px;border-style:dashed;padding:14px 12px;font-family:inherit;-webkit-appearance:none}
+/* Колонки */
+.cols{display:-webkit-flex;display:flex;-webkit-align-items:stretch;align-items:stretch}
+.c1{-webkit-flex:1.5 1 0;flex:1.5 1 0;min-width:0;margin-right:16px}
+.c2{-webkit-flex:1 1 0;flex:1 1 0;min-width:0;display:-webkit-flex;display:flex;-webkit-flex-direction:column;flex-direction:column}
+.c2 .card{margin-bottom:16px}.c2 .card.last{margin-bottom:0;-webkit-flex:1;flex:1}
+@media (max-width:820px){.cols{display:block}.c1{margin:0 0 16px}}
+.lbl{font-weight:700;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:#a89cc8}
+.hd{display:-webkit-flex;display:flex;-webkit-justify-content:space-between;justify-content:space-between;-webkit-align-items:center;align-items:center}
+.ib{border:1px solid #34255c;background:#1c1233;color:#a89cc8;border-radius:8px;padding:4px 9px;font-size:12px;font-weight:700;margin-left:8px;font-family:inherit;-webkit-appearance:none}
+.ib.on{color:#c9a6ff;border-color:#9b5cff}
+/* План / факт */
+.m{padding:14px 0;border-bottom:1px solid #34255c}.m:last-child{border:0;padding-bottom:0}
+.m .v{font-weight:700;font-size:26px;letter-spacing:-.02em}.m .v small{font-size:14px;color:#a89cc8;font-weight:500}
+.bar{position:relative;height:8px;border-radius:99px;background:rgba(255,255,255,.1);margin:6px 0 4px}
+.bar i{position:absolute;left:0;top:0;bottom:0;border-radius:99px;background:#9b5cff;background:-webkit-linear-gradient(left,#6a2fe0,#9b5cff);background:linear-gradient(90deg,#6a2fe0,#9b5cff)}
+.bar u{position:absolute;top:-4px;bottom:-4px;width:2px;background:#f1ebff;border-radius:1px}
+.meta{display:-webkit-flex;display:flex;-webkit-justify-content:space-between;justify-content:space-between;font-size:12px;color:#a89cc8}
+.meta .ok{color:#3ddc97;font-weight:700}.meta .warn{color:#ffb84d;font-weight:700}.meta .bad{color:#ff6b8a;font-weight:700}
+/* Чистая прибыль */
+.big{font-weight:800;font-size:44px;letter-spacing:-.03em;line-height:1.05;margin:8px 0}
+.chip{display:inline-block;font-size:12px;font-weight:700;padding:4px 10px;border-radius:99px}
+.chip.ok{background:rgba(61,220,151,.13);color:#3ddc97}.chip.bad{background:rgba(255,107,138,.13);color:#ff6b8a}
+.eq{border-top:1px solid #34255c;padding-top:12px;margin-top:10px;font-size:13px;color:#a89cc8}
+.eq div{display:-webkit-flex;display:flex;-webkit-justify-content:space-between;justify-content:space-between;padding:3px 0}.eq b{color:#f1ebff}
+.list .r{display:-webkit-flex;display:flex;-webkit-justify-content:space-between;justify-content:space-between;padding:9px 0;border-bottom:1px solid #34255c;font-size:13px}
+.list .r:last-child{border:0}.list .r em{font-style:normal;color:#a89cc8;font-size:12px;display:block}
+.pop{background:#251847;border:1px solid #34255c;border-radius:12px;padding:12px;margin-top:12px}
+/* Требует внимания */
+.tk{display:-webkit-flex;display:flex;-webkit-align-items:center;align-items:center;padding:13px 4px;border-bottom:1px solid #34255c}
+.bd{display:inline-block;min-width:34px;height:34px;line-height:34px;border-radius:99px;color:#fff;font-size:15px;font-weight:700;text-align:center;margin-right:14px;padding:0 6px}
+.bd.w{background:#d98a0b}.bd.r{background:#d6455d}
+.tt{font-size:15px;font-weight:600;display:block}.ts{font-size:13px;color:#a89cc8;display:block}
+.okm{padding:18px 0;color:#a89cc8;text-align:center}
+/* Таблицы */
+h3{font-size:15px;margin:24px 0 8px}
+table{width:100%;border-collapse:collapse;background:#1c1233;border:1px solid #34255c;border-radius:14px}
+th{font-weight:600;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#a89cc8;background:#150d26;padding:10px 12px;text-align:center}
+td{padding:11px 12px;border-top:1px solid #34255c;text-align:center}
+td.l,th.l{text-align:left}
 .scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
-.hide{display:none}
+.seg2{display:-webkit-flex;display:flex;height:22px;border-radius:6px;overflow:hidden;margin:4px 0 10px}
+.seg2 span{display:block;height:22px;line-height:22px;padding:0 6px;font-size:11px;font-weight:700;color:#0d0817;white-space:nowrap;overflow:hidden}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1><img src="/img/office-192.png" alt="" width="34" height="34" style="vertical-align:middle;border-radius:9px;margin-right:8px">Hunter Office <span class="mut">lite</span></h1>
-
-  <div id="login" class="card hide">
+  <div id="login" class="card hide" style="max-width:400px;margin:40px auto">
+    <h2 style="margin:0 0 14px"><img src="/img/office-192.png" alt="" width="34" height="34" style="vertical-align:middle;border-radius:9px;margin-right:8px">Hunter Office</h2>
     <div id="step1">
       <div class="mut">Логин</div><input id="lg" autocapitalize="off" autocorrect="off">
       <div class="mut">Пароль</div><input id="pw" type="password">
     </div>
     <div id="step2" class="hide">
-      <div class="mut">Код из приложения (или резервный код)</div><input id="code" inputmode="numeric" autocomplete="one-time-code">
+      <div class="mut">Код из приложения (или резервный код)</div><input id="code" inputmode="numeric">
     </div>
     <div id="lerr" class="err"></div>
-    <button id="lbtn">Войти</button>
+    <button class="btn" id="lbtn">Войти</button>
   </div>
-
-  <div id="main" class="hide">
-    <div class="bar">
-      <button class="o" data-p="month">Этот месяц</button><button class="o" data-p="prev">Прошлый месяц</button><button class="o" data-p="today">Сегодня</button><button class="o" id="reload">Обновить</button><button class="o" id="out">Выйти</button>
-    </div>
-    <div id="period" class="mut" style="margin-bottom:10px"></div>
-    <div id="body"><div class="card mut">Загрузка…</div></div>
-  </div>
+  <div id="main" class="hide"><div id="body"><div class="card mut">Загрузка…</div></div></div>
 </div>
 <script>
-// Только ES5: var, function, XMLHttpRequest. Никаких стрелочных функций, let/const, ?. и fetch
-var challenge = null, period = 'month';
+// Только ES5: var, function, XMLHttpRequest. Никаких стрелочных функций, let/const, ?., fetch и CSS Grid (Safari 9)
+var challenge = null, period = 'month', liveAll = false, open = {}, last = null;
+var MG = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+var MN = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
+var DXC = ['#f472b6', '#fbbf24', '#3ddc97', '#2dd4bf', '#a78bfa', '#60a5fa', '#fb923c', '#e879f9', '#a3e635', '#38bdf8'];
 
 function $(id) { return document.getElementById(id); }
 function req(method, url, body, done) {
@@ -97,145 +131,206 @@ function req(method, url, body, done) {
   x.send(body ? JSON.stringify(body) : null);
 }
 function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
-function usd(n) {
-  n = Number(n) || 0;
-  var neg = n < 0, v = Math.round(Math.abs(n)), s = String(v).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
-  return (neg ? '−$' : '$') + s;
-}
+function grp(v) { return String(v).replace(/\B(?=(\d{3})+(?!\d))/g, ' '); }
+function usd(n) { n = Number(n) || 0; return (n < 0 ? '−$' : '$') + grp(Math.round(Math.abs(n))); }
+function n0(n) { return grp(Math.round(Number(n) || 0)); }
 function pad(n) { return (n < 10 ? '0' : '') + n; }
+function hw(m) { return String(Math.floor((Number(m) || 0) / 60)); }
+function hm(m) { var r = Math.round(Number(m) || 0); return Math.floor(r / 60) + ' ч ' + pad(r % 60) + ' мин'; }
+function hmin(m) { var r = Math.round(Number(m) || 0); return Math.floor(r / 60) + ' ч ' + pad(r % 60) + ' мин'; }
 function ymd(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+function day(s) { var p = String(s).split('-'); return Number(p[2]) + ' ' + MG[Number(p[1]) - 1]; }
+function dmy(s) { return String(s || '').slice(0, 10).split('-').reverse().join('.'); }
+function lastDay(ym) { var p = ym.split('-'); return ymd(new Date(Number(p[0]), Number(p[1]), 0)); }
+function perLabel(ym) { var p = ym.split('-'); return MN[Number(p[1]) - 1] + ' ' + p[0]; }
 function range() {
   var now = new Date(), y = now.getFullYear(), m = now.getMonth();
   if (period === 'today') return { from: ymd(now), to: ymd(now) };
   if (period === 'prev') return { from: ymd(new Date(y, m - 1, 1)), to: ymd(new Date(y, m, 0)) };
   return { from: ymd(new Date(y, m, 1)), to: ymd(new Date(y, m + 1, 0)) };
 }
+function rangeLabel(from, to, today) {
+  if (from === to) return from === today ? 'Сегодня, ' + day(today) : day(from) + ' ' + from.slice(0, 4);
+  if (from.slice(8) === '01' && to === lastDay(from.slice(0, 7))) return perLabel(from.slice(0, 7)) + (from.slice(0, 7) === today.slice(0, 7) ? ' · на ' + day(today) + ' (день ' + Number(today.slice(8)) + ' из ' + Number(to.slice(8)) + ')' : '');
+  return dmy(from) + ' — ' + dmy(to);
+}
+function lvl(m, pace) { return !pace || m >= pace ? 'pos' : m >= pace * 0.85 ? 'warn' : 'neg'; }
+function offText(s, today) {
+  if (!s.lastEnd) return 'ещё не выходил';
+  var k = ymd(new Date(s.lastEnd));
+  var diff = Math.round((Date.parse(today + 'T00:00:00Z') - Date.parse(k + 'T00:00:00Z')) / 86400000);
+  return (diff <= 0 ? 'сегодня' : diff === 1 ? 'вчера' : day(k)) + (s.lastMin ? ', ' + hm(s.lastMin) : '');
+}
 
 function showLogin() { $('main').className = 'hide'; $('login').className = 'card'; }
-function showMain() { $('login').className = 'hide'; $('main').className = ''; load(); }
-
-function tile(label, value, cls) { return '<td><div class="tile"><span class="mut">' + label + '</span><b class="' + (cls || '') + '">' + value + '</b></div></td>'; }
+function showMain() { $('login').className = 'card hide'; $('main').className = ''; load(); }
 
 function load() {
-  var bs = document.querySelectorAll('.bar button[data-p]');
-  for (var i = 0; i < bs.length; i++) bs[i].className = bs[i].getAttribute('data-p') === period ? 'on' : 'o';
-  var r = range();
-  $('period').innerHTML = 'Период: ' + r.from.split('-').reverse().join('.') + ' — ' + r.to.split('-').reverse().join('.');
-  $('body').innerHTML = '<div class="card mut">Загрузка…</div>';
+  var r = range(), got = 0, dash = null, onl = null, fs = null, fail = null;
+  var done = function () { if (++got < 3) return; if (fail) { $('body').innerHTML = '<div class="card err">' + esc(fail) + '</div>'; return; } last = { d: dash, onl: onl, fs: fs }; render(); };
   req('GET', '/api/office/dashboard?from=' + r.from + '&to=' + r.to, null, function (st, d) {
-    if (st === 401) return showLogin();
-    if (st !== 200) { $('body').innerHTML = '<div class="card err">' + esc(d.error || ('Ошибка ' + st)) + '</div>'; return; }
-    render(d);
+    if (st === 401) { got = -9; return showLogin(); }
+    if (st !== 200) fail = d.error || ('Ошибка ' + st); else dash = d; done();
   });
+  req('GET', '/api/office/online', null, function (st, d) { if (st === 200) onl = d; done(); });
+  req('GET', '/api/office/shifts/fieldstats?from=' + r.from + '&to=' + r.to, null, function (st, d) { if (st === 200) fs = d; done(); });
 }
 
-function hm(min) { min = Math.max(0, Math.round(Number(min) || 0)); var h = Math.floor(min / 60), m = min % 60; return h + ' ч' + (m ? ' ' + m + ' мин' : ''); }
-function hrs(min) { return (Math.round((Number(min) || 0) / 6) / 10) + ' ч'; }
-function pct(v, g) { return g > 0 ? Math.round(v / g * 100) : null; }
-function dmy(s) { return String(s || '').slice(0, 10).split('-').reverse().join('.'); }
-function bar(p, mark) {
-  var w = Math.max(0, Math.min(100, p || 0)), col = p === null ? '#4a3a7a' : p >= 100 ? '#3ddc97' : p >= 70 ? '#ffb84d' : '#ff6b8a';
-  return '<div class="bar2"><i style="width:' + w + '%;background:' + col + '"></i>' + (mark !== null && mark !== undefined && mark < 99.5 ? '<u style="left:' + Math.min(100, mark) + '%"></u>' : '') + '</div>';
-}
-function row(label, val, cls) { return '<tr><td>' + label + '</td><td class="n ' + (cls || '') + '">' + val + '</td></tr>'; }
+function render() {
+  var d = last.d, t = d.totals || {}, g = d.goals || null, pace = Number(d.pace) || 0, h = '', i;
+  var showMark = g && pace < 0.995;
 
-function render(d) {
-  var t = d.totals || {}, g = d.goals || null, pace = Number(d.pace) || 0, h = '';
-  var ss = d.streamers || [], i;
-  var mark = g && pace < 0.995 ? pace * 100 : null;
+  // Шапка: Дашборд, онлайн, период, переключатель периода
+  h += '<div class="top"><div class="ttl"><h2>Дашборд</h2>' + (last.onl ? '<span class="onl"><i></i>онлайн <b>' + last.onl.total + '</b></span>' : '') +
+    '<span class="sub">' + esc(rangeLabel(d.range.from, d.range.to, d.today)) + '</span></div>' +
+    '<div class="seg"><button data-p="today"' + (period === 'today' ? ' class="on"' : '') + '>Сегодня</button><button data-p="month"' + (period === 'month' ? ' class="on"' : '') + '>Месяц</button><button data-p="prev"' + (period === 'prev' ? ' class="on"' : '') + '>Прошлый</button><button data-p="out">Выйти</button></div></div>';
 
-  // Сейчас в эфире
-  var live = [];
-  for (i = 0; i < ss.length; i++) if (ss[i].live) live.push(ss[i]);
-  h += '<div class="card"><h2>Сейчас в эфире</h2>';
-  if (!live.length) h += '<div class="mut">Никто не в эфире</div>';
-  else for (i = 0; i < live.length; i++) h += '<div class="live"><span class="dot"></span><b>' + esc(live[i].name) + '</b> <span class="mut">' + hm(live[i].live.elapsed) + (live[i].minLeft !== null ? ' · до плана смены ' + hm(live[i].minLeft) : '') + '</span></div>';
+  // Полоса стримеров: сначала в эфире, потом по FTD за месяц; админы только в эфире
+  var list = [];
+  for (i = 0; i < d.streamers.length; i++) { var s0 = d.streamers[i]; if ((s0.active || s0.live) && (s0.role !== 'admin' || s0.live)) list.push(s0); }
+  list.sort(function (a, b) {
+    var x = [a.role === 'admin' ? 1 : 0, a.live ? 0 : 1, -((a.month || {}).ftd || 0)], y = [b.role === 'admin' ? 1 : 0, b.live ? 0 : 1, -((b.month || {}).ftd || 0)];
+    for (var k = 0; k < 3; k++) if (x[k] !== y[k]) return x[k] - y[k];
+    return 0;
+  });
+  var shown = [], more = 0;
+  for (i = 0; i < list.length; i++) { if (liveAll || i < 4 || list[i].live) shown.push(list[i]); else more++; }
+  h += '<div class="card live">';
+  if (!list.length) h += '<span class="mut" style="margin-bottom:10px">Стримеров пока нет</span>';
+  for (i = 0; i < shown.length; i++) {
+    var s = shown[i], mo = s.month || {};
+    h += '<div class="lc"><b>' + esc(s.name) + (s.role === 'streamer' ? '<span class="hp ' + lvl(mo.hoursMin, d.plan.paceMin) + '">' + hw(mo.hoursMin) + '/' + d.plan.hours + ' ч</span>' : '') + '<span class="fc">FTD ' + (mo.ftd || 0) + '</span></b>' +
+      (s.live ? '<span class="t">' + hm(s.live.elapsed) + '<span class="liv">LIVE</span></span>' : '<span class="t off">' + esc(offText(s, d.today)) + '</span>') + '</div>';
+  }
+  if (more > 0 || liveAll && list.length > 4) h += '<button class="lc more" id="liveTog">' + (liveAll ? 'Свернуть ▴' : 'Ещё ' + more + ' ▾') + '</button>';
   h += '</div>';
-
-  // Чистая прибыль
-  var margin = t.commission > 0 ? Math.round(t.net / t.commission * 100) : null;
-  var diff = t.netPlanToDate === null || t.netPlanToDate === undefined ? null : t.net - t.netPlanToDate;
-  h += '<div class="card"><h2>Чистая прибыль</h2><div class="big ' + (t.net < 0 ? 'neg' : 'pos') + '">' + usd(t.net) + '</div>' +
-    (diff !== null ? '<div class="' + (diff >= 0 ? 'pos' : 'neg') + '">' + (diff >= 0 ? '▲ на ' + usd(diff) + ' выше' : '▼ на ' + usd(-diff) + ' ниже') + ' плана на эту дату</div>' : '') +
-    (margin !== null ? '<div class="mut">Маржа ' + margin + '% от комиссии</div>' : '') +
-    '<table style="margin-top:10px">' + row('Комиссия получена', usd(t.commission)) + row('− Зарплаты и бонусы', usd(-(t.salaries || 0)), 'neg') +
-    row('− Расходы', usd(-(t.expenses || 0)), 'neg') + row('<b>= Чистая прибыль</b>', '<b>' + usd(t.net) + '</b>') + '</table></div>';
 
   // План / факт
-  var avg = t.ftd ? t.ftdSum / t.ftd : 0;
-  var pf = [
-    ['FTD — первый депозит', t.ftd || 0, g && g.ftd, function (v) { return String(v); }, 'средний FTD ' + usd(avg)],
-    ['Пополнения по FTD', t.ftdSum, g && g.ftdSum, usd, ''],
-    ['Все депозиты (FTD + додепы)', t.deposits, g && g.deposits, usd, 'додепы ' + usd(t.depSum)],
-    ['Комиссия получена', t.commission, g && g.commission, usd, t.deposits ? (Math.round(t.commission / t.deposits * 1000) / 10) + '% от депозитов' : '']
-  ];
-  h += '<div class="card"><h2>План / факт</h2>';
-  for (i = 0; i < pf.length; i++) {
-    var p = pf[i], pp = pct(p[1], p[2]);
-    h += '<div class="pf"><div class="mut">' + p[0] + '</div><div><b class="v">' + p[3](p[1] || 0) + '</b>' + (p[2] ? ' <span class="mut">/ ' + p[3](p[2]) + '</span>' : '') + '</div>' +
-      bar(pp, mark) + '<div class="mut sm2">' + (pp !== null ? pp + '% плана' : 'план не задан') + (mark !== null ? ' · по графику ' + Math.round(mark) + '%' : '') + (p[4] ? ' · ' + p[4] : '') + '</div></div>';
+  var avg = t.ftd ? t.ftdSum / t.ftd : 0, dShare = t.deposits ? t.depSum / t.deposits * 100 : 0, cShare = t.deposits ? t.commission / t.deposits * 100 : 0;
+  var rows = [['FTD — первый депозит', t.ftd, g && g.ftd, n0, showMark ? 'по графику ' + Math.round(pace * 100) + '%' : ''],
+    ['Пополнения по FTD', t.ftdSum, g && g.ftdSum, usd, 'средний FTD ' + usd(avg)],
+    ['Все депозиты (FTD + додепы)', t.deposits, g && g.deposits, usd, 'додепы ' + usd(t.depSum) + ' · ' + Math.round(dShare) + '%'],
+    ['Комиссия получена', t.commission, g && g.commission, usd, String(Math.round(cShare * 10) / 10).replace('.', ',') + '% от депозитов']];
+  var pf = '<div class="card"><div class="hd"><div><span class="lbl">' + (d.range.whole && !d.range.all ? 'План / факт за месяц' : 'План / факт') + '</span><button class="ib' + (open.funnel ? ' on' : '') + '" data-o="funnel">Воронка</button></div>' +
+    (showMark ? '<span class="mut" style="font-size:12px">метка: план на сегодня</span>' : '') + '</div>';
+  if (open.funnel) pf += '<div class="pop">' + funnel(d) + '</div>';
+  for (i = 0; i < rows.length; i++) {
+    var rw = rows[i], v = rw[1] || 0, goal = rw[2], pct = goal > 0 ? v / goal * 100 : null;
+    var cls = pct === null ? '' : pct >= pace * 100 ? 'ok' : pct >= pace * 85 ? 'warn' : 'bad';
+    pf += '<div class="m"><div class="lbl">' + rw[0] + '</div><div class="v">' + rw[3](v) + (goal > 0 ? '<small> / ' + rw[3](goal) + '</small>' : '') + '</div>' +
+      (pct !== null ? '<div class="bar"><i style="width:' + Math.min(100, pct) + '%"></i>' + (showMark ? '<u style="left:' + pace * 100 + '%"></u>' : '') + '</div>' : '') +
+      '<div class="meta"><span class="' + cls + '">' + (pct !== null ? Math.round(pct) + '% плана' : '') + '</span><span>' + rw[4] + '</span></div></div>';
   }
-  h += '</div>';
+  pf += '</div>';
 
-  // Воронка
-  var ctr = t.clicks ? Math.round(t.regs / t.clicks * 1000) / 10 : null, rtd = t.regs ? Math.round(t.ftd / t.regs * 1000) / 10 : null, ch = t.ftd ? Math.round((t.churned || 0) / t.ftd * 1000) / 10 : null;
-  h += '<div class="card"><h2>Воронка</h2><table class="tiles"><tr>' + tile('Клики', t.clicks || 0) + tile('Регистрации', t.regs || 0) + tile('FTD', t.ftd || 0) +
-    '</tr><tr>' + tile('Додепы', t.dep || 0) + tile('Отвал', t.churned || 0, t.churned ? 'neg' : '') + tile('Комиссия', usd(t.commission)) + '</tr></table>' +
-    '<div class="mut" style="margin-top:6px">CTR (клик → регистрация): ' + (ctr === null ? '—' : ctr + '%') + ' · RTD (регистрация → FTD): ' + (rtd === null ? '—' : rtd + '%') + ' · Churn: ' + (ch === null ? '—' : ch + '%') + '</div></div>';
+  // Чистая прибыль
+  var diff = t.netPlanToDate === null || t.netPlanToDate === undefined ? null : t.net - t.netPlanToDate;
+  var margin = t.commission > 0 ? Math.round(t.net / t.commission * 100) : null;
+  var net = '<div class="card"><div class="hd"><div><span class="lbl">Чистая прибыль</span><button class="ib' + (open.sal ? ' on' : '') + '" data-o="sal">Зарплаты</button><button class="ib' + (open.exp ? ' on' : '') + '" data-o="exp">Расходы</button></div></div>' +
+    '<div class="big ' + (t.net < 0 ? 'neg' : 'pos') + '">' + usd(t.net) + '</div>' +
+    (diff !== null ? '<span class="chip ' + (diff >= 0 ? 'ok' : 'bad') + '">' + (diff >= 0 ? '▲ на ' + usd(diff) + ' выше' : '▼ на ' + usd(-diff) + ' ниже') + ' плана на эту дату</span>' : '') +
+    (margin !== null ? '<div class="mut" style="font-size:13px;margin-top:6px">Маржа ' + margin + '% от комиссии</div>' : '') +
+    '<div class="eq"><div><span>Комиссия получена</span><b>' + usd(t.commission) + '</b></div><div><span>− Зарплаты и бонусы</span><b class="neg">' + usd(-(t.salaries || 0)) + '</b></div>' +
+    '<div><span>− Расходы</span><b class="neg">' + usd(-(t.expenses || 0)) + '</b></div><div><span>= Чистая прибыль</span><b class="' + (t.net < 0 ? 'neg' : 'pos') + '">' + usd(t.net) + '</b></div></div>';
+  if (open.sal) net += '<div class="pop"><div class="lbl" style="margin-bottom:4px">Зарплаты за период (начислено)</div>' + salaries(d) + '</div>';
+  if (open.exp) net += '<div class="pop"><div class="lbl" style="margin-bottom:4px">Расходы за период</div>' + expenses(d) + '</div>';
+  net += '</div>';
 
-  // Стримеры: за период и часы за месяц
-  h += '<div class="card"><h2>Стримеры</h2><div class="scroll"><table><tr><th>Имя</th><th class="n">Часы за месяц</th><th class="n">Клики</th><th class="n">Рег.</th><th class="n">FTD</th><th class="n">Депозиты</th><th class="n">Комиссия</th><th class="n">Зарплата</th></tr>';
-  for (i = 0; i < ss.length; i++) {
-    var s = ss[i], rg = s.range || {}, mo = s.month || {};
-    if (!s.active && !rg.ftd && !rg.salary && !rg.deposits) continue;
-    var hp = pct(mo.hoursMin, mo.planMin);
-    h += '<tr><td>' + (s.live ? '<span class="dot"></span>' : '') + esc(s.name) + (s.role !== 'streamer' ? ' <span class="mut">' + esc(s.role === 'admin' ? 'админ' : s.role === 'teamlead' ? 'тимлид' : s.role) + '</span>' : '') + '</td>' +
-      '<td class="n">' + hrs(mo.hoursMin) + (mo.planMin ? ' <span class="mut">/ ' + hrs(mo.planMin) + (hp !== null ? ' · ' + hp + '%' : '') + '</span>' : '') + '</td>' +
-      '<td class="n">' + (rg.clicks || 0) + '</td><td class="n">' + (rg.regs || 0) + '</td><td class="n">' + (rg.ftd || 0) + '</td>' +
-      '<td class="n">' + usd(rg.deposits) + '</td><td class="n">' + usd(rg.commission) + '</td><td class="n">' + usd(rg.salary) + '</td></tr>';
-  }
-  h += '</table></div></div>';
-
-  // Зарплаты: начислено, выплачено, к выплате
-  var ts = d.teamSalaries || [], sal = '';
-  for (i = 0; i < ss.length; i++) {
-    var r = ss[i].range || {};
-    if (!r.salary && !r.paid) continue;
-    sal += '<tr><td>' + esc(ss[i].name) + '</td><td class="n">' + usd(r.salary) + '</td><td class="n">' + usd(r.paid) + '</td><td class="n">' + usd(Math.max(0, (r.salary || 0) - (r.paid || 0))) + '</td></tr>';
-  }
-  for (i = 0; i < ts.length; i++) sal += '<tr><td>' + esc(ts[i].name) + ' <span class="mut">ставка</span></td><td class="n">' + usd(ts[i].salary) + '</td><td class="n">' + usd(ts[i].paid) + '</td><td class="n">' + usd(Math.max(0, (ts[i].salary || 0) - (ts[i].paid || 0))) + '</td></tr>';
-  h += '<div class="card"><h2>Зарплаты</h2>' + (sal ? '<table><tr><th>Кто</th><th class="n">Начислено</th><th class="n">Выплачено</th><th class="n">К выплате</th></tr>' + sal +
-    '<tr><td><b>Итого начислено</b></td><td class="n"><b>' + usd(t.salaries) + '</b></td><td></td><td></td></tr></table>' : '<div class="mut">Начислений за период нет</div>') +
-    (d.range && !d.range.whole ? '<div class="mut" style="margin-top:6px">Неполный месяц: зарплата считается пропорционально дням.</div>' : '') + '</div>';
-
-  // Расходы
-  var ex = d.expenses || [];
-  h += '<div class="card"><h2>Расходы</h2>';
-  if (!ex.length) h += '<div class="mut">Расходов за период нет</div>';
-  else {
-    h += '<table>';
-    for (i = 0; i < ex.length; i++) h += row(esc(ex[i].comment) + ' <span class="mut">' + dmy(ex[i].day) + '</span>', usd(-ex[i].amount), 'neg');
-    h += row('<b>Итого</b>', '<b>' + usd(-(t.expenses || 0)) + '</b>', 'neg') + '</table>';
-  }
-  h += '</div>';
-
-  // Требует внимания
-  var T = d.tasks || {}, at = [];
-  var names = function (a, f) { var o = []; for (var j = 0; j < a.length; j++) o.push(f(a[j])); return o.join(' · '); };
-  if (T.pending && T.pending.length) at.push(['Отчёты ждут проверки', names(T.pending, function (x) { return x.name + ' ' + x.n; })]);
-  if (T.advances && T.advances.length) at.push(['Заявки на аванс', names(T.advances, function (x) { return x.staff_name + ' · ' + usd(x.amount); })]);
-  if (T.lagging && T.lagging.length) at.push(['Отстают от плана по часам', names(T.lagging, function (x) { return x.name + ' ' + hrs(x.hoursMin); })]);
-  if (T.shortfalls && T.shortfalls.length) at.push(['Недобор часов без причины', names(T.shortfalls, function (x) { return x.name + ' ' + x.n; })]);
-  if (T.tasksDone && T.tasksDone.length) at.push(['Задачи ждут принятия', names(T.tasksDone, function (x) { return x.staff_name + ': ' + x.title; })]);
-  if (T.tasksOverdue && T.tasksOverdue.length) at.push(['Просрочены задачи', names(T.tasksOverdue, function (x) { return x.staff_name + ': ' + x.title; })]);
-  if (T.monthWaiting) at.push(['Прошлый месяц ждёт закрытия', T.monthWaiting.pending ? 'не проверено отчётов: ' + T.monthWaiting.pending : 'закройте после правок']);
-  h += '<div class="card"><h2>Требует внимания</h2>';
-  if (!at.length) h += '<div class="pos">Всё в порядке</div>';
-  else for (i = 0; i < at.length; i++) h += '<div class="att"><b>' + esc(at[i][0]) + '</b><div class="mut">' + esc(at[i][1]) + '</div></div>';
-  h += '</div>';
-
-  h += '<div class="mut" style="text-align:center;margin:6px 0 20px">Обновлено ' + new Date().toLocaleTimeString('ru-RU').slice(0, 5) + ' · обновляется само раз в минуту</div>';
+  h += '<div class="cols"><div class="c1">' + pf + '</div><div class="c2">' + net + '<div class="card last"><div class="lbl">Требует внимания</div>' + tasks(d) + '</div></div></div>';
+  h += shifts(last.fs, d);
+  h += '<div class="mut" style="text-align:center;margin:16px 0 4px;font-size:12px">Обновлено ' + pad(new Date().getHours()) + ':' + pad(new Date().getMinutes()) + ' · обновляется само раз в минуту</div>';
   $('body').innerHTML = h;
+  bind();
+}
+
+function funnel(d) {
+  var t = d.totals || {}, out = '', st = [['Клики', 'clicks'], ['Регистрации', 'regs'], ['FTD', 'ftd'], ['Додепы', 'dep'], ['Отвал', 'churned']];
+  var ids = [], i, j;
+  for (i = 0; i < d.streamers.length; i++) ids.push(d.streamers[i].id);
+  ids.sort(function (a, b) { return a - b; });
+  var col = function (id) { return DXC[ids.indexOf(id) % DXC.length]; };
+  var S = []; for (i = 0; i < d.streamers.length; i++) if (d.streamers[i].role === 'streamer') S.push(d.streamers[i]);
+  var tot = {}; for (i = 0; i < st.length; i++) { tot[st[i][1]] = 0; for (j = 0; j < S.length; j++) tot[st[i][1]] += Number((S[j].range || {})[st[i][1]]) || 0; }
+  var pc = function (v) { return v === null ? '—' : String(Math.round(v * 10) / 10).replace('.', ',') + '%'; };
+  out += '<div style="font-weight:700;color:#c9a6ff;margin-bottom:8px">CTR: ' + pc(tot.clicks ? tot.regs / tot.clicks * 100 : null) + ' &nbsp; RTD: ' + pc(tot.regs ? tot.ftd / tot.regs * 100 : null) + ' &nbsp; Churn: ' + pc(tot.ftd ? tot.churned / tot.ftd * 100 : null) + '</div>';
+  for (i = 0; i < st.length; i++) {
+    var k = st[i][1], seg = '';
+    for (j = 0; j < S.length; j++) { var v = Number((S[j].range || {})[k]) || 0; if (v > 0) seg += '<span style="-webkit-flex:' + v + ' 1 auto;flex:' + v + ' 1 auto;background:' + col(S[j].id) + '">' + esc(S[j].name) + ' ' + v + '</span>'; }
+    out += '<div class="hd"><span class="lbl">' + st[i][0] + '</span><b>' + n0(tot[k]) + '</b></div><div class="seg2">' + (seg || '<span style="-webkit-flex:1;flex:1;background:rgba(255,255,255,.1);color:#a89cc8">нет данных</span>') + '</div>';
+  }
+  return out;
+}
+function salaries(d) {
+  var t = d.totals || {}, TS = {}, i, o = '', ts = d.teamSalaries || [];
+  for (i = 0; i < ts.length; i++) TS[ts[i].id] = ts[i];
+  var pay = function (acc, paid) { return paid >= acc - 0.5 && acc > 0 ? 'выплачено полностью ✓' : 'выплачено ' + usd(paid) + ' · к выплате ' + usd(Math.max(0, acc - paid)); };
+  for (i = 0; i < d.streamers.length; i++) {
+    var s = d.streamers[i], r = s.range || {}, tt = TS[s.id];
+    if (!r.salary && !r.paid && !tt) continue;
+    if (tt) delete TS[s.id];
+    var tot = (r.salary || 0) + (tt ? tt.salary : 0);
+    o += '<div class="r"><span>' + esc(s.name) + '<em>' + (tt ? 'смены и лиды ' + usd(r.salary) + ' + ставка ' + usd(tt.salary) : 'начислено') + ' · ' + pay(tot, r.paid || 0) + '</em></span><b>' + usd(tot) + '</b></div>';
+  }
+  for (var id in TS) if (TS.hasOwnProperty(id)) o += '<div class="r"><span>' + esc(TS[id].name) + '<em>ставка из «ЗП (команда)» · ' + pay(TS[id].salary, TS[id].paid) + '</em></span><b>' + usd(TS[id].salary) + '</b></div>';
+  o += '<div class="r"><span>Итого начислено</span><b>' + usd(t.salaries) + '</b></div>';
+  return '<div class="list">' + o + '</div>';
+}
+function expenses(d) {
+  var ex = d.expenses || [], o = '', i;
+  if (!ex.length) return '<div class="okm">Расходов за период нет</div>';
+  for (i = 0; i < ex.length; i++) o += '<div class="r"><span>' + esc(ex[i].comment) + '<em>' + dmy(ex[i].day).slice(0, 5) + '</em></span><b class="neg">' + usd(-ex[i].amount) + '</b></div>';
+  o += '<div class="r"><span>Итого расходов</span><b class="neg">' + usd(-(d.totals.expenses || 0)) + '</b></div>';
+  return '<div class="list">' + o + '</div>';
+}
+function tasks(d) {
+  var T = d.tasks || {}, rows = [], i;
+  var names = function (a, f) { var o = []; for (var j = 0; j < a.length; j++) o.push(f(a[j])); return o.join(' · '); };
+  var sum = function (a) { var n = 0; for (var j = 0; j < a.length; j++) n += a[j].n; return n; };
+  if (T.pending && T.pending.length) rows.push([sum(T.pending), 'w', 'Отчёты ждут проверки', names(T.pending, function (x) { return x.name + ' ' + x.n; })]);
+  if (T.advances && T.advances.length) rows.push([T.advances.length, 'w', 'Заявка на аванс', names(T.advances, function (x) { return x.staff_name + ' · ' + usd(x.amount); })]);
+  if (T.lagging && T.lagging.length) {
+    var bad = false; for (i = 0; i < T.lagging.length; i++) if (T.lagging[i].level === 'bad') bad = true;
+    rows.push([T.lagging.length, bad ? 'r' : 'w', 'Стримеры отстают от плана', names(T.lagging, function (x) { return x.name + ' ' + hw(x.hoursMin) + '/' + d.plan.hours + ' ч'; })]);
+  }
+  if (T.shortfalls && T.shortfalls.length) rows.push([sum(T.shortfalls), 'w', 'Недобор часов без причины', names(T.shortfalls, function (x) { return x.name + ' ' + x.n; })]);
+  if (T.monthWaiting) rows.push([T.monthWaiting.pending || '!', T.monthWaiting.pending ? 'w' : 'r', 'Месяц ' + perLabel(T.monthWaiting.period) + ' ждёт закрытия', T.monthWaiting.hold ? 'Открыт заново: закройте его после правок' : T.monthWaiting.pending + ' отчётов не проверено']);
+  if (T.tasksDone && T.tasksDone.length) rows.push([T.tasksDone.length, 'w', 'Задачи ждут принятия', names(T.tasksDone, function (x) { return x.staff_name + ': ' + x.title; })]);
+  if (T.tasksOverdue && T.tasksOverdue.length) rows.push([T.tasksOverdue.length, 'r', 'Просрочены задачи', names(T.tasksOverdue, function (x) { return x.staff_name + ': ' + x.title; })]);
+  if (!rows.length) return '<div class="okm">Всё под контролем ✓</div>';
+  var o = '';
+  for (i = 0; i < rows.length; i++) o += '<div class="tk"><span class="bd ' + rows[i][1] + '">' + rows[i][0] + '</span><span><span class="tt">' + esc(rows[i][2]) + '</span><span class="ts">' + esc(rows[i][3]) + '</span></span></div>';
+  return o;
+}
+function shifts(fs, d) {
+  if (!fs || (!fs.fields.length && !fs.rows.length)) return '';
+  var label = fs.from ? (fs.from.slice(0, 7) === fs.to.slice(0, 7) && fs.from.slice(8) === '01' && fs.to === lastDay(fs.from.slice(0, 7)) ? perLabel(fs.from.slice(0, 7)) : dmy(fs.from) + ' — ' + dmy(fs.to)) : perLabel(fs.period);
+  var o = '<h3>Эфиры за ' + esc(label) + '</h3>';
+  if (!fs.rows.length) return o + '<div class="card mut" style="text-align:center">Зачтённых отчётов за период пока нет.</div>';
+  var i, j, tot = {}, rep = 0, min = 0;
+  o += '<div class="scroll"><table><tr><th class="l">Сотрудник</th><th>Отчётов</th><th>Время</th>';
+  for (j = 0; j < fs.fields.length; j++) o += '<th>' + esc(fs.fields[j]) + '</th>';
+  o += '</tr>';
+  for (i = 0; i < fs.rows.length; i++) {
+    var r = fs.rows[i]; rep += r.reports; min += r.minutes;
+    o += '<tr><td class="l">' + esc(r.name) + '</td><td>' + r.reports + '</td><td>' + hmin(r.minutes) + '</td>';
+    for (j = 0; j < fs.fields.length; j++) { var v = r.sums[fs.fields[j]] || 0; tot[fs.fields[j]] = (tot[fs.fields[j]] || 0) + v; o += '<td>' + n0(v) + '</td>'; }
+    o += '</tr>';
+  }
+  o += '<tr><td class="l"><b>Всего</b></td><td><b>' + rep + '</b></td><td><b>' + hmin(min) + '</b></td>';
+  for (j = 0; j < fs.fields.length; j++) o += '<td><b>' + n0(tot[fs.fields[j]] || 0) + '</b></td>';
+  return o + '</tr></table></div>';
+}
+
+function bind() {
+  var b = document.querySelectorAll('[data-p]'), i;
+  for (i = 0; i < b.length; i++) b[i].onclick = function () {
+    var p = this.getAttribute('data-p');
+    if (p === 'out') return req('POST', '/api/office/logout', {}, function () { challenge = null; $('step1').className = ''; $('step2').className = 'hide'; showLogin(); });
+    period = p; load();
+  };
+  var o = document.querySelectorAll('[data-o]');
+  for (i = 0; i < o.length; i++) o[i].onclick = function () { var k = this.getAttribute('data-o'); open[k] = !open[k]; render(); };
+  if ($('liveTog')) $('liveTog').onclick = function () { liveAll = !liveAll; render(); };
 }
 
 $('lbtn').onclick = function () {
@@ -257,14 +352,9 @@ $('lbtn').onclick = function () {
     });
   }
 };
-var pb = document.querySelectorAll('.bar button[data-p]');
-for (var k = 0; k < pb.length; k++) pb[k].onclick = function () { period = this.getAttribute('data-p'); load(); };
-$('reload').onclick = function () { load(); };
-$('out').onclick = function () { req('POST', '/api/office/logout', {}, function () { challenge = null; $('step1').className = ''; $('step2').className = 'hide'; showLogin(); }); };
 
-// Уже вошли (cookie сессии): сразу данные, иначе форма входа
+// Уже вошли (cookie сессии): сразу данные, иначе форма входа. Дальше сами обновляем раз в минуту
 req('GET', '/api/office/me', null, function (st) { if (st === 200) showMain(); else showLogin(); });
-// Сами обновляем данные раз в минуту, пока открыта страница с данными
 setInterval(function () { if ($('main').className !== 'hide') load(); }, 60000);
 </script>
 </body>
