@@ -137,21 +137,6 @@ td{white-space:nowrap}
 .tiers{display:-webkit-flex;display:flex}.tier{-webkit-flex:1;flex:1;text-align:center;border:1px solid #34255c;border-radius:12px;padding:8px 4px;margin-right:8px;opacity:.55}
 .tier:last-child{margin-right:0}.tier.on{opacity:1;border-color:#3ddc97}.tier b{display:block;font-size:13px}.tier span{font-size:11px}
 @media (max-width:620px){.kv{width:50%}.c2c{display:block}}
-.vgrid{display:-webkit-flex;display:flex;-webkit-flex-wrap:wrap;flex-wrap:wrap;margin-right:-14px}
-.vc{width:31.3%;margin:0 2% 14px 0;background:#1c1233;border:1px solid #34255c;border-radius:14px;overflow:hidden}
-@media (max-width:820px){.vc{width:48%}}
-.vth{position:relative;height:0;padding-bottom:56.25%;background:#150d26 center/cover no-repeat;background-size:cover}
-.vpl{position:absolute;left:50%;top:50%;width:54px;height:54px;margin:-27px 0 0 -27px;border-radius:54px;background:rgba(155,92,255,.9);color:#fff;font-size:22px;line-height:54px;text-align:center}
-.vt{display:-webkit-flex;display:flex;-webkit-justify-content:space-between;justify-content:space-between;-webkit-align-items:center;align-items:center;padding:10px 12px}
-.vt b{font-size:14px;min-width:0}
-.vbox{position:fixed;left:50%;top:40px;width:900px;max-width:96%;-webkit-transform:translateX(-50%);transform:translateX(-50%);z-index:71;background:#1c1233;border:1px solid #34255c;border-radius:16px;padding:14px}
-.vbox.full{left:0;top:0;right:0;bottom:0;width:100%;max-width:none;height:100%;-webkit-transform:none;transform:none;border-radius:0;border:0;padding:6px 8px 8px;display:-webkit-flex;display:flex;-webkit-flex-direction:column;flex-direction:column;background:#000;z-index:80}
-.vbox.full .chd{margin-bottom:6px}.vbox.full .mut{display:none}
-.vbox.full .vfr{-webkit-flex:1;flex:1;padding-bottom:0;height:auto;border-radius:0}
-.ytb{display:block;text-align:center;text-decoration:none;margin-top:10px;background:#ff3d3d}
-.vbox.full .ytb{display:none}
-.vfr{position:relative;height:0;padding-bottom:56.25%;background:#000;border-radius:10px;overflow:hidden}
-.vfr iframe,.vfr video{position:absolute;left:0;top:0;width:100%;height:100%;border:0;background:#000}
 tr.sum td{border-top:2px solid #9b5cff;background:rgba(155,92,255,.08);font-weight:700}
 .seg2{display:-webkit-flex;display:flex;height:22px;border-radius:6px;overflow:hidden;margin:4px 0 10px}
 .seg2 span{display:block;height:22px;line-height:22px;padding:0 6px;font-size:11px;font-weight:700;color:#0d0817;white-space:nowrap;overflow:hidden}
@@ -178,7 +163,7 @@ tr.sum td{border-top:2px solid #9b5cff;background:rgba(155,92,255,.08);font-weig
 <script>
 // Только ES5: var, function, XMLHttpRequest. Никаких стрелочных функций, let/const, ?., fetch и CSS Grid (Safari 9)
 var challenge = null, liveAll = false, last = null;
-var view = location.hash === '#leads' ? 'leads' : location.hash === '#video' ? 'video' : 'dash';
+var view = location.hash === '#leads' ? 'leads' : 'dash';
 var rng = (function () { var n = new Date(); return { from: ymdx(new Date(n.getFullYear(), n.getMonth(), 1)), to: ymdx(new Date(n.getFullYear(), n.getMonth() + 1, 0)) }; })();
 function ymdx(d) { return d.getFullYear() + '-' + (d.getMonth() < 9 ? '0' : '') + (d.getMonth() + 1) + '-' + (d.getDate() < 10 ? '0' : '') + d.getDate(); }
 var MG = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
@@ -231,7 +216,6 @@ function showMain() { $('login').className = 'card hide'; $('main').className = 
 
 function load() {
   if (view === 'leads') return loadLeads();
-  if (view === 'video') return loadVideos();
   var r = range(), got = 0, dash = null, onl = null, fs = null, fail = null;
   var done = function () { if (++got < 3) return; if (fail) { $('body').innerHTML = '<div class="card err">' + esc(fail) + '</div>'; return; } last = { d: dash, onl: onl, fs: fs }; render(); };
   req('GET', '/api/office/dashboard?from=' + r.from + '&to=' + r.to, null, function (st, d) {
@@ -399,7 +383,7 @@ function calBind() {
 var menuOpen = false;
 function menuHtml() {
   if (!menuOpen) return '';
-  var it = [['dash', 'Дашборд'], ['leads', 'Лиды'], ['video', 'Музыка']], h = '<div class="mov" id="mov"></div><div class="menu"><div class="mlogo"><img src="/img/office-192.png" width="30" height="30" alt="" style="border-radius:8px;vertical-align:middle;margin-right:8px">Hunter Office</div>', i;
+  var it = [['dash', 'Дашборд'], ['leads', 'Лиды']], h = '<div class="mov" id="mov"></div><div class="menu"><div class="mlogo"><img src="/img/office-192.png" width="30" height="30" alt="" style="border-radius:8px;vertical-align:middle;margin-right:8px">Hunter Office</div>', i;
   for (i = 0; i < it.length; i++) h += '<button class="mi' + (view === it[i][0] ? ' on' : '') + '" data-v="' + it[i][0] + '">' + it[i][1] + '</button>';
   return h + '<button class="mi out" id="logout">Выйти</button></div>';
 }
@@ -414,7 +398,7 @@ function navBind() {
   if ($('logout')) $('logout').onclick = function () { menuOpen = false; req('POST', '/api/office/logout', {}, function () { challenge = null; $('step1').className = ''; $('step2').className = 'hide'; showLogin(); }); };
   calBind();
 }
-function draw() { if (view === 'leads') renderLeads(); else if (view === 'video') renderVideos(); else render(); }
+function draw() { if (view === 'leads') renderLeads(); else render(); }
 
 // ---------- Лиды ----------
 var LST = { new: ['Новый', 'st-new'], registered: ['Регистрация', 'st-reg'], ftd: ['FTD', 'st-ftd'], active: ['Активный', 'st-act'], churned: ['Отвал', 'st-ch'] };
@@ -513,73 +497,6 @@ function renderCard(d) {
   $('cov').onclick = closeCard; $('cx').onclick = closeCard;
   var rc = document.querySelectorAll('[data-card]');
   for (i = 0; i < rc.length; i++) rc[i].onclick = function (e) { e.preventDefault(); openCard(this.getAttribute('data-card')); };
-}
-
-// ---------- Музыка: плейлисты и треки YouTube Music / YouTube, файлы .mp3/.mp4; только список. Добавляет админ в обычном Office (меню → «Музыка») ----------
-var videos = null, myRole = '';
-function ytList(u) { var m = /(?:youtube\.com|youtu\.be)\/\S*[?&]list=([A-Za-z0-9_-]{10,})/.exec(u || ''); return m ? m[1] : null; }
-function ytId(u) {
-  var m = /(?:youtube(?:-nocookie)?\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/|live\/|v\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/.exec(u || '');
-  return m ? m[1] : null;
-}
-// Из того, что вставили (ссылка или HTML-код <iframe ...>), достаём адрес видео
-function videoUrl(text) {
-  var t = String(text || '').replace(/^\s+|\s+$/g, ''), m = /src=["']([^"']+)["']/i.exec(t);
-  if (m) t = m[1];
-  if (/^\/\//.test(t)) t = 'https:' + t;
-  return /^https:\/\/\S+$/i.test(t) ? t : null;
-}
-function isFile(u) { return /\.(mp4|m4v|mov|webm|m3u8|mp3|m4a|aac)(\?|#|$)/i.test(u) || /dropbox\.com\/.*[?&]raw=1/i.test(u) || /drive\.google\.com\/uc\?/i.test(u); }
-function loadVideos() {
-  req('GET', '/api/office/lite/videos', null, function (st, d) {
-    if (st === 401) return showLogin();
-    videos = st === 200 ? d : [];
-    renderVideos();
-  });
-}
-function renderVideos() {
-  var list = videos || [], i, h = header('Музыка', '', true);
-  if (!list.length) h += '<div class="card mut" style="text-align:center">Музыки пока нет. Добавьте плейлист в Office: меню → «Музыка».</div>';
-  else {
-    h += '<div class="vgrid">';
-    for (i = 0; i < list.length; i++) {
-      var v = list[i], pl = ytList(v.url), id = pl ? null : ytId(v.url);
-      h += '<div class="vc" data-play="' + i + '"><div class="vth"' + (id ? ' style="background-image:url(https://i.ytimg.com/vi/' + id + '/hqdefault.jpg)"' : '') + '><span class="vpl">' + (pl ? '♫' : '▶') + '</span></div>' +
-        '<div class="vt"><b>' + esc(v.title || (pl ? 'Плейлист' : id ? 'Трек' : 'Музыка')) + '</b></div></div>';
-    }
-    h += '</div>';
-  }
-  $('body').innerHTML = menuHtml() + h;
-  navBind();
-  var b = document.querySelectorAll('[data-play]');
-  for (i = 0; i < b.length; i++) b[i].onclick = function () { playVideo(list[Number(this.getAttribute('data-play'))]); };
-}
-// Плеер: YouTube — встроенный плеер YouTube, файл — стандартный плеер iPad, остальное — страница внутри окна
-function playVideo(v) {
-  var pl = ytList(v.url), id = pl ? null : ytId(v.url), inner;
-  // YouTube и YouTube Music: встроенный плеер YouTube на iOS 9 не запускается, поэтому сразу открываем мобильный сайт YouTube
-  // (в Safari он работает). С ярлыка на экране «Домой» откроется Safari
-  if (pl || id) { window.open('https://m.youtube.com/' + (pl ? 'playlist?list=' + pl : 'watch?v=' + id), '_blank'); return; }
-  // Плейлист YouTube Music / YouTube: официальный встроенный плеер со всем списком
-  if (pl) inner = '<iframe src="https://www.youtube.com/embed/videoseries?list=' + pl + '&autoplay=1&fs=1&rel=0" allow="autoplay; fullscreen; encrypted-media" allowfullscreen webkitallowfullscreen frameborder="0"></iframe>';
-  else if (id) inner = '<iframe src="https://www.youtube.com/embed/' + id + '?autoplay=1&fs=1&rel=0" allow="autoplay; fullscreen; encrypted-media" allowfullscreen webkitallowfullscreen frameborder="0"></iframe>';
-  else if (isFile(v.url)) inner = '<video src="' + esc(v.url) + '" controls autoplay playsinline webkit-playsinline></video>';
-  else inner = '<iframe src="' + esc(v.url) + '" allowfullscreen webkitallowfullscreen frameborder="0"></iframe>';
-  $('card').innerHTML = '<div class="cov" id="cov"></div><div class="vbox" id="vbox"><div class="chd"><b>' + esc(v.title || (pl ? 'Плейлист' : 'Музыка')) + '</b><span><button class="ib" id="vfull">⛶ На весь экран</button><button class="ib" id="cx">✕</button></span></div><div class="vfr">' + inner + '</div>' +
-    (pl || id ? '<a class="btn ytb" href="https://m.youtube.com/' + (pl ? 'playlist?list=' + pl : 'watch?v=' + id) + '" target="_blank">▶ Открыть в YouTube</a><div class="mut" style="font-size:12px;margin-top:6px">Если встроенный плеер не запускается, кнопка откроет ' + (pl ? 'плейлист' : 'трек') + ' на сайте YouTube, как в Safari</div>'
-      : '<div class="mut" style="font-size:12px;margin-top:8px">Если видео не запускается: <a href="' + esc(v.url) + '" target="_blank" style="color:#c9a6ff">открыть по ссылке</a></div>') + '</div>';
-  $('card').className = '';
-  $('cov').onclick = closeCard; $('cx').onclick = closeCard;
-  // На весь экран: окно с плеером растягивается на весь экран планшета (у плеера YouTube на iOS 9 своей кнопки нет).
-  // Где браузер умеет настоящий полноэкранный режим, включаем и его
-  $('vfull').onclick = function () {
-    var b = $('vbox'), on = b.className.indexOf('full') < 0;
-    b.className = on ? 'vbox full' : 'vbox';
-    this.innerHTML = on ? '✕ Свернуть' : '⛶ На весь экран';
-    var rq = b.requestFullscreen || b.webkitRequestFullscreen || b.webkitRequestFullScreen;
-    if (on && rq) { try { rq.call(b); } catch (e) {} }
-    else if (!on) { var ex = document.exitFullscreen || document.webkitExitFullscreen || document.webkitCancelFullScreen; if (ex && (document.fullscreenElement || document.webkitFullscreenElement)) { try { ex.call(document); } catch (e) {} } }
-  };
 }
 
 function usd2(n) { n = Number(n) || 0; var r = Math.round(Math.abs(n) * 100) / 100, s = String(r).split('.'); return (n < 0 ? '−$' : '$') + grp(s[0]) + (s[1] ? ',' + (s[1].length < 2 ? s[1] + '0' : s[1]).replace(/0$/, '') : ''); }

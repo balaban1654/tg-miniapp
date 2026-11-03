@@ -1718,21 +1718,6 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     const staffId = Number(b.staff_id);
     return { kind, title, url, subtitle: str(b.subtitle, 80) || null, country: country || null, contact_url: contact || null, staff_id: Number.isInteger(staffId) && staffId > 0 ? staffId : null, sort: Math.trunc(num(b.sort)) };
   }
-  // Видео для Office Lite (старый iPad): список ссылок, админ добавляет и удаляет. Хранится в app_settings.lite_videos (JSON)
-  const liteVideos = async () => {
-    const v = (await db.query(`SELECT value FROM app_settings WHERE key = 'lite_videos'`)).rows[0]?.value;
-    try { const a = JSON.parse(v || '[]'); return Array.isArray(a) ? a : []; } catch { return []; }
-  };
-  app.get('/lite/videos', { preHandler: auth }, async () => liteVideos());
-  app.put('/lite/videos', { preHandler: need('admin') }, async (req, reply) => {
-    const raw = (req.body as any)?.videos;
-    if (!Array.isArray(raw) || raw.length > 300) return reply.code(400).send({ error: 'Список видео не распознан' });
-    const list = raw.map((x: any) => ({ id: str(x?.id, 40) || randomBytes(6).toString('hex'), title: str(x?.title, 200), url: str(x?.url, 1000) }))
-      .filter((x) => /^https:\/\/\S+$/i.test(x.url));
-    await db.query(`INSERT INTO app_settings (key, value, updated_at) VALUES ('lite_videos', $1, now()) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()`, [JSON.stringify(list)]);
-    return list;
-  });
-
   // Контакты команды для всех сотрудников: значки Telegram и Discord в меню над именем. Ссылки меняет админ (шестерёнка → «Контакты»)
   app.get('/contacts', { preHandler: auth }, async () => {
     const r = (await db.query(`SELECT key, value FROM app_settings WHERE key IN ('contact_tg','contact_discord')`)).rows as { key: string; value: string }[];
