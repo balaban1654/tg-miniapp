@@ -4,6 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <meta name="theme-color" content="#0d0817">
+<script>
+(function(){var t=null;try{t=localStorage.getItem('pref_theme')}catch(e){}
+if(!t){try{var w=window.Telegram&&Telegram.WebApp;t=w&&w.colorScheme==='light'?'light':'dark'}catch(e){t='dark'}}
+if(t==='light')document.documentElement.setAttribute('data-theme','light')})();
+</script>
 <title>Hunter AI</title>
 <link rel="icon" type="image/png" href="/img/favicon.png">
 <link rel="apple-touch-icon" href="/img/apple-touch-icon.png">
@@ -309,6 +314,26 @@ svg{max-width:100%}
 .rf-p{background:#ffb84d22;color:#ffb84d;padding:4px 12px;border-radius:999px;font-size:12px;font-weight:700}
 
 .nw-more{color:inherit;font:inherit;text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:3px;text-decoration-color:currentColor;transition:color .15s}.nw-more:hover,.nw-more:active,.nw-more:focus-visible{color:var(--acc2,#c9a6ff)}
+
+/* Светлая тема (Профиль → Тема): та же вёрстка, другая палитра. Включается атрибутом data-theme="light" у <html> */
+html[data-theme=light]{--bg:#f6f4fb;--bg2:#efeaf9;--card:#ffffff;--card2:#f3effc;--line:#e3dcf3;--fg:#1b1530;--mut:#6d6585;--acc:#7c3aed;--acc2:#7c3aed;--acc3:#6a2fe0;--ok:#13996a;--warn:#d97706;--bad:#e11d48;color-scheme:light}
+html[data-theme=light] body{background:linear-gradient(180deg,#efe9fb,#f6f4fb 45%) fixed,var(--bg)}
+html[data-theme=light] .hd{background:rgba(246,244,251,.92);border-bottom:1px solid var(--line)}
+html[data-theme=light] .tabs{background:#ffffff;box-shadow:0 -4px 20px rgba(60,30,120,.06)}
+html[data-theme=light] .pay.g,html[data-theme=light] .gw-p-row{background:rgba(27,21,48,.05)}
+html[data-theme=light] .ttag{background:rgba(27,21,48,.08)}
+html[data-theme=light] .sw{background:rgba(27,21,48,.15)}
+html[data-theme=light] .wait{border-color:rgba(27,21,48,.1)}
+html[data-theme=light] .spin{border-color:rgba(27,21,48,.12);border-top-color:var(--acc)}
+html[data-theme=light] .psbar{background:rgba(27,21,48,.07)}
+html[data-theme=light] .ps+.ps{border-top-color:rgba(27,21,48,.07)}
+html[data-theme=light] .stars,html[data-theme=light] .dr-d.dis,html[data-theme=light] .rv-pick button{color:rgba(27,21,48,.2)}
+html[data-theme=light] .hint,html[data-theme=light] .cd{background:#e7f7ef;color:var(--fg)}
+html[data-theme=light] .pop{background:var(--card);box-shadow:0 14px 40px rgba(60,30,120,.14)}
+html[data-theme=light] .toast{background:rgba(255,255,255,.97);color:var(--fg);box-shadow:0 14px 44px rgba(60,30,120,.18)}
+html[data-theme=light] .tl.lk:hover .un,html[data-theme=light] .tl.lk:active .un,html[data-theme=light] .tl.lk:focus-visible .un{color:var(--acc);text-shadow:none}
+html[data-theme=light] .rv-x,html[data-theme=light] .rv-view button{color:var(--fg)}
+html[data-theme=light] .rv-sheet{background:rgba(27,21,48,.35)}
 </style>
 <script>
 /* Перевод Mini App на английский. Если в профиле выбран EN, каждый текст на экране (и подсказки, и ошибки сервера)
@@ -439,7 +464,15 @@ svg{max-width:100%}
 <script>
 const tg=window.Telegram&&window.Telegram.WebApp;
 if(window.__splash)window.__splash(30,'Запускаем Hunter AI');
-try{tg&&tg.ready();tg&&tg.expand();tg&&tg.setHeaderColor&&tg.setHeaderColor('#0d0817');tg&&tg.setBackgroundColor&&tg.setBackgroundColor('#0d0817')}catch{}
+try{tg&&tg.ready();tg&&tg.expand()}catch{}
+/** Применить тему: атрибут у <html>, цвет шапки и фона Telegram, theme-color */
+function applyTheme(t){
+  const light=t==='light',c=light?'#f6f4fb':'#0d0817';
+  if(light)document.documentElement.setAttribute('data-theme','light');else document.documentElement.removeAttribute('data-theme');
+  try{tg&&tg.setHeaderColor&&tg.setHeaderColor(c);tg&&tg.setBackgroundColor&&tg.setBackgroundColor(c);tg&&tg.setBottomBarColor&&tg.setBottomBarColor(light?'#ffffff':'#0b0616')}catch{}
+  const m=document.querySelector('meta[name=theme-color]');if(m)m.setAttribute('content',c);
+}
+applyTheme(document.documentElement.getAttribute('data-theme')==='light'?'light':'dark');
 const $=s=>document.querySelector(s);
 const root=$('#root');
 let me=null,tab='home',region=null,timers=[];
@@ -1790,10 +1823,10 @@ function prefBox(){
   // Тема: линейные значки солнца и луны
   const SUN='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>';
   const MOON='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.5 14.5A8.5 8.5 0 1 1 9.5 3.5a7 7 0 0 0 11 11z"/></svg>';
-  const light=()=>prefGet('pref_theme','dark')==='light';
+  const light=()=>document.documentElement.getAttribute('data-theme')==='light';
   const theme=el('button',{type:'button','aria-label':'Тема',style:chip+';color:var(--acc2);width:36px;justify-content:center;padding:0'});
   const paintT=()=>{theme.replaceChildren(svgEl(light()?SUN:MOON));theme.title=light()?'Светлая тема':'Тёмная тема'};
-  theme.addEventListener('click',()=>{prefSet('pref_theme',light()?'dark':'light');paintT()});
+  theme.addEventListener('click',()=>{const nt=light()?'dark':'light';prefSet('pref_theme',nt);applyTheme(nt);paintT()});
   paintT();
   const lab=t=>el('span',{class:'sm',style:'white-space:nowrap'},t);
   return el('div',{style:'margin-left:auto;display:grid;grid-template-columns:auto auto;gap:6px 8px;align-items:center;justify-items:end;flex:none'},lab('Язык:'),el('div',{style:'position:relative'},lang,menu),lab('Тема:'),theme);
