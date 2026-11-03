@@ -2654,17 +2654,9 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
       extra += ` AND (coalesce(d.lead_role, 'lead') <> 'lead' OR (${leadListDate('d')} AT TIME ZONE 'Europe/Kyiv')::date BETWEEN $${vals.length - 1}::date AND $${vals.length}::date)`;
     }
     const DT = depTypes(me);
-    // Регистрация через демо из тренажёра: код кампании в постбеке совпал с кодом демо-ссылки (параметр ac).
-    // Если у демо-ссылки своего кода нет: клиент открыл демо раньше, чем зарегистрировался
-    const demoUrl = (await db.query(`SELECT value FROM app_settings WHERE key = 'demo_url'`)).rows[0]?.value as string | undefined;
-    let demoAc: string | null = null;
-    try { demoAc = demoUrl ? new URL(demoUrl).searchParams.get('ac') : null; } catch { demoAc = null; }
-    vals.push(demoAc);
-    const demoP = `$${vals.length}::text`;
     const r = await db.query(
       `SELECT d.tg_id, d.trader_id, d.is_tester,
-              CASE WHEN ${demoP} IS NOT NULL THEN EXISTS (SELECT 1 FROM events e WHERE e.tg_id = d.tg_id AND e.type = 'reg' AND lower(e.raw->>'ac') = lower(${demoP}))
-                   ELSE d.demo_clicked_at IS NOT NULL AND EXISTS (SELECT 1 FROM events e WHERE e.tg_id = d.tg_id AND e.type = 'reg' AND e.created_at >= d.demo_clicked_at) END AS via_demo, d.lead_role, d.origin, d.username, d.first_name, d.status, d.access, d.created_at, d.owner_id, (d.banned_at IS NOT NULL) AS banned, ${leadListDate('d')} AS status_at,
+              (SELECT nullif(e.raw->>'ac', '') FROM events e WHERE e.tg_id = d.tg_id AND nullif(e.raw->>'ac', '') IS NOT NULL ORDER BY (e.type = 'reg') DESC, e.id LIMIT 1) AS po_ac, d.lead_role, d.origin, d.username, d.first_name, d.status, d.access, d.created_at, d.owner_id, (d.banned_at IS NOT NULL) AS banned, ${leadListDate('d')} AS status_at,
               s.name AS owner_name, l.slug AS link_slug,
               (SELECT amount FROM events e WHERE e.tg_id = d.tg_id AND e.type = 'ftd' ORDER BY e.created_at, e.id LIMIT 1) AS ftd_amount,
               coalesce((SELECT sum(amount) FROM events e WHERE e.tg_id = d.tg_id AND e.type IN ${DT}),0) AS deposits,
@@ -2687,7 +2679,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     ).rows[0];
     // Лид без ссылки пришёл сам: с кнопки на сайте — метка site, иначе (поиск по нику в Telegram) органика miniapp-org
     return r.rows.map((x) =>
-      x.lead_role && x.lead_role !== 'lead' && x.lead_role !== 'test' ? { ...x, deposits: 0, commission: 0, owner_id: x.owner_id ?? main?.id ?? null, owner_name: x.owner_id ? x.owner_name : main?.name ?? null, link_slug: x.link_slug ?? main?.slug ?? null } : x.link_slug ? x : { ...x, link_slug: x.origin || 'miniapp-org' },
+      x.lead_role && x.lead_role !== 'lead' && x.lead_role !== 'test' ? { ...x, deposits: 0, commission: 0, owner_id: x.owner_id ?? main?.id ?? null, owner_name: x.owner_id ? x.owner_name : main?.name ?? null, link_slug: x.link_slug ?? main?.slug ?? null } : x.link_slug ? x : { ...x, link_slug: x.origin === 'ref' ? 'ref' : x.po_ac || x.origin || 'miniapp-org' },
     );
   });
 
