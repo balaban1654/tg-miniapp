@@ -1702,6 +1702,25 @@ function tierBadge(){
     el('span',{style:'font:700 10px var(--fd);letter-spacing:.08em;text-transform:uppercase;color:var(--fg,#fff);white-space:nowrap'},clientRank()),
     el('span',{style:'display:grid;filter:drop-shadow(0 4px 8px #0008)'},svgEl(medalSvg(k,36))));
 }
+/** Строка «Ваш статус»: название градации и маленькая медаль */
+function tierInline(){
+  const k=['novice','bronze','silver','gold','plat'][me.tier?me.tier.idx:0]||'gold';
+  return el('span',{style:'display:inline-flex;align-items:center;gap:6px'},clientRank(),el('span',{style:'display:grid;filter:drop-shadow(0 2px 4px #0008)'},svgEl(medalSvg(k,22))));
+}
+/** Язык и тема справа в карточке профиля. Пока только выбор (запоминается на устройстве), перевода и смены темы ещё нет */
+const prefGet=(k,d)=>{try{return localStorage.getItem(k)||d}catch{return d}};
+const prefSet=(k,v)=>{try{localStorage.setItem(k,v)}catch{}};
+function prefBox(){
+  const lang=el('select',{'aria-label':'Язык',style:'background:var(--card2);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:3px 6px;font:700 12px var(--fd);cursor:pointer'},
+    ...[['ru','RU'],['en','EN']].map(([v,t])=>el('option',{value:v},t)));
+  lang.value=prefGet('pref_lang','ru');
+  lang.addEventListener('change',()=>prefSet('pref_lang',lang.value));
+  const ic=()=>prefGet('pref_theme','dark')==='light'?'☀️':'🌙';
+  const theme=el('button',{type:'button','aria-label':'Тема',style:'background:var(--card2);border:1px solid var(--line);border-radius:8px;padding:2px 8px;font-size:14px;line-height:1.4;cursor:pointer'},ic());
+  theme.addEventListener('click',()=>{prefSet('pref_theme',prefGet('pref_theme','dark')==='light'?'dark':'light');theme.textContent=ic()});
+  const lab=t=>el('span',{class:'sm',style:'white-space:nowrap'},t);
+  return el('div',{style:'margin-left:auto;display:grid;grid-template-columns:auto auto;gap:6px 8px;align-items:center;justify-items:end;flex:none'},lab('Язык:'),lang,lab('Тема:'),theme);
+}
 /** Значок градации (SVG): медаль с лентой, металлическим диском и бликом; у Диаманта просто кристалл */
 function medalSvg(k,size){
   // Новичок: не медаль, а росток
@@ -1918,9 +1937,9 @@ function hiddenId(v){
 /** Ссылка на менеджера из «Сотрудников» с параметром profile: Telegram открывает сначала профиль человека, а не сразу чат */
 function mgrProfileLink(){const u=me.managerLink||'https://t.me/'+me.managerTg;return /[?&]profile\b/.test(u)?u:u+(u.includes('?')?'&':'?')+'profile'}
 function viewProfile(){
-  const rows=[...([['Ваш трейдер',me.manager?(me.managerTg?el('a',{href:mgrProfileLink(),style:'color:var(--acc2);text-decoration:none',onclick:e=>{e.preventDefault();openLink(mgrProfileLink())}},'@'+me.managerTg):me.manager):'не назначен']]),['Telegram ID',me.tgId,true],['Pocket ID',me.pocketId||null,true],...(me.leadRole&&me.leadRole!=='lead'&&me.leadRole!=='test'?[['Роль',ROLE_NAME[me.leadRole]||me.leadRole]]:[])];
+  const rows=[...([['Ваш трейдер',me.manager?(me.managerTg?el('a',{href:mgrProfileLink(),style:'color:var(--acc2);text-decoration:none',onclick:e=>{e.preventDefault();openLink(mgrProfileLink())}},'@'+me.managerTg):me.manager):'не назначен']]),['Telegram ID',me.tgId,true],['Pocket ID',me.pocketId||null,true],...(me.leadRole&&me.leadRole!=='lead'&&me.leadRole!=='test'?[['Роль',ROLE_NAME[me.leadRole]||me.leadRole]]:[['Ваш статус',tierInline()]])];
   const copyBtn=v=>el('button',{type:'button','aria-label':'Копировать',title:'Копировать',style:'background:none;border:0;padding:2px;color:var(--mut);cursor:pointer;display:grid;place-items:center',onclick:()=>copyText(v)},svgEl(COPY_ICON));
-  shell('Профиль',[el('div',{class:'card row',style:'justify-content:flex-start;gap:12px'},withPhoto(el('div',{class:'ava'},(me.name||'?').trim().slice(0,1).toUpperCase())),el('div',{style:'min-width:0'},el('b',{style:'font:700 16px var(--fd)'},me.name),el('div',{class:'sm'},me.username?'@'+me.username:'')),tierBadge()),
+  shell('Профиль',[el('div',{class:'card row',style:'justify-content:flex-start;gap:12px'},withPhoto(el('div',{class:'ava'},(me.name||'?').trim().slice(0,1).toUpperCase())),el('div',{style:'min-width:0'},el('b',{style:'font:700 16px var(--fd)'},me.name),el('div',{class:'sm'},me.username?'@'+me.username:'')),prefBox()),
     el('div',{class:'card',style:'display:grid;grid-template-columns:minmax(0,1fr);gap:10px'},rows.filter(([k,v])=>!(k==='Pocket ID'&&!v)).map(([k,v,cp])=>el('div',{class:'row'},el('span',{class:'sm'},k),
       el('span',{style:'display:inline-flex;align-items:center;gap:8px'},cp?hiddenId(v):el('b',{class:'mono'},v instanceof Node?v:String(v)),cp?copyBtn(v):null)))),
     refTile(),
