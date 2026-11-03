@@ -4629,7 +4629,11 @@ async function viewLiteVideos(){
   const url=el('input',{placeholder:'Ссылка на YouTube, файл .mp4 или код вставки <iframe …>'}),title=el('input',{placeholder:'Название (необязательно)',maxlength:'200'});
   const err=el('div',{class:'err',role:'alert'});
   const save=async next=>{err.textContent='';try{list=await api('/lite/videos',{method:'PUT',body:{videos:next}});draw()}catch(x){err.textContent=x.message}};
-  const parse=t=>{t=String(t||'').trim();const m=/src=["']([^"']+)["']/i.exec(t);if(m)t=m[1];if(t.startsWith('//'))t='https:'+t;if(!/^https:\/\/\S+$/i.test(t))return null;const id=ytIdOf(t);return id?'https://www.youtube.com/watch?v='+id:t};
+  const parse=t=>{t=String(t||'').trim();const m=/src=["']([^"']+)["']/i.exec(t);if(m)t=m[1];if(t.startsWith('//'))t='https:'+t;if(!/^https:\/\/\S+$/i.test(t))return null;const id=ytIdOf(t);if(id)return 'https://www.youtube.com/watch?v='+id;
+    // Облака: делаем прямую ссылку на файл, чтобы iPad играл его своим плеером. Dropbox: dl=0 → raw=1; Google Drive: /file/d/ID/… → uc?export=download&id=ID
+    if(/dropbox\.com\//i.test(t)){t=t.replace(/([?&])dl=[01]/i,'$1raw=1');if(!/[?&]raw=1/i.test(t))t+=(t.includes('?')?'&':'?')+'raw=1'}
+    const g=/drive\.google\.com\/(?:file\/d\/|open\?id=)([A-Za-z0-9_-]{10,})/i.exec(t);if(g)t='https://drive.google.com/uc?export=download&id='+g[1];
+    return t};
   const add=el('button',{class:'btn',type:'button',onclick:()=>{const u=parse(url.value);if(!u){err.textContent='Вставьте ссылку, которая начинается с https://, или код вставки с YouTube';return}save([{title:title.value.trim(),url:u},...list]);url.value='';title.value=''}},'Добавить');
   const draw=()=>{
     box.replaceChildren(...(list.length?list.map((v,i)=>{const id=ytIdOf(v.url);

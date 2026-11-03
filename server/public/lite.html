@@ -523,7 +523,7 @@ function videoUrl(text) {
   if (/^\/\//.test(t)) t = 'https:' + t;
   return /^https:\/\/\S+$/i.test(t) ? t : null;
 }
-function isFile(u) { return /\.(mp4|m4v|mov|webm|m3u8)(\?|#|$)/i.test(u); }
+function isFile(u) { return /\.(mp4|m4v|mov|webm|m3u8)(\?|#|$)/i.test(u) || /dropbox\.com\/.*[?&]raw=1/i.test(u) || /drive\.google\.com\/uc\?/i.test(u); }
 function loadVideos() {
   req('GET', '/api/office/lite/videos', null, function (st, d) {
     if (st === 401) return showLogin();
