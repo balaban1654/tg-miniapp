@@ -89,6 +89,7 @@ th{font-weight:600;font-size:11px;letter-spacing:.06em;text-transform:uppercase;
 td{padding:11px 12px;border-top:1px solid #34255c;text-align:center}
 td.l,th.l{text-align:left}
 .scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+tr.sum td{border-top:2px solid #9b5cff;background:rgba(155,92,255,.08);font-weight:700}
 .seg2{display:-webkit-flex;display:flex;height:22px;border-radius:6px;overflow:hidden;margin:4px 0 10px}
 .seg2 span{display:block;height:22px;line-height:22px;padding:0 6px;font-size:11px;font-weight:700;color:#0d0817;white-space:nowrap;overflow:hidden}
 </style>
@@ -111,10 +112,9 @@ td.l,th.l{text-align:left}
 </div>
 <script>
 // Только ES5: var, function, XMLHttpRequest. Никаких стрелочных функций, let/const, ?., fetch и CSS Grid (Safari 9)
-var challenge = null, period = 'month', liveAll = false, open = {}, last = null;
+var challenge = null, period = 'month', liveAll = false, last = null;
 var MG = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
 var MN = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
-var DXC = ['#f472b6', '#fbbf24', '#3ddc97', '#2dd4bf', '#a78bfa', '#60a5fa', '#fb923c', '#e879f9', '#a3e635', '#38bdf8'];
 
 function $(id) { return document.getElementById(id); }
 function req(method, url, body, done) {
@@ -211,9 +211,8 @@ function render() {
     ['Пополнения по FTD', t.ftdSum, g && g.ftdSum, usd, 'средний FTD ' + usd(avg)],
     ['Все депозиты (FTD + додепы)', t.deposits, g && g.deposits, usd, 'додепы ' + usd(t.depSum) + ' · ' + Math.round(dShare) + '%'],
     ['Комиссия получена', t.commission, g && g.commission, usd, String(Math.round(cShare * 10) / 10).replace('.', ',') + '% от депозитов']];
-  var pf = '<div class="card"><div class="hd"><div><span class="lbl">' + (d.range.whole && !d.range.all ? 'План / факт за месяц' : 'План / факт') + '</span><button class="ib' + (open.funnel ? ' on' : '') + '" data-o="funnel">Воронка</button></div>' +
+  var pf = '<div class="card"><div class="hd"><div><span class="lbl">' + (d.range.whole && !d.range.all ? 'План / факт за месяц' : 'План / факт') + '</span></div>' +
     (showMark ? '<span class="mut" style="font-size:12px">метка: план на сегодня</span>' : '') + '</div>';
-  if (open.funnel) pf += '<div class="pop">' + funnel(d) + '</div>';
   for (i = 0; i < rows.length; i++) {
     var rw = rows[i], v = rw[1] || 0, goal = rw[2], pct = goal > 0 ? v / goal * 100 : null;
     var cls = pct === null ? '' : pct >= pace * 100 ? 'ok' : pct >= pace * 85 ? 'warn' : 'bad';
@@ -226,14 +225,12 @@ function render() {
   // Чистая прибыль
   var diff = t.netPlanToDate === null || t.netPlanToDate === undefined ? null : t.net - t.netPlanToDate;
   var margin = t.commission > 0 ? Math.round(t.net / t.commission * 100) : null;
-  var net = '<div class="card"><div class="hd"><div><span class="lbl">Чистая прибыль</span><button class="ib' + (open.sal ? ' on' : '') + '" data-o="sal">Зарплаты</button><button class="ib' + (open.exp ? ' on' : '') + '" data-o="exp">Расходы</button></div></div>' +
+  var net = '<div class="card"><div class="hd"><div><span class="lbl">Чистая прибыль</span></div></div>' +
     '<div class="big ' + (t.net < 0 ? 'neg' : 'pos') + '">' + usd(t.net) + '</div>' +
     (diff !== null ? '<span class="chip ' + (diff >= 0 ? 'ok' : 'bad') + '">' + (diff >= 0 ? '▲ на ' + usd(diff) + ' выше' : '▼ на ' + usd(-diff) + ' ниже') + ' плана на эту дату</span>' : '') +
     (margin !== null ? '<div class="mut" style="font-size:13px;margin-top:6px">Маржа ' + margin + '% от комиссии</div>' : '') +
     '<div class="eq"><div><span>Комиссия получена</span><b>' + usd(t.commission) + '</b></div><div><span>− Зарплаты и бонусы</span><b class="neg">' + usd(-(t.salaries || 0)) + '</b></div>' +
     '<div><span>− Расходы</span><b class="neg">' + usd(-(t.expenses || 0)) + '</b></div><div><span>= Чистая прибыль</span><b class="' + (t.net < 0 ? 'neg' : 'pos') + '">' + usd(t.net) + '</b></div></div>';
-  if (open.sal) net += '<div class="pop"><div class="lbl" style="margin-bottom:4px">Зарплаты за период (начислено)</div>' + salaries(d) + '</div>';
-  if (open.exp) net += '<div class="pop"><div class="lbl" style="margin-bottom:4px">Расходы за период</div>' + expenses(d) + '</div>';
   net += '</div>';
 
   h += '<div class="cols"><div class="c1">' + pf + '</div><div class="c2">' + net + '<div class="card last"><div class="lbl">Требует внимания</div>' + tasks(d) + '</div></div></div>';
@@ -243,45 +240,6 @@ function render() {
   bind();
 }
 
-function funnel(d) {
-  var t = d.totals || {}, out = '', st = [['Клики', 'clicks'], ['Регистрации', 'regs'], ['FTD', 'ftd'], ['Додепы', 'dep'], ['Отвал', 'churned']];
-  var ids = [], i, j;
-  for (i = 0; i < d.streamers.length; i++) ids.push(d.streamers[i].id);
-  ids.sort(function (a, b) { return a - b; });
-  var col = function (id) { return DXC[ids.indexOf(id) % DXC.length]; };
-  var S = []; for (i = 0; i < d.streamers.length; i++) if (d.streamers[i].role === 'streamer') S.push(d.streamers[i]);
-  var tot = {}; for (i = 0; i < st.length; i++) { tot[st[i][1]] = 0; for (j = 0; j < S.length; j++) tot[st[i][1]] += Number((S[j].range || {})[st[i][1]]) || 0; }
-  var pc = function (v) { return v === null ? '—' : String(Math.round(v * 10) / 10).replace('.', ',') + '%'; };
-  out += '<div style="font-weight:700;color:#c9a6ff;margin-bottom:8px">CTR: ' + pc(tot.clicks ? tot.regs / tot.clicks * 100 : null) + ' &nbsp; RTD: ' + pc(tot.regs ? tot.ftd / tot.regs * 100 : null) + ' &nbsp; Churn: ' + pc(tot.ftd ? tot.churned / tot.ftd * 100 : null) + '</div>';
-  for (i = 0; i < st.length; i++) {
-    var k = st[i][1], seg = '';
-    for (j = 0; j < S.length; j++) { var v = Number((S[j].range || {})[k]) || 0; if (v > 0) seg += '<span style="-webkit-flex:' + v + ' 1 auto;flex:' + v + ' 1 auto;background:' + col(S[j].id) + '">' + esc(S[j].name) + ' ' + v + '</span>'; }
-    out += '<div class="hd"><span class="lbl">' + st[i][0] + '</span><b>' + n0(tot[k]) + '</b></div><div class="seg2">' + (seg || '<span style="-webkit-flex:1;flex:1;background:rgba(255,255,255,.1);color:#a89cc8">нет данных</span>') + '</div>';
-  }
-  return out;
-}
-function salaries(d) {
-  var t = d.totals || {}, TS = {}, i, o = '', ts = d.teamSalaries || [];
-  for (i = 0; i < ts.length; i++) TS[ts[i].id] = ts[i];
-  var pay = function (acc, paid) { return paid >= acc - 0.5 && acc > 0 ? 'выплачено полностью ✓' : 'выплачено ' + usd(paid) + ' · к выплате ' + usd(Math.max(0, acc - paid)); };
-  for (i = 0; i < d.streamers.length; i++) {
-    var s = d.streamers[i], r = s.range || {}, tt = TS[s.id];
-    if (!r.salary && !r.paid && !tt) continue;
-    if (tt) delete TS[s.id];
-    var tot = (r.salary || 0) + (tt ? tt.salary : 0);
-    o += '<div class="r"><span>' + esc(s.name) + '<em>' + (tt ? 'смены и лиды ' + usd(r.salary) + ' + ставка ' + usd(tt.salary) : 'начислено') + ' · ' + pay(tot, r.paid || 0) + '</em></span><b>' + usd(tot) + '</b></div>';
-  }
-  for (var id in TS) if (TS.hasOwnProperty(id)) o += '<div class="r"><span>' + esc(TS[id].name) + '<em>ставка из «ЗП (команда)» · ' + pay(TS[id].salary, TS[id].paid) + '</em></span><b>' + usd(TS[id].salary) + '</b></div>';
-  o += '<div class="r"><span>Итого начислено</span><b>' + usd(t.salaries) + '</b></div>';
-  return '<div class="list">' + o + '</div>';
-}
-function expenses(d) {
-  var ex = d.expenses || [], o = '', i;
-  if (!ex.length) return '<div class="okm">Расходов за период нет</div>';
-  for (i = 0; i < ex.length; i++) o += '<div class="r"><span>' + esc(ex[i].comment) + '<em>' + dmy(ex[i].day).slice(0, 5) + '</em></span><b class="neg">' + usd(-ex[i].amount) + '</b></div>';
-  o += '<div class="r"><span>Итого расходов</span><b class="neg">' + usd(-(d.totals.expenses || 0)) + '</b></div>';
-  return '<div class="list">' + o + '</div>';
-}
 function tasks(d) {
   var T = d.tasks || {}, rows = [], i;
   var names = function (a, f) { var o = []; for (var j = 0; j < a.length; j++) o.push(f(a[j])); return o.join(' · '); };
@@ -316,7 +274,7 @@ function shifts(fs, d) {
     for (j = 0; j < fs.fields.length; j++) { var v = r.sums[fs.fields[j]] || 0; tot[fs.fields[j]] = (tot[fs.fields[j]] || 0) + v; o += '<td>' + n0(v) + '</td>'; }
     o += '</tr>';
   }
-  o += '<tr><td class="l"><b>Всего</b></td><td><b>' + rep + '</b></td><td><b>' + hmin(min) + '</b></td>';
+  o += '<tr class="sum"><td class="l"><b>Всего</b></td><td><b>' + rep + '</b></td><td><b>' + hmin(min) + '</b></td>';
   for (j = 0; j < fs.fields.length; j++) o += '<td><b>' + n0(tot[fs.fields[j]] || 0) + '</b></td>';
   return o + '</tr></table></div>';
 }
@@ -328,8 +286,6 @@ function bind() {
     if (p === 'out') return req('POST', '/api/office/logout', {}, function () { challenge = null; $('step1').className = ''; $('step2').className = 'hide'; showLogin(); });
     period = p; load();
   };
-  var o = document.querySelectorAll('[data-o]');
-  for (i = 0; i < o.length; i++) o[i].onclick = function () { var k = this.getAttribute('data-o'); open[k] = !open[k]; render(); };
   if ($('liveTog')) $('liveTog').onclick = function () { liveAll = !liveAll; render(); };
 }
 
