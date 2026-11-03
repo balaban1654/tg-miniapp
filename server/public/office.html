@@ -2545,7 +2545,7 @@ async function openLeadCard(tgId){
       // На компьютере сначала «Владелец», потом «Страна»; в мобильной версии порядок прежний
       ...(matchMedia('(min-width:521px)').matches?[kv('Владелец',L.owner_name||'не закреплён'),kv('Страна',countryName(d.country))]:[kv('Страна',countryName(d.country)),kv('Владелец',L.owner_name||'не закреплён')]),
       // Пришёл по реферальной ссылке: на месте часового пояса «Пригласил» (Telegram ID, по нажатию его карточка), пояс ниже
-      L.referrer_id?kv('Пригласил',el('a',{href:'#',title:L.referrer_name?'Открыть карточку: '+L.referrer_name:'Открыть карточку',style:'color:var(--acc2)',onclick:e=>{e.preventDefault();document.querySelectorAll('.lc-overlay').forEach(x=>x.remove());openLeadCard(L.referrer_id)}},String(L.referrer_id))):kv('Часовой пояс',L.tz),
+      L.referrer_id?kv('Пригласил',el('a',{href:'#',title:L.referrer_name?'Открыть карточку: '+L.referrer_name:'Открыть карточку',style:'color:var(--fg);text-decoration:none',onclick:e=>{e.preventDefault();document.querySelectorAll('.lc-overlay').forEach(x=>x.remove());openLeadCard(L.referrer_id)}},String(L.referrer_id))):kv('Часовой пояс',L.tz),
       kvc('Промокод',d.promo),kv('Последний визит',fmtDT(L.last_seen_at)),L.referrer_id?kv('Часовой пояс',L.tz):null),
     el('div',{class:'lc-two2'},
       el('div',{},el('h4',{class:'lc-h'},'Путь клиента'),
