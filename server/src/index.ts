@@ -83,6 +83,11 @@ app.get<{ Params: { name: string } }>('/img/:name', async (req, reply) => {
   return reply.type(req.params.name.endsWith('.png') ? 'image/png' : 'image/webp').header('Cache-Control', 'public, max-age=86400').send(f);
 });
 
+// iOS при «На экран Домой» сам ищет иконку в корне сайта, если не нашёл ссылку на странице
+for (const n of ['/apple-touch-icon.png', '/apple-touch-icon-precomposed.png']) {
+  app.get(n, async (_req, reply) => reply.type('image/png').header('Cache-Control', 'public, max-age=86400').send(imgs.get('office-180.png')));
+}
+
 // Браузеры сами просят /favicon.ico на любой странице и на любом поддомене: отдаём ту же круглую иконку
 app.get('/favicon.ico', async (_req, reply) => reply.type('image/png').header('Cache-Control', 'public, max-age=86400').send(imgs.get('favicon.png')));
 
