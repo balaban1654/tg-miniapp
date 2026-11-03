@@ -2541,7 +2541,8 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     const tgId = Number(req.params.tgId);
     if (!Number.isSafeInteger(tgId)) return reply.code(400).send({ error: 'Неверный ID' });
     const r = await db.query(
-      `SELECT d.tg_id, d.username, d.first_name, d.status, d.access, d.trader_id, d.is_tester, d.lead_role, d.region, d.tz,
+      `SELECT d.tg_id, d.username, d.first_name, d.status, d.access, d.trader_id, d.is_tester, d.lead_role, d.region, d.tz, d.referrer_id,
+              (SELECT coalesce(nullif(r.first_name, ''), '@' || r.username) FROM leads r WHERE r.tg_id = d.referrer_id) AS referrer_name,
               d.created_at, d.last_seen_at, d.bot_started, d.bot_blocked, d.owner_id, d.banned_at, d.ban_reason,
               (SELECT name FROM staff WHERE id = d.banned_by) AS banned_by_name,
               o.name AS owner_name, l.slug AS link_slug, l.source AS link_source, l.campaign AS link_campaign, d.origin
