@@ -145,6 +145,9 @@ td{white-space:nowrap}
 .vt{display:-webkit-flex;display:flex;-webkit-justify-content:space-between;justify-content:space-between;-webkit-align-items:center;align-items:center;padding:10px 12px}
 .vt b{font-size:14px;min-width:0}
 .vbox{position:fixed;left:50%;top:40px;width:900px;max-width:96%;-webkit-transform:translateX(-50%);transform:translateX(-50%);z-index:71;background:#1c1233;border:1px solid #34255c;border-radius:16px;padding:14px}
+.vbox.full{left:0;top:0;right:0;bottom:0;width:100%;max-width:none;height:100%;-webkit-transform:none;transform:none;border-radius:0;border:0;padding:6px 8px 8px;display:-webkit-flex;display:flex;-webkit-flex-direction:column;flex-direction:column;background:#000;z-index:80}
+.vbox.full .chd{margin-bottom:6px}.vbox.full .mut{display:none}
+.vbox.full .vfr{-webkit-flex:1;flex:1;padding-bottom:0;height:auto;border-radius:0}
 .vfr{position:relative;height:0;padding-bottom:56.25%;background:#000;border-radius:10px;overflow:hidden}
 .vfr iframe,.vfr video{position:absolute;left:0;top:0;width:100%;height:100%;border:0;background:#000}
 tr.sum td{border-top:2px solid #9b5cff;background:rgba(155,92,255,.08);font-weight:700}
@@ -551,13 +554,23 @@ function renderVideos() {
 // Плеер: YouTube — встроенный плеер YouTube, файл — стандартный плеер iPad, остальное — страница внутри окна
 function playVideo(v) {
   var id = ytId(v.url), inner;
-  if (id) inner = '<iframe src="https://www.youtube-nocookie.com/embed/' + id + '?autoplay=1&playsinline=1&rel=0" allow="autoplay; fullscreen; encrypted-media" allowfullscreen webkitallowfullscreen frameborder="0"></iframe>';
+  if (id) inner = '<iframe src="https://www.youtube-nocookie.com/embed/' + id + '?autoplay=1&fs=1&rel=0" allow="autoplay; fullscreen; encrypted-media" allowfullscreen webkitallowfullscreen frameborder="0"></iframe>';
   else if (isFile(v.url)) inner = '<video src="' + esc(v.url) + '" controls autoplay playsinline webkit-playsinline></video>';
   else inner = '<iframe src="' + esc(v.url) + '" allowfullscreen webkitallowfullscreen frameborder="0"></iframe>';
-  $('card').innerHTML = '<div class="cov" id="cov"></div><div class="vbox"><div class="chd"><b>' + esc(v.title || 'Видео') + '</b><button class="ib" id="cx">✕</button></div><div class="vfr">' + inner + '</div>' +
+  $('card').innerHTML = '<div class="cov" id="cov"></div><div class="vbox" id="vbox"><div class="chd"><b>' + esc(v.title || 'Видео') + '</b><span><button class="ib" id="vfull">⛶ На весь экран</button><button class="ib" id="cx">✕</button></span></div><div class="vfr">' + inner + '</div>' +
     '<div class="mut" style="font-size:12px;margin-top:8px">Если видео не запускается: <a href="' + esc(v.url) + '" target="_blank" style="color:#c9a6ff">открыть по ссылке</a></div></div>';
   $('card').className = '';
   $('cov').onclick = closeCard; $('cx').onclick = closeCard;
+  // На весь экран: окно с плеером растягивается на весь экран планшета (у плеера YouTube на iOS 9 своей кнопки нет).
+  // Где браузер умеет настоящий полноэкранный режим, включаем и его
+  $('vfull').onclick = function () {
+    var b = $('vbox'), on = b.className.indexOf('full') < 0;
+    b.className = on ? 'vbox full' : 'vbox';
+    this.innerHTML = on ? '✕ Свернуть' : '⛶ На весь экран';
+    var rq = b.requestFullscreen || b.webkitRequestFullscreen || b.webkitRequestFullScreen;
+    if (on && rq) { try { rq.call(b); } catch (e) {} }
+    else if (!on) { var ex = document.exitFullscreen || document.webkitExitFullscreen || document.webkitCancelFullScreen; if (ex && (document.fullscreenElement || document.webkitFullscreenElement)) { try { ex.call(document); } catch (e) {} } }
+  };
 }
 
 function usd2(n) { n = Number(n) || 0; var r = Math.round(Math.abs(n) * 100) / 100, s = String(r).split('.'); return (n < 0 ? '−$' : '$') + grp(s[0]) + (s[1] ? ',' + (s[1].length < 2 ? s[1] + '0' : s[1]).replace(/0$/, '') : ''); }
