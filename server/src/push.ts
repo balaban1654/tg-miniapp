@@ -16,6 +16,8 @@ export interface Button {
   style?: 'primary' | 'success' | 'danger';
   /** Кнопка стоит в одной строке со следующей */
   inline?: boolean;
+  /** Подпись для клиентов с английским языком */
+  label_en?: string;
 }
 export interface Rule {
   id: number;
@@ -23,6 +25,7 @@ export interface Rule {
   trigger: Trigger;
   delay_min: number;
   text: string;
+  text_en?: string;
   buttons: Button[];
   daytime_only: boolean;
   enabled: boolean;
@@ -38,6 +41,7 @@ interface Target {
   po_link: string | null;
   po_link_ru: string | null;
   tz: string | null;
+  lang?: string | null;
 }
 
 /** В тестах (DISABLE_BOT=1) сообщения не уходят в Telegram, а складываются сюда. */
@@ -48,7 +52,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 // ---------- Тексты и кнопки ----------
 
 /** Время вида «13:30:15» в часовом поясе клиента. Если пояс неизвестен, берём Киев и добавляем пометку */
-export function clockFor(ms: number, tz: string | null | undefined): string {
+export function clockFor(ms: number, tz: string | null | undefined, lang?: string | null): string {
   const fmt = (zone: string) => new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23', timeZone: zone }).format(new Date(ms));
   if (tz) {
     try {
@@ -57,14 +61,39 @@ export function clockFor(ms: number, tz: string | null | undefined): string {
       /* неизвестный пояс, падаем в Киев */
     }
   }
-  return `${fmt(config.pushTz)} (Киев)`;
+  return `${fmt(config.pushTz)} ${lang === 'en' ? '(Kyiv)' : '(Киев)'}`;
 }
 
-export function renderText(text: string, t: Pick<Target, 'first_name' | 'username' | 'owner_name' | 'po_promo'> & { tz?: string | null }): string {
+/** Текст для клиента на его языке: английский, если клиент выбрал English и у пуша есть перевод, иначе русский */
+export function pickText(ru: string, en: string | null | undefined, lang: string | null | undefined): string {
+  return lang === 'en' && en && en.trim() ? en : ru;
+}
+
+/** Английские подписи стандартных кнопок: если у кнопки нет своей label_en, берём отсюда */
+const LABEL_EN: Record<string, string> = {
+  'Написать в поддержку': 'Contact support',
+  'Не получается — написать в поддержку': 'Having trouble? Contact support',
+  'Зарегистрироваться': 'Sign up',
+  'Нет, создать': 'No, create one',
+  'Да, уже есть': 'Yes, I have one',
+  'Открыть кабинет': 'Open the app',
+  'Смотреть эфир': 'Watch the stream',
+  'Активировать скидку': 'Activate discount',
+  'Оставить отзыв': 'Leave a review',
+  'Всё понятно — регистрация': 'Got it: sign up',
+  'Поддержка': 'Support',
+};
+export function buttonLabel(b: Button, lang: string | null | undefined): string {
+  if (lang !== 'en') return b.label;
+  return (b.label_en && b.label_en.trim()) || LABEL_EN[b.label] || b.label;
+}
+
+export function renderText(text: string, t: Pick<Target, 'first_name' | 'username' | 'owner_name' | 'po_promo'> & { tz?: string | null; lang?: string | null }): string {
+  const en = t.lang === 'en';
   return text
-    .replace(/\{время:(\d{10,14})\}/g, (_m, ms) => clockFor(Number(ms), t.tz))
-    .replaceAll('{имя}', t.first_name || t.username || 'друг')
-    .replaceAll('{стример}', t.owner_name || 'наша команда')
+    .replace(/\{время:(\d{10,14})\}/g, (_m, ms) => clockFor(Number(ms), t.tz, t.lang))
+    .replaceAll('{имя}', t.first_name || t.username || (en ? 'friend' : 'друг'))
+    .replaceAll('{стример}', t.owner_name || (en ? 'our team' : 'наша команда'))
     .replaceAll('{промокод}', t.po_promo || '');
 }
 
@@ -91,14 +120,15 @@ export function buildKeyboard(buttons: Button[], t: Target): InlineKeyboard | un
   let any = false;
   for (const b of buttons) {
     let btn: InlineKeyboardButton | null = null;
-    if (b.type === 'callback' && b.data) btn = InlineKeyboard.text(b.label, b.data);
-    else if (b.type === 'url' && b.url) btn = InlineKeyboard.url(b.label, b.url);
-    else if (b.type === 'support') btn = InlineKeyboard.url(b.label, `https://t.me/${config.botUsername}?start=support`);
+    const label = buttonLabel(b, t.lang);
+    if (b.type === 'callback' && b.data) btn = InlineKeyboard.text(label, b.data);
+    else if (b.type === 'url' && b.url) btn = InlineKeyboard.url(label, b.url);
+    else if (b.type === 'support') btn = InlineKeyboard.url(label, `https://t.me/${config.botUsername}?start=support`);
     else if (b.type === 'register') {
       // Регистрация только в Mini App: ссылки Pocket Option в боте не показываем, регион и ссылка выбираются там
-      if (config.miniAppUrl) btn = InlineKeyboard.webApp(b.label, config.miniAppUrl);
-    } else if (b.type === 'miniapp' && config.miniAppUrl) btn = InlineKeyboard.webApp(b.label, config.miniAppUrl);
-    else if (b.type === 'review' && config.miniAppUrl) btn = InlineKeyboard.webApp(b.label, config.miniAppUrl + (config.miniAppUrl.includes('?') ? '&' : '?') + 'go=review');
+      if (config.miniAppUrl) btn = InlineKeyboard.webApp(label, config.miniAppUrl);
+    } else if (b.type === 'miniapp' && config.miniAppUrl) btn = InlineKeyboard.webApp(label, config.miniAppUrl);
+    else if (b.type === 'review' && config.miniAppUrl) btn = InlineKeyboard.webApp(label, config.miniAppUrl + (config.miniAppUrl.includes('?') ? '&' : '?') + 'go=review');
     if (!btn) continue;
     kb.add(b.style ? { ...btn, style: b.style } : btn);
     if (!b.inline) kb.row();
@@ -112,7 +142,7 @@ export function buildKeyboard(buttons: Button[], t: Target): InlineKeyboard | un
 
 export async function loadTarget(tgId: number | string): Promise<Target> {
   const r = await db.query(
-    `SELECT d.tg_id, d.first_name, d.username, d.region, d.tz, o.name AS owner_name, o.po_promo, o.po_link, o.po_link_ru
+    `SELECT d.tg_id, d.first_name, d.username, d.region, d.tz, d.lang, o.name AS owner_name, o.po_promo, o.po_link, o.po_link_ru
        FROM leads d LEFT JOIN staff o ON o.id = d.owner_id WHERE d.tg_id = $1`,
     [tgId],
   );
@@ -220,9 +250,11 @@ async function dueTargets(rule: Rule, limit: number, tgId?: string): Promise<Tar
     only = `AND d.tg_id = $5`;
   }
   const r = await db.query(
-    `SELECT d.tg_id, d.first_name, d.username, d.region, d.tz, o.name AS owner_name, o.po_promo, o.po_link, o.po_link_ru
+    `SELECT d.tg_id, d.first_name, d.username, d.region, d.tz, d.lang, o.name AS owner_name, o.po_promo, o.po_link, o.po_link_ru
        FROM leads d LEFT JOIN staff o ON o.id = d.owner_id
       WHERE d.removed_at IS NULL AND d.banned_at IS NULL AND d.bot_started AND NOT d.bot_blocked AND ${COND[rule.trigger]}
+        -- Новый клиент ещё выбирает язык: ждём его выбора до 30 минут, потом шлём на русском
+        AND (d.lang IS NOT NULL OR d.created_at < now() - interval '30 minutes')
         AND (${t}) + ($1 || ' minutes')::interval <= now()
         AND (${t}) + ($1 || ' minutes')::interval >= $2
         AND NOT EXISTS (SELECT 1 FROM push_log l WHERE l.rule_id = $3 AND l.tg_id = d.tg_id)
@@ -239,7 +271,7 @@ export function isDaytime(now = new Date()): boolean {
 }
 
 async function sendRule(rule: Rule, t: Target): Promise<'sent' | 'retry' | 'failed'> {
-  const res = await deliver(t.tg_id, renderText(rule.text, t), buildKeyboard(rule.buttons, t));
+  const res = await deliver(t.tg_id, renderText(pickText(rule.text, rule.text_en, t.lang), t), buildKeyboard(rule.buttons, t));
   if (!res.ok && res.retry) return 'retry';
   await db.query(`INSERT INTO push_log (rule_id, tg_id, status, error) VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING`, [
     rule.id,
@@ -302,11 +334,11 @@ export function segmentWhere(segment: string, ownerId?: number | null): { sql: s
   return { sql, params };
 }
 
-export async function createBroadcast(b: { text: string; buttons: Button[]; segment: string; ownerId?: number | null; createdBy: number; photo?: Photo | null }) {
+export async function createBroadcast(b: { text: string; textEn?: string; buttons: Button[]; segment: string; ownerId?: number | null; createdBy: number; photo?: Photo | null }) {
   const w = segmentWhere(b.segment, b.ownerId);
   const ins = await db.query(
-    `INSERT INTO broadcasts (text, buttons, segment, owner_id, created_by, photo, photo_type) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
-    [b.text, JSON.stringify(b.buttons), b.segment, b.ownerId ?? null, b.createdBy, b.photo?.data ?? null, b.photo?.type ?? null],
+    `INSERT INTO broadcasts (text, text_en, buttons, segment, owner_id, created_by, photo, photo_type) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`,
+    [b.text, b.textEn ?? '', JSON.stringify(b.buttons), b.segment, b.ownerId ?? null, b.createdBy, b.photo?.data ?? null, b.photo?.type ?? null],
   );
   const id = ins.rows[0].id;
   const jobs = await db.query(
@@ -333,7 +365,7 @@ async function runBroadcasts(): Promise<boolean> {
 
 async function runBroadcastBatch(): Promise<'done' | 'more' | 'retry'> {
   const jobs = await db.query(
-    `SELECT j.broadcast_id, j.tg_id, b.text, b.buttons, (b.photo IS NOT NULL) AS has_photo, d.first_name, d.username, d.region, d.tz,
+    `SELECT j.broadcast_id, j.tg_id, b.text, b.text_en, b.buttons, (b.photo IS NOT NULL) AS has_photo, d.first_name, d.username, d.region, d.tz, d.lang,
             o.name AS owner_name, o.po_promo, o.po_link, o.po_link_ru
        FROM broadcast_jobs j
        JOIN broadcasts b ON b.id = j.broadcast_id
@@ -353,7 +385,7 @@ async function runBroadcastBatch(): Promise<'done' | 'more' | 'retry'> {
     const anim = ph && (ph.type === 'image/gif' || !ph.type.startsWith('image/')) ? ph : null;
     const res = anim
       ? await deliverAnimation(String(j.tg_id), anim.data, anim.type, anim)
-      : await deliver(j.tg_id, renderText(j.text, j), buildKeyboard(j.buttons, j), ph);
+      : await deliver(j.tg_id, renderText(pickText(j.text, j.text_en, j.lang), j), buildKeyboard(j.buttons, j), ph);
     if (!res.ok && res.retry) return 'retry';
     await db.query(`UPDATE broadcast_jobs SET status = $3, error = $4 WHERE broadcast_id = $1 AND tg_id = $2`, [
       j.broadcast_id,

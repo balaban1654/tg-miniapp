@@ -41,6 +41,15 @@ export const DEFAULTS: Record<TemplateKey, { enabled: boolean; text: string; but
   },
 };
 
+/** Английские тексты стандартных шаблонов: пока админ не задал свой английский и русский не менялся */
+export const DEFAULTS_EN: Record<TemplateKey, string> = {
+  signal: 'New signal: {пара}, {направление}, expiry {экспирация}.\nEntry at {время}. Open the app.',
+  result: '{иконка} Signal result: {пара}, {направление}, expiry {экспирация}.\n**{итог}**',
+  result_win: '🟢 **The signal closed in profit**\n**{пара} — {сделка}** 📈\n\n{экспирация}: the trade closed in profit 💸\n\nProfit = {прибыль}$\n\nCongrats to everyone who got in 🎉',
+  result_step: '✅ **Signal result: +{прибыль}$**\n{пара} — {сделка}\n\n{отработка}\n\nOn to the next one 🔥',
+  live: '🔴 {стример} is live now!\n\nJoin while the stream is on.',
+};
+
 export async function seedTemplates(): Promise<void> {
   for (const k of TEMPLATE_KEYS) {
     const d = DEFAULTS[k];
@@ -70,6 +79,7 @@ export const CHANNEL_RE = /^(@[A-Za-z][A-Za-z0-9_]{3,31}|-100\d{5,})$/;
 interface Tpl {
   enabled: boolean;
   text: string;
+  textEn: string;
   buttons: Button[];
   segment: string;
   channels: string[];
@@ -78,9 +88,9 @@ interface Tpl {
 }
 
 async function load(key: TemplateKey): Promise<Tpl | null> {
-  const r = (await db.query('SELECT enabled, text, buttons, segment, channels, to_staff_channel, photo, photo_type FROM push_templates WHERE key = $1', [key])).rows[0];
+  const r = (await db.query('SELECT enabled, text, text_en, buttons, segment, channels, to_staff_channel, photo, photo_type FROM push_templates WHERE key = $1', [key])).rows[0];
   if (!r) return null;
-  return { enabled: r.enabled, text: r.text, buttons: r.buttons, segment: r.segment, channels: r.channels, toStaffChannel: r.to_staff_channel, photo: r.photo ? { data: r.photo, type: r.photo_type } : null };
+  return { enabled: r.enabled, text: r.text, textEn: r.text_en || (r.text === DEFAULTS[key].text ? DEFAULTS_EN[key] : ''), buttons: r.buttons, segment: r.segment, channels: r.channels, toStaffChannel: r.to_staff_channel, photo: r.photo ? { data: r.photo, type: r.photo_type } : null };
 }
 
 /** В канал нельзя кнопку Mini App и обратные вызовы: оставляем ссылки, а вход в кабинет превращаем в ссылку на бота */
@@ -97,6 +107,8 @@ function channelButtons(buttons: Button[]): Button[] {
 export interface Dispatch {
   /** Значения для подстановок в текст: {пара}, {стример} и т. д. */
   vars: Record<string, string>;
+  /** Те же подстановки для английского текста (клиентам с English); если нет — берутся русские */
+  varsEn?: Record<string, string>;
   /** Ссылка на эфир для кнопки «Смотреть эфир» */
   streamUrl?: string;
   /** Канал самого стримера (из карточки сотрудника) */
@@ -122,6 +134,11 @@ export async function dispatchTemplate(key: TemplateKey, d: Dispatch): Promise<{
   let text = t.text;
   for (const [k, v] of Object.entries(d.vars)) text = text.replaceAll(`{${k}}`, v);
   text = (d.prefix ?? '') + text;
+  let textEn = t.textEn;
+  if (textEn) {
+    for (const [k, v] of Object.entries({ ...d.vars, ...(d.varsEn ?? {}) })) textEn = textEn.replaceAll(`{${k}}`, v);
+    textEn = (d.prefix ?? '') + textEn;
+  }
   if (!text.trim() && !t.photo) return { users: 0, channels: 0, skipped: 'нет текста и картинки' };
   const buttons: Button[] = [];
   for (const b of t.buttons) {
@@ -132,7 +149,7 @@ export async function dispatchTemplate(key: TemplateKey, d: Dispatch): Promise<{
   let users = 0;
   const seg = d.segment ?? t.segment;
   if (!d.channelsOnly && seg !== 'none' && (seg === 'own' ? d.ownerId : seg in SEGMENTS)) {
-    const r = await createBroadcast({ text, buttons, segment: seg === 'own' ? 'all' : seg, ownerId: seg === 'own' ? d.ownerId : null, createdBy: d.createdBy, photo: t.photo });
+    const r = await createBroadcast({ text, textEn, buttons, segment: seg === 'own' ? 'all' : seg, ownerId: seg === 'own' ? d.ownerId : null, createdBy: d.createdBy, photo: t.photo });
     users = r.total;
   }
   let channels = 0;

@@ -29,15 +29,18 @@ export function drawState(d: { sent_at: Date | null; deadline: Date | null; clai
 }
 
 export async function sendClaim(drawId: number): Promise<{ deadline: Date } | { error: string }> {
-  const d = (await db.query('SELECT id, tg_id, place, prize, sent_at FROM giveaway_draws WHERE id = $1', [drawId])).rows[0];
+  const d = (await db.query('SELECT g.id, g.tg_id, g.place, g.prize, g.sent_at, l.lang FROM giveaway_draws g LEFT JOIN leads l ON l.tg_id = g.tg_id WHERE g.id = $1', [drawId])).rows[0];
   if (!d) return { error: 'Победитель не найден' };
   if (d.sent_at) return { error: 'Сообщение уже отправлено' };
   const prize = Number(d.prize).toLocaleString('ru-RU', { maximumFractionDigits: 2 });
-  const text =
-    `🎁 Поздравляем! Вы победили в розыгрыше Hunter AI: ${d.place} место, бонус $${prize}.\n\n` +
-    `Нажмите «Забрать бонус» в течение ${CLAIM_SEC} секунд, иначе приз перейдёт другому участнику.`;
+  const en = d.lang === 'en';
+  const text = en
+    ? `🎁 Congratulations! You won the Hunter AI giveaway: place ${d.place}, bonus $${Number(d.prize).toLocaleString('en-US', { maximumFractionDigits: 2 })}.\n\n` +
+      `Tap “Claim bonus” within ${CLAIM_SEC} seconds, otherwise the prize goes to another participant.`
+    : `🎁 Поздравляем! Вы победили в розыгрыше Hunter AI: ${d.place} место, бонус $${prize}.\n\n` +
+      `Нажмите «Забрать бонус» в течение ${CLAIM_SEC} секунд, иначе приз перейдёт другому участнику.`;
   try {
-    const m = await bot.api.sendMessage(Number(d.tg_id), text, { reply_markup: new InlineKeyboard().text('🎁 Забрать бонус', `gw:${d.id}`) });
+    const m = await bot.api.sendMessage(Number(d.tg_id), text, { reply_markup: new InlineKeyboard().text(en ? '🎁 Claim bonus' : '🎁 Забрать бонус', `gw:${d.id}`) });
     // Время пошло с момента отправки
     const r = await db.query(`UPDATE giveaway_draws SET sent_at = now(), deadline = now() + make_interval(secs => $2), msg_id = $3 WHERE id = $1 RETURNING deadline`, [
       d.id,
@@ -58,13 +61,17 @@ bot.callbackQuery(/^gw:(\d+)$/, async (ctx) => {
      RETURNING prize, place`,
     [id, ctx.from.id],
   );
+  const en = (await db.query('SELECT lang FROM leads WHERE tg_id = $1', [ctx.from.id])).rows[0]?.lang === 'en';
   if (r.rowCount) {
-    const prize = Number(r.rows[0].prize).toLocaleString('ru-RU', { maximumFractionDigits: 2 });
-    await ctx.answerCallbackQuery({ text: 'Бонус ваш! 🎉' });
-    await ctx.editMessageText(`🎉 Бонус $${prize} ваш (${r.rows[0].place} место)! Менеджер свяжется с вами, чтобы его начислить.`).catch(() => {});
+    const prize = Number(r.rows[0].prize).toLocaleString(en ? 'en-US' : 'ru-RU', { maximumFractionDigits: 2 });
+    await ctx.answerCallbackQuery({ text: en ? 'The bonus is yours! 🎉' : 'Бонус ваш! 🎉' });
+    await ctx.editMessageText(en
+      ? `🎉 The $${prize} bonus is yours (place ${r.rows[0].place})! A manager will contact you to credit it.`
+      : `🎉 Бонус $${prize} ваш (${r.rows[0].place} место)! Менеджер свяжется с вами, чтобы его начислить.`).catch(() => {});
     return;
   }
   const d = (await db.query('SELECT claimed_at FROM giveaway_draws WHERE id = $1 AND tg_id = $2', [id, ctx.from.id])).rows[0];
-  await ctx.answerCallbackQuery({ text: d?.claimed_at ? 'Бонус уже ваш' : 'Время вышло, приз перешёл другому участнику', show_alert: !d?.claimed_at });
-  if (d && !d.claimed_at) await ctx.editMessageText('⏱ Время вышло: бонус не был забран за 15 секунд и перешёл другому участнику.').catch(() => {});
+  const msg = d?.claimed_at ? (en ? 'The bonus is already yours' : 'Бонус уже ваш') : en ? 'Time is up, the prize went to another participant' : 'Время вышло, приз перешёл другому участнику';
+  await ctx.answerCallbackQuery({ text: msg, show_alert: !d?.claimed_at });
+  if (d && !d.claimed_at) await ctx.editMessageText(en ? '⏱ Time is up: the bonus was not claimed within 15 seconds and went to another participant.' : '⏱ Время вышло: бонус не был забран за 15 секунд и перешёл другому участнику.').catch(() => {});
 });

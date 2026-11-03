@@ -233,8 +233,8 @@ code{font-family:var(--fm);font-size:12px;color:var(--acc2)}
 .row2{display:flex;justify-content:space-between;align-items:center;gap:8px}
 .dot{width:9px;height:9px;border-radius:50%;background:var(--acc);flex:none}
 .sm{font-size:12px}
-.bt{display:grid;grid-template-columns:1.2fr 1fr auto 1.4fr auto;gap:8px;align-items:center}
-@media(max-width:560px){.bt{grid-template-columns:1fr 1fr}.bt>input:first-child{grid-column:1/-1}}
+.bt{display:grid;grid-template-columns:1.1fr 1.1fr 1fr auto 1.3fr auto;gap:8px;align-items:center}
+@media(max-width:560px){.bt{grid-template-columns:1fr 1fr}.bt>input:nth-child(-n+2){grid-column:1/-1}}
 .pv{background:var(--card2);border-radius:12px;border-top-left-radius:3px;padding:10px 12px;max-width:340px;white-space:pre-wrap;overflow-wrap:anywhere}
 .pv .k{display:grid;gap:4px;margin-top:8px}.pv .k span{background:#ffffff14;border-radius:8px;text-align:center;padding:6px;font-weight:600;font-size:12px;color:var(--acc2)}.pv .k span.st-success{background:#3e9b4f;color:#fff}.pv .k span.st-primary{background:#3d7fd6;color:#fff}.pv .k span.st-danger{background:#d64545;color:#fff}
 textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;width:100%;font:inherit;color:inherit;min-height:110px;resize:vertical}
@@ -3844,20 +3844,21 @@ function buttonsEditor(initial,types){
   const rows=[];
   const add=(b={})=>{
     const label=el('input',{placeholder:'Подпись кнопки',maxlength:'40',value:b.label||''});
+    const labelEn=el('input',{placeholder:'Подпись (EN)',maxlength:'40',value:b.label_en||'',title:'Подпись для клиентов с английским языком. Пусто — стандартный перевод или русская подпись'});
     const kind=b.type==='callback'?b.data:(b.type||'miniapp');
     const type=el('select',{},Object.entries(TYPES).map(([k,v])=>el('option',{value:k,...(k===kind?{selected:''}:{})},v)));
     const url=el('input',{placeholder:'https://…',value:b.url||''});
     const color=el('select',{title:'Цвет кнопки'},Object.entries(BCOLOR).map(([k,v])=>el('option',{value:k,...(k===(b.style||'')?{selected:''}:{})},v)));
     const del=el('button',{class:'btn o s',type:'button',onclick:()=>{rows.splice(rows.indexOf(r),1);r.node.remove()}},'Убрать');
     const sync=()=>{url.hidden=type.value!=='url'};type.addEventListener('change',sync);sync();
-    const r={node:el('div',{class:'bt'},label,type,color,url,del),label,type,color,url,orig:b};
+    const r={node:el('div',{class:'bt'},label,labelEn,type,color,url,del),label,labelEn,type,color,url,orig:b};
     rows.push(r);box.append(r.node);
   };
   (initial||[]).forEach(add);
   const addBtn=el('button',{class:'btn o s',type:'button',onclick:()=>{if(rows.length<4)add()}},'+ Кнопка');
   return{set:l=>{rows.splice(0).forEach(r=>r.node.remove());(l||[]).forEach(add)},node:el('div',{style:'display:grid;gap:8px'},el('span',{class:'mut sm'},'Кнопки под сообщением (до 4)'),box,addBtn),
     get:()=>rows.filter(r=>r.label.value.trim()).map(r=>{const k=r.type.value;
-      const keep={...(r.color.value?{style:r.color.value}:{}),...(r.orig.inline?{inline:true}:{})};
+      const keep={...(r.color.value?{style:r.color.value}:{}),...(r.orig.inline?{inline:true}:{}),...(r.labelEn.value.trim()?{label_en:r.labelEn.value.trim()}:{})};
       if(k==='acc_no'||k==='acc_yes'||k==='acc_ready')return{label:r.label.value.trim(),type:'callback',data:k,...keep};
       if(k==='url')return{label:r.label.value.trim(),type:'url',url:r.url.value.trim(),...keep};
       return{label:r.label.value.trim(),type:k,...keep}})};
@@ -3879,6 +3880,7 @@ function templateCard(t){
   const err=el('div',{class:'err',role:'alert'});
   const on=el('input',{type:'checkbox',style:'width:auto'});on.checked=t.enabled;
   const txt=el('textarea',{class:'big',rows:'4',maxlength:'4000',placeholder:'Текст сообщения. Можно оставить пустым, если есть картинка'});txt.value=t.text||'';
+  const txtEn=el('textarea',{class:'big',rows:'4',maxlength:'4000',placeholder:'Text in English (те же подстановки на русском: {пара}, {имя}…)'});txtEn.value=t.text_en||'';
   const be=buttonsEditor(t.buttons,info.types);
   const segOpts=[['none','Никому в боте (только каналы)'],...(t.key==='live'?[['own','Лиды этого стримера']]:[]),...Object.entries(SEG_LABELS)];
   const seg=el('select',{'aria-label':'Кому'},segOpts.map(([v,n])=>el('option',{value:v},n)));seg.value=t.segment;
@@ -3902,7 +3904,7 @@ function templateCard(t){
   drawPv();upd();
   const save=el('button',{class:'btn',type:'button'},'Сохранить');
   save.addEventListener('click',async()=>{err.className='err';err.textContent='';
-    try{await api('/push/templates/'+t.key,{method:'PUT',body:{enabled:on.checked,text:txt.value,buttons:be.get(),segment:seg.value,channels:ch.value,to_staff_channel:own.checked,photo,remove_photo:removePhoto}});
+    try{await api('/push/templates/'+t.key,{method:'PUT',body:{enabled:on.checked,text:txt.value,text_en:txtEn.value,buttons:be.get(),segment:seg.value,channels:ch.value,to_staff_channel:own.checked,photo,remove_photo:removePhoto}});
       err.className='ok-msg';err.textContent='Сохранено';setTimeout(render,700)}catch(x){err.textContent=x.message}});
   const reset=el('button',{class:'btn o',type:'button',onclick:async()=>{if(!reset.dataset.s){reset.dataset.s='1';reset.textContent='Точно вернуть стандартный текст?';return}
     try{await api('/push/templates/'+t.key+'/reset',{method:'POST'});render({soft:true})}catch(x){err.textContent=x.message}}},'Вернуть стандартный текст');
@@ -3910,6 +3912,7 @@ function templateCard(t){
     el('div',{style:'display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap'},el('h3',{style:'font-size:15px'},info.title),el('label',{style:'display:flex;gap:8px;align-items:center;cursor:pointer'},on,'Включён')),
     el('div',{class:'mut sm'},info.when),
     el('label',{},'Текст. Подстановки: '+info.vars,txt),
+    el('label',{},'Текст на английском',txtEn),el('div',{class:'mut sm'},'Клиенты, выбравшие English, получат английский текст. Если оставить пустым, им уйдёт русский.'),
     el('div',{style:'display:grid;gap:6px'},el('span',{class:'mut sm'},'Картинка (необязательно, можно отправить только её)'),pv,file),
     be.node,
     el('div',{class:'form'},t.key==='live'?el('label',{},'Кому в боте',seg):el('div',{class:'mut sm',style:'align-self:end'},'Кому в боте: всем лидам, кто запускал бота, если при отправке стоит галочка «Отправить пуш»'),el('label',{style:'grid-column:span 2'},t.key==='live'?'Основной канал команды: сюда попадает эфир любого стримера (по одному на строку, бот должен быть админом)':'Telegram-каналы, по одному на строку (бот должен быть админом)',ch)),
@@ -3929,6 +3932,7 @@ function replyCard(t){
   const info=REPLY_INFO[t.key]||{title:t.key,when:''};
   const err=el('div',{class:'err',role:'alert'});
   const txt=el('textarea',{class:'big',rows:'5',maxlength:'4000',placeholder:'Текст сообщения. Можно оставить пустым, если есть картинка'});txt.value=t.text||'';
+  const txtEn=el('textarea',{class:'big',rows:'5',maxlength:'4000',placeholder:'Text in English'});txtEn.value=t.text_en||'';
   const be=buttonsEditor(t.buttons);
   let photo=null,removePhoto=false;
   const file=el('input',{type:'file',accept:'image/jpeg,image/png,image/webp',style:'display:none'});
@@ -3948,7 +3952,7 @@ function replyCard(t){
   drawPv();upd();
   const save=el('button',{class:'btn',type:'button'},'Сохранить');
   save.addEventListener('click',async()=>{err.className='err';err.textContent='';
-    try{await api('/bot-replies/'+t.key,{method:'PUT',body:{text:txt.value,buttons:be.get(),photo,remove_photo:removePhoto}});
+    try{await api('/bot-replies/'+t.key,{method:'PUT',body:{text:txt.value,text_en:txtEn.value,buttons:be.get(),photo,remove_photo:removePhoto}});
       err.className='ok-msg';err.textContent='Сохранено';setTimeout(()=>render({soft:true}),700)}catch(x){err.textContent=x.message}});
   const reset=el('button',{class:'btn o',type:'button',onclick:async()=>{if(!reset.dataset.s){reset.dataset.s='1';reset.textContent='Точно вернуть стандартный текст и кнопки?';return}
     try{await api('/bot-replies/'+t.key+'/reset',{method:'POST'});render({soft:true})}catch(x){err.textContent=x.message}}},'Вернуть стандартный');
@@ -3956,6 +3960,7 @@ function replyCard(t){
     el('h3',{style:'font-size:15px'},info.title),
     el('div',{class:'mut sm'},info.when),
     el('label',{},'Текст. Подстановки: {имя} {стример} {промокод} {условия}. **жирный**, __курсив__, [текст](https://ссылка)',txt),
+    el('label',{},'Текст на английском',txtEn),el('div',{class:'mut sm'},'Клиенты, выбравшие English, получат английский текст. Если оставить пустым, им уйдёт русский.'),
     el('div',{style:'display:grid;gap:6px'},el('span',{class:'mut sm'},'Картинка (необязательно)'),pv,file),
     be.node,
     el('div',{},el('div',{class:'mut',style:'font-size:12px;margin-bottom:6px'},'Так увидит клиент'),bpv),
@@ -3972,7 +3977,8 @@ async function viewPush(){
     delay:el('input',{type:'number',min:'0',value:'0',style:'min-width:70px'}),
     unit:el('select',{},el('option',{value:'1'},'мин'),el('option',{value:'60'},'часов'),el('option',{value:'1440'},'дней')),
     day:el('input',{type:'checkbox',style:'width:auto'}),
-    text:el('textarea',{class:'big',required:'',placeholder:'Привет, {имя}! …',maxlength:'4000'})};
+    text:el('textarea',{class:'big',required:'',placeholder:'Привет, {имя}! …',maxlength:'4000'}),
+    textEn:el('textarea',{class:'big',placeholder:'Hi, {имя}! …',maxlength:'4000'})};
   let be=buttonsEditor([]);
   const bbox=el('div',{});bbox.append(be.node);
   const pv=el('div',{});
@@ -3983,16 +3989,17 @@ async function viewPush(){
   const fill=r=>{editId=r?r.id:null;formTitle.textContent=r?'Редактирование: '+r.name:'Новое правило';
     f.name.value=r?r.name:'';f.trig.value=r?r.trigger:'no_reg';
     const m=r?r.delay_min:0;const u=m&&m%1440===0?1440:m&&m%60===0?60:1;f.unit.value=String(u);f.delay.value=String(m/u);
-    f.day.checked=r?r.daytime_only:false;f.text.value=r?r.text:'';
+    f.day.checked=r?r.daytime_only:false;f.text.value=r?r.text:'';f.textEn.value=r?(r.text_en||''):'';
     be=buttonsEditor(r?r.buttons:[]);bbox.replaceChildren(be.node);upd();err.textContent='';};
   fill(null);
   const form=el('form',{class:'card',style:'display:grid;gap:12px',onsubmit:async e=>{e.preventDefault();err.textContent='';err.className='err';
-    const body={name:f.name.value,trigger:f.trig.value,delay_min:Number(f.delay.value)*Number(f.unit.value),text:f.text.value,buttons:be.get(),daytime_only:f.day.checked};
+    const body={name:f.name.value,trigger:f.trig.value,delay_min:Number(f.delay.value)*Number(f.unit.value),text:f.text.value,text_en:f.textEn.value,buttons:be.get(),daytime_only:f.day.checked};
     try{if(editId)await api('/push/rules/'+editId,{method:'PATCH',body});else await api('/push/rules',{method:'POST',body});render()}catch(x){err.textContent=x.message}}},
     formTitle,
     el('div',{class:'form'},el('label',{},'Название',f.name),el('label',{},'Когда',f.trig),el('label',{},'Задержка',el('div',{style:'display:flex;gap:6px'},f.delay,f.unit))),
     el('label',{style:'display:flex;gap:8px;align-items:center'},f.day,'Только днём ('+'10:00–22:00'+' по Киеву)'),
-    el('label',{},'Текст. Подстановки: {имя} {стример} {промокод}',f.text),bbox,
+    el('label',{},'Текст. Подстановки: {имя} {стример} {промокод}',f.text),
+    el('label',{},'Текст на английском',f.textEn),el('div',{class:'mut sm'},'Клиенты, выбравшие English, получат английский текст. Если оставить пустым, им уйдёт русский.'),bbox,
     el('div',{},el('div',{class:'mut sm',style:'margin-bottom:6px'},'Так увидит клиент'),pv),
     el('div',{style:'display:flex;gap:8px'},el('button',{class:'btn',type:'submit'},'Сохранить'),el('button',{class:'btn o',type:'button',onclick:()=>fill(null)},'Новое правило')),err);
   const tog=r=>el('button',{class:'btn s'+(r.enabled?'':' o'),type:'button',onclick:async()=>{await api('/push/rules/'+r.id,{method:'PATCH',body:{enabled:!r.enabled}});render()}},r.enabled?'Включено':'Выключено');
@@ -4008,6 +4015,7 @@ async function viewPush(){
   const owner=el('select',{},el('option',{value:''},'Все стримеры'),...staff.filter(x=>(x.streams||['streamer','teamlead','buyer'].includes(x.role))).map(x=>el('option',{value:x.id},x.name)));
   owner.addEventListener('change',async()=>{const c=await api('/push/segments'+(owner.value?'?owner_id='+owner.value:''));[...sel.options].forEach(o=>o.textContent=SEGL[o.value]+' ('+c[o.value]+')')});
   const bt=el('textarea',{class:'big',placeholder:'{имя}, у нас новости…',maxlength:'4000'});
+  const btEn=el('textarea',{class:'big',placeholder:'{имя}, we have news…',maxlength:'4000'});
   const bbe=buttonsEditor([]);const bpv=el('div',{});
   const bupd=()=>bpv.replaceChildren(preview(bt.value,bbe.get()));
   bt.addEventListener('input',bupd);bbe.node.addEventListener('input',bupd);bbe.node.addEventListener('click',()=>setTimeout(bupd,0));bupd();
@@ -4033,12 +4041,13 @@ async function viewPush(){
   sendBtn.addEventListener('click',async()=>{
     berr.className='err';berr.textContent='';
     if(!sendBtn.dataset.s){const n=(sel.selectedOptions[0].textContent.match(/\((\d+)\)/)||[])[1];sendBtn.dataset.s='1';sendBtn.textContent='Подтвердить отправку '+n+' получателям';return}
-    try{const r=await api('/push/broadcast',{method:'POST',body:{segment:sel.value,owner_id:owner.value||undefined,text:bt.value,buttons:bbe.get(),photo:photo?await fileToDataUrl(photo):undefined}});berr.className='ok-msg';berr.textContent='Рассылка поставлена в очередь: '+r.total+' получателей';clearPhoto();setTimeout(render,1200)}
+    try{const r=await api('/push/broadcast',{method:'POST',body:{segment:sel.value,owner_id:owner.value||undefined,text:bt.value,text_en:btEn.value,buttons:bbe.get(),photo:photo?await fileToDataUrl(photo):undefined}});berr.className='ok-msg';berr.textContent='Рассылка поставлена в очередь: '+r.total+' получателей';clearPhoto();setTimeout(render,1200)}
     catch(x){berr.textContent=x.message;delete sendBtn.dataset.s;sendBtn.textContent='Отправить'}});
   const bform=el('div',{class:'card',style:'display:grid;gap:12px'},el('h3',{style:'font-size:14px'},'Рассылка вручную'),
     el('div',{class:'form'},el('label',{},'Кому',sel),el('label',{},'Стример',owner)),
     el('div',{},el('button',{class:'btn o s',type:'button',onclick:()=>{bt.value='{имя}, у нас к вам просьба. Если вам нравится работа с командой, оставьте короткий отзыв: оценка и пара слов, можно с фото. Это займёт меньше минуты и поможет тем, кто только присматривается.';bt.dispatchEvent(new Event('input'));bbe.set([{label:'Оставить отзыв',type:'review',style:'success'}]);bbe.node.dispatchEvent(new Event('input',{bubbles:true}));sel.value='withdrew'}},'Шаблон: просьба об отзыве')),
     el('label',{},'Текст. Подстановки: {имя} {стример} {промокод}',bt),
+    el('label',{},'Текст на английском',btEn),el('div',{class:'mut sm'},'Клиенты, выбравшие English, получат английский текст. Если оставить пустым, им уйдёт русский.'),
     el('div',{style:'display:grid;gap:6px'},el('span',{class:'mut sm'},'Картинка (необязательно): прикрепите файл или вставьте из буфера прямо в поле текста'),el('div',{style:'display:flex;gap:10px;align-items:center;flex-wrap:wrap'},attachBtn,prev),fileIn),bbe.node,el('div',{},el('div',{class:'mut sm',style:'margin-bottom:6px'},'Так увидит клиент'),bpv),
     el('div',{class:'mut sm'},'Получают только те, кто нажал /start у бота и не заблокировал его. Отправка идёт очередью, примерно 20 сообщений в секунду.'),
     el('div',{},sendBtn),berr);
@@ -4657,6 +4666,7 @@ function cnOf(d){
   const pct=el('input',{type:'number',min:'1',max:'95',step:'1',value:String(cur.discount_pct)});
   const days=el('input',{type:'number',min:'1',max:'60',step:'1',value:String(cur.days)});
   const text=el('textarea',{class:'big',rows:'4',maxlength:'800'});text.value=cur.text;
+  const textEn=el('textarea',{class:'big',rows:'3',maxlength:'800',placeholder:'Text in English'});textEn.value=cur.id?(cur.text_en||''):(cur.text_en||d.defaultTextEn||'');
   const info=el('div',{class:'cn-ok'}),prev=el('div',{});
   const need=()=>Math.round(d.minDeposit*(1-(Number(pct.value)||0)/100)*100)/100;
   const upd=()=>{
@@ -4666,7 +4676,7 @@ function cnOf(d){
   };
   [pct,days,text].forEach(x=>x.addEventListener('input',upd));upd();
   const err=el('div',{class:'err',role:'alert'});
-  const body=()=>({name:name.value.trim(),discount_pct:Number(pct.value),days:Number(days.value),text:text.value});
+  const body=()=>({name:name.value.trim(),discount_pct:Number(pct.value),days:Number(days.value),text:text.value,text_en:textEn.value});
   // Первое сохранение создаёт акцию, дальше правится она же: «Тест» и «Отправить всем» не плодят копии
   const saveOffer=async()=>{err.textContent='';
     if(cur.id){await api('/connect/offers/'+cur.id,{method:'PATCH',body:body()});return cur.id}
@@ -4685,7 +4695,8 @@ function cnOf(d){
   return[el('div',{class:'cn-two'},
     el('div',{class:'card',style:'display:grid;gap:12px;align-content:start'},el('b',{},cur.id?'Изменить акцию':'Новая акция'),
       el('div',{class:'cn-row'},el('div',{class:'lc-field',style:'flex:1'},el('label',{},'Название'),name),el('div',{class:'lc-field',style:'width:110px'},el('label',{},'Скидка, %'),pct),el('div',{class:'lc-field',style:'width:130px'},el('label',{},'Действует, дней'),days)),
-      info,el('div',{class:'lc-field'},el('label',{},'Текст пуша ({скидка}, {сумма}, {дата}, {имя}; **жирный**)'),text),err,
+      info,el('div',{class:'lc-field'},el('label',{},'Текст пуша ({скидка}, {сумма}, {дата}, {имя}; **жирный**)'),text),
+      el('div',{class:'lc-field'},el('label',{},'Текст на английском (те же подстановки)'),textEn),el('div',{class:'mut sm'},'Клиенты, выбравшие English, получат английский текст. Если оставить пустым, им уйдёт русский.'),err,
       el('div',{style:'display:flex;gap:8px;flex-wrap:wrap'},save,test,cur.id?el('button',{class:'btn o',type:'button',onclick:()=>{connState.edit=null;render({soft:true})}},'Новая'):null),
       el('div',{class:'lc-field'},el('label',{},'Кому: все, кто не подключился (Новый и Регистрация), доступные пуши'),el('div',{style:'display:flex;gap:8px;flex-wrap:wrap'},owner,sendAll))),
     el('div',{style:'display:grid;gap:8px;align-content:start'},el('div',{class:'mut sm'},'Как увидит лид в боте'),prev)),

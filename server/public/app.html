@@ -889,7 +889,13 @@ function signalResult(r){
     el('p',{class:'sm',style:'margin:0'},'Это мнение аналитика, а не гарантия результата. Торгуйте только той суммой, которую готовы потерять.')]);
 }
 
-async function refreshMe(){me=await api('/me');return me}
+async function refreshMe(){me=await api('/me');syncLang();return me}
+/** Язык общий с ботом: выбор в боте (при /start) включает его здесь, выбор здесь сохраняется на сервере для пушей */
+function syncLang(){
+  let local=null;try{local=localStorage.getItem('pref_lang')}catch{}
+  if(me.lang&&me.lang!==local){try{localStorage.setItem('pref_lang',me.lang)}catch{}if(window.__setLang)window.__setLang(me.lang)}
+  else if(!me.lang&&local){me.lang=local;api('/lang',{method:'POST',body:{lang:local}}).catch(()=>{})}
+}
 
 /** Пока доступ закрыт, раз в 15 секунд спрашиваем статус: регистрация и депозит приходят постбеком, экран обновится сам */
 function watchAccess(){
@@ -1777,7 +1783,7 @@ function prefBox(){
   const lbl=el('span',{},'');
   const menu=el('div',{style:'position:absolute;right:0;top:32px;z-index:20;background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:4px;display:none;min-width:110px;box-shadow:0 10px 30px #0008'});
   const paint=()=>{lbl.textContent=(LANGS.find(x=>x[0]===cur())||LANGS[0])[1];
-    menu.replaceChildren(...LANGS.map(([v,t])=>el('button',{type:'button',style:'display:block;width:100%;text-align:left;background:'+(v===cur()?'var(--acc)':'none')+';color:'+(v===cur()?'#fff':'var(--fg)')+';border:0;border-radius:7px;padding:7px 10px;font:700 12px var(--fd);cursor:pointer;outline:none;white-space:nowrap',onclick:e=>{e.stopPropagation();menu.style.display='none';if(v===cur())return;prefSet('pref_lang',v);if(window.__setLang)window.__setLang(v);render()}},v==='ru'?'Русский':'English')))};
+    menu.replaceChildren(...LANGS.map(([v,t])=>el('button',{type:'button',style:'display:block;width:100%;text-align:left;background:'+(v===cur()?'var(--acc)':'none')+';color:'+(v===cur()?'#fff':'var(--fg)')+';border:0;border-radius:7px;padding:7px 10px;font:700 12px var(--fd);cursor:pointer;outline:none;white-space:nowrap',onclick:e=>{e.stopPropagation();menu.style.display='none';if(v===cur())return;prefSet('pref_lang',v);me.lang=v;api('/lang',{method:'POST',body:{lang:v}}).catch(()=>{});if(window.__setLang)window.__setLang(v);render()}},v==='ru'?'Русский':'English')))};
   const lang=el('button',{type:'button','aria-label':'Язык',style:chip,onclick:e=>{e.stopPropagation();menu.style.display=menu.style.display==='none'?'block':'none'}},lbl,svgEl('<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>'));
   document.addEventListener('click',()=>{menu.style.display='none'});
   paint();

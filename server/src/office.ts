@@ -20,8 +20,8 @@ import { toVoice, toVideoNote } from './media.js';
 import { parseReviewPhoto, cleanReviewText, cleanRating } from './reviews.js';
 import { loadDepConfig, leadTierState } from './depbonus.js';
 import { RESERVED_SLUGS } from './reserved.js';
-import { REPLY_KEYS, REPLY_DEFAULTS, type ReplyKey } from './replies.js';
-import { dispatchTemplate, TEMPLATE_KEYS, DEFAULTS, CHANNEL_RE, normChannel, type TemplateKey } from './templates.js';
+import { REPLY_KEYS, REPLY_DEFAULTS, type ReplyKey, REPLY_DEFAULTS_EN } from './replies.js';
+import { dispatchTemplate, TEMPLATE_KEYS, DEFAULTS, CHANNEL_RE, normChannel, type TemplateKey, DEFAULTS_EN } from './templates.js';
 import {
   type Staff,
   type Role,
@@ -1213,6 +1213,8 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
       const extra: Partial<Button> = {};
       if (['primary', 'success', 'danger'].includes(str(b.style, 10))) extra.style = str(b.style, 10) as Button['style'];
       if (b.inline === true) extra.inline = true;
+      const labelEn = str(b.label_en, 40);
+      if (labelEn) extra.label_en = labelEn;
       if (type === 'url') {
         const url = str(b.url, 400);
         if (!/^https:\/\/[^\s]+$/.test(url)) return 'Ссылка кнопки должна начинаться с https://';
@@ -1229,7 +1231,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
 
   app.get('/push/rules', { preHandler: need('admin') }, async () => {
     const r = await db.query(
-      `SELECT r.id, r.name, r.trigger, r.delay_min, r.text, r.buttons, r.daytime_only, r.enabled,
+      `SELECT r.id, r.name, r.trigger, r.delay_min, r.text, r.text_en, r.buttons, r.daytime_only, r.enabled,
               (SELECT count(*)::int FROM push_log l WHERE l.rule_id = r.id AND l.status = 'sent') AS sent,
               (SELECT count(*)::int FROM push_log l WHERE l.rule_id = r.id AND l.status = 'failed') AS failed
          FROM push_rules r ORDER BY r.sort, r.id`,
@@ -1256,6 +1258,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
       out.text = str(b.text, 4000);
       if (!out.text) return { error: 'Введите текст' };
     }
+    if (b.text_en !== undefined) out.text_en = str(b.text_en, 4000);
     if (!partial || b.buttons !== undefined) {
       const bt = cleanButtons(b.buttons);
       if (typeof bt === 'string') return { error: bt };
@@ -1271,9 +1274,9 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     if (r.error) return reply.code(400).send({ error: r.error });
     const v = r.values!;
     const ins = await db.query(
-      `INSERT INTO push_rules (name, trigger, delay_min, text, buttons, daytime_only, sort)
-       VALUES ($1,$2,$3,$4,$5,$6,(SELECT coalesce(max(sort),0)+1 FROM push_rules)) RETURNING id`,
-      [v.name, v.trigger, v.delay_min, v.text, v.buttons ?? '[]', v.daytime_only ?? false],
+      `INSERT INTO push_rules (name, trigger, delay_min, text, text_en, buttons, daytime_only, sort)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,(SELECT coalesce(max(sort),0)+1 FROM push_rules)) RETURNING id`,
+      [v.name, v.trigger, v.delay_min, v.text, v.text_en ?? '', v.buttons ?? '[]', v.daytime_only ?? false],
     );
     return { id: ins.rows[0].id };
   });
@@ -1322,7 +1325,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     if (!text && !ph) return reply.code(400).send({ error: 'Введите текст или прикрепите картинку' });
     if (!(segment in SEGMENTS)) return reply.code(400).send({ error: 'Неизвестный сегмент' });
     if (typeof buttons === 'string') return reply.code(400).send({ error: buttons });
-    const res = await createBroadcast({ text, buttons, segment, ownerId: b.owner_id ? Number(b.owner_id) : null, createdBy: req.staff!.id, photo: ph });
+    const res = await createBroadcast({ text, textEn: str(b.text_en, 4000), buttons, segment, ownerId: b.owner_id ? Number(b.owner_id) : null, createdBy: req.staff!.id, photo: ph });
     if (!res.total) return reply.code(400).send({ error: 'В этом сегменте нет получателей' });
     return res;
   });
@@ -1853,7 +1856,8 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
   // Шаблоны сообщений бота: новый сигнал и «стример в эфире»
   const tplKey = (k: string): TemplateKey | null => ((TEMPLATE_KEYS as readonly string[]).includes(k) ? (k as TemplateKey) : null);
   app.get('/push/templates', { preHandler: need('admin') }, async () => {
-    return (await db.query(`SELECT key, enabled, text, buttons, segment, channels, to_staff_channel, (photo IS NOT NULL) AS has_photo, updated_at FROM push_templates ORDER BY key DESC`)).rows;
+    const rows = (await db.query(`SELECT key, enabled, text, text_en, buttons, segment, channels, to_staff_channel, (photo IS NOT NULL) AS has_photo, updated_at FROM push_templates ORDER BY key DESC`)).rows;
+    return rows.map((r) => ({ ...r, text_en: r.text_en || (DEFAULTS[r.key as TemplateKey] && r.text === DEFAULTS[r.key as TemplateKey].text ? DEFAULTS_EN[r.key as TemplateKey] : '') }));
   });
   app.get<{ Params: { key: string } }>('/push/templates/:key/photo', { preHandler: need('admin') }, async (req, reply) => {
     const r = (await db.query('SELECT photo, photo_type FROM push_templates WHERE key = $1', [req.params.key])).rows[0];
@@ -1883,8 +1887,8 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     if (enabled && !text && !hasPhoto) return reply.code(400).send({ error: 'Нужен текст или картинка' });
     if (enabled && segment === 'none' && !channels.length && !(key === 'live' && b.to_staff_channel !== false)) return reply.code(400).send({ error: 'Выберите получателей или добавьте канал' });
     await db.query(
-      'UPDATE push_templates SET enabled = $2, text = $3, buttons = $4, segment = $5, channels = $6, to_staff_channel = $7, updated_at = now() WHERE key = $1',
-      [key, enabled, text, JSON.stringify(buttons), segment, JSON.stringify(channels), b.to_staff_channel !== false],
+      'UPDATE push_templates SET enabled = $2, text = $3, buttons = $4, segment = $5, channels = $6, to_staff_channel = $7, text_en = $8, updated_at = now() WHERE key = $1',
+      [key, enabled, text, JSON.stringify(buttons), segment, JSON.stringify(channels), b.to_staff_channel !== false, str(b.text_en, 4000)],
     );
     if (b.remove_photo) await db.query('UPDATE push_templates SET photo = NULL, photo_type = NULL WHERE key = $1', [key]);
     if (ph) await db.query('UPDATE push_templates SET photo = $2, photo_type = $3 WHERE key = $1', [key, ph.data, ph.type]);
@@ -1894,14 +1898,15 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     const key = tplKey(req.params.key);
     if (!key) return reply.code(404).send({ error: 'Шаблон не найден' });
     const d = DEFAULTS[key];
-    await db.query('UPDATE push_templates SET text = $2, buttons = $3, updated_at = now() WHERE key = $1', [key, d.text, JSON.stringify(d.buttons)]);
+    await db.query("UPDATE push_templates SET text = $2, buttons = $3, text_en = '', updated_at = now() WHERE key = $1", [key, d.text, JSON.stringify(d.buttons)]);
     return { ok: true };
   });
 
   // Ответы бота на кнопки воронки и /start
   const replyKey = (k: string): ReplyKey | null => ((REPLY_KEYS as readonly string[]).includes(k) ? (k as ReplyKey) : null);
   app.get('/bot-replies', { preHandler: need('admin') }, async () => {
-    return (await db.query(`SELECT key, text, buttons, (photo IS NOT NULL) AS has_photo, updated_at FROM bot_replies`)).rows;
+    const rows = (await db.query(`SELECT key, text, text_en, buttons, (photo IS NOT NULL) AS has_photo, updated_at FROM bot_replies`)).rows;
+    return rows.map((r) => ({ ...r, text_en: r.text_en || (REPLY_DEFAULTS[r.key as ReplyKey] && r.text === REPLY_DEFAULTS[r.key as ReplyKey].text ? REPLY_DEFAULTS_EN[r.key as ReplyKey] : '') }));
   });
   app.get<{ Params: { key: string } }>('/bot-replies/:key/photo', { preHandler: need('admin') }, async (req, reply) => {
     const r = (await db.query('SELECT photo, photo_type FROM bot_replies WHERE key = $1', [req.params.key])).rows[0];
@@ -1921,9 +1926,9 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     const hasPhoto = ph ? true : b.remove_photo ? false : Boolean(cur?.has_photo);
     if (!text && !hasPhoto) return reply.code(400).send({ error: 'Нужен текст или картинка' });
     await db.query(
-      `INSERT INTO bot_replies (key, text, buttons, updated_at) VALUES ($1,$2,$3,now())
-       ON CONFLICT (key) DO UPDATE SET text = EXCLUDED.text, buttons = EXCLUDED.buttons, updated_at = now()`,
-      [key, text, JSON.stringify(buttons)],
+      `INSERT INTO bot_replies (key, text, text_en, buttons, updated_at) VALUES ($1,$2,$4,$3,now())
+       ON CONFLICT (key) DO UPDATE SET text = EXCLUDED.text, text_en = EXCLUDED.text_en, buttons = EXCLUDED.buttons, updated_at = now()`,
+      [key, text, JSON.stringify(buttons), str(b.text_en, 4000)],
     );
     if (b.remove_photo) await db.query('UPDATE bot_replies SET photo = NULL, photo_type = NULL WHERE key = $1', [key]);
     if (ph) await db.query('UPDATE bot_replies SET photo = $2, photo_type = $3 WHERE key = $1', [key, ph.data, ph.type]);
@@ -1933,7 +1938,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     const key = replyKey(req.params.key);
     if (!key) return reply.code(404).send({ error: 'Ответ не найден' });
     const d = REPLY_DEFAULTS[key];
-    await db.query('UPDATE bot_replies SET text = $2, buttons = $3, photo = NULL, photo_type = NULL, updated_at = now() WHERE key = $1', [key, d.text, JSON.stringify(d.buttons)]);
+    await db.query("UPDATE bot_replies SET text = $2, buttons = $3, text_en = '', photo = NULL, photo_type = NULL, updated_at = now() WHERE key = $1", [key, d.text, JSON.stringify(d.buttons)]);
     return { ok: true };
   });
 
@@ -1961,6 +1966,11 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
           'время': `{время:${entryAt.getTime()}}`,
           'сделка': o.direction === 'up' ? 'BUY (Вверх)' : 'SELL (Вниз)',
           'вход': new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: config.pushTz }).format(entryAt),
+        },
+        varsEn: {
+          'направление': o.direction === 'up' ? 'up' : 'down',
+          'экспирация': o.expirySec ? `${o.expirySec} sec` : `${o.expiry} min`,
+          'сделка': o.direction === 'up' ? 'BUY (Up)' : 'SELL (Down)',
         },
         createdBy: o.by,
         channelsOnly: !o.push,
@@ -2024,6 +2034,15 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
           'прибыль': profit === null ? '' : String(profit),
           'отработка': worked,
           'время': `{время:${entryMs}}`,
+        },
+        varsEn: {
+          'направление': sg.direction === 'up' ? 'up' : 'down',
+          'сделка': sg.direction === 'up' ? 'BUY (Up)' : 'SELL (Down)',
+          'экспирация': sg.expiry_sec ? `${sg.expiry_sec} sec` : `${sg.expiry_min} min`,
+          'результат': result === 'win' ? 'win' : 'loss',
+          'шаг': result === 'win' ? (step ? `on martingale ${step}` : 'on entry') : '',
+          'итог': result === 'win' ? `win ${step ? `on martingale ${step}` : 'on entry'}` : 'loss',
+          'отработка': Array.from({ length: (step ?? 0) + 1 }, (_, i) => `Worked at: ${hms(entryMs + i * gapSec * 1000)}/M5 ${i === (step ?? 0) ? '✅' : '🔄'}`).join('\n'),
         },
         createdBy: req.staff!.id,
         channelsOnly: b.push === false,

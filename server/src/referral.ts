@@ -81,8 +81,11 @@ export async function accrueReferral(tgId: number | string): Promise<void> {
     );
     await db.query('UPDATE referral_rewards SET adjustment_id = $2 WHERE tg_id = $1', [d.tg_id, a.rows[0].id]);
   }
-  const friend = d.first_name || (d.username ? '@' + d.username : 'Ваш друг');
-  if (rate.lead > 0) await deliver(String(d.referrer_id), `🎉 ${friend} сделал первый депозит по вашей ссылке. На реферальный баланс начислено **${usd(rate.lead)}**.`).catch(() => {});
+  const refEn = (await db.query('SELECT lang FROM leads WHERE tg_id = $1', [d.referrer_id])).rows[0]?.lang === 'en';
+  const friend = d.first_name || (d.username ? '@' + d.username : refEn ? 'Your friend' : 'Ваш друг');
+  if (rate.lead > 0) await deliver(String(d.referrer_id), refEn
+    ? `🎉 ${friend} made their first deposit via your link. **${usd(rate.lead).replace(',', '.')}** has been added to your referral balance.`
+    : `🎉 ${friend} сделал первый депозит по вашей ссылке. На реферальный баланс начислено **${usd(rate.lead)}**.`).catch(() => {});
 }
 
 /** Баланс пригласившего: начислено минус выплаченное и ждущее выплаты */
@@ -218,10 +221,16 @@ export async function referralOfficeRoutes(app: FastifyInstance, h: { need: Need
       )
     ).rows[0];
     if (!r) return reply.code(409).send({ error: 'Заявка уже обработана' });
-    const where = r.method === 'usdt' ? 'кошелёк USDT BEP20' : 'торговый счёт Pocket Option';
-    const text = action === 'paid'
-      ? `✅ Реферальная выплата **${usd(r.amount)}** отправлена на ${where}.`
-      : `Заявка на реферальную выплату ${usd(r.amount)} отклонена: ${reason}. Сумма вернулась на баланс.`;
+    const en = (await db.query('SELECT lang FROM leads WHERE tg_id = $1', [r.tg_id])).rows[0]?.lang === 'en';
+    const where = r.method === 'usdt' ? (en ? 'your USDT BEP20 wallet' : 'кошелёк USDT BEP20') : en ? 'your Pocket Option trading account' : 'торговый счёт Pocket Option';
+    const sum = en ? usd(r.amount).replace(',', '.') : usd(r.amount);
+    const text = en
+      ? action === 'paid'
+        ? `✅ Your referral payout of **${sum}** has been sent to ${where}.`
+        : `Your referral payout request for ${sum} was rejected: ${reason}. The amount is back on your balance.`
+      : action === 'paid'
+        ? `✅ Реферальная выплата **${sum}** отправлена на ${where}.`
+        : `Заявка на реферальную выплату ${sum} отклонена: ${reason}. Сумма вернулась на баланс.`;
     await deliver(String(r.tg_id), text).catch(() => {});
     return { ok: true };
   });

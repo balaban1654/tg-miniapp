@@ -9,6 +9,7 @@ export interface Lead {
   owner_id: number | null;
   status: string;
   access: boolean;
+  lang?: string | null;
 }
 
 /**

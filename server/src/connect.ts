@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { markLeadBlocked } from './leadblock.js';
 import { db } from './db.js';
-import { buildKeyboard, deliver, loadTarget, renderText, type Button } from './push.js';
+import { buildKeyboard, deliver, loadTarget, pickText, renderText, type Button } from './push.js';
 
 import type { Role } from './auth.js';
 type Need = (...roles: Role[]) => (req: FastifyRequest, reply: FastifyReply) => Promise<unknown>;
@@ -51,7 +51,8 @@ const usd = (n: number) => '$' + String(r2(n)).replace('.', ',');
 const kyivDate = (d: Date) => new Intl.DateTimeFormat('ru-RU', { day: '2-digit', month: '2-digit', timeZone: 'Europe/Kyiv' }).format(d);
 
 export const DEFAULT_OFFER_TEXT = '🔥 Для вас скидка {скидка}%: подключитесь всего от **{сумма}**! Предложение действует до {дата}.';
-const OFFER_BUTTONS: Button[] = [{ label: 'Активировать скидку', type: 'miniapp', style: 'success' }];
+export const DEFAULT_OFFER_TEXT_EN = '🔥 A {скидка}% discount for you: get connected from just **{сумма}**! The offer is valid until {дата}.';
+const OFFER_BUTTONS: Button[] = [{ label: 'Активировать скидку', label_en: 'Activate discount', type: 'miniapp', style: 'success' }];
 
 interface Offer {
   id: number;
@@ -59,6 +60,7 @@ interface Offer {
   discount_pct: number;
   days: number;
   text: string;
+  text_en?: string;
 }
 
 function fillText(text: string, o: { pct: number; required: number; until: Date }): string {
@@ -77,7 +79,9 @@ async function sendOffer(o: Offer, tgId: string, by: number | null): Promise<{ o
   );
   const id = ins.rows[0].id as number;
   const t = await loadTarget(tgId);
-  const text = renderText(fillText(o.text, { pct: o.discount_pct, required, until }), t);
+  // Английский: свой текст акции, иначе стандартный перевод, если русский текст стандартный
+  const en = o.text_en || (o.text === DEFAULT_OFFER_TEXT ? DEFAULT_OFFER_TEXT_EN : '');
+  const text = renderText(fillText(pickText(o.text, en, t?.lang), { pct: o.discount_pct, required, until }), t);
   const kb = buildKeyboard(OFFER_BUTTONS, t);
   let res = await deliver(tgId, text, kb);
   if (!res.ok && res.retry) {
@@ -134,7 +138,7 @@ export async function connectRoutes(app: FastifyInstance, h: { need: Need; str: 
   app.get('/connect', { preHandler: lead }, async (req) => {
     const me = (req as any).staff as { id: number; role: string };
     const base = await getMinDeposit();
-    const offers = (await db.query(`SELECT id, name, discount_pct, days, text, active FROM connect_offers ORDER BY id`)).rows;
+    const offers = (await db.query(`SELECT id, name, discount_pct, days, text, text_en, active FROM connect_offers ORDER BY id`)).rows;
     const aud = (
       await db.query(
         `SELECT d.owner_id, o.name AS owner_name, count(*)::int AS n,
@@ -152,6 +156,7 @@ export async function connectRoutes(app: FastifyInstance, h: { need: Need; str: 
       offers: offers.map((o) => ({ ...o, required: r2(base * (1 - o.discount_pct / 100)) })),
       audience: aud,
       defaultText: DEFAULT_OFFER_TEXT,
+      defaultTextEn: DEFAULT_OFFER_TEXT_EN,
       canEdit: me.role === 'admin',
     };
   });
@@ -168,24 +173,25 @@ export async function connectRoutes(app: FastifyInstance, h: { need: Need; str: 
     const pct = Math.round(Number(b.discount_pct));
     const days = Math.round(Number(b.days));
     const text = str(b.text, 800);
+    const textEn = str(b.text_en, 800);
     if (!name) return { error: 'Назовите акцию' };
     if (!(pct >= 1 && pct <= 95)) return { error: 'Скидка от 1 до 95%' };
     if (!(days >= 1 && days <= 60)) return { error: 'Срок от 1 до 60 дней' };
     if (text.length < 5) return { error: 'Напишите текст пуша' };
-    return { name, pct, days, text };
+    return { name, pct, days, text, textEn };
   };
 
   app.post('/connect/offers', { preHandler: lead }, async (req, reply) => {
     const o = readOffer((req.body ?? {}) as Record<string, unknown>);
     if ('error' in o) return reply.code(400).send({ error: o.error });
-    const r = await db.query(`INSERT INTO connect_offers (name, discount_pct, days, text) VALUES ($1,$2,$3,$4) RETURNING id`, [o.name, o.pct, o.days, o.text]);
+    const r = await db.query(`INSERT INTO connect_offers (name, discount_pct, days, text, text_en) VALUES ($1,$2,$3,$4,$5) RETURNING id`, [o.name, o.pct, o.days, o.text, o.textEn]);
     return { id: r.rows[0].id };
   });
 
   app.patch<{ Params: { id: string } }>('/connect/offers/:id', { preHandler: lead }, async (req, reply) => {
     const o = readOffer((req.body ?? {}) as Record<string, unknown>);
     if ('error' in o) return reply.code(400).send({ error: o.error });
-    const r = await db.query(`UPDATE connect_offers SET name = $2, discount_pct = $3, days = $4, text = $5 WHERE id = $1 RETURNING id`, [Number(req.params.id), o.name, o.pct, o.days, o.text]);
+    const r = await db.query(`UPDATE connect_offers SET name = $2, discount_pct = $3, days = $4, text = $5, text_en = $6 WHERE id = $1 RETURNING id`, [Number(req.params.id), o.name, o.pct, o.days, o.text, o.textEn]);
     if (!r.rowCount) return reply.code(404).send({ error: 'Акция не найдена' });
     return { ok: true };
   });
@@ -204,7 +210,7 @@ export async function connectRoutes(app: FastifyInstance, h: { need: Need; str: 
     // Стример предлагает скидку только из карточки своего лида. Тимлид из карточки и рассылкой, но только своей команде
     const mine = me.role === 'streamer' || me.role === 'teamlead';
     if (me.role === 'streamer' && (b.test === true || b.tg_id === undefined || b.tg_id === null || b.tg_id === '')) return reply.code(403).send({ error: 'Стример предлагает скидку из карточки своего лида' });
-    const o = (await db.query(`SELECT id, name, discount_pct, days, text FROM connect_offers WHERE id = $1 AND active`, [Number(req.params.id)])).rows[0] as Offer | undefined;
+    const o = (await db.query(`SELECT id, name, discount_pct, days, text, text_en FROM connect_offers WHERE id = $1 AND active`, [Number(req.params.id)])).rows[0] as Offer | undefined;
     if (!o) return reply.code(404).send({ error: 'Акция не найдена' });
 
     if (b.test === true) {
@@ -222,7 +228,7 @@ export async function connectRoutes(app: FastifyInstance, h: { need: Need; str: 
       const required = r2(base * (1 - o.discount_pct / 100));
       const until = new Date(Date.now() + o.days * 86_400_000);
       const t = await loadTarget(lead.tg_id);
-      const res = await deliver(String(lead.tg_id), renderText(fillText(o.text, { pct: o.discount_pct, required, until }), t), buildKeyboard(OFFER_BUTTONS, t));
+      const res = await deliver(String(lead.tg_id), renderText(fillText(pickText(o.text, o.text_en || (o.text === DEFAULT_OFFER_TEXT ? DEFAULT_OFFER_TEXT_EN : ''), t?.lang), { pct: o.discount_pct, required, until }), t), buildKeyboard(OFFER_BUTTONS, t));
       if (!res.ok) return reply.code(422).send({ error: 'Не удалось отправить: ' + res.error });
       return { ok: true, test: true };
     }

@@ -1,6 +1,6 @@
 import { db } from './db.js';
 import { config } from './config.js';
-import { buildKeyboard, deliver, loadTarget, renderText, type Button } from './push.js';
+import { buildKeyboard, deliver, loadTarget, pickText, renderText, type Button } from './push.js';
 
 /** Ответы бота на кнопки и /start. Текст, картинку и кнопки админ правит в Office: Пуши → Ответы бота */
 export const REPLY_KEYS = ['acc_ready', 'acc_no', 'acc_yes', 'access_open', 'support'] as const;
@@ -32,6 +32,15 @@ export const REPLY_DEFAULTS: Record<ReplyKey, { text: string; buttons: Button[] 
   },
 };
 
+/** Английские тексты стандартных ответов. Используются, пока админ не задал свой английский текст и русский не менялся */
+export const REPLY_DEFAULTS_EN: Record<ReplyKey, string> = {
+  acc_ready: 'Great! To get signals you need a new Pocket Option account: I will unlock signals for it.\n\n**Do you already have a Pocket Option account?**',
+  acc_no: 'Registration takes 2 minutes:\n\n1. Tap the button below and create an account\n2. Top up from $50 (we recommend $100+)\n3. Access unlocks by itself, nothing to enter\n\n__By tapping “Sign up” you confirm you are 18+ and understand that trading involves the risk of losing money.__ [Terms]({условия})',
+  acc_yes: 'Great! For us to see your account and unlock access, it must be registered via our link. If you registered without it, write to support and we will help.',
+  access_open: 'Access is open. Open the app: trades, the trainer and team materials are there.',
+  support: 'Describe what happened in one message. You can add a screenshot. We will reply right here in this chat.',
+};
+
 export async function seedReplies(): Promise<void> {
   for (const k of REPLY_KEYS) {
     const d = REPLY_DEFAULTS[k];
@@ -41,10 +50,13 @@ export async function seedReplies(): Promise<void> {
 
 /** Отправить клиенту ответ из настроек; если строки нет, стандартный */
 export async function sendReply(tgId: number, key: ReplyKey): Promise<void> {
-  const r = (await db.query('SELECT text, buttons, photo, photo_type FROM bot_replies WHERE key = $1', [key])).rows[0];
+  const r = (await db.query('SELECT text, text_en, buttons, photo, photo_type FROM bot_replies WHERE key = $1', [key])).rows[0];
   const d = REPLY_DEFAULTS[key];
   const t = await loadTarget(tgId);
-  const raw: string = r ? r.text : d.text;
+  const ru: string = r ? r.text : d.text;
+  // Английский: свой текст из Office, иначе стандартный перевод, если русский текст не меняли
+  const en = r?.text_en || (ru === d.text ? REPLY_DEFAULTS_EN[key] : '');
+  const raw: string = pickText(ru, en, t?.lang);
   const text = t ? renderText(raw, t) : raw;
   const kb = t ? buildKeyboard(r ? r.buttons : d.buttons, t) : undefined;
   const res = await deliver(String(tgId), text.replaceAll('{условия}', config.termsUrl), kb, r?.photo ? { data: r.photo, type: r.photo_type } : null);

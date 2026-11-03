@@ -1010,3 +1010,11 @@ ALTER TABLE leads ADD COLUMN IF NOT EXISTS chat_notified_at TIMESTAMPTZ;
 
 -- Когда клиент открыл «Попробовать демо» в тренажёре: для пометки «демо» у лида, если в демо-ссылке нет своего кода кампании
 ALTER TABLE leads ADD COLUMN IF NOT EXISTS demo_clicked_at TIMESTAMPTZ;
+
+-- Язык клиента: выбирается при /start (или в Mini App). Пуши уходят на его языке, если у пуша есть английский текст
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS lang TEXT;
+ALTER TABLE push_rules ADD COLUMN IF NOT EXISTS text_en TEXT NOT NULL DEFAULT '';
+ALTER TABLE bot_replies ADD COLUMN IF NOT EXISTS text_en TEXT NOT NULL DEFAULT '';
+ALTER TABLE push_templates ADD COLUMN IF NOT EXISTS text_en TEXT NOT NULL DEFAULT '';
+ALTER TABLE broadcasts ADD COLUMN IF NOT EXISTS text_en TEXT NOT NULL DEFAULT '';
+ALTER TABLE connect_offers ADD COLUMN IF NOT EXISTS text_en TEXT NOT NULL DEFAULT '';

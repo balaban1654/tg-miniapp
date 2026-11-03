@@ -209,7 +209,7 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
   app.get('/me', { preHandler: auth }, async (req) => {
     const u = req.tg!;
     const r = await db.query(
-      `SELECT coalesce(d.status_before_block, d.status) AS status, d.access, d.is_tester, d.lead_role, d.region, d.created_at, d.trader_id, o.name AS manager,
+      `SELECT coalesce(d.status_before_block, d.status) AS status, d.access, d.is_tester, d.lead_role, d.region, d.lang, d.created_at, d.trader_id, o.name AS manager,
               o.po_promo, o.po_link, o.po_link_ru, o.tg_username AS manager_tg, o.tg_link AS manager_link
          FROM leads d LEFT JOIN staff o ON o.id = d.owner_id WHERE d.tg_id = $1`,
       [u.id],
@@ -242,6 +242,7 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
       access: Boolean(l.access || (l.is_tester && l.lead_role !== 'test')), // сотрудник с доступом: как у клиента; тест открывает доступ депозитом, как обычный лид
       isTester: Boolean(l.is_tester),
       leadRole: l.lead_role || 'lead',
+      lang: l.lang ?? null,
       tier,
       pocketId: l.trader_id,
       manager: l.manager,
@@ -261,6 +262,14 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
       botUsername: config.botUsername,
       stats: { deals: s.deals, wins: s.wins, losses: s.losses, rate: s.deals ? Math.round((s.wins / s.deals) * 100) : null },
     };
+  });
+
+  // Язык клиента из Mini App: пуши и бот дальше пишут ему на этом языке
+  app.post('/lang', { preHandler: auth }, async (req, reply) => {
+    const lang = (req.body as any)?.lang;
+    if (lang !== 'ru' && lang !== 'en') return reply.code(400).send({ error: 'Неизвестный язык' });
+    await db.query('UPDATE leads SET lang = $2 WHERE tg_id = $1', [req.tg!.id, lang]);
+    return { ok: true };
   });
 
   app.post('/region', { preHandler: auth }, async (req, reply) => {
