@@ -1711,15 +1711,27 @@ function tierInline(){
 const prefGet=(k,d)=>{try{return localStorage.getItem(k)||d}catch{return d}};
 const prefSet=(k,v)=>{try{localStorage.setItem(k,v)}catch{}};
 function prefBox(){
-  const lang=el('select',{'aria-label':'Язык',style:'background:var(--card2);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:3px 6px;font:700 12px var(--fd);cursor:pointer'},
-    ...[['ru','RU'],['en','EN']].map(([v,t])=>el('option',{value:v},t)));
-  lang.value=prefGet('pref_lang','ru');
-  lang.addEventListener('change',()=>prefSet('pref_lang',lang.value));
-  const ic=()=>prefGet('pref_theme','dark')==='light'?'☀️':'🌙';
-  const theme=el('button',{type:'button','aria-label':'Тема',style:'background:var(--card2);border:1px solid var(--line);border-radius:8px;padding:2px 8px;font-size:14px;line-height:1.4;cursor:pointer'},ic());
-  theme.addEventListener('click',()=>{prefSet('pref_theme',prefGet('pref_theme','dark')==='light'?'dark':'light');theme.textContent=ic()});
+  // Язык: своя кнопка с выпадающим списком (у системного select при выборе появлялась чёрная рамка)
+  const LANGS=[['ru','RU'],['en','EN']];
+  const cur=()=>prefGet('pref_lang','ru');
+  const chip='background:var(--card2);color:var(--fg);border:1px solid var(--line);border-radius:9px;height:28px;padding:0 9px;font:700 12px var(--fd);cursor:pointer;display:inline-flex;align-items:center;gap:5px;outline:none;-webkit-tap-highlight-color:transparent';
+  const lbl=el('span',{},'');
+  const menu=el('div',{style:'position:absolute;right:0;top:32px;z-index:20;background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:4px;display:none;min-width:130px;box-shadow:0 10px 30px #0008'});
+  const paint=()=>{lbl.textContent=(LANGS.find(x=>x[0]===cur())||LANGS[0])[1];
+    menu.replaceChildren(...LANGS.map(([v,t])=>el('button',{type:'button',style:'display:block;width:100%;text-align:left;background:'+(v===cur()?'var(--acc)':'none')+';color:'+(v===cur()?'#fff':'var(--fg)')+';border:0;border-radius:7px;padding:7px 10px;font:700 12px var(--fd);cursor:pointer;outline:none;white-space:nowrap',onclick:e=>{e.stopPropagation();prefSet('pref_lang',v);menu.style.display='none';paint()}},t+(v==='ru'?' · Русский':' · English'))))};
+  const lang=el('button',{type:'button','aria-label':'Язык',style:chip,onclick:e=>{e.stopPropagation();menu.style.display=menu.style.display==='none'?'block':'none'}},lbl,svgEl('<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>'));
+  document.addEventListener('click',()=>{menu.style.display='none'});
+  paint();
+  // Тема: линейные значки солнца и луны
+  const SUN='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>';
+  const MOON='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.5 14.5A8.5 8.5 0 1 1 9.5 3.5a7 7 0 0 0 11 11z"/></svg>';
+  const light=()=>prefGet('pref_theme','dark')==='light';
+  const theme=el('button',{type:'button','aria-label':'Тема',style:chip+';color:var(--acc2);width:36px;justify-content:center;padding:0'});
+  const paintT=()=>{theme.replaceChildren(svgEl(light()?SUN:MOON));theme.title=light()?'Светлая тема':'Тёмная тема'};
+  theme.addEventListener('click',()=>{prefSet('pref_theme',light()?'dark':'light');paintT()});
+  paintT();
   const lab=t=>el('span',{class:'sm',style:'white-space:nowrap'},t);
-  return el('div',{style:'margin-left:auto;display:grid;grid-template-columns:auto auto;gap:6px 8px;align-items:center;justify-items:end;flex:none'},lab('Язык:'),lang,lab('Тема:'),theme);
+  return el('div',{style:'margin-left:auto;display:grid;grid-template-columns:auto auto;gap:6px 8px;align-items:center;justify-items:end;flex:none'},lab('Язык:'),el('div',{style:'position:relative'},lang,menu),lab('Тема:'),theme);
 }
 /** Значок градации (SVG): медаль с лентой, металлическим диском и бликом; у Диаманта просто кристалл */
 function medalSvg(k,size){
