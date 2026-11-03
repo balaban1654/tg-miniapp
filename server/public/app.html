@@ -317,7 +317,7 @@ svg{max-width:100%}
 /*I18N_EN*/
 (function(){
   var lang='ru';try{lang=localStorage.getItem('pref_lang')||'ru'}catch(e){}
-  if(lang!=='en'||!window.HUNTER_EN)return;
+  if(!window.HUNTER_EN)return;
   // Неразрывные пробелы в текстах приравниваем к обычным, иначе фраза не совпадёт со словарём
   var NB=/[\u00a0\u202f]/g,norm=function(x){return x.replace(NB,' ')};
   var D={},CY=/[А-Яа-яЁё]/,keys=[],shortk=[],k;
@@ -350,8 +350,11 @@ svg{max-width:100%}
     if((n.tagName==='INPUT'&&(n.type==='button'||n.type==='submit'))&&CY.test(n.value))n.value=tr(n.value);
     for(var c=n.firstChild;c;c=c.nextSibling)node(c);
   }
-  document.documentElement.setAttribute('lang','en');
+  // Язык меняется на лету: window.__setLang('en' | 'ru'), затем приложение перерисовывает экран (render)
+  window.__setLang=function(l){lang=l==='en'?'en':'ru';document.documentElement.setAttribute('lang',lang);if(lang==='en'&&document.body)node(document.body)};
+  document.documentElement.setAttribute('lang',lang);
   new MutationObserver(function(ms){
+    if(lang!=='en')return;
     for(var i=0;i<ms.length;i++){var m=ms[i];
       if(m.type==='characterData')node(m.target);
       else if(m.type==='attributes')node(m.target);
@@ -359,11 +362,11 @@ svg{max-width:100%}
     }
   }).observe(document.documentElement,{childList:true,subtree:true,characterData:true,attributes:true,attributeFilter:ATTR});
   // Даты и время: вместо русского формата английский
-  var fix=function(l){return l==='ru-RU'||l==='ru'?'en-GB':l};
+  var fix=function(l){return lang==='en'&&(l==='ru-RU'||l==='ru')?'en-GB':l};
   var P=Date.prototype;['toLocaleString','toLocaleDateString','toLocaleTimeString'].forEach(function(f){var o=P[f];P[f]=function(l,op){return o.call(this,fix(l),op)}});
   var DTF=Intl.DateTimeFormat;Intl.DateTimeFormat=function(l,op){return new DTF(fix(l),op)};Intl.DateTimeFormat.prototype=DTF.prototype;Intl.DateTimeFormat.supportedLocalesOf=DTF.supportedLocalesOf;
   // Системные окна
-  var oc=window.confirm,oa=window.alert;window.confirm=function(m){return oc.call(window,tr(String(m)))};window.alert=function(m){return oa.call(window,tr(String(m)))};
+  var oc=window.confirm,oa=window.alert;window.confirm=function(m){return oc.call(window,lang==='en'?tr(String(m)):m)};window.alert=function(m){return oa.call(window,lang==='en'?tr(String(m)):m)};
 })();
 </script>
 </head>
@@ -1774,7 +1777,7 @@ function prefBox(){
   const lbl=el('span',{},'');
   const menu=el('div',{style:'position:absolute;right:0;top:32px;z-index:20;background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:4px;display:none;min-width:110px;box-shadow:0 10px 30px #0008'});
   const paint=()=>{lbl.textContent=(LANGS.find(x=>x[0]===cur())||LANGS[0])[1];
-    menu.replaceChildren(...LANGS.map(([v,t])=>el('button',{type:'button',style:'display:block;width:100%;text-align:left;background:'+(v===cur()?'var(--acc)':'none')+';color:'+(v===cur()?'#fff':'var(--fg)')+';border:0;border-radius:7px;padding:7px 10px;font:700 12px var(--fd);cursor:pointer;outline:none;white-space:nowrap',onclick:e=>{e.stopPropagation();menu.style.display='none';if(v===cur())return;prefSet('pref_lang',v);paint();location.reload()}},v==='ru'?'Русский':'English')))};
+    menu.replaceChildren(...LANGS.map(([v,t])=>el('button',{type:'button',style:'display:block;width:100%;text-align:left;background:'+(v===cur()?'var(--acc)':'none')+';color:'+(v===cur()?'#fff':'var(--fg)')+';border:0;border-radius:7px;padding:7px 10px;font:700 12px var(--fd);cursor:pointer;outline:none;white-space:nowrap',onclick:e=>{e.stopPropagation();menu.style.display='none';if(v===cur())return;prefSet('pref_lang',v);if(window.__setLang)window.__setLang(v);render()}},v==='ru'?'Русский':'English')))};
   const lang=el('button',{type:'button','aria-label':'Язык',style:chip,onclick:e=>{e.stopPropagation();menu.style.display=menu.style.display==='none'?'block':'none'}},lbl,svgEl('<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>'));
   document.addEventListener('click',()=>{menu.style.display='none'});
   paint();
