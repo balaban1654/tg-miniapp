@@ -1,1 +1,240 @@
-[]
+[
+  {
+    "type": "news",
+    "id": "1",
+    "field": "title",
+    "ru": "Статистика сигналов на главной",
+    "en": "Signal stats on the home screen"
+  },
+  {
+    "type": "news",
+    "id": "1",
+    "field": "body",
+    "ru": "На главной появился блок со статистикой по сигналам: сколько плюсов и минусов, винрейт и разбивка плюсов по входу и перекрытиям. Список прошедших сигналов теперь можно листать, чтобы посмотреть все прошлые.",
+    "en": "The home screen now has a signal stats block: wins and losses, win rate, and a breakdown of wins on entry and on martingale steps. You can now scroll through the list of past signals to see all previous ones."
+  },
+  {
+    "type": "news",
+    "id": "2",
+    "field": "title",
+    "ru": "Демо без регистрации",
+    "en": "Demo without registration"
+  },
+  {
+    "type": "news",
+    "id": "2",
+    "field": "body",
+    "ru": "Во вкладке «Тренажёр» появилась кнопка «Попробовать демо». Торгуйте на реальном графике без регистрации и без риска.",
+    "en": "The “Trainer” tab now has a “Try demo” button. Trade on a real chart with no registration and no risk."
+  },
+  {
+    "type": "news",
+    "id": "4",
+    "field": "title",
+    "ru": "ВАЖНОЕ ОБНОВЛЕНИЕ HUNTER AI",
+    "en": "IMPORTANT HUNTER AI UPDATE"
+  },
+  {
+    "type": "news",
+    "id": "4",
+    "field": "body",
+    "ru": "Мы обновили систему взаимодействия с трейдерами. Теперь в разделе «Медиа» больше нет списка трейдеров — у каждого пользователя есть свой персональный трейдер. Найти его очень просто",
+    "en": "We have updated how you work with traders. The “Media” section no longer has a list of traders: every user now has their own personal trader. Finding yours is very easy"
+  },
+  {
+    "type": "news",
+    "id": "5",
+    "field": "title",
+    "ru": "Реферальная программа  Hunter AI запущена!",
+    "en": "The Hunter AI referral program is live!"
+  },
+  {
+    "type": "news",
+    "id": "5",
+    "field": "body",
+    "ru": "Можно приглашать друзей и зарабатывать...",
+    "en": "You can now invite friends and earn..."
+  },
+  {
+    "type": "review",
+    "id": "6",
+    "field": "body",
+    "ru": "Всё прекрасно спасибо разработчику что уделяет внимание что-бы команда сам торговал и заработал бот супер нет слов.",
+    "en": "Everything is great, thanks to the developer for making sure the team trades and earns on its own. The bot is super, no words."
+  },
+  {
+    "type": "review",
+    "id": "8",
+    "field": "body",
+    "ru": "Новый бот это нечто, работает просто шикарно, сразу пополнился на 1000$ и буквально 5-7 сделок и уже +500$, ставлю на вывод 🤝💸 Дальше больше!",
+    "en": "The new bot is something else, it works just brilliantly. I topped up $1000 right away, and after literally 5-7 trades I’m already +$500, withdrawing now 🤝💸 More to come!"
+  },
+  {
+    "type": "review",
+    "id": "9",
+    "field": "body",
+    "ru": "Я пока тестирую на демо но как оно всё отрабатывает это круто, бот продуманный, отсчёт времени это нечто. У меня самсунг фолд, я открыл покет и бот на одном экране это так удобно. У меня пока одни восхищения.\nНиколай, ты гений! Только не меняй в боте ничего в худшую сторону, дай денег заработать 🙂\nНу с таким ботом не стыдно и стримить, не стыдно советовать. Я ещё потестю но продукт очень крутой вышел! Аплодирую!",
+    "en": "I’m still testing on demo, but the way it all works is awesome. The bot is well thought out, and the countdown is something else. I have a Samsung Fold, I opened Pocket and the bot on one screen and it’s so convenient. So far I’m just impressed.\nNikolay, you’re a genius! Just don’t change anything in the bot for the worse, let us make money 🙂\nWith a bot like this you’re not ashamed to stream or to recommend it. I’ll keep testing, but the product turned out really great! Applause!"
+  },
+  {
+    "type": "review",
+    "id": "10",
+    "field": "body",
+    "ru": "Бот просто 🔥🔥🔥 Пробую потихоньку 😊Вы лучшие, спасибо 🤗 огромное вам за ваш труд)",
+    "en": "The bot is just 🔥🔥🔥 Trying it out little by little 😊 You’re the best, thank you 🤗 so much for your work)"
+  },
+  {
+    "type": "review",
+    "id": "12",
+    "field": "body",
+    "ru": "Якщо чесно, багато ботів бачила і пробувала, але щоб реально давав такий хороший результат то це вперше. Щиро дякую чудовій команді за роботу і постійну підтримку, за навчання та дуже хороші результати до яких я нарешті дійшла🔥",
+    "en": "Honestly, I’ve seen and tried a lot of bots, but this is the first one that really gives such good results. Sincere thanks to the wonderful team for the work and constant support, for the training and the very good results I’ve finally reached 🔥"
+  },
+  {
+    "type": "review",
+    "id": "13",
+    "field": "body",
+    "ru": "Працював по боту, сьогодні вивів свій перший +( без ніяких нюансів), дякую команді і наставникам за підтримку, розуміння і ясність, всюди допомогли, все пояснили ♥️",
+    "en": "I traded with the bot and today withdrew my first profit (no issues at all). Thanks to the team and mentors for the support, understanding and clarity, they helped with everything and explained it all ♥️"
+  },
+  {
+    "type": "review",
+    "id": "14",
+    "field": "body",
+    "ru": "Бот просто пушка з 12 до 100 дійшов за 5 днів такого я ще не бачив і зразу поставив на вивод через 2-3години гроші зарахувалися на картку",
+    "en": "The bot is a blast: I went from 12 to 100 in 5 days, I’ve never seen anything like it. I requested a withdrawal right away, and 2-3 hours later the money was on my card"
+  },
+  {
+    "type": "review",
+    "id": "15",
+    "field": "body",
+    "ru": "Чесно кажучи, спочатку трохи сумнівався, але вирішив спробувати — і не пошкодував ні на секунду! Все зроблено максимально професійно, чітко та в обумовлені терміни. Результат просто супер, команда знає свою справу. Рекомендую всім, хто шукає якість без компромісів! ⭐️⭐️⭐️⭐️⭐️",
+    "en": "To be honest, I had some doubts at first, but I decided to try and didn’t regret it for a second! Everything is done as professionally as possible, clearly and on time. The result is just great, the team knows its business. I recommend it to anyone looking for quality without compromise! ⭐️⭐️⭐️⭐️⭐️"
+  },
+  {
+    "type": "review",
+    "id": "18",
+    "field": "body",
+    "ru": "Бот просто неймовірний! 🔥 Ще ніколи не зустрічав нічого подібного. Почав із $12 і дійшов до $1000 🤯 Результат вражає, користуватися ним одне задоволення. Окремо хочеться відзначити команду — справжні професіонали, які роблять круту роботу! 💪🚀 Однозначно один із найкращих ботів, які я бачив! ⭐",
+    "en": "The bot is just incredible! 🔥 I’ve never come across anything like it. I started with $12 and got to $1000 🤯 The result is impressive and it’s a pleasure to use. Special mention goes to the team: real professionals doing great work! 💪🚀 Definitely one of the best bots I’ve seen! ⭐"
+  },
+  {
+    "type": "review",
+    "id": "21",
+    "field": "body",
+    "ru": "Нереально крутой бот! С 10 000 ₴ подняла 19 000 ₴, не могу поверить. Вывод денег пришёл очень быстро: пара часиков, и деньги на карте. Все, кто думает, что Pocket — это скам, ребята, думайте дальше, а мы работаем и зарабатываем. Отдельное огромное спасибо всей команде Hunter AI bot!\n\nОтдельно спасибо Лизочке, которая всегда на связи, помогает и подсказывает 🥰",
+    "en": "An unbelievably cool bot! I grew 10,000 ₴ into 19,000 ₴, I can’t believe it. The withdrawal came very fast: a couple of hours and the money was on my card. To everyone who thinks Pocket is a scam: keep thinking, guys, while we work and earn. A huge thank you to the whole Hunter AI bot team!\n\nSpecial thanks to Liza, who is always available, helps and gives advice 🥰"
+  },
+  {
+    "type": "rule",
+    "id": "1",
+    "field": "text",
+    "ru": "**Привет! Я Hunter AI.**\n\nДаю готовые сигналы: пара, направление, точки входа. Твоя задача — просто повторить.\n\nЗа 1 минуту покажу в тренажёре, как это выглядит на практике.",
+    "en": "**Hi! I’m Hunter AI.**\n\nI give ready-made signals: the pair, the direction and the entry points. All you have to do is repeat them.\n\nIn 1 minute I’ll show you in the trainer how it works in practice."
+  },
+  {
+    "type": "rule",
+    "id": "2",
+    "field": "text",
+    "ru": "{имя}, не вижу твоей регистрации. Если возникли трудности, напиши в поддержку: ответим прямо здесь, в этом чате.",
+    "en": "{имя}, I don’t see your registration. If you ran into any trouble, write to support: we’ll reply right here in this chat."
+  },
+  {
+    "type": "rule",
+    "id": "3",
+    "field": "text",
+    "ru": "{имя}, регистрация в Pocket Option занимает пару минут. После неё и пополнения счёта в приложении откроется доступ. Если что-то непонятно, напиши нам.",
+    "en": "{имя}, registering with Pocket Option takes a couple of minutes. After that, top up your account and access in the app will open. If anything is unclear, write to us."
+  },
+  {
+    "type": "rule",
+    "id": "4",
+    "field": "text",
+    "ru": "{имя}, регистрация есть. Осталось пополнить счёт, и доступ откроется автоматически. Рекомендуем от 100 $. Если не получается, напиши сюда, подскажем.",
+    "en": "{имя}, your registration is done. Now just top up your account and access will open automatically. We recommend $100 or more. If it doesn’t work, write here and we’ll help."
+  },
+  {
+    "type": "rule",
+    "id": "5",
+    "field": "text",
+    "ru": "{имя}, ждём твой первый депозит. Как только он поступит, мы сразу откроем доступ. Если нужна помощь, напиши нам.",
+    "en": "{имя}, we’re waiting for your first deposit. As soon as it arrives, we’ll open access right away. If you need help, write to us."
+  },
+  {
+    "type": "rule",
+    "id": "6",
+    "field": "text",
+    "ru": "Депозит получен. Доступ открыт. Откройте кабинет: там сделки, тренажёр и материалы команды.",
+    "en": "Deposit received. Access is open. Open the app: trades, the trainer and team materials are there."
+  },
+  {
+    "type": "rule",
+    "id": "7",
+    "field": "text",
+    "ru": "{имя}, давно не виделись. В кабинете тренажёр и материалы команды, заглядывай.",
+    "en": "{имя}, long time no see. The trainer and team materials are waiting in the app, drop by."
+  },
+  {
+    "type": "rule",
+    "id": "8",
+    "field": "text",
+    "ru": "{имя}, поздравляем с выводом средств! 🎉\n\nЕсли вам нравится работа с командой, оставьте короткий отзыв: оценка и пара слов, можно с фото. Это займёт меньше минуты и поможет новичкам решиться.",
+    "en": "{имя}, congratulations on your withdrawal! 🎉\n\nIf you enjoy working with the team, leave a short review: a rating and a few words, a photo is welcome. It takes less than a minute and helps newcomers make up their minds."
+  },
+  {
+    "type": "template",
+    "id": "live",
+    "field": "text",
+    "ru": "🔴 Эфир начался!\n\n{стример}, открывает сделки \nпо сигналам бота, ты повторяешь \nвсе действия 🤖🔥 и забираешь\nплюсики к своему депозиту 💸\n\nЖдём тебя 👇🏻",
+    "en": "🔴 The stream has started!\n\n{стример} opens trades\nusing the bot’s signals, you repeat\nall the actions 🤖🔥 and take\nprofits to your deposit 💸\n\nWe’re waiting for you 👇🏻"
+  },
+  {
+    "type": "template",
+    "id": "signal",
+    "field": "text",
+    "ru": "💸 **Быстрый профит** 💸\n🔴 СИГНАЛ ПО **{пара}**\n\n⚡ Вход: **{вход}** по Киеву 🇺🇦\n\n⚙️ Детали сигнала:\n💱 Пара: **{пара}**\n📈 Сделка: **{сделка}**\n⏱ Время сделки: **{экспирация}** • M5\n💵 Ставка: **1-3% от банка**\n\nСигнал от нашего бота 👇",
+    "en": "💸 **Quick profit** 💸\n🔴 SIGNAL ON **{пара}**\n\n⚡ Entry: **{вход}** Kyiv time 🇺🇦\n\n⚙️ Signal details:\n💱 Pair: **{пара}**\n📈 Trade: **{сделка}**\n⏱ Trade time: **{экспирация}** • M5\n💵 Stake: **1-3% of your balance**\n\nSignal from our bot 👇"
+  },
+  {
+    "type": "reply",
+    "id": "acc_no",
+    "field": "text",
+    "ru": "Регистрация займёт 2 минуты:\n\n1. Нажми кнопку ниже, перейди в приложение\n2. Далее \"Зарегистрироваться\" и выбери RU или EU\n3. Пополни счёт от 50 $ (рекомендуем от 100 $)\n4. Доступ откроется сам — ничего вводить не нужно\n\n__Нажимая «Зарегистрироваться», ты подтверждаешь, что тебе 18+ и понимаешь: торговля связана с риском потери денег.__ [Условия]({условия})",
+    "en": "Registration takes 2 minutes:\n\n1. Tap the button below to go to the app\n2. Then tap \"Sign up\" and choose RU or EU\n3. Top up your account from $50 (we recommend $100 or more)\n4. Access opens by itself, nothing to enter\n\n__By tapping “Sign up”, you confirm that you are 18+ and understand that trading involves the risk of losing money.__ [Terms]({условия})"
+  },
+  {
+    "type": "reply",
+    "id": "acc_yes",
+    "field": "text",
+    "ru": "Отлично! Чтобы мы видели твой аккаунт и открыли доступ, регистрация должна быть по нашей ссылке. Если ты уже зарегистрирован был ранее не по ней, напиши в поддержку: подскажем, как быть.",
+    "en": "Great! For us to see your account and open access, you must register via our link. If you registered earlier without it, write to support and we’ll tell you what to do."
+  },
+  {
+    "type": "button",
+    "id": "",
+    "field": "label",
+    "ru": "Открыть Hunter AI",
+    "en": "Open Hunter AI"
+  },
+  {
+    "type": "button",
+    "id": "",
+    "field": "label",
+    "ru": "Тренажёр",
+    "en": "Trainer"
+  },
+  {
+    "type": "button",
+    "id": "",
+    "field": "label",
+    "ru": "💬 Хочу в команду",
+    "en": "💬 I want to join the team"
+  },
+  {
+    "type": "button",
+    "id": "",
+    "field": "label",
+    "ru": "📲 Открыть Hunter AI",
+    "en": "📲 Open Hunter AI"
+  }
+]
