@@ -557,6 +557,9 @@ function renderVideos() {
 // Плеер: YouTube — встроенный плеер YouTube, файл — стандартный плеер iPad, остальное — страница внутри окна
 function playVideo(v) {
   var pl = ytList(v.url), id = pl ? null : ytId(v.url), inner;
+  // YouTube и YouTube Music: встроенный плеер YouTube на iOS 9 не запускается, поэтому сразу открываем мобильный сайт YouTube
+  // (в Safari он работает). С ярлыка на экране «Домой» откроется Safari
+  if (pl || id) { window.open('https://m.youtube.com/' + (pl ? 'playlist?list=' + pl : 'watch?v=' + id), '_blank'); return; }
   // Плейлист YouTube Music / YouTube: официальный встроенный плеер со всем списком
   if (pl) inner = '<iframe src="https://www.youtube.com/embed/videoseries?list=' + pl + '&autoplay=1&fs=1&rel=0" allow="autoplay; fullscreen; encrypted-media" allowfullscreen webkitallowfullscreen frameborder="0"></iframe>';
   else if (id) inner = '<iframe src="https://www.youtube.com/embed/' + id + '?autoplay=1&fs=1&rel=0" allow="autoplay; fullscreen; encrypted-media" allowfullscreen webkitallowfullscreen frameborder="0"></iframe>';
