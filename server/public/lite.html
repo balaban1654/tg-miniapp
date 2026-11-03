@@ -88,6 +88,7 @@ table{width:100%;border-collapse:collapse;background:#1c1233;border:1px solid #3
 th{font-weight:600;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#a89cc8;background:#150d26;padding:10px 12px;text-align:center}
 td{padding:11px 12px;border-top:1px solid #34255c;text-align:center}
 td.l,th.l{text-align:left}
+.ptr{position:fixed;left:0;right:0;top:0;height:0;overflow:hidden;text-align:center;color:#c9a6ff;font-size:13px;font-weight:700;line-height:44px;background:#0d0817;z-index:5}
 .scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
 tr.sum td{border-top:2px solid #9b5cff;background:rgba(155,92,255,.08);font-weight:700}
 .seg2{display:-webkit-flex;display:flex;height:22px;border-radius:6px;overflow:hidden;margin:4px 0 10px}
@@ -95,6 +96,7 @@ tr.sum td{border-top:2px solid #9b5cff;background:rgba(155,92,255,.08);font-weig
 </style>
 </head>
 <body>
+<div id="ptr" class="ptr">↓ Потяните, чтобы обновить</div>
 <div class="wrap">
   <div id="login" class="card hide" style="max-width:400px;margin:40px auto">
     <h2 style="margin:0 0 14px"><img src="/img/office-192.png" alt="" width="34" height="34" style="vertical-align:middle;border-radius:9px;margin-right:8px">Hunter Office</h2>
@@ -312,6 +314,29 @@ $('lbtn').onclick = function () {
 // Уже вошли (cookie сессии): сразу данные, иначе форма входа. Дальше сами обновляем раз в минуту
 req('GET', '/api/office/me', null, function (st) { if (st === 200) showMain(); else showLogin(); });
 setInterval(function () { if ($('main').className !== 'hide') load(); }, 60000);
+
+// Обновление свайпом вниз: потянули страницу в самом верху больше чем на 70 px и отпустили — данные загружаются заново.
+// На экране «Домой» у Safari нет своего «потяните для обновления», поэтому делаем сами
+var ptrY = null, ptrD = 0, ptrBusy = false;
+function ptrShow(h, txt) { var p = $('ptr'); p.style.height = h + 'px'; p.style.lineHeight = h + 'px'; if (txt) p.innerHTML = txt; }
+document.addEventListener('touchstart', function (e) {
+  if (ptrBusy || $('main').className === 'hide' || (window.pageYOffset || document.documentElement.scrollTop) > 0) { ptrY = null; return; }
+  ptrY = e.touches[0].clientY; ptrD = 0;
+}, false);
+document.addEventListener('touchmove', function (e) {
+  if (ptrY === null) return;
+  ptrD = e.touches[0].clientY - ptrY;
+  if (ptrD <= 0) { ptrShow(0); return; }
+  ptrShow(Math.min(60, ptrD / 2), ptrD > 70 ? '↻ Отпустите, чтобы обновить' : '↓ Потяните, чтобы обновить');
+}, false);
+document.addEventListener('touchend', function () {
+  if (ptrY === null) return;
+  ptrY = null;
+  if (ptrD > 70) {
+    ptrBusy = true; ptrShow(44, 'Обновляем…'); load();
+    setTimeout(function () { ptrBusy = false; ptrShow(0); }, 900);
+  } else ptrShow(0);
+}, false);
 </script>
 </body>
 </html>
