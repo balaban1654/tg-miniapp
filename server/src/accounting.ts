@@ -1189,7 +1189,9 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
                 f.accepted_at, f.penalty_id, a.amount::float AS penalty_amount, a.comment AS penalty_comment,
                 (SELECT name FROM staff WHERE id = f.accepted_by) AS accepted_by_name, (SELECT name FROM staff WHERE id = a.created_by) AS penalty_by_name
            FROM shift_shortfalls f JOIN staff s ON s.id = f.staff_id LEFT JOIN staff_adjustments a ON a.id = f.penalty_id
-          WHERE to_char(f.day, 'YYYY-MM') = $1 AND f.dismissed_at IS NULL AND s.role <> 'admin' AND ($2::int IS NULL OR s.parent_id = $2) ORDER BY f.day DESC, s.name`,
+          -- Плюс причины из других месяцев, которые ещё ждут решения: их считает цифра у вкладки, значит они должны быть видны
+          WHERE (to_char(f.day, 'YYYY-MM') = $1 OR (f.reason IS NOT NULL AND f.accepted_at IS NULL AND f.penalty_id IS NULL))
+            AND f.dismissed_at IS NULL AND s.role <> 'admin' AND ($2::int IS NULL OR s.parent_id = $2) ORDER BY f.day DESC, s.name`,
         [period, teamScope(req)],
       )
     ).rows;
