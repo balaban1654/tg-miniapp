@@ -1992,8 +1992,8 @@ async function viewLeads(){
     const flat=F.q||F.status||F.link||F.owner||F.sort!=='new';
     // С фильтрами список общий: сотрудников (админ состав) показываем только при поиске — у них нет даты в периоде
     if(flat&&!F.q.trim())list=list.filter(r=>!isStaff(r));
-    // По дате: внутри одного дня (по Киеву) лиды в «Отвале» идут в конце этого дня
-    const tms=r=>new Date(r.status_at||r.created_at).getTime(),dayK=r=>Number(new Date(tms(r)).toLocaleDateString('sv-SE',{timeZone:'Europe/Kyiv'}).replaceAll('-','')),isCh=r=>r.status==='churned'?1:0;
+    // По дате: внутри одного дня (по Киеву) сверху новые, ниже регистрации, FTD, активные и в самом низу «Отвал»
+    const tms=r=>new Date(r.status_at||r.created_at).getTime(),dayK=r=>Number(new Date(tms(r)).toLocaleDateString('sv-SE',{timeZone:'Europe/Kyiv'}).replaceAll('-','')),isCh=r=>({new:0,registered:1,ftd:2,active:3,churned:4})[r.status]??0;
     const by={dep:(a,b)=>b.deposits-a.deposits,depAsc:(a,b)=>a.deposits-b.deposits,comm:(a,b)=>b.commission-a.commission,old:(a,b)=>dayK(a)-dayK(b)||isCh(a)-isCh(b)||tms(a)-tms(b),new:(a,b)=>dayK(b)-dayK(a)||isCh(a)-isCh(b)||tms(b)-tms(a)}[F.sort];
     list=[...list].sort(by);
     // @r1654 (создатель компании) всегда самый первый в админ составе
