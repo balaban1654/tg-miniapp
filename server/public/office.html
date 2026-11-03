@@ -85,7 +85,26 @@ textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10
 .bub img{max-width:240px;border-radius:8px;display:block;margin-bottom:4px}
 .reply{display:flex;gap:8px;padding:10px;border-top:1px solid var(--line)}
 .reply textarea{flex:1;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px;resize:none;font:inherit;color:inherit;min-height:44px;max-height:120px}
-@media(max-width:760px){.chat-wrap{grid-template-columns:1fr;height:auto}.chat-list{max-height:220px}.chat-thread{height:60vh}}
+.chat-back{display:none}
+.chat-thread{min-height:0}
+.chat-wrap{height:calc(100vh - 120px);height:calc(100dvh - 120px)}
+/* Планшет (iPad): список уже, чтобы переписка не сжималась */
+@media(max-width:1024px){.chat-wrap{grid-template-columns:250px 1fr}.bub img{max-width:100%}}
+/* Телефон: список и переписка по очереди, у переписки кнопка «Чаты» назад */
+@media(max-width:760px){
+ .chat-wrap{grid-template-columns:1fr;grid-template-rows:minmax(0,1fr);height:calc(100vh - 150px);height:calc(100dvh - 150px);min-height:340px}
+ .chat-wrap .chat-thread{display:none}
+ .chat-wrap.in-thread .chat-list{display:none}
+ .chat-wrap.in-thread .chat-thread{display:grid}
+ .chat-list{max-height:none;height:100%}
+ .chat-item{padding:12px 14px}
+ .chat-back{display:inline-flex;align-items:center;justify-content:center;min-height:36px;margin-bottom:6px;justify-self:start}
+ .reply{padding:8px;padding-bottom:calc(8px + env(safe-area-inset-bottom))}
+ .reply textarea{font-size:16px}
+ .reply .btn{min-height:44px;padding:0 14px}
+ .bub{max-width:90%}
+ .thread-head{padding:10px 12px}
+}
 @media(max-width:760px){
  #app{grid-template-columns:1fr}
  .side{position:static;height:auto;flex-direction:row;flex-wrap:wrap;align-items:center;padding:10px;border-right:0;border-bottom:1px solid var(--line)}
@@ -290,6 +309,7 @@ async function viewChats(){
   fileIn.addEventListener('change',()=>setPhoto(fileIn.files[0]));
   const err=el('div',{class:'err',role:'alert',style:'padding:0 12px'});
   const thread=el('div',{class:'chat-thread'},head,msgs,el('div',{},err,prev,el('div',{class:'reply'},attachBtn,fileIn,ta,sendBtn)));
+  const wrap=el('div',{class:'chat-wrap'},list,thread);
   const preview=r=>(r.last_dir==='out'?'Вы: ':'')+(r.last_text||({photo:'📷 Фото',document:'📎 Файл',voice:'🎤 Голосовое',video:'🎬 Видео',sticker:'Стикер'})[r.last_kind]||'Сообщение');
   async function loadList(){
     const rows=await api('/chats');
@@ -304,7 +324,7 @@ async function viewChats(){
     const d=await api('/chats/'+active);
     const near=msgs.scrollHeight-msgs.scrollTop-msgs.clientHeight<80;
     const L={href:profileUrl(d.lead),target:'_blank',rel:'noopener',title:'Открыть профиль в Telegram',style:'color:#6cb4ff;text-decoration:none'};
-    head.replaceChildren(el('div',{},d.lead.username?[d.lead.first_name?el('b',{style:'margin-right:8px'},d.lead.first_name):null,el('a',{...L,style:L.style+';font-weight:600'},'@'+d.lead.username)]:el('a',{...L,style:L.style+';font-weight:700'},cname(d.lead))),el('span',{class:'mut sm'},'Telegram ID '+d.lead.tg_id+' · Pocket ID '+(d.lead.trader_id||'нет')+' · '+(d.lead.owner_name?'ведёт '+d.lead.owner_name:'не закреплён')));
+    head.replaceChildren(el('button',{class:'btn o s chat-back',type:'button',onclick:()=>wrap.classList.remove('in-thread')},'‹ Чаты'),el('div',{},d.lead.username?[d.lead.first_name?el('b',{style:'margin-right:8px'},d.lead.first_name):null,el('a',{...L,style:L.style+';font-weight:600'},'@'+d.lead.username)]:el('a',{...L,style:L.style+';font-weight:700'},cname(d.lead))),el('span',{class:'mut sm'},'Telegram ID '+d.lead.tg_id+' · Pocket ID '+(d.lead.trader_id||'нет')+' · '+(d.lead.owner_name?'ведёт '+d.lead.owner_name:'не закреплён')));
     msgs.replaceChildren(...d.messages.map(m=>{
       const body=[];
       if(m.has_file&&m.kind==='photo')body.push(el('img',{src:'/api/office/chats/'+d.lead.tg_id+'/file/'+m.id,alt:'Фото от клиента'}));
@@ -316,7 +336,7 @@ async function viewChats(){
     }));
     if(near||!msgs.dataset.init){msgs.scrollTop=msgs.scrollHeight;msgs.dataset.init='1'}
   }
-  async function openChat(id){active=id;msgs.dataset.init='';err.textContent='';try{await loadThread();await loadList()}catch(e){err.textContent=e.message}}
+  async function openChat(id){active=id;wrap.classList.add('in-thread');msgs.dataset.init='';err.textContent='';try{await loadThread();await loadList()}catch(e){err.textContent=e.message}}
   async function send(){
     const text=ta.value.trim();if((!text&&!photo)||!active)return;
     sendBtn.disabled=true;err.textContent='';
@@ -329,9 +349,9 @@ async function viewChats(){
   ta.addEventListener('paste',e=>{const f=[...(e.clipboardData?.files||[])].find(x=>x.type.startsWith('image/'));if(f){e.preventDefault();setPhoto(f)}});
   ta.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send()}});
   await loadList();
-  head.replaceChildren(el('span',{class:'mut'},'Выберите чат слева'));
+  head.replaceChildren(el('span',{class:'mut'},'Выберите чат из списка'));
   poll=setInterval(()=>{loadList().catch(()=>{});loadThread().catch(()=>{})},6000);
-  return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Чаты поддержки'),el('span',{class:'mut sm'},'Кто первым ответит неразобранному клиенту, тот его и забирает')),el('div',{class:'chat-wrap'},list,thread)];
+  return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Чаты поддержки'),el('span',{class:'mut sm'},'Кто первым ответит неразобранному клиенту, тот его и забирает')),wrap];
 }
 
 const TRIG={start:'Нажал /start',no_reg:'Нет регистрации',no_deposit:'Регистрация без депозита',ftd:'Депозит получен',inactive:'Давно не заходил'};
