@@ -98,7 +98,8 @@ const termsHtml = readFileSync(resolve(process.cwd(), 'public/terms.html'), 'utf
 app.get('/terms', async (_req, reply) => reply.type('text/html; charset=utf-8').header('Cache-Control', 'public, max-age=300').send(termsHtml));
 
 // Клиентский Mini App
-const appHtml = readFileSync(resolve(process.cwd(), 'public/app.html'), 'utf8');
+// Словарь английского перевода встраивается прямо в страницу (без отдельного запроса)
+const appHtml = readFileSync(resolve(process.cwd(), 'public/app.html'), 'utf8').replace('/*I18N_EN*/', () => readFileSync(resolve(process.cwd(), 'public/i18n-en.js'), 'utf8'));
 app.get('/app', async (_req, reply) => reply.type('text/html; charset=utf-8').header('Cache-Control', 'no-store').send(appHtml));
 await app.register(appRoutes, { prefix: '/api/app' });
 

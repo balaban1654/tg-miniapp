@@ -310,6 +310,62 @@ svg{max-width:100%}
 
 .nw-more{color:inherit;font:inherit;text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:3px;text-decoration-color:currentColor;transition:color .15s}.nw-more:hover,.nw-more:active,.nw-more:focus-visible{color:var(--acc2,#c9a6ff)}
 </style>
+<script>
+/* Перевод Mini App на английский. Если в профиле выбран EN, каждый текст на экране (и подсказки, и ошибки сервера)
+   подменяется по словарю i18n-en.js: сначала целиком, иначе по кусочкам. Логика приложения не меняется.
+   Старый синтаксис (var, function), как и у диагностики выше */
+/*I18N_EN*/
+(function(){
+  var lang='ru';try{lang=localStorage.getItem('pref_lang')||'ru'}catch(e){}
+  if(lang!=='en'||!window.HUNTER_EN)return;
+  // Неразрывные пробелы в текстах приравниваем к обычным, иначе фраза не совпадёт со словарём
+  var NB=/[\u00a0\u202f]/g,norm=function(x){return x.replace(NB,' ')};
+  var D={},CY=/[А-Яа-яЁё]/,keys=[],shortk=[],k;
+  for(k in window.HUNTER_EN)if(window.HUNTER_EN.hasOwnProperty(k))D[norm(k)]=window.HUNTER_EN[k];
+  for(k in D)if(D.hasOwnProperty(k)){if(k.length>=4)keys.push(k);else if(CY.test(k))shortk.push(k)}
+  keys.sort(function(a,b){return b.length-a.length});
+  var esc=function(s){return s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')};
+  // Короткие слова (ч, мин, дн, из…) меняем только целиком, чтобы не задеть буквы внутри других слов
+  var shortRe=shortk.length?new RegExp('(^|[^А-Яа-яЁё])('+shortk.sort(function(a,b){return b.length-a.length}).map(esc).join('|')+')(?=$|[^А-Яа-яЁё])','g'):null;
+  var cache={};
+  function tr(s){
+    if(!s||!CY.test(s))return s;
+    if(cache.hasOwnProperty(s))return cache[s];
+    var src=s;s=norm(s);
+    var t=s.replace(/^\s+|\s+$/g,''),out;
+    if(D.hasOwnProperty(t))out=s.replace(t,D[t]);
+    else{
+      out=s;
+      for(var i=0;i<keys.length&&CY.test(out);i++)if(out.indexOf(keys[i])>=0)out=out.split(keys[i]).join(D[keys[i]]);
+      if(shortRe&&CY.test(out))out=out.replace(shortRe,function(m,p,w){return p+D[w]});
+    }
+    cache[src]=out;return out;
+  }
+  window.__tr=tr;
+  var ATTR=['placeholder','title','aria-label'];
+  function node(n){
+    if(n.nodeType===3){var v=n.nodeValue,t=tr(v);if(t!==v)n.nodeValue=t;return}
+    if(n.nodeType!==1||n.tagName==='SCRIPT'||n.tagName==='STYLE')return;
+    for(var a=0;a<ATTR.length;a++){var av=n.getAttribute&&n.getAttribute(ATTR[a]);if(av&&CY.test(av)){var at=tr(av);if(at!==av)n.setAttribute(ATTR[a],at)}}
+    if((n.tagName==='INPUT'&&(n.type==='button'||n.type==='submit'))&&CY.test(n.value))n.value=tr(n.value);
+    for(var c=n.firstChild;c;c=c.nextSibling)node(c);
+  }
+  document.documentElement.setAttribute('lang','en');
+  new MutationObserver(function(ms){
+    for(var i=0;i<ms.length;i++){var m=ms[i];
+      if(m.type==='characterData')node(m.target);
+      else if(m.type==='attributes')node(m.target);
+      else for(var j=0;j<m.addedNodes.length;j++)node(m.addedNodes[j]);
+    }
+  }).observe(document.documentElement,{childList:true,subtree:true,characterData:true,attributes:true,attributeFilter:ATTR});
+  // Даты и время: вместо русского формата английский
+  var fix=function(l){return l==='ru-RU'||l==='ru'?'en-GB':l};
+  var P=Date.prototype;['toLocaleString','toLocaleDateString','toLocaleTimeString'].forEach(function(f){var o=P[f];P[f]=function(l,op){return o.call(this,fix(l),op)}});
+  var DTF=Intl.DateTimeFormat;Intl.DateTimeFormat=function(l,op){return new DTF(fix(l),op)};Intl.DateTimeFormat.prototype=DTF.prototype;Intl.DateTimeFormat.supportedLocalesOf=DTF.supportedLocalesOf;
+  // Системные окна
+  var oc=window.confirm,oa=window.alert;window.confirm=function(m){return oc.call(window,tr(String(m)))};window.alert=function(m){return oa.call(window,tr(String(m)))};
+})();
+</script>
 </head>
 <body>
 <div id="splash" role="status" aria-live="polite">
@@ -1718,7 +1774,7 @@ function prefBox(){
   const lbl=el('span',{},'');
   const menu=el('div',{style:'position:absolute;right:0;top:32px;z-index:20;background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:4px;display:none;min-width:110px;box-shadow:0 10px 30px #0008'});
   const paint=()=>{lbl.textContent=(LANGS.find(x=>x[0]===cur())||LANGS[0])[1];
-    menu.replaceChildren(...LANGS.map(([v,t])=>el('button',{type:'button',style:'display:block;width:100%;text-align:left;background:'+(v===cur()?'var(--acc)':'none')+';color:'+(v===cur()?'#fff':'var(--fg)')+';border:0;border-radius:7px;padding:7px 10px;font:700 12px var(--fd);cursor:pointer;outline:none;white-space:nowrap',onclick:e=>{e.stopPropagation();prefSet('pref_lang',v);menu.style.display='none';paint()}},v==='ru'?'Русский':'English')))};
+    menu.replaceChildren(...LANGS.map(([v,t])=>el('button',{type:'button',style:'display:block;width:100%;text-align:left;background:'+(v===cur()?'var(--acc)':'none')+';color:'+(v===cur()?'#fff':'var(--fg)')+';border:0;border-radius:7px;padding:7px 10px;font:700 12px var(--fd);cursor:pointer;outline:none;white-space:nowrap',onclick:e=>{e.stopPropagation();menu.style.display='none';if(v===cur())return;prefSet('pref_lang',v);paint();location.reload()}},v==='ru'?'Русский':'English')))};
   const lang=el('button',{type:'button','aria-label':'Язык',style:chip,onclick:e=>{e.stopPropagation();menu.style.display=menu.style.display==='none'?'block':'none'}},lbl,svgEl('<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>'));
   document.addEventListener('click',()=>{menu.style.display='none'});
   paint();
