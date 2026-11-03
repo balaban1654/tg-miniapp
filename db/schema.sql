@@ -62,6 +62,17 @@ CREATE TABLE IF NOT EXISTS sessions (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
+-- «Запомнить меня»: доверенное устройство. После выхода на нём достаточно кода 2FA, без логина и пароля.
+-- fp: отпечаток пароля и секрета 2FA на момент входа; сменили пароль или 2FA — устройство больше не подходит
+CREATE TABLE IF NOT EXISTS trusted_devices (
+  token_hash TEXT PRIMARY KEY,
+  staff_id   INT NOT NULL REFERENCES staff(id) ON DELETE CASCADE,
+  fp         TEXT NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  used_at    TIMESTAMPTZ
+);
+
 -- Журнал входящих постбеков для отладки. Секрет в журнал не попадает
 CREATE TABLE IF NOT EXISTS postback_log (
   id         BIGSERIAL PRIMARY KEY,

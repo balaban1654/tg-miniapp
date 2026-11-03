@@ -60,6 +60,36 @@ export function setSessionCookie(reply: FastifyReply, token: string): void {
   });
 }
 
+// ----- Доверенное устройство («Запомнить меня»): после выхода вход по одному коду 2FA -----
+export const DEVICE_COOKIE = 'hunter_device';
+const DEVICE_DAYS = 30;
+const deviceFp = (passwordHash: string, totpSecret: string) => sha(`${passwordHash}|${totpSecret}`);
+
+export async function rememberDevice(reply: FastifyReply, staffId: number): Promise<void> {
+  const st = (await db.query('SELECT password_hash, totp_secret FROM staff WHERE id = $1', [staffId])).rows[0];
+  if (!st?.totp_secret) return; // без 2FA вход «по коду» невозможен: запоминаем только логин (в браузере)
+  const token = randomBytes(32).toString('hex');
+  await db.query(`INSERT INTO trusted_devices (token_hash, staff_id, fp, expires_at) VALUES ($1,$2,$3, now() + ($4 || ' days')::interval)`,
+    [sha(token), staffId, deviceFp(st.password_hash, st.totp_secret), String(DEVICE_DAYS)]);
+  await db.query('DELETE FROM trusted_devices WHERE expires_at < now()');
+  reply.setCookie(DEVICE_COOKIE, token, { httpOnly: true, secure: config.secureCookies, sameSite: 'strict', path: '/api/office', maxAge: DEVICE_DAYS * 24 * 3600 });
+}
+
+/** Сотрудник запомненного устройства, если ключ действует, пароль и 2FA не менялись и учётка активна */
+export async function deviceStaff(token: string | undefined): Promise<{ id: number; login: string; name: string; role: Role; totp_secret: string } | null> {
+  if (!token) return null;
+  const r = (await db.query(
+    `SELECT s.id, s.login, s.name, s.role, s.password_hash, s.totp_secret, d.fp FROM trusted_devices d JOIN staff s ON s.id = d.staff_id
+      WHERE d.token_hash = $1 AND d.expires_at > now() AND s.active AND s.deleted_at IS NULL`, [sha(token)])).rows[0];
+  if (!r || !r.totp_secret || r.fp !== deviceFp(r.password_hash, r.totp_secret)) return null;
+  return { id: r.id, login: r.login, name: r.name, role: r.role, totp_secret: r.totp_secret };
+}
+
+export async function forgetDevice(reply: FastifyReply, token: string | undefined): Promise<void> {
+  if (token) await db.query('DELETE FROM trusted_devices WHERE token_hash = $1', [sha(token)]);
+  reply.clearCookie(DEVICE_COOKIE, { path: '/api/office' });
+}
+
 export async function destroySession(token: string): Promise<void> {
   await db.query('DELETE FROM sessions WHERE token_hash = $1', [sha(token)]);
 }

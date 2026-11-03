@@ -61,7 +61,7 @@ input,select{background:var(--bg2);border:1px solid var(--line);border-radius:10
 html{-webkit-text-size-adjust:100%;-webkit-tap-highlight-color:transparent}
 @media(display-mode:standalone){html,body{overscroll-behavior-y:none}body{padding-bottom:env(safe-area-inset-bottom)}}
 html{background:#0a0613}
-#login .brand{margin-bottom:6px;gap:12px}#login .brand .logo{width:46px;height:46px;font-size:20px}#login .rem{display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;margin-top:-4px}#login .rem input{width:16px;height:16px;padding:0;accent-color:var(--acc);cursor:pointer}#login .err:empty{display:none}#login .err{min-height:0;margin-top:-4px}#login .btn{margin-top:6px;padding:12px}#login p.hint{margin-top:8px;line-height:1.5}#login .brand .hint{margin-top:3px}
+#login .brand{margin-bottom:6px;gap:12px}#login .brand .logo{width:46px;height:46px;font-size:20px}#login .ldev{display:grid;gap:3px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:var(--bg2)}#login .ldev b{font:700 16px var(--fd)}#login .rem{display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;margin-top:-4px}#login .rem input{width:16px;height:16px;padding:0;accent-color:var(--acc);cursor:pointer}#login .err:empty{display:none}#login .err{min-height:0;margin-top:-4px}#login .btn{margin-top:6px;padding:12px}#login p.hint{margin-top:8px;line-height:1.5}#login .brand .hint{margin-top:3px}
 .brand{display:flex;gap:10px;align-items:center}
 .logo{width:34px;height:34px;border-radius:50%;background:var(--acc);display:grid;place-items:center;font:700 15px var(--fd)}
 .logo{overflow:hidden;background:#000;flex:none}.logo img{width:100%;height:100%;object-fit:cover;display:block}
@@ -504,6 +504,7 @@ textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10
   <div class="rain" id="rain" aria-hidden="true"></div>
   <form class="card" id="loginForm" autocomplete="on">
     <div class="brand"><div class="logo"><img src="/img/logo-256.webp" alt="H" draggable="false"></div><div><h1 style="font-size:18px">Hunter Office</h1><div class="hint">Кабинет команды Hunter AI</div></div></div>
+    <div id="lDev" class="ldev" hidden><span class="mut sm">Вход на запомненном устройстве</span><b id="lDevName"></b></div>
     <label>Логин<input id="lLogin" name="username" autocomplete="username" required></label>
     <label>Пароль<span class="pw-wrap"><input id="lPass" name="password" type="password" autocomplete="current-password" required><button type="button" class="pw-eye" id="lPassEye" aria-label="Показать пароль" title="Показать пароль" aria-pressed="false"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s4-6 10-6 10 6 10 6-4 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button></span></label>
     <div id="lCodeW" class="lc-field" hidden><label id="lCodeL">Код из приложения-аутентификатора</label>
@@ -514,6 +515,7 @@ textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10
     <div class="err" id="lErr" role="alert"></div>
     <button class="btn" id="lBtn" type="submit">Войти</button>
     <button class="btn o" id="lBack" type="button" hidden>Назад</button>
+    <button class="btn o" id="lSwitch" type="button" hidden>Сменить аккаунт</button>
     <div id="lInstall" hidden><p class="hint" id="lInstallTxt"></p><button class="btn o s" id="lInstallBtn" type="button" hidden>Установить приложение</button></div>
   </form>
 </div>
@@ -611,7 +613,16 @@ async function runImport(f){
 function toast(t){document.querySelectorAll('.toast').forEach(x=>x.remove());const n=el('div',{class:'toast',role:'status'},t);document.body.append(n);setTimeout(()=>n.remove(),2050)}
 (function(){const r=document.getElementById('rain');if(!r||matchMedia('(prefers-reduced-motion:reduce)').matches)return;
   for(let i=0;i<26;i++){const c=document.createElement('i');c.style.cssText='left:'+Math.random()*100+'%;height:'+(14+Math.random()*34)+'px;background:'+(Math.random()<.5?'#43b82f':'#ff3b1d')+';opacity:'+(.15+Math.random()*.3)+';animation-duration:'+(14+Math.random()*18)+'s;animation-delay:-'+Math.random()*30+'s';r.appendChild(c)}})();
-function showLogin(){me=null;$('#app').hidden=true;$('#login').hidden=false;$('#lPass').value=''}
+function showLogin(){me=null;$('#app').hidden=true;$('#login').hidden=false;$('#lPass').value='';
+  // Запомненное устройство: вместо логина и пароля только код 2FA
+  api('/login/device').then(d=>{if(d&&d.name)devStep(true,d)}).catch(()=>{})}
+let devMode=false;
+function devStep(on,d){
+  devMode=on;loginChallenge=null;$('#lErr').textContent='';
+  if(!on){$('#lDev').hidden=true;$('#lSwitch').hidden=true;loginStep(false);return}
+  loginStep(true);$('#lBack').hidden=true;$('#lSwitch').hidden=false;
+  $('#lDev').hidden=false;$('#lDevName').textContent=d.name+' · '+(ROLE[d.role]||d.role);
+}
 const ICONS={
   treview:'<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>',
   tshift:'<circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3 2"/>',
@@ -845,13 +856,15 @@ async function openNavEditor(){
 $('#loginForm').addEventListener('submit',async e=>{
   e.preventDefault();$('#lErr').textContent='';$('#lBtn').disabled=true;
   try{
-    if(loginChallenge){await api('/login/totp',{method:'POST',body:{challenge:loginChallenge,code:$('#lCode').value}})}
+    if(devMode){await api('/login/device',{method:'POST',body:{code:$('#lCode').value}})}
+    else if(loginChallenge){await api('/login/totp',{method:'POST',body:{challenge:loginChallenge,code:$('#lCode').value,remember:$('#lRem').checked}})}
     else{
-      const r=await api('/login',{method:'POST',body:{login:$('#lLogin').value,password:$('#lPass').value}});
+      const r=await api('/login',{method:'POST',body:{login:$('#lLogin').value,password:$('#lPass').value,remember:$('#lRem').checked}});
       if(r.need_totp){loginChallenge=r.challenge;loginStep(true);return}
     }
-    loginChallenge=null;loginStep(false);rememberSave();me=await api('/me');readHash();showApp()}
-  catch(x){$('#lErr').textContent=x.message;if(x.restart){loginChallenge=null;loginStep(false)}else if(loginChallenge&&!$('#otp').hidden){otpIn().forEach(i=>i.value='');$('#lCode').value='';otpIn()[0].focus()}}
+    const wasDev=devMode;if(wasDev){devMode=false;$('#lDev').hidden=true;$('#lSwitch').hidden=true}
+    loginChallenge=null;loginStep(false);if(!wasDev)rememberSave();me=await api('/me');readHash();showApp()}
+  catch(x){$('#lErr').textContent=x.message;if(x.restart){if(devMode)devStep(false);loginChallenge=null;loginStep(false);$('#lErr').textContent=x.message}else if((loginChallenge||devMode)&&!$('#otp').hidden){otpIn().forEach(i=>i.value='');$('#lCode').value='';otpIn()[0].focus()}}
   finally{$('#lBtn').disabled=false}
 });
 /** Установка как приложения: подсказка под устройство, кнопка там, где браузер умеет сам */
@@ -922,6 +935,7 @@ $('#lRec').onclick=()=>otpMode(!$('#otp').hidden);
   });
 })();
 $('#lBack').onclick=()=>{loginChallenge=null;loginStep(false);$('#lErr').textContent=''};
+$('#lSwitch').onclick=async()=>{try{await api('/login/device/forget',{method:'POST'})}catch{}$('#lLogin').value='';devStep(false);$('#lLogin').focus()};
 {const hb=$('#homeBrand'),goHome=()=>{const h=me&&me.role==='analyst'?'signals':'home';if(tab===h){const r=render({soft:true});if(r&&r.then)r.then(()=>window.scrollTo({top:0,behavior:'smooth'}));else window.scrollTo({top:0,behavior:'smooth'});return}window.scrollTo(0,0);tab=h;showApp();render()};hb.addEventListener('click',goHome);hb.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();goHome()}})}
 $('#logout').addEventListener('click',async()=>{try{await api('/logout',{method:'POST'})}catch{}showLogin()});
 

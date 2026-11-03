@@ -37,6 +37,10 @@ import {
   setSessionCookie,
   staffFromRequest,
   verifyPassword,
+  DEVICE_COOKIE,
+  rememberDevice,
+  deviceStaff,
+  forgetDevice,
 } from './auth.js';
 
 const ROLES: Role[] = ['admin', 'teamlead', 'streamer', 'buyer', 'analyst'];
@@ -179,6 +183,45 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     }
     loginOk(key);
     setSessionCookie(reply, await createSession(row.id));
+    if (body.remember !== true) await forgetDevice(reply, req.cookies[DEVICE_COOKIE]);
+    return { ok: true };
+  });
+
+  /** Код из приложения (одноразовый) или резервный код. true — код верный */
+  const checkCode = async (st: { id: number; totp_secret: string; totp_last: unknown }, code: string): Promise<{ ok: boolean; recovery: boolean }> => {
+    const step = verifyTotp(st.totp_secret, code);
+    if (step !== null && step > Number(st.totp_last)) {
+      // Одноразовость: тот же шаг второй раз не принимаем
+      return { ok: (await db.query('UPDATE staff SET totp_last = $2 WHERE id = $1 AND totp_last < $2', [st.id, step])).rowCount === 1, recovery: false };
+    }
+    if (/^[0-9a-f]{5}-?[0-9a-f]{5}$/i.test(code)) {
+      const h = sha256(code.toLowerCase().replace('-', ''));
+      return { ok: (await db.query('UPDATE staff SET recovery_codes = array_remove(recovery_codes, $2) WHERE id = $1 AND $2 = ANY(recovery_codes)', [st.id, h])).rowCount === 1, recovery: true };
+    }
+    return { ok: false, recovery: false };
+  };
+
+  // «Запомнить меня»: на этом устройстве после выхода достаточно кода 2FA. Здесь — кто запомнен (для экрана входа)
+  app.get('/login/device', async (req) => {
+    const d = await deviceStaff(req.cookies[DEVICE_COOKIE]);
+    return d ? { name: d.name, login: d.login, role: d.role } : {};
+  });
+  app.post('/login/device', async (req, reply) => {
+    const d = await deviceStaff(req.cookies[DEVICE_COOKIE]);
+    if (!d) { await forgetDevice(reply, req.cookies[DEVICE_COOKIE]); return reply.code(401).send({ error: 'Устройство больше не запомнено, войдите по логину и паролю', restart: true }); }
+    const key = `${req.ip}|${d.login.toLowerCase()}`;
+    if (loginBlocked(key)) return reply.code(429).send({ error: 'Слишком много попыток. Подождите 15 минут.' });
+    const st = (await db.query('SELECT id, totp_secret, totp_last FROM staff WHERE id = $1', [d.id])).rows[0];
+    const r = await checkCode(st, str(((req.body ?? {}) as Record<string, unknown>).code, 20));
+    if (!r.ok) { loginFailed(key); return reply.code(401).send({ error: 'Неверный код' }); }
+    loginOk(key);
+    await db.query('UPDATE trusted_devices SET used_at = now() WHERE staff_id = $1', [d.id]);
+    setSessionCookie(reply, await createSession(d.id));
+    return { ok: true };
+  });
+  // «Сменить аккаунт»: забыть это устройство
+  app.post('/login/device/forget', async (req, reply) => {
+    await forgetDevice(reply, req.cookies[DEVICE_COOKIE]);
     return { ok: true };
   });
 
@@ -197,15 +240,8 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     if (!st || !st.active || !st.totp_secret) return bad();
     const key = `${req.ip}|${String(st.login).toLowerCase()}`;
     if (loginBlocked(key)) return reply.code(429).send({ error: 'Слишком много попыток. Подождите 15 минут.' });
-    let ok = false;
-    const step = verifyTotp(st.totp_secret, code);
-    if (step !== null && step > Number(st.totp_last)) {
-      // Одноразовость: тот же шаг второй раз не принимаем
-      ok = (await db.query('UPDATE staff SET totp_last = $2 WHERE id = $1 AND totp_last < $2', [st.id, step])).rowCount === 1;
-    } else if (/^[0-9a-f]{5}-?[0-9a-f]{5}$/i.test(code)) {
-      const h = sha256(code.toLowerCase().replace('-', ''));
-      ok = (await db.query('UPDATE staff SET recovery_codes = array_remove(recovery_codes, $2) WHERE id = $1 AND $2 = ANY(recovery_codes)', [st.id, h])).rowCount === 1;
-    }
+    const cc = await checkCode(st, code);
+    const ok = cc.ok;
     if (!ok) {
       loginFailed(key);
       return bad();
@@ -213,7 +249,9 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     loginOk(key);
     await db.query('DELETE FROM login_challenges WHERE token_hash = $1', [sha256(ch)]);
     setSessionCookie(reply, await createSession(st.id));
-    return { ok: true, recovery_left: st.recovery_codes.length - (step === null ? 1 : 0) };
+    if (body.remember === true) await rememberDevice(reply, st.id);
+    else await forgetDevice(reply, req.cookies[DEVICE_COOKIE]);
+    return { ok: true, recovery_left: st.recovery_codes.length - (cc.recovery ? 1 : 0) };
   });
 
   app.post('/logout', async (req, reply) => {
