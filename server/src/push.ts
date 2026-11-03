@@ -70,7 +70,7 @@ export function pickText(ru: string, en: string | null | undefined, lang: string
 }
 
 /** Английские подписи стандартных кнопок: если у кнопки нет своей label_en, берём отсюда */
-const LABEL_EN: Record<string, string> = {
+export const LABEL_EN: Record<string, string> = {
   'Написать в поддержку': 'Contact support',
   'Не получается — написать в поддержку': 'Having trouble? Contact support',
   'Зарегистрироваться': 'Sign up',

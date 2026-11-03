@@ -16,4 +16,6 @@ RUN npm ci --omit=dev
 COPY --from=build /app/dist ./dist
 COPY server/public ./public
 COPY db/schema.sql ./schema.sql
+# Английские версии текстов из Office: вписываются при запуске (см. src/i18nFill.ts)
+COPY server/i18n-fill.json ./i18n-fill.json
 CMD ["node", "dist/index.js"]

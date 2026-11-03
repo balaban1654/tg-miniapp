@@ -15,6 +15,7 @@ import { monoRoutes } from './mono.js';
 import { mainMediaTeam } from './mediaTeams.js';
 import { leadStatusDate, leadListDate, funnelStage, funnelStageDate, churnedAfterFtd } from './leaddate.js';
 import { referralOfficeRoutes, accrueReferral } from './referral.js';
+import { exportTexts } from './i18nFill.js';
 import { connectRoutes, connectInfo, requiredFor, markConnected, TOL } from './connect.js';
 import { toVoice, toVideoNote } from './media.js';
 import { parseReviewPhoto, cleanReviewText, cleanRating } from './reviews.js';
@@ -1669,6 +1670,8 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     if (/^(t\.me|telegram\.me)\//i.test(u)) u = 'https://' + u;
     return /^https?:\/\/[^\s]+\.[^\s]+$/i.test(u) ? u : false;
   };
+  // Тексты без английской версии: админ выгружает файл, переводы потом вписываются при запуске (i18nFill.ts)
+  app.get('/i18n/export', { preHandler: need('admin') }, async () => exportTexts());
   app.get<{ Querystring: { team?: string } }>('/news', { preHandler: need('admin') }, async (req, reply) => {
     const team = await teamParam(req.query.team);
     if (!team) return reply.code(404).send({ error: 'Команда не найдена' });

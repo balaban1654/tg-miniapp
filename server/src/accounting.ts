@@ -656,9 +656,8 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     const b = (req.body ?? {}) as Record<string, any>;
     const cur = (await db.query(
       `SELECT s.id, s.status, s.declared_min, to_char(s.day, 'YYYY-MM') AS pm FROM shift_reports s JOIN staff st ON st.id = s.staff_id
-        WHERE s.id = $1 AND (s.status = 'pending' OR ($3 AND s.status = 'approved')) AND ($2::int IS NULL OR (st.parent_id = $2 AND NOT s.team))`,
-      // Зачтённый отчёт тоже можно отклонить: его время уходит из расчёта часов и зарплаты
-      [Number(req.params.id), teamScope(req), b.action === 'reject'],
+        WHERE s.id = $1 AND s.status = 'pending' AND ($2::int IS NULL OR (st.parent_id = $2 AND NOT s.team))`,
+      [Number(req.params.id), teamScope(req)],
     )).rows[0];
     if (!cur) return reply.code(404).send({ error: 'Отчёт не найден или уже проверен' });
     // Отклонить отчёт на проверке можно и в закрытом месяце: в расчёт он ещё не входил, закрытые цифры не меняются
@@ -669,7 +668,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
       if (!Number.isFinite(min) || min < 1 || min > 720) return reply.code(400).send({ error: 'Время от 1 до 720 минут' });
       await db.query(`UPDATE shift_reports SET status = 'approved', approved_min = $2, reviewed_by = $3, reviewed_at = now() WHERE id = $1`, [cur.id, min, me.id]);
     } else if (b.action === 'reject') {
-      await db.query(`UPDATE shift_reports SET status = 'rejected', approved_min = NULL, reject_reason = $2, reviewed_by = $3, reviewed_at = now() WHERE id = $1`, [cur.id, str(b.reason, 500) || null, me.id]);
+      await db.query(`UPDATE shift_reports SET status = 'rejected', reject_reason = $2, reviewed_by = $3, reviewed_at = now() WHERE id = $1`, [cur.id, str(b.reason, 500) || null, me.id]);
     } else return reply.code(400).send({ error: 'Неизвестное действие' });
     return { ok: true };
   });
