@@ -399,7 +399,7 @@ function calBind() {
 var menuOpen = false;
 function menuHtml() {
   if (!menuOpen) return '';
-  var it = [['dash', 'Дашборд'], ['leads', 'Лиды'], ['video', 'Видео']], h = '<div class="mov" id="mov"></div><div class="menu"><div class="mlogo"><img src="/img/office-192.png" width="30" height="30" alt="" style="border-radius:8px;vertical-align:middle;margin-right:8px">Hunter Office</div>', i;
+  var it = [['dash', 'Дашборд'], ['leads', 'Лиды'], ['video', 'Музыка']], h = '<div class="mov" id="mov"></div><div class="menu"><div class="mlogo"><img src="/img/office-192.png" width="30" height="30" alt="" style="border-radius:8px;vertical-align:middle;margin-right:8px">Hunter Office</div>', i;
   for (i = 0; i < it.length; i++) h += '<button class="mi' + (view === it[i][0] ? ' on' : '') + '" data-v="' + it[i][0] + '">' + it[i][1] + '</button>';
   return h + '<button class="mi out" id="logout">Выйти</button></div>';
 }
@@ -515,8 +515,9 @@ function renderCard(d) {
   for (i = 0; i < rc.length; i++) rc[i].onclick = function (e) { e.preventDefault(); openCard(this.getAttribute('data-card')); };
 }
 
-// ---------- Видео: только список для просмотра. Добавляет и удаляет админ в обычном Office (меню → «Видео») ----------
+// ---------- Музыка: плейлисты и треки YouTube Music / YouTube, файлы .mp3/.mp4; только список. Добавляет админ в обычном Office (меню → «Музыка») ----------
 var videos = null, myRole = '';
+function ytList(u) { var m = /(?:youtube\.com|youtu\.be)\/\S*[?&]list=([A-Za-z0-9_-]{10,})/.exec(u || ''); return m ? m[1] : null; }
 function ytId(u) {
   var m = /(?:youtube(?:-nocookie)?\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/|live\/|v\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/.exec(u || '');
   return m ? m[1] : null;
@@ -528,7 +529,7 @@ function videoUrl(text) {
   if (/^\/\//.test(t)) t = 'https:' + t;
   return /^https:\/\/\S+$/i.test(t) ? t : null;
 }
-function isFile(u) { return /\.(mp4|m4v|mov|webm|m3u8)(\?|#|$)/i.test(u) || /dropbox\.com\/.*[?&]raw=1/i.test(u) || /drive\.google\.com\/uc\?/i.test(u); }
+function isFile(u) { return /\.(mp4|m4v|mov|webm|m3u8|mp3|m4a|aac)(\?|#|$)/i.test(u) || /dropbox\.com\/.*[?&]raw=1/i.test(u) || /drive\.google\.com\/uc\?/i.test(u); }
 function loadVideos() {
   req('GET', '/api/office/lite/videos', null, function (st, d) {
     if (st === 401) return showLogin();
@@ -537,14 +538,14 @@ function loadVideos() {
   });
 }
 function renderVideos() {
-  var list = videos || [], i, h = header('Видео', '', true);
-  if (!list.length) h += '<div class="card mut" style="text-align:center">Видео пока нет. Добавьте их в Office: меню → «Видео».</div>';
+  var list = videos || [], i, h = header('Музыка', '', true);
+  if (!list.length) h += '<div class="card mut" style="text-align:center">Музыки пока нет. Добавьте плейлист в Office: меню → «Музыка».</div>';
   else {
     h += '<div class="vgrid">';
     for (i = 0; i < list.length; i++) {
-      var v = list[i], id = ytId(v.url);
-      h += '<div class="vc" data-play="' + i + '"><div class="vth"' + (id ? ' style="background-image:url(https://i.ytimg.com/vi/' + id + '/hqdefault.jpg)"' : '') + '><span class="vpl">▶</span></div>' +
-        '<div class="vt"><b>' + esc(v.title || (id ? 'Видео YouTube' : 'Видео')) + '</b></div></div>';
+      var v = list[i], pl = ytList(v.url), id = pl ? null : ytId(v.url);
+      h += '<div class="vc" data-play="' + i + '"><div class="vth"' + (id ? ' style="background-image:url(https://i.ytimg.com/vi/' + id + '/hqdefault.jpg)"' : '') + '><span class="vpl">' + (pl ? '♫' : '▶') + '</span></div>' +
+        '<div class="vt"><b>' + esc(v.title || (pl ? 'Плейлист' : id ? 'Трек' : 'Музыка')) + '</b></div></div>';
     }
     h += '</div>';
   }
@@ -555,12 +556,14 @@ function renderVideos() {
 }
 // Плеер: YouTube — встроенный плеер YouTube, файл — стандартный плеер iPad, остальное — страница внутри окна
 function playVideo(v) {
-  var id = ytId(v.url), inner;
-  if (id) inner = '<iframe src="https://www.youtube.com/embed/' + id + '?autoplay=1&fs=1&rel=0" allow="autoplay; fullscreen; encrypted-media" allowfullscreen webkitallowfullscreen frameborder="0"></iframe>';
+  var pl = ytList(v.url), id = pl ? null : ytId(v.url), inner;
+  // Плейлист YouTube Music / YouTube: официальный встроенный плеер со всем списком
+  if (pl) inner = '<iframe src="https://www.youtube.com/embed/videoseries?list=' + pl + '&autoplay=1&fs=1&rel=0" allow="autoplay; fullscreen; encrypted-media" allowfullscreen webkitallowfullscreen frameborder="0"></iframe>';
+  else if (id) inner = '<iframe src="https://www.youtube.com/embed/' + id + '?autoplay=1&fs=1&rel=0" allow="autoplay; fullscreen; encrypted-media" allowfullscreen webkitallowfullscreen frameborder="0"></iframe>';
   else if (isFile(v.url)) inner = '<video src="' + esc(v.url) + '" controls autoplay playsinline webkit-playsinline></video>';
   else inner = '<iframe src="' + esc(v.url) + '" allowfullscreen webkitallowfullscreen frameborder="0"></iframe>';
-  $('card').innerHTML = '<div class="cov" id="cov"></div><div class="vbox" id="vbox"><div class="chd"><b>' + esc(v.title || 'Видео') + '</b><span><button class="ib" id="vfull">⛶ На весь экран</button><button class="ib" id="cx">✕</button></span></div><div class="vfr">' + inner + '</div>' +
-    (id ? '<a class="btn ytb" href="https://m.youtube.com/watch?v=' + id + '" target="_blank">▶ Открыть в YouTube</a><div class="mut" style="font-size:12px;margin-top:6px">Если встроенный плеер не запускается, кнопка откроет видео на сайте YouTube, как в Safari</div>'
+  $('card').innerHTML = '<div class="cov" id="cov"></div><div class="vbox" id="vbox"><div class="chd"><b>' + esc(v.title || (pl ? 'Плейлист' : 'Музыка')) + '</b><span><button class="ib" id="vfull">⛶ На весь экран</button><button class="ib" id="cx">✕</button></span></div><div class="vfr">' + inner + '</div>' +
+    (pl || id ? '<a class="btn ytb" href="https://m.youtube.com/' + (pl ? 'playlist?list=' + pl : 'watch?v=' + id) + '" target="_blank">▶ Открыть в YouTube</a><div class="mut" style="font-size:12px;margin-top:6px">Если встроенный плеер не запускается, кнопка откроет ' + (pl ? 'плейлист' : 'трек') + ' на сайте YouTube, как в Safari</div>'
       : '<div class="mut" style="font-size:12px;margin-top:8px">Если видео не запускается: <a href="' + esc(v.url) + '" target="_blank" style="color:#c9a6ff">открыть по ссылке</a></div>') + '</div>';
   $('card').className = '';
   $('cov').onclick = closeCard; $('cx').onclick = closeCard;
