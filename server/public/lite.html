@@ -207,6 +207,10 @@ td{white-space:nowrap}
 .lk-ban{margin-top:14px;border:1px solid #ff6b8a;border-radius:12px;padding:12px 14px}
 .lk-act{margin-top:14px}
 .lk-act a{display:inline-block;border:1px solid #9b5cff;color:#c9a6ff;border-radius:10px;padding:9px 16px;font-weight:700;text-decoration:none}
+.p-warn{background:rgba(255,184,77,.13);color:#ffb84d}
+.pb-tots{display:-webkit-flex;display:flex;-webkit-flex-wrap:wrap;flex-wrap:wrap;margin:2px 0 12px}
+.pb-tot{margin-right:18px;white-space:nowrap}.pb-tot .pill{margin-right:8px}.pb-tot b{font-size:16px;margin-right:6px}
+.pbf select{margin-right:10px}.pbf input{-webkit-flex:3;flex:3;min-width:220px}
 .mi svg{width:19px;height:19px;vertical-align:-4px;margin-right:12px}
 .cov{position:fixed;left:0;top:0;right:0;bottom:0;background:rgba(0,0,0,.7);z-index:70}
 .cbox{position:fixed;left:50%;top:30px;bottom:30px;width:600px;max-width:94%;-webkit-transform:translateX(-50%);transform:translateX(-50%);z-index:71;background:#1c1233;border:1px solid #34255c;border-radius:16px;padding:20px;overflow-y:auto;-webkit-overflow-scrolling:touch}
@@ -247,7 +251,7 @@ tr.sum td{border-top:2px solid #9b5cff;background:rgba(155,92,255,.08);font-weig
 <script>
 // Только ES5: var, function, XMLHttpRequest. Никаких стрелочных функций, let/const, ?., fetch и CSS Grid (Safari 9)
 var challenge = null, liveAll = false, last = null, shownS = [], myRole = '';
-var view = location.hash === '#leads' ? 'leads' : 'dash';
+var view = location.hash === '#leads' ? 'leads' : location.hash === '#pb' ? 'pb' : 'dash';
 var rng = (function () { var n = new Date(); return { from: ymdx(new Date(n.getFullYear(), n.getMonth(), 1)), to: ymdx(new Date(n.getFullYear(), n.getMonth() + 1, 0)) }; })();
 function ymdx(d) { return d.getFullYear() + '-' + (d.getMonth() < 9 ? '0' : '') + (d.getMonth() + 1) + '-' + (d.getDate() < 10 ? '0' : '') + d.getDate(); }
 var MG = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
@@ -298,10 +302,21 @@ function offText(s, today) {
 function showLogin() { $('main').className = 'hide'; $('login').className = 'card'; }
 function showMain() { $('login').className = 'card hide'; $('main').className = ''; load(); }
 
+// Перерисовка без рывков: если ничего не поменялось, экран не трогаем; иначе меняем и возвращаем прокрутку на место.
+// Строка «Обновлено …» обновляется отдельно, чтобы из-за неё не перерисовывать всё
+var lastHtml = '';
+function foot() { return '<div class="mut" id="upd" style="text-align:center;margin:16px 0 4px;font-size:12px"></div>'; }
+function paint(h) {
+  var y = window.pageYOffset || document.documentElement.scrollTop || 0;
+  if (h !== lastHtml) { $('body').innerHTML = h; lastHtml = h; window.scrollTo(0, y); navBind(); return true; }
+  return false;
+}
+function stamp() { var u = $('upd'); if (u) u.innerHTML = 'Обновлено ' + pad(new Date().getHours()) + ':' + pad(new Date().getMinutes()) + ':' + pad(new Date().getSeconds()) + ' · обновляется само раз в 30 секунд'; }
 function load() {
   if (view === 'leads') return loadLeads();
+  if (view === 'pb') return loadPb();
   var r = range(), got = 0, dash = null, onl = null, fs = null, fail = null;
-  var done = function () { if (++got < 3) return; if (fail) { $('body').innerHTML = '<div class="card err">' + esc(fail) + '</div>'; return; } last = { d: dash, onl: onl, fs: fs }; render(); };
+  var done = function () { if (++got < 3) return; if (fail) { lastHtml = ''; $('body').innerHTML = '<div class="card err">' + esc(fail) + '</div>'; return; } last = { d: dash, onl: onl, fs: fs }; render(); };
   req('GET', '/api/office/dashboard?from=' + r.from + '&to=' + r.to, null, function (st, d) {
     if (st === 401) { got = -9; return showLogin(); }
     if (st !== 200) fail = d.error || ('Ошибка ' + st); else dash = d; done();
@@ -368,8 +383,9 @@ function render() {
 
   h += '<div class="cols"><div class="c1">' + pf + '</div><div class="c2">' + net + '<div class="card last"><div class="lbl">Требует внимания</div>' + tasks(d) + '</div></div></div>';
   h += shifts(last.fs, d);
-  h += '<div class="mut" style="text-align:center;margin:16px 0 4px;font-size:12px">Обновлено ' + pad(new Date().getHours()) + ':' + pad(new Date().getMinutes()) + ' · обновляется само раз в минуту</div>';
-  $('body').innerHTML = menuHtml() + h;
+  h += foot();
+  var fresh = paint(menuHtml() + h); stamp();
+  if (!fresh) return;
   bind();
 }
 
@@ -470,8 +486,8 @@ function calBind() {
 var menuOpen = false;
 function menuHtml() {
   if (!menuOpen) return '';
-  var IC = { dash: '<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>', leads: '<path d="M3 5h18l-7 8v6l-4 2v-8z"/>' };
-  var it = [['dash', 'Дашборд'], ['leads', 'Лиды']], h = '<div class="mov" id="mov"></div><div class="menu"><div class="mlogo"><img src="/img/office-192.png" width="30" height="30" alt="" style="border-radius:8px;vertical-align:middle;margin-right:8px">Hunter Office</div>', i;
+  var IC = { dash: '<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>', leads: '<path d="M3 5h18l-7 8v6l-4 2v-8z"/>', pb: '<path d="M4 12h5l2-6 3 12 2-6h4"/>' };
+  var it = [['dash', 'Дашборд'], ['leads', 'Лиды']].concat(myRole === 'admin' || myRole === 'teamlead' ? [['pb', 'Постбеки']] : []), h = '<div class="mov" id="mov"></div><div class="menu"><div class="mlogo"><img src="/img/office-192.png" width="30" height="30" alt="" style="border-radius:8px;vertical-align:middle;margin-right:8px">Hunter Office</div>', i;
   for (i = 0; i < it.length; i++) h += '<button class="mi' + (view === it[i][0] ? ' on' : '') + '" data-v="' + it[i][0] + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' + IC[it[i][0]] + '</svg>' + it[i][1] + '</button>';
   return h + '<button class="mi out" id="logout">Выйти</button></div>';
 }
@@ -482,11 +498,11 @@ function navBind() {
   if ($('burger')) $('burger').onclick = function () { menuOpen = true; draw(); };
   if ($('mov')) $('mov').onclick = function () { menuOpen = false; draw(); };
   var b = document.querySelectorAll('[data-v]'), i;
-  for (i = 0; i < b.length; i++) b[i].onclick = function () { view = this.getAttribute('data-v'); menuOpen = false; try { location.hash = view === 'dash' ? '' : '#' + view; } catch (e) {} calOpen = false; load(); };
+  for (i = 0; i < b.length; i++) b[i].onclick = function () { view = this.getAttribute('data-v'); menuOpen = false; try { location.hash = view === 'dash' ? '' : '#' + view; } catch (e) {} lastHtml = ''; calOpen = false; load(); };
   if ($('logout')) $('logout').onclick = function () { menuOpen = false; req('POST', '/api/office/logout', {}, function () { challenge = null; $('step1').className = ''; $('step2').className = 'hide'; showLogin(); }); };
   calBind();
 }
-function draw() { if (view === 'leads') renderLeads(); else render(); }
+function draw() { if (view === 'leads') renderLeads(); else if (view === 'pb') renderPb(); else render(); }
 
 // ---------- Лиды ----------
 var LST = { new: ['Новый', 'st-new'], registered: ['Регистрация', 'st-reg'], ftd: ['FTD', 'st-ftd'], active: ['Активный', 'st-act'], churned: ['Отвал', 'st-ch'] };
@@ -495,7 +511,7 @@ function loadLeads() {
   var url = leadsQ ? '/api/office/leads?q=' + encodeURIComponent(leadsQ) : '/api/office/leads?from=' + rng.from + '&to=' + rng.to;
   req('GET', url, null, function (st, d) {
     if (st === 401) return showLogin();
-    if (st !== 200) { $('body').innerHTML = header('Лиды') + '<div class="card err">' + esc(d.error || ('Ошибка ' + st)) + '</div>'; navBind(); return; }
+    if (st !== 200) { lastHtml = ''; $('body').innerHTML = header('Лиды') + '<div class="card err">' + esc(d.error || ('Ошибка ' + st)) + '</div>'; navBind(); return; }
     leadsData = d; renderLeads();
   });
 }
@@ -529,11 +545,73 @@ function renderLeads() {
     }
     h += '</table></div>';
   }
-  h += '<div class="mut" style="text-align:center;margin:16px 0 4px;font-size:12px">Обновлено ' + pad(new Date().getHours()) + ':' + pad(new Date().getMinutes()) + ' · обновляется само раз в минуту</div>';
-  $('body').innerHTML = menuHtml() + h;
+  h += foot();
+  var fresh = paint(menuHtml() + h); stamp();
+  if (!fresh) return;
   navBind();
   $('lq').oninput = function () { var v = this.value; clearTimeout(qTimer); qTimer = setTimeout(function () { leadsQ = v.replace(/^\s+|\s+$/g, ''); loadLeads(); }, 400); };
   $('ls').onchange = function () { leadsStatus = this.value; renderLeads(); };
+  var cb = document.querySelectorAll('.tgid');
+  for (var ci = 0; ci < cb.length; ci++) cb[ci].onclick = function (e) { e.preventDefault(); openCard(this.getAttribute('data-card')); };
+}
+// ---------- Постбеки (как в Office, только просмотр) ----------
+var pbRows = null, pbF = { q: '', ev: '', res: '', sort: 'new' }, pbTimer = null;
+function loadPb() {
+  req('GET', '/api/office/postbacks?from=' + rng.from + '&to=' + rng.to, null, function (st, d) {
+    if (st === 401) return showLogin();
+    if (st !== 200) { paint(menuHtml() + header('Постбеки') + '<div class="card err">' + esc(d.error || ('Ошибка ' + st)) + '</div>'); return; }
+    pbRows = d; renderPb();
+  });
+}
+function pbKind(r) { var x = String(r.result || ''); return x === 'ok' ? 'ok' : x.indexOf('дубль') === 0 ? 'dup' : x.indexOf('пропущен') === 0 ? 'skip' : 'err'; }
+function pbAmt(r) { var q = r.query || {}; return Number(q.commission || q.sumdep || q.wdr_sum || q.amount || q.sum || 0) || 0; }
+function pbTime(v) { var d = new Date(v); return d.getDate() + ' ' + MS[d.getMonth()] + ', ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds()); }
+function renderPb() {
+  var rows = pbRows || [], F = pbF, q = F.q.replace(/^\s+|\s+$/g, '').toLowerCase(), list = [], i;
+  for (i = 0; i < rows.length; i++) {
+    var r = rows[i], qq = r.query || {};
+    if (F.ev && r.event !== F.ev) continue;
+    if (F.res && pbKind(r) !== F.res) continue;
+    if (q) { var hit = false, vs = [r.tg_id, qq.trader_id, qq.click_id]; for (var j = 0; j < vs.length; j++) if (vs[j] != null && String(vs[j]).toLowerCase().indexOf(q) >= 0) hit = true; if (!hit) continue; }
+    list.push(r);
+  }
+  var by = { new: function (a, b) { return Date.parse(b.created_at) - Date.parse(a.created_at); }, old: function (a, b) { return Date.parse(a.created_at) - Date.parse(b.created_at); }, sum: function (a, b) { return pbAmt(b) - pbAmt(a); }, sumAsc: function (a, b) { return pbAmt(a) - pbAmt(b); } };
+  list.sort(by[F.sort] || by.new);
+  var opt = function (arr, cur, all) { var o = all ? '<option value="">' + all + '</option>' : ''; for (var k = 0; k < arr.length; k++) o += '<option value="' + arr[k][0] + '"' + (cur === arr[k][0] ? ' selected' : '') + '>' + arr[k][1] + '</option>'; return o; };
+  var h = header('Постбеки', '<span class="sub">' + (list.length === rows.length ? rows.length + ' всего' : list.length + ' из ' + rows.length) + '</span>');
+  h += '<div class="lf pbf"><input id="pq" type="search" placeholder="Поиск: Pocket ID, Telegram ID" value="' + esc(F.q) + '">' +
+    '<select id="pev">' + opt([['reg', 'Регистрация (reg)'], ['ftd', 'Первый депозит (ftd)'], ['dep', 'Депозит (dep)'], ['comm', 'Комиссия (comm)'], ['wd', 'Вывод (wd)']], F.ev, 'Все события') + '</select>' +
+    '<select id="pres">' + opt([['ok', 'Принятые'], ['skip', 'Пропущенные (нет лида)'], ['dup', 'Дубли'], ['err', 'С ошибкой']], F.res, 'Все результаты') + '</select>' +
+    '<select id="psort">' + opt([['new', 'Сначала новые'], ['old', 'Сначала старые'], ['sum', 'Сумма: больше → меньше'], ['sumAsc', 'Сумма: меньше → больше']], F.sort) + '</select>' +
+    '<button class="lc more" id="preset" style="margin:0">Сбросить</button></div>';
+  // Итого по событиям
+  var tot = {}, ORDER = ['reg', 'ftd', 'dep', 'wd', 'comm'], th = '';
+  for (i = 0; i < list.length; i++) { var o = tot[list[i].event] || (tot[list[i].event] = { n: 0, s: 0 }); o.n++; o.s += pbAmt(list[i]); }
+  for (i = 0; i < ORDER.length; i++) { var k2 = ORDER[i], t = tot[k2]; if (!t) continue; th += '<span class="pb-tot"><span class="pill ev-' + k2 + '">' + k2 + '</span>' + (k2 === 'reg' ? '<b>' + t.n + ' шт</b>' : '<b>' + usd2(t.s) + '</b><span class="mut">' + t.n + ' шт</span>') + '</span>'; }
+  if (th) h += '<div class="pb-tots">' + th + '</div>';
+  if (!list.length) h += '<div class="card mut" style="text-align:center">' + (rows.length ? 'Ничего не найдено. Измените фильтры.' : 'Постбеков пока нет.') + '</div>';
+  else {
+    h += '<div class="scroll"><table><tr><th>Время</th><th>Событие</th><th>Telegram ID</th><th>Pocket ID</th><th>Сумма</th><th>Результат</th></tr>';
+    for (i = 0; i < list.length; i++) {
+      var r2 = list[i], q2 = r2.query || {}, tg = r2.tg_id || (/^\d{5,15}$/.test(String(q2.click_id || '')) ? q2.click_id : ''), res = String(r2.result || '');
+      var rc = res === 'ok' ? 'p-ok' : (res.indexOf('дубль') === 0 || res.indexOf('пропущен') === 0) ? 'p-warn' : 'p-bad';
+      var sm = q2.commission || q2.sumdep || q2.wdr_sum || q2.amount || q2.sum;
+      h += '<tr><td>' + pbTime(r2.created_at) + '</td><td><span class="pill ev-' + esc(r2.event) + '">' + esc(r2.event) + '</span></td>' +
+        '<td>' + (tg ? '<a href="#" class="tgid" data-card="' + esc(tg) + '">' + esc(tg) + '</a>' : '—') + '</td><td>' + esc(q2.trader_id || '—') + '</td><td>' + (sm ? esc(sm) : '—') + '</td>' +
+        '<td><span class="pill ' + rc + '">' + esc(res) + '</span></td></tr>';
+    }
+    var ev1 = []; for (var kk in tot) if (tot.hasOwnProperty(kk)) ev1.push(kk);
+    if (ev1.length === 1 && ev1[0] !== 'reg') h += '<tr class="sum"><td>Итого</td><td><span class="pill ev-' + ev1[0] + '">' + ev1[0] + '</span></td><td></td><td></td><td>' + usd2(tot[ev1[0]].s) + '</td><td>' + tot[ev1[0]].n + ' шт</td></tr>';
+    h += '</table></div>';
+  }
+  h += foot();
+  var fresh = paint(menuHtml() + h); stamp();
+  if (!fresh) return;
+  $('pq').oninput = function () { var v = this.value; clearTimeout(pbTimer); pbTimer = setTimeout(function () { pbF.q = v; renderPb(); var x = $('pq'); if (x) { x.focus(); try { x.setSelectionRange(v.length, v.length); } catch (e) {} } }, 300); };
+  $('pev').onchange = function () { pbF.ev = this.value; renderPb(); };
+  $('pres').onchange = function () { pbF.res = this.value; renderPb(); };
+  $('psort').onchange = function () { pbF.sort = this.value; renderPb(); };
+  $('preset').onclick = function () { pbF = { q: '', ev: '', res: '', sort: 'new' }; renderPb(); };
   var cb = document.querySelectorAll('.tgid');
   for (var ci = 0; ci < cb.length; ci++) cb[ci].onclick = function (e) { e.preventDefault(); openCard(this.getAttribute('data-card')); };
 }
@@ -674,7 +752,6 @@ function renderCard(d) {
       (C.deposited !== null && C.deposited !== undefined ? kv('Внесено', usd2(C.deposited)) : '') + kv('Акция', C.offer ? esc(C.offer.name) + ' до ' + dmy(C.offer.until).slice(0, 5) : 'нет') + '</div></div>';
   }
   if (L.banned_at) h += '<div class="lk-ban"><b style="color:#ff6b8a">Лид заблокирован</b><div style="font-size:13px">Причина: ' + esc(L.ban_reason || '—') + '</div><div class="mut" style="font-size:12px">' + dt(L.banned_at) + (L.banned_by_name ? ' · ' + esc(L.banned_by_name) : '') + '</div></div>';
-  h += '<div class="lk-act"><a href="' + (L.username ? 'https://t.me/' + esc(L.username) : 'tg://user?id=' + esc(L.tg_id)) + '" target="_blank" rel="noopener">Профиль в Telegram</a></div>';
   $('smd').innerHTML = h;
   $('cov').onclick = closeCard; $('cx').onclick = closeCard;
   var rc = $('smd').querySelectorAll('[data-card]');
@@ -715,7 +792,12 @@ $('lbtn').onclick = function () {
 
 // Уже вошли (cookie сессии): сразу данные, иначе форма входа. Дальше сами обновляем раз в минуту
 req('GET', '/api/office/me', null, function (st, d) { if (st === 200) { myRole = d.role || ''; showMain(); } else showLogin(); });
-setInterval(function () { if ($('main').className !== 'hide') load(); }, 60000);
+// Не обновляем, пока открыта карточка, меню, календарь, идёт свайп или печатают в поиске: иначе всё сбросится под пальцем
+setInterval(function () {
+  if ($('main').className === 'hide' || document.hidden || menuOpen || calOpen || ptrY !== null || ptrBusy || $('card').className !== 'hide') return;
+  var a = document.activeElement; if (a && (a.tagName === 'INPUT' || a.tagName === 'SELECT')) return;
+  load();
+}, 30000);
 
 // Экран не гаснет, пока открыт дашборд. Новые браузеры: Wake Lock. Старая iOS (9) его не знает: каждые 15 с начинаем
 // и сразу отменяем переход на эту же страницу, iOS считает это активностью и не гасит экран (приём NoSleep.js для iOS < 10).
