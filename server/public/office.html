@@ -631,6 +631,7 @@ const ICONS={
   plans:'<path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 6l1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2"/>',
   mytasks:'<circle cx="12" cy="12" r="9"/><path d="M8 12.5l3 3 5-6"/>',
   connect:'<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>',
+  lvideo:'<rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M10 9.5v5l4.5-2.5z"/>',
   newsig:'<circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/>'};
 const icon=k=>{const s=document.createElementNS('http://www.w3.org/2000/svg','svg');s.setAttribute('viewBox','0 0 24 24');s.setAttribute('width','18');s.setAttribute('height','18');s.setAttribute('fill','none');s.setAttribute('stroke','currentColor');s.setAttribute('stroke-width','2');s.setAttribute('stroke-linecap','round');s.setAttribute('stroke-linejoin','round');s.setAttribute('aria-hidden','true');s.innerHTML=ICONS[k]||'';return s};
 function showApp(){
@@ -688,7 +689,7 @@ function navItemsFor(role){
   if(['admin','teamlead','streamer'].includes(role))items.splice(1,0,['chats','Чаты']);
   if(role==='admin')items.splice(1,0,['signals','Сигналы']);
   if(role==='analyst'){items.length=0;items.push(['newsig','Новый сигнал'],['signals','Сигналы'])}
-  if(role==='admin')items.push(['push','Пуши'],['media','Медиа'],['pb','Постбеки']);
+  if(role==='admin')items.push(['push','Пуши'],['media','Медиа'],['lvideo','Видео'],['pb','Постбеки']);
   if(role==='streamer')items.splice(items.length,0,['signals','Сигналы'],['shifts','Смены и отчёты'],['mytasks','Мои задачи']);
   if(role==='admin'){items.splice(items.findIndex(x=>x[0]==='push'),0,['acc','Бухгалтерия']);items.splice(1,0,['plans','Планы и задачи'])}
   if(role==='admin'||role==='teamlead')items.splice(items.findIndex(x=>x[0]==='leads')+1,0,['connect','Подключение']);
@@ -943,6 +944,7 @@ async function render(opt){
     else if(tab==='leads')m.replaceChildren(...await viewLeads());
     else if(tab==='newsig')m.replaceChildren(...await viewSignals('new'));
     else if(tab==='connect')m.replaceChildren(...await viewConnect());
+    else if(tab==='lvideo')m.replaceChildren(...await viewLiteVideos());
     else if(tab==='links')m.replaceChildren(...await viewLinks());
     else if(tab==='staff')m.replaceChildren(...await viewStaff());
     else if(tab==='chats')m.replaceChildren(...await viewChats());
@@ -4619,6 +4621,31 @@ const cnMoney=n=>'$'+String(Math.round(Number(n)*100)/100).replace('.',',');
 const cnBold=t=>{const out=[];String(t).split(/\*\*(.+?)\*\*/gs).forEach((p,i)=>out.push(i%2?el('b',{},p):p));return out};
 const cnFill=(text,pct,need,days)=>{const u=new Date(addDay(kyivToday(),days)+'T12:00:00Z');const dd=u.toLocaleDateString('ru-RU',{day:'2-digit',month:'2-digit',timeZone:'Europe/Kyiv'});return String(text).replaceAll('{скидка}',pct).replaceAll('{сумма}',cnMoney(need)).replaceAll('{дата}',dd)};
 const tgPreview=(text,pct,need,days)=>el('div',{class:'cn-tg'},el('div',{},...cnBold(cnFill(text,pct,need,days))),el('div',{class:'cn-tgb'},'Активировать скидку'));
+/** Видео для Office Lite (старый iPad): здесь админ добавляет ссылки YouTube, файлы .mp4 или код вставки, на планшете только список для просмотра */
+const ytIdOf=u=>{const m=/(?:youtube(?:-nocookie)?\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/|live\/|v\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/.exec(u||'');return m?m[1]:null};
+async function viewLiteVideos(){
+  let list=await api('/lite/videos');
+  const box=el('div',{style:'display:grid;gap:14px'});
+  const url=el('input',{placeholder:'Ссылка на YouTube, файл .mp4 или код вставки <iframe …>'}),title=el('input',{placeholder:'Название (необязательно)',maxlength:'200'});
+  const err=el('div',{class:'err',role:'alert'});
+  const save=async next=>{err.textContent='';try{list=await api('/lite/videos',{method:'PUT',body:{videos:next}});draw()}catch(x){err.textContent=x.message}};
+  const parse=t=>{t=String(t||'').trim();const m=/src=["']([^"']+)["']/i.exec(t);if(m)t=m[1];if(t.startsWith('//'))t='https:'+t;if(!/^https:\/\/\S+$/i.test(t))return null;const id=ytIdOf(t);return id?'https://www.youtube.com/watch?v='+id:t};
+  const add=el('button',{class:'btn',type:'button',onclick:()=>{const u=parse(url.value);if(!u){err.textContent='Вставьте ссылку, которая начинается с https://, или код вставки с YouTube';return}save([{title:title.value.trim(),url:u},...list]);url.value='';title.value=''}},'Добавить');
+  const draw=()=>{
+    box.replaceChildren(...(list.length?list.map((v,i)=>{const id=ytIdOf(v.url);
+      const mv=(d)=>{const n=list.slice();const j=i+d;if(j<0||j>=n.length)return;[n[i],n[j]]=[n[j],n[i]];save(n)};
+      return el('div',{class:'card',style:'display:flex;gap:14px;align-items:center;padding:12px'},
+        id?el('img',{src:'https://i.ytimg.com/vi/'+id+'/mqdefault.jpg',alt:'',style:'width:128px;height:72px;object-fit:cover;border-radius:8px;flex:none'}):el('div',{style:'width:128px;height:72px;border-radius:8px;background:var(--bg2);display:grid;place-items:center;flex:none;color:var(--mut)'},'▶'),
+        el('div',{style:'flex:1;min-width:0;display:grid;gap:2px'},el('b',{},v.title||(id?'Видео YouTube':'Видео')),el('a',{href:v.url,target:'_blank',rel:'noopener',class:'mut sm',style:'overflow:hidden;text-overflow:ellipsis;white-space:nowrap'},v.url)),
+        el('div',{style:'display:flex;gap:6px;flex:none'},el('button',{class:'btn o s',type:'button',title:'Выше',disabled:i?null:'',onclick:()=>mv(-1)},'↑'),el('button',{class:'btn o s',type:'button',title:'Ниже',disabled:i<list.length-1?null:'',onclick:()=>mv(1)},'↓'),
+          el('button',{class:'btn o s',type:'button',style:'color:var(--bad)',onclick:async()=>{if(await askC('Удалить «'+(v.title||'видео')+'» из списка?'))save(list.filter((_,k)=>k!==i))}},'Удалить')))})
+      :[el('div',{class:'card empty'},'Видео пока нет. Добавьте ссылку выше.')]));
+  };
+  draw();
+  return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Видео для планшета')),
+    el('div',{class:'card',style:'display:grid;gap:10px'},el('b',{},'Добавить видео'),url,title,err,el('div',{},add),
+      el('div',{class:'mut sm'},'Список появится в Office Lite (/lite → меню → «Видео»). YouTube открывается во встроенном плеере, файлы .mp4 — в стандартном плеере планшета. Код вставки берите на YouTube: «Поделиться» → «Встроить».')),box];
+}
 async function viewConnect(){
   const d=await api('/connect');
   const bar=el('div',{class:'lc-tabs',role:'tablist'}),body=el('div',{style:'display:grid;gap:14px'});
