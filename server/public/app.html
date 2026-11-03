@@ -922,7 +922,15 @@ function signalResult(r){
     el('p',{class:'sm',style:'margin:0'},'Это мнение аналитика, а не гарантия результата. Торгуйте только той суммой, которую готовы потерять.')]);
 }
 
-async function refreshMe(){me=await api('/me');syncLang();return me}
+async function refreshMe(){me=await api('/me');syncLang();syncTheme();return me}
+/** Тема общая для всех устройств: выбор с сервера важнее локального; старый локальный выбор отправляем на сервер */
+function syncTheme(){
+  let local=null;try{local=localStorage.getItem('pref_theme')}catch{}
+  if(me.theme==='light'||me.theme==='dark'){
+    if(me.theme!==local){try{localStorage.setItem('pref_theme',me.theme)}catch{}}
+    if((me.theme==='light')!==(document.documentElement.getAttribute('data-theme')==='light')){applyTheme(me.theme);if(typeof tab!=='undefined'&&tab==='profile')render()}
+  }else if(local){me.theme=local;api('/theme',{method:'POST',body:{theme:local}}).catch(()=>{})}
+}
 /** Язык общий с ботом: выбор в боте (при /start) включает его здесь, выбор здесь сохраняется на сервере для пушей */
 function syncLang(){
   let local=null;try{local=localStorage.getItem('pref_lang')}catch{}
@@ -1826,7 +1834,7 @@ function prefBox(){
   const light=()=>document.documentElement.getAttribute('data-theme')==='light';
   const theme=el('button',{type:'button','aria-label':'Тема',style:chip+';color:var(--acc2);width:36px;justify-content:center;padding:0'});
   const paintT=()=>{theme.replaceChildren(svgEl(light()?SUN:MOON));theme.title=light()?'Светлая тема':'Тёмная тема'};
-  theme.addEventListener('click',()=>{const nt=light()?'dark':'light';prefSet('pref_theme',nt);applyTheme(nt);paintT()});
+  theme.addEventListener('click',()=>{const nt=light()?'dark':'light';prefSet('pref_theme',nt);me.theme=nt;api('/theme',{method:'POST',body:{theme:nt}}).catch(()=>{});applyTheme(nt);paintT()});
   paintT();
   const lab=t=>el('span',{class:'sm',style:'white-space:nowrap'},t);
   return el('div',{style:'margin-left:auto;display:grid;grid-template-columns:auto auto;gap:6px 8px;align-items:center;justify-items:end;flex:none'},lab('Язык:'),el('div',{style:'position:relative'},lang,menu),lab('Тема:'),theme);

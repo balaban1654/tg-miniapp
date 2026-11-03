@@ -209,7 +209,7 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
   app.get('/me', { preHandler: auth }, async (req) => {
     const u = req.tg!;
     const r = await db.query(
-      `SELECT coalesce(d.status_before_block, d.status) AS status, d.access, d.is_tester, d.lead_role, d.region, d.lang, d.created_at, d.trader_id, o.name AS manager,
+      `SELECT coalesce(d.status_before_block, d.status) AS status, d.access, d.is_tester, d.lead_role, d.region, d.lang, d.theme, d.created_at, d.trader_id, o.name AS manager,
               o.po_promo, o.po_link, o.po_link_ru, o.tg_username AS manager_tg, o.tg_link AS manager_link
          FROM leads d LEFT JOIN staff o ON o.id = d.owner_id WHERE d.tg_id = $1`,
       [u.id],
@@ -243,6 +243,7 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
       isTester: Boolean(l.is_tester),
       leadRole: l.lead_role || 'lead',
       lang: l.lang ?? null,
+      theme: l.theme ?? null,
       tier,
       pocketId: l.trader_id,
       manager: l.manager,
@@ -265,6 +266,14 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // Язык клиента из Mini App: пуши и бот дальше пишут ему на этом языке
+  // Тема Mini App: сохраняется на сервере, чтобы была одинаковой на всех устройствах клиента
+  app.post('/theme', { preHandler: auth }, async (req, reply) => {
+    const theme = (req.body as any)?.theme;
+    if (theme !== 'light' && theme !== 'dark') return reply.code(400).send({ error: 'Неизвестная тема' });
+    await db.query('UPDATE leads SET theme = $2 WHERE tg_id = $1', [req.tg!.id, theme]);
+    return { ok: true };
+  });
+
   app.post('/lang', { preHandler: auth }, async (req, reply) => {
     const lang = (req.body as any)?.lang;
     if (lang !== 'ru' && lang !== 'en') return reply.code(400).send({ error: 'Неизвестный язык' });
