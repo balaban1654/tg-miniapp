@@ -91,7 +91,10 @@ table{width:100%;border-collapse:collapse;background:#1c1233;border:1px solid #3
 th{font-weight:600;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#a89cc8;background:#150d26;padding:10px 12px;text-align:center}
 td{padding:11px 12px;border-top:1px solid #34255c;text-align:center}
 td.l,th.l{text-align:left}
-.ptr{position:relative;height:0;overflow:hidden;text-align:center;color:#c9a6ff;font-size:18px;font-weight:700;background:#000;display:-webkit-flex;display:flex;-webkit-align-items:center;align-items:center;-webkit-justify-content:center;justify-content:center}
+.ptr{position:fixed;left:0;right:0;top:0;height:80px;z-index:0;text-align:center;color:#c9a6ff;font-size:18px;font-weight:700;display:-webkit-flex;display:flex;-webkit-align-items:center;align-items:center;-webkit-justify-content:center;justify-content:center;opacity:0}
+/* Дашборд лежит поверх полосы и при свайпе плавно съезжает вниз (сдвигом, без перестройки страницы) */
+.wrap{position:relative;z-index:1;background:#000;min-height:100vh;box-sizing:border-box}
+.wrap.ptr-anim{-webkit-transition:-webkit-transform .28s ease-out;transition:transform .28s ease-out}
 .ptr .ar{display:inline-block;font-size:30px;line-height:30px;margin-right:12px;-webkit-transition:-webkit-transform .2s;transition:transform .2s}
 .ptr .ar.up{-webkit-transform:rotate(180deg);transform:rotate(180deg)}
 .ptr .ar.spin{-webkit-animation:ptrs .8s linear infinite;animation:ptrs .8s linear infinite}
@@ -170,7 +173,7 @@ tr.sum td{border-top:2px solid #9b5cff;background:rgba(155,92,255,.08);font-weig
 </head>
 <body>
 <div id="ptr" class="ptr"></div>
-<div class="wrap">
+<div class="wrap" id="wrap">
   <div id="login" class="card hide" style="max-width:400px;margin:40px auto">
     <h2 style="margin:0 0 14px"><img src="/img/office-192.png" alt="" width="34" height="34" style="vertical-align:middle;border-radius:9px;margin-right:8px">Hunter Office</h2>
     <div id="step1">
@@ -618,30 +621,43 @@ document.addEventListener('click', keepAwake, false);
 
 // Обновление свайпом вниз: потянули страницу в самом верху больше чем на 70 px и отпустили — данные загружаются заново.
 // На экране «Домой» у Safari нет своего «потяните для обновления», поэтому делаем сами
-var ptrY = null, ptrD = 0, ptrBusy = false;
-// Полоса обновления стоит над дашбордом и сдвигает его вниз, а не закрывает
-function ptrShow(h, mode) {
-  var p = $('ptr'); p.style.height = h + 'px';
-  if (mode) p.innerHTML = mode === 'busy' ? '<span class="ar spin">↻</span>Обновляем…'
+var ptrY = null, ptrD = 0, ptrBusy = false, ptrMode = '';
+var ptrOpt = false;
+try { window.addEventListener('test', null, Object.defineProperty({}, 'passive', { get: function () { ptrOpt = { passive: false }; return true; } })); } catch (e) {}
+// Полоса обновления лежит под дашбордом; дашборд сдвигается вниз transform-ом, поэтому ничего не перестраивается и не дёргается
+function ptrMove(y, anim) {
+  var w = $('wrap'), p = $('ptr');
+  w.className = 'wrap' + (anim ? ' ptr-anim' : '');
+  var t = y > 0 ? 'translate3d(0,' + y + 'px,0)' : 'none';
+  w.style.webkitTransform = t; w.style.transform = t;
+  p.style.opacity = y > 0 ? String(Math.min(1, y / 50)) : '0';
+}
+function ptrSet(mode) {
+  if (mode === ptrMode) return; ptrMode = mode;
+  $('ptr').innerHTML = mode === 'busy' ? '<span class="ar spin">↻</span>Обновляем…'
     : '<span class="ar' + (mode === 'ready' ? ' up' : '') + '">↓</span>' + (mode === 'ready' ? 'Отпустите, чтобы обновить' : 'Потяните, чтобы обновить');
 }
 document.addEventListener('touchstart', function (e) {
-  if (ptrBusy || $('main').className === 'hide' || (window.pageYOffset || document.documentElement.scrollTop) > 0) { ptrY = null; return; }
+  if (ptrBusy || menuOpen || $('main').className === 'hide' || $('card').className !== 'hide' || (window.pageYOffset || document.documentElement.scrollTop) > 0) { ptrY = null; return; }
   ptrY = e.touches[0].clientY; ptrD = 0;
 }, false);
 document.addEventListener('touchmove', function (e) {
   if (ptrY === null) return;
   ptrD = e.touches[0].clientY - ptrY;
-  if (ptrD <= 0) { ptrShow(0); return; }
-  ptrShow(Math.min(80, ptrD / 2), ptrD > 110 ? 'ready' : 'pull');
-}, false);
+  if (ptrD <= 0) { ptrMove(0); return; }
+  // Свою пружину Safari выключаем, иначе она спорит с нашим сдвигом. Сопротивление растёт по мере оттягивания
+  if (e.cancelable) e.preventDefault();
+  var y = 120 * (1 - Math.exp(-ptrD / 200));
+  ptrSet(y > 60 ? 'ready' : 'pull');
+  ptrMove(y);
+}, ptrOpt);
 document.addEventListener('touchend', function () {
   if (ptrY === null) return;
   ptrY = null;
-  if (ptrD > 110) {
-    ptrBusy = true; ptrShow(64, 'busy'); load();
-    setTimeout(function () { ptrBusy = false; ptrShow(0); }, 900);
-  } else ptrShow(0);
+  if (ptrMode === 'ready') {
+    ptrBusy = true; ptrSet('busy'); ptrMove(64, true); load();
+    setTimeout(function () { ptrMove(0, true); setTimeout(function () { ptrBusy = false; ptrSet(''); $('wrap').className = 'wrap'; }, 300); }, 900);
+  } else { ptrMove(0, true); setTimeout(function () { ptrSet(''); }, 300); }
 }, false);
 </script>
 </body>
