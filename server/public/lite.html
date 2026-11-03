@@ -101,9 +101,10 @@ td.l,th.l{text-align:left}
 @-webkit-keyframes ptrs{to{-webkit-transform:rotate(360deg)}}@keyframes ptrs{to{transform:rotate(360deg)}}
 .scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
 .rb{position:relative;display:-webkit-flex;display:flex;-webkit-align-items:center;align-items:center;margin-top:6px}
-.rb-pill{background:#1c1233;border:1px solid #34255c;border-radius:12px;padding:9px 14px;color:#f1ebff;font-weight:600;font-size:14px;font-family:inherit;-webkit-appearance:none}
+.rb-pill{height:40px;box-sizing:border-box;background:#1c1233;border:1px solid #34255c;border-radius:12px;padding:0 14px;color:#f1ebff;font-weight:600;font-size:14px;line-height:38px;text-align:center;white-space:nowrap;font-family:inherit;-webkit-appearance:none}
+.rb-pill svg{width:15px;height:15px;vertical-align:-2px;margin-right:7px}
 .rb-pill.on{border-color:#9b5cff}.rb-pill .chv{color:#a89cc8;margin-left:6px}
-.rb-go{margin-left:10px;background:#251847;border:1px solid #34255c;color:#f1ebff;border-radius:12px;padding:10px 18px;font-weight:700;font-size:12px;letter-spacing:.08em;text-transform:uppercase;font-family:inherit;-webkit-appearance:none}
+.rb-go{margin-left:10px;height:40px;box-sizing:border-box;line-height:38px;background:#251847;border:1px solid #34255c;color:#f1ebff;border-radius:12px;padding:0 18px;font-weight:700;font-size:12px;letter-spacing:.08em;text-transform:uppercase;font-family:inherit;-webkit-appearance:none}
 .rb-pop{position:absolute;right:0;top:100%;margin-top:8px;z-index:40;background:#120b22;border:1px solid #34255c;border-radius:16px;padding:16px 18px;box-shadow:0 20px 50px rgba(0,0,0,.6);display:-webkit-flex;display:flex}
 .rb-ps{width:170px;margin-right:18px;padding-top:34px}
 .rb-ps button{display:block;width:100%;text-align:left;background:none;border:0;color:#f1ebff;font-weight:600;font-size:14px;padding:7px 12px;border-radius:99px;font-family:inherit;-webkit-appearance:none}
@@ -446,7 +447,7 @@ function presets() {
     ['Последние 30 дней', addDay(t, -29), t]];
 }
 function calHtml() {
-  var h = '<div class="rb"><button class="rb-pill' + (calOpen ? ' on' : '') + '" id="calBtn">📅 ' + dmy(rng.from) + ' - ' + dmy(rng.to) + ' <span class="chv">▾</span></button><button class="rb-go" id="calGo">Найти</button>';
+  var h = '<div class="rb"><button class="rb-pill' + (calOpen ? ' on' : '') + '" id="calBtn"><svg viewBox="0 0 24 24" fill="none" stroke="#c9a6ff" stroke-width="2" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>' + dmy(rng.from) + ' - ' + dmy(rng.to) + ' <span class="chv">▾</span></button><button class="rb-go" id="calGo">Найти</button>';
   if (calOpen) {
     var s = calSel, v = calView, i, ps = presets(), today = ymd(new Date());
     h += '<div class="rb-pop"><div class="rb-ps">';
