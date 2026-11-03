@@ -148,6 +148,8 @@ td{white-space:nowrap}
 .vbox.full{left:0;top:0;right:0;bottom:0;width:100%;max-width:none;height:100%;-webkit-transform:none;transform:none;border-radius:0;border:0;padding:6px 8px 8px;display:-webkit-flex;display:flex;-webkit-flex-direction:column;flex-direction:column;background:#000;z-index:80}
 .vbox.full .chd{margin-bottom:6px}.vbox.full .mut{display:none}
 .vbox.full .vfr{-webkit-flex:1;flex:1;padding-bottom:0;height:auto;border-radius:0}
+.ytb{display:block;text-align:center;text-decoration:none;margin-top:10px;background:#ff3d3d}
+.vbox.full .ytb{display:none}
 .vfr{position:relative;height:0;padding-bottom:56.25%;background:#000;border-radius:10px;overflow:hidden}
 .vfr iframe,.vfr video{position:absolute;left:0;top:0;width:100%;height:100%;border:0;background:#000}
 tr.sum td{border-top:2px solid #9b5cff;background:rgba(155,92,255,.08);font-weight:700}
@@ -554,11 +556,12 @@ function renderVideos() {
 // Плеер: YouTube — встроенный плеер YouTube, файл — стандартный плеер iPad, остальное — страница внутри окна
 function playVideo(v) {
   var id = ytId(v.url), inner;
-  if (id) inner = '<iframe src="https://www.youtube-nocookie.com/embed/' + id + '?autoplay=1&fs=1&rel=0" allow="autoplay; fullscreen; encrypted-media" allowfullscreen webkitallowfullscreen frameborder="0"></iframe>';
+  if (id) inner = '<iframe src="https://www.youtube.com/embed/' + id + '?autoplay=1&fs=1&rel=0" allow="autoplay; fullscreen; encrypted-media" allowfullscreen webkitallowfullscreen frameborder="0"></iframe>';
   else if (isFile(v.url)) inner = '<video src="' + esc(v.url) + '" controls autoplay playsinline webkit-playsinline></video>';
   else inner = '<iframe src="' + esc(v.url) + '" allowfullscreen webkitallowfullscreen frameborder="0"></iframe>';
   $('card').innerHTML = '<div class="cov" id="cov"></div><div class="vbox" id="vbox"><div class="chd"><b>' + esc(v.title || 'Видео') + '</b><span><button class="ib" id="vfull">⛶ На весь экран</button><button class="ib" id="cx">✕</button></span></div><div class="vfr">' + inner + '</div>' +
-    '<div class="mut" style="font-size:12px;margin-top:8px">Если видео не запускается: <a href="' + esc(v.url) + '" target="_blank" style="color:#c9a6ff">открыть по ссылке</a></div></div>';
+    (id ? '<a class="btn ytb" href="https://m.youtube.com/watch?v=' + id + '" target="_blank">▶ Открыть в YouTube</a><div class="mut" style="font-size:12px;margin-top:6px">Если встроенный плеер не запускается, кнопка откроет видео на сайте YouTube, как в Safari</div>'
+      : '<div class="mut" style="font-size:12px;margin-top:8px">Если видео не запускается: <a href="' + esc(v.url) + '" target="_blank" style="color:#c9a6ff">открыть по ссылке</a></div>') + '</div>';
   $('card').className = '';
   $('cov').onclick = closeCard; $('cx').onclick = closeCard;
   // На весь экран: окно с плеером растягивается на весь экран планшета (у плеера YouTube на iOS 9 своей кнопки нет).
