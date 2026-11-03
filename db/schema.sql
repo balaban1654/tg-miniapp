@@ -1007,3 +1007,6 @@ ALTER TABLE connect_settings ADD COLUMN IF NOT EXISTS ref_staff NUMERIC(12,2) NO
 ALTER TABLE connect_settings ADD COLUMN IF NOT EXISTS ref_min_payout NUMERIC(12,2) NOT NULL DEFAULT 50; -- минимальная сумма реферальной выплаты
 -- Уведомление о новом сообщении в поддержку (группа команды, ветка): одно на лида, следующее только после «Закрыть чат»
 ALTER TABLE leads ADD COLUMN IF NOT EXISTS chat_notified_at TIMESTAMPTZ;
+
+-- Когда клиент открыл «Попробовать демо» в тренажёре: для пометки «демо» у лида, если в демо-ссылке нет своего кода кампании
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS demo_clicked_at TIMESTAMPTZ;

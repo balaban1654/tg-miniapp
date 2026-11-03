@@ -356,6 +356,7 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
   // постбек найдёт его в боте (владелец остаётся тот, что был; без владельца — по настройкам органики)
   app.get('/trainer/demo', { preHandler: auth }, async (req) => {
     const r = (await db.query(`SELECT value FROM app_settings WHERE key = 'demo_url'`)).rows[0];
+    if (r?.value) await db.query('UPDATE leads SET demo_clicked_at = coalesce(demo_clicked_at, now()) WHERE tg_id = $1', [req.tg!.id]).catch(() => {});
     return { url: r?.value ? withClickId(r.value, req.tg!.id) ?? r.value : null };
   });
   app.get('/trainer', { preHandler: auth }, async (req) => {
