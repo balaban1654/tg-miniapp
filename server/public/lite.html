@@ -200,7 +200,7 @@ td{white-space:nowrap}
 .fc-pop div span{margin-right:14px}
 .fc-pop a{color:#c9a6ff;font-weight:700;text-decoration:none;margin-right:10px}
 .tg4{display:-webkit-flex;display:flex;margin:0 -4px}
-.tg-t{-webkit-flex:1;flex:1;margin:0 4px;border:1px solid #34255c;border-radius:10px;padding:6px;text-align:center}
+.tg-t{-webkit-flex:1;flex:1;margin:0 4px;border:1px solid #34255c;border-radius:10px;padding:9px 6px;text-align:center}
 .tg-t .tg-i{display:block;font-size:17px;line-height:1.2}.tg-t b{display:block;font-size:12.5px}.tg-t span.s{display:block;font-size:11px;color:#a89cc8}
 .tg-t.on{border-color:#3ddc97;background:rgba(61,220,151,.07)}.tg-t.on span.s{color:#3ddc97}.tg-t.next{border-style:dashed}.tg-t.off{opacity:.55}
 .lk-sec{margin-top:14px}
@@ -734,13 +734,13 @@ function renderCard(d) {
   var R = d.refs || [], rh = '';
   for (i = 0; i < R.length; i++) rh += '<div><span class="mut">' + dt(R[i].ftd_at || R[i].start_at) + '</span><span><a href="#" data-card="' + esc(R[i].tg_id) + '">' + esc(R[i].trader_id || R[i].tg_id) + '</a>' + (R[i].commission !== null && R[i].commission !== undefined ? '<b>' + usd2(R[i].commission) + '</b>' : '') + '</span></div>';
   fcData.push(rh || '<div class="mut">Рефералов нет</div>');
-  fin += '<div class="fc-row"><span style="width:150px;font-weight:600">Рефералов</span><button class="fc-cnt" data-fc="' + (fcData.length - 1) + '">' + R.length + ' шт</button></div>';
+  fin += '<div class="fc-row"><span style="width:150px;margin-right:8px;font-weight:600">Рефералов</span><button class="fc-cnt" data-fc="' + (fcData.length - 1) + '">' + R.length + ' шт</button></div>';
   h += '<div class="lk-two lk-sec"><div><div class="lk-h">Путь клиента</div>' + path + '</div><div><div class="lk-h">Финансы по постбекам</div>' + fin + '</div></div>';
   // Градации додепов
   var T = d.tier;
   if (T && T.tiers) {
     var TI = ['🥉', '🥈', '🥇', '💎'], tg = '';
-    for (i = 0; i < T.tiers.length; i++) { var t = T.tiers[i], cl = t.reached ? ' on' : i === T.reached ? ' next' : ' off'; tg += '<div class="tg-t' + cl + '"><span class="tg-i">' + TI[i] + '</span><b>' + esc(t.name) + '</b><span class="s">' + (t.reached ? 'достигнута' : i === T.reached ? 'следующая' : 'впереди') + '</span></div>'; }
+    for (i = 0; i < T.tiers.length; i++) { var t = T.tiers[i], cl = t.reached ? ' on' : i === T.reached ? ' next' : ' off'; tg += '<div class="tg-t' + cl + '"><b>' + esc(t.name) + '</b><span class="s">' + (t.reached ? 'достигнута' : i === T.reached ? 'следующая' : 'впереди') + '</span></div>'; }
     h += '<div class="lk-sec"><div class="lk-h">Градации додепов</div><div class="tg4">' + tg + '</div>';
     for (i = 0; i < (T.requests || []).length; i++) { var q = T.requests[i]; h += '<div class="mut" style="font-size:12px;margin-top:6px">«' + esc(q.name) + '»: ' + (q.status === 'pending' ? 'запрос бонуса на проверке' : q.status === 'approved' ? 'бонус принят' : 'запрос отклонён' + (q.reject_reason ? ': ' + esc(q.reject_reason) : '')) + '</div>'; }
     h += '</div>';
