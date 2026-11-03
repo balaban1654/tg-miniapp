@@ -123,6 +123,20 @@ table.rb-g{border:0;background:none;width:auto}.rb-g th{background:none;padding:
 .st-act{background:rgba(77,163,255,.15);color:#6db6ff}.st-ch{background:rgba(255,107,138,.13);color:#ff6b8a}.st-test{background:rgba(255,184,77,.13);color:#ffb84d}
 tr.dayb td{border-top:2px solid #6a2fe0}
 td{white-space:nowrap}
+.tgid{color:#f1ebff;text-decoration:none;border-bottom:1px dashed #a89cc8}
+.cov{position:fixed;left:0;top:0;right:0;bottom:0;background:rgba(0,0,0,.7);z-index:70}
+.cbox{position:fixed;left:50%;top:30px;bottom:30px;width:600px;max-width:94%;-webkit-transform:translateX(-50%);transform:translateX(-50%);z-index:71;background:#1c1233;border:1px solid #34255c;border-radius:16px;padding:20px;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.chd{display:-webkit-flex;display:flex;-webkit-justify-content:space-between;justify-content:space-between;-webkit-align-items:flex-start;align-items:flex-start;margin-bottom:14px}
+.kvs{display:-webkit-flex;display:flex;-webkit-flex-wrap:wrap;flex-wrap:wrap}
+.kv{width:33.33%;padding:0 8px 10px 0}.kv span{display:block;font-size:12px}.kv b{font-size:14px;word-break:break-all}
+.sec{font-weight:800;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#c9a6ff;margin:14px 0 8px}
+.c2c{display:-webkit-flex;display:flex}.c2c>div{-webkit-flex:1;flex:1;min-width:0}
+.step{padding:4px 0 8px 18px;position:relative}.step:before{content:'';position:absolute;left:0;top:9px;width:9px;height:9px;border-radius:9px;background:#34255c}
+.step.on:before{background:#3ddc97}.step b{display:block;font-size:14px}.step span{font-size:12px}
+.fr{display:-webkit-flex;display:flex;-webkit-align-items:center;align-items:center;padding:4px 0}.fr b{width:90px;margin:0 10px;font-size:16px}
+.tiers{display:-webkit-flex;display:flex}.tier{-webkit-flex:1;flex:1;text-align:center;border:1px solid #34255c;border-radius:12px;padding:8px 4px;margin-right:8px;opacity:.55}
+.tier:last-child{margin-right:0}.tier.on{opacity:1;border-color:#3ddc97}.tier b{display:block;font-size:13px}.tier span{font-size:11px}
+@media (max-width:620px){.kv{width:50%}.c2c{display:block}}
 tr.sum td{border-top:2px solid #9b5cff;background:rgba(155,92,255,.08);font-weight:700}
 .seg2{display:-webkit-flex;display:flex;height:22px;border-radius:6px;overflow:hidden;margin:4px 0 10px}
 .seg2 span{display:block;height:22px;line-height:22px;padding:0 6px;font-size:11px;font-weight:700;color:#0d0817;white-space:nowrap;overflow:hidden}
@@ -143,6 +157,7 @@ tr.sum td{border-top:2px solid #9b5cff;background:rgba(155,92,255,.08);font-weig
     <div id="lerr" class="err"></div>
     <button class="btn" id="lbtn">Войти</button>
   </div>
+  <div id="card" class="hide"></div>
   <div id="main" class="hide"><div id="body"><div class="card mut">Загрузка…</div></div></div>
 </div>
 <script>
@@ -420,7 +435,7 @@ function renderLeads() {
     for (i = 0; i < list.length; i++) {
       var r = list[i], st = staff(r) ? ['Сотрудник', 'st-new'] : LST[r.status] || [r.status, 'st-new'], dd = dk(r);
       h += '<tr' + (prev && prev !== dd ? ' class="dayb"' : '') + '><td>' + Number(dd.slice(8)) + ' ' + MS[Number(dd.slice(5, 7)) - 1] + '</td><td class="l">' + esc(r.first_name || '—') + '</td><td class="l">' + (r.username ? '@' + esc(r.username) : '—') + '</td>' +
-        '<td>' + esc(r.tg_id) + '</td><td>' + esc(r.trader_id || '—') + '</td><td>' + (r.lead_role === 'test' ? '<span class="st st-test">Тест</span> ' : '') + '<span class="st ' + st[1] + '">' + st[0] + '</span>' + (r.banned ? ' ⛔' : '') + '</td>' +
+        '<td><a href="#" class="tgid" data-card="' + esc(r.tg_id) + '">' + esc(r.tg_id) + '</a></td><td>' + esc(r.trader_id || '—') + '</td><td>' + (r.lead_role === 'test' ? '<span class="st st-test">Тест</span> ' : '') + '<span class="st ' + st[1] + '">' + st[0] + '</span>' + (r.banned ? ' ⛔' : '') + '</td>' +
         '<td>' + esc(r.owner_name || 'не закреплён') + '</td><td>' + esc(r.link_slug || '—') + '</td><td>' + (r.ftd_amount != null ? usd2(r.ftd_amount) : '—') + '</td><td>' + usd2(r.deposits) + '</td><td>' + usd2(r.commission) + '</td></tr>';
       prev = dd;
     }
@@ -431,7 +446,59 @@ function renderLeads() {
   navBind();
   $('lq').oninput = function () { var v = this.value; clearTimeout(qTimer); qTimer = setTimeout(function () { leadsQ = v.replace(/^\s+|\s+$/g, ''); loadLeads(); }, 400); };
   $('ls').onchange = function () { leadsStatus = this.value; renderLeads(); };
+  var cb = document.querySelectorAll('.tgid');
+  for (var ci = 0; ci < cb.length; ci++) cb[ci].onclick = function (e) { e.preventDefault(); openCard(this.getAttribute('data-card')); };
 }
+// ---------- Карточка клиента (по нажатию на Telegram ID), только просмотр ----------
+function dt(v) { if (!v) return '—'; var d = new Date(v); return d.getDate() + ' ' + MS[d.getMonth()] + ' ' + d.getFullYear() + ', ' + pad(d.getHours()) + ':' + pad(d.getMinutes()); }
+function openCard(id) {
+  $('card').innerHTML = '<div class="cov" id="cov"></div><div class="cbox"><div class="mut">Загрузка…</div></div>';
+  $('card').className = '';
+  $('cov').onclick = closeCard;
+  req('GET', '/api/office/leads/' + encodeURIComponent(id), null, function (st, d) {
+    if (st !== 200) { $('card').innerHTML = '<div class="cov" id="cov"></div><div class="cbox"><div class="err">' + esc(d.error || 'Лид не найден') + '</div><button class="ib" id="cx" style="margin:12px 0 0">Закрыть</button></div>'; $('cov').onclick = closeCard; $('cx').onclick = closeCard; return; }
+    renderCard(d);
+  });
+}
+function closeCard() { $('card').className = 'hide'; $('card').innerHTML = ''; }
+function renderCard(d) {
+  var L = d.lead, i, h = '', ev = d.events || [];
+  var st = LST[L.status] || [L.status, 'st-new'];
+  var first = function (t) { for (var j = 0; j < ev.length; j++) if (ev[j].type === t) return ev[j]; return null; };
+  var kv = function (k, v) { return '<div class="kv"><span class="mut">' + k + '</span><b>' + (v === null || v === undefined || v === '' ? '—' : v) + '</b></div>'; };
+  h += '<div class="chd"><div><h2 style="margin:0">' + esc(L.first_name || (L.username ? '@' + L.username : L.tg_id)) + '</h2>' + (L.username && L.first_name ? '<div class="mut">@' + esc(L.username) + '</div>' : '') + '</div>' +
+    '<div><span class="st ' + st[1] + '">' + st[0] + '</span> <span class="st ' + (L.access ? 'st-ftd' : 'st-new') + '">доступ ' + (L.access ? 'открыт' : 'закрыт') + '</span>' + (L.banned_at ? ' <span class="st st-ch">заблокирован</span>' : '') + ' <button class="ib" id="cx">✕</button></div></div>';
+  var from = L.link_source || L.link_slug || L.origin || 'miniapp-org';
+  h += '<div class="kvs">' + kv('Telegram ID', esc(L.tg_id)) + kv('Pocket ID', esc(L.trader_id || '')) + kv('Откуда пришёл', esc(from)) +
+    kv('Владелец', esc(L.owner_name || 'не закреплён')) + kv('Страна', esc(d.country || '')) + (L.referrer_id ? kv('Пригласил', '<a href="#" data-card="' + esc(L.referrer_id) + '" style="color:#f1ebff;text-decoration:none">' + esc(L.referrer_id) + '</a>') : kv('Часовой пояс', esc(L.tz || ''))) +
+    kv('Промокод', esc(d.promo || '')) + kv('Последний визит', dt(L.last_seen_at)) + (L.referrer_id ? kv('Часовой пояс', esc(L.tz || '')) : '') + '</div>';
+  if (L.banned_at) h += '<div class="err" style="margin-top:8px">Заблокирован ' + dt(L.banned_at) + (L.ban_reason ? ': ' + esc(L.ban_reason) : '') + '</div>';
+  // Путь клиента
+  var steps = [['Нажал «Старт» в боте', first('start') || (L.bot_started ? { created_at: L.created_at } : null)], ['Регистрация', first('reg')], ['Первый депозит', first('ftd')]];
+  var path = '';
+  for (i = 0; i < steps.length; i++) path += '<div class="step' + (steps[i][1] ? ' on' : '') + '"><b>' + steps[i][0] + '</b><span class="mut">' + (steps[i][1] ? dt(steps[i][1].created_at) + (steps[i][1].amount ? ' · ' + usd2(steps[i][1].amount) : '') : 'ещё нет') + '</span></div>';
+  // Финансы
+  var F = d.fin || {}, fin = '', T = [['ftd', 'st-ftd'], ['dep', 'st-act'], ['wd', 'st-test'], ['comm', 'st-ch'], ['bonus', 'st-new']];
+  for (i = 0; i < T.length; i++) { var f = F[T[i][0]]; if (!f || (T[i][0] === 'bonus' && !f.count)) continue; fin += '<div class="fr"><span class="st ' + T[i][1] + '" style="width:58px;text-align:center">' + T[i][0] + '</span><b>' + (f.sum === null ? '—' : usd2(f.sum)) + '</b><span class="mut">' + f.count + ' шт</span></div>'; }
+  fin += '<div class="fr"><span style="width:58px">Рефералов</span><b></b><span class="mut">' + (d.refs || []).length + ' шт</span></div>';
+  h += '<div class="c2c"><div><div class="sec">Путь клиента</div>' + path + '</div><div><div class="sec">Финансы по постбекам</div>' + fin + '</div></div>';
+  // Градации
+  if (d.tier && d.tier.tiers) {
+    var tg = '', IC = ['🥉', '🥈', '🥇', '💎'];
+    for (i = 0; i < d.tier.tiers.length; i++) { var got = i < d.tier.reached; tg += '<div class="tier' + (got ? ' on' : '') + '"><div>' + IC[i] + '</div><b>' + esc(d.tier.tiers[i].name) + '</b><span class="mut">' + (got ? 'достигнута' : i === d.tier.reached ? 'следующая' : 'впереди') + '</span></div>'; }
+    h += '<div class="sec">Градации додепов</div><div class="tiers">' + tg + '</div>';
+  }
+  // Подключение
+  if (d.connect) {
+    var C = d.connect;
+    h += '<div class="sec">Подключение</div><div class="kvs">' + kv('Нужно пополнить', usd2(C.required) + ' (от ' + usd2(C.from) + ')') + kv('Внесено', C.deposited === null ? '—' : usd2(C.deposited)) + kv('Акция', C.offer ? esc(C.offer.name) + ' до ' + dt(C.offer.until) : 'нет') + '</div>';
+  }
+  $('card').innerHTML = '<div class="cov" id="cov"></div><div class="cbox">' + h + '</div>';
+  $('cov').onclick = closeCard; $('cx').onclick = closeCard;
+  var rc = document.querySelectorAll('[data-card]');
+  for (i = 0; i < rc.length; i++) rc[i].onclick = function (e) { e.preventDefault(); openCard(this.getAttribute('data-card')); };
+}
+
 function usd2(n) { n = Number(n) || 0; var r = Math.round(Math.abs(n) * 100) / 100, s = String(r).split('.'); return (n < 0 ? '−$' : '$') + grp(s[0]) + (s[1] ? ',' + (s[1].length < 2 ? s[1] + '0' : s[1]).replace(/0$/, '') : ''); }
 
 $('lbtn').onclick = function () {
