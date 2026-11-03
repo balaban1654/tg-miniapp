@@ -92,6 +92,37 @@ td{padding:11px 12px;border-top:1px solid #34255c;text-align:center}
 td.l,th.l{text-align:left}
 .ptr{position:fixed;left:0;right:0;top:0;height:0;overflow:hidden;text-align:center;color:#c9a6ff;font-size:13px;font-weight:700;line-height:44px;background:#000;z-index:5}
 .scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.rb{position:relative;display:-webkit-flex;display:flex;-webkit-align-items:center;align-items:center;margin-top:6px}
+.rb-pill{background:#1c1233;border:1px solid #34255c;border-radius:12px;padding:9px 14px;color:#f1ebff;font-weight:600;font-size:14px;font-family:inherit;-webkit-appearance:none}
+.rb-pill.on{border-color:#9b5cff}.rb-pill .chv{color:#a89cc8;margin-left:6px}
+.rb-go{margin-left:10px;background:#251847;border:1px solid #34255c;color:#f1ebff;border-radius:12px;padding:10px 18px;font-weight:700;font-size:12px;letter-spacing:.08em;text-transform:uppercase;font-family:inherit;-webkit-appearance:none}
+.rb-pop{position:absolute;right:0;top:100%;margin-top:8px;z-index:40;background:#120b22;border:1px solid #34255c;border-radius:16px;padding:16px 18px;box-shadow:0 20px 50px rgba(0,0,0,.6);display:-webkit-flex;display:flex}
+.rb-ps{width:170px;margin-right:18px;padding-top:34px}
+.rb-ps button{display:block;width:100%;text-align:left;background:none;border:0;color:#f1ebff;font-weight:600;font-size:14px;padding:7px 12px;border-radius:99px;font-family:inherit;-webkit-appearance:none}
+.rb-ps button.on{background:#6a2fe0;color:#fff}
+.rb-mh{display:-webkit-flex;display:flex;-webkit-justify-content:space-between;justify-content:space-between;-webkit-align-items:center;align-items:center;margin-bottom:8px}
+.rb-nav{background:none;border:1px solid #34255c;color:#f1ebff;border-radius:8px;width:32px;height:32px;font-size:18px;-webkit-appearance:none}
+table.rb-g{border:0;background:none;width:auto}.rb-g th{background:none;padding:4px;font-size:11px}.rb-g td{border:0;padding:1px}
+.rb-d{width:36px;height:34px;border:0;background:none;color:#f1ebff;border-radius:8px;font-size:14px;font-family:inherit;-webkit-appearance:none}
+.rb-d.out{color:#5b4d80}.rb-d.in{background:rgba(155,92,255,.25)}.rb-d.edge{background:#9b5cff;color:#fff;font-weight:700}.rb-d.today{box-shadow:inset 0 0 0 1px #c9a6ff}
+@media (max-width:620px){.rb-pop{left:0;right:auto;display:block}.rb-ps{width:auto;margin:0 0 10px;padding:0}.rb-ps button{display:inline-block;width:auto}}
+.burger{background:none;border:1px solid #34255c;border-radius:10px;width:40px;height:38px;padding:9px 9px;margin-right:12px;vertical-align:middle;-webkit-appearance:none}
+.burger i{display:block;height:2px;background:#f1ebff;border-radius:2px;margin:4px 0}
+.ttl{-webkit-align-items:center!important;align-items:center!important}
+.mov{position:fixed;left:0;top:0;right:0;bottom:0;background:rgba(0,0,0,.6);z-index:60}
+.menu{position:fixed;left:0;top:0;bottom:0;width:250px;background:#0a0613;border-right:1px solid #34255c;z-index:61;padding:16px 10px;display:-webkit-flex;display:flex;-webkit-flex-direction:column;flex-direction:column}
+.mlogo{font-weight:800;font-size:16px;padding:4px 8px 16px}
+.mi{display:block;width:100%;text-align:left;background:none;border:0;border-radius:9px;padding:11px 12px;color:#a89cc8;font-weight:600;font-size:15px;font-family:inherit;margin-bottom:3px;-webkit-appearance:none}
+.mi.on{background:#1c1233;color:#f1ebff}
+.mi.out{margin-top:auto;margin-bottom:0;border:1px solid #9b5cff;color:#c9a6ff;text-align:center}
+.lf{display:-webkit-flex;display:flex;margin-bottom:14px}
+.lf input{margin:0 10px 0 0;-webkit-flex:2;flex:2;font-size:15px;padding:11px 12px}
+.lf select{-webkit-flex:1;flex:1;background:#150d26;border:1px solid #34255c;color:#f1ebff;border-radius:10px;padding:11px 12px;font-size:15px;font-family:inherit}
+.st{display:inline-block;padding:2px 9px;border-radius:99px;font-size:11px;font-weight:700;white-space:nowrap}
+.st-new{background:rgba(155,92,255,.2);color:#c9a6ff}.st-reg{background:rgba(255,213,77,.15);color:#ffd54d}.st-ftd{background:rgba(61,220,151,.15);color:#3ddc97}
+.st-act{background:rgba(77,163,255,.15);color:#6db6ff}.st-ch{background:rgba(255,107,138,.13);color:#ff6b8a}.st-test{background:rgba(255,184,77,.13);color:#ffb84d}
+tr.dayb td{border-top:2px solid #6a2fe0}
+td{white-space:nowrap}
 tr.sum td{border-top:2px solid #9b5cff;background:rgba(155,92,255,.08);font-weight:700}
 .seg2{display:-webkit-flex;display:flex;height:22px;border-radius:6px;overflow:hidden;margin:4px 0 10px}
 .seg2 span{display:block;height:22px;line-height:22px;padding:0 6px;font-size:11px;font-weight:700;color:#0d0817;white-space:nowrap;overflow:hidden}
@@ -116,8 +147,12 @@ tr.sum td{border-top:2px solid #9b5cff;background:rgba(155,92,255,.08);font-weig
 </div>
 <script>
 // Только ES5: var, function, XMLHttpRequest. Никаких стрелочных функций, let/const, ?., fetch и CSS Grid (Safari 9)
-var challenge = null, period = 'month', liveAll = false, last = null;
+var challenge = null, liveAll = false, last = null;
+var view = (location.hash === '#leads') ? 'leads' : 'dash';
+var rng = (function () { var n = new Date(); return { from: ymdx(new Date(n.getFullYear(), n.getMonth(), 1)), to: ymdx(new Date(n.getFullYear(), n.getMonth() + 1, 0)) }; })();
+function ymdx(d) { return d.getFullYear() + '-' + (d.getMonth() < 9 ? '0' : '') + (d.getMonth() + 1) + '-' + (d.getDate() < 10 ? '0' : '') + d.getDate(); }
 var MG = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+var MS = ['янв.', 'февр.', 'мар.', 'апр.', 'мая', 'июн.', 'июл.', 'авг.', 'сент.', 'окт.', 'нояб.', 'дек.'];
 var MN = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
 
 function $(id) { return document.getElementById(id); }
@@ -147,12 +182,7 @@ function day(s) { var p = String(s).split('-'); return Number(p[2]) + ' ' + MG[N
 function dmy(s) { return String(s || '').slice(0, 10).split('-').reverse().join('.'); }
 function lastDay(ym) { var p = ym.split('-'); return ymd(new Date(Number(p[0]), Number(p[1]), 0)); }
 function perLabel(ym) { var p = ym.split('-'); return MN[Number(p[1]) - 1] + ' ' + p[0]; }
-function range() {
-  var now = new Date(), y = now.getFullYear(), m = now.getMonth();
-  if (period === 'today') return { from: ymd(now), to: ymd(now) };
-  if (period === 'prev') return { from: ymd(new Date(y, m - 1, 1)), to: ymd(new Date(y, m, 0)) };
-  return { from: ymd(new Date(y, m, 1)), to: ymd(new Date(y, m + 1, 0)) };
-}
+function range() { return rng; }
 function rangeLabel(from, to, today) {
   if (from === to) return from === today ? 'Сегодня, ' + day(today) : day(from) + ' ' + from.slice(0, 4);
   if (from.slice(8) === '01' && to === lastDay(from.slice(0, 7))) return perLabel(from.slice(0, 7)) + (from.slice(0, 7) === today.slice(0, 7) ? ' · на ' + day(today) + ' (день ' + Number(today.slice(8)) + ' из ' + Number(to.slice(8)) + ')' : '');
@@ -170,6 +200,7 @@ function showLogin() { $('main').className = 'hide'; $('login').className = 'car
 function showMain() { $('login').className = 'card hide'; $('main').className = ''; load(); }
 
 function load() {
+  if (view === 'leads') return loadLeads();
   var r = range(), got = 0, dash = null, onl = null, fs = null, fail = null;
   var done = function () { if (++got < 3) return; if (fail) { $('body').innerHTML = '<div class="card err">' + esc(fail) + '</div>'; return; } last = { d: dash, onl: onl, fs: fs }; render(); };
   req('GET', '/api/office/dashboard?from=' + r.from + '&to=' + r.to, null, function (st, d) {
@@ -184,10 +215,8 @@ function render() {
   var d = last.d, t = d.totals || {}, g = d.goals || null, pace = Number(d.pace) || 0, h = '', i;
   var showMark = g && pace < 0.995;
 
-  // Шапка: Дашборд, онлайн, период, переключатель периода
-  h += '<div class="top"><div class="ttl"><h2>Дашборд</h2>' + (last.onl ? '<span class="onl"><i></i>онлайн <b>' + last.onl.total + '</b></span>' : '') +
-    '<span class="sub">' + esc(rangeLabel(d.range.from, d.range.to, d.today)) + '</span></div>' +
-    '<div class="seg"><button data-p="today"' + (period === 'today' ? ' class="on"' : '') + '>Сегодня</button><button data-p="month"' + (period === 'month' ? ' class="on"' : '') + '>Месяц</button><button data-p="prev"' + (period === 'prev' ? ' class="on"' : '') + '>Прошлый</button><button data-p="out">Выйти</button></div></div>';
+  // Шапка: меню, «Дашборд», онлайн, период; справа календарь и «Найти»
+  h += header('Дашборд', (last.onl ? '<span class="onl"><i></i>онлайн <b>' + last.onl.total + '</b></span>' : '') + '<span class="sub">' + esc(rangeLabel(d.range.from, d.range.to, d.today)) + '</span>');
 
   // Полоса стримеров: сначала в эфире, потом по FTD за месяц; админы только в эфире
   var list = [];
@@ -240,7 +269,7 @@ function render() {
   h += '<div class="cols"><div class="c1">' + pf + '</div><div class="c2">' + net + '<div class="card last"><div class="lbl">Требует внимания</div>' + tasks(d) + '</div></div></div>';
   h += shifts(last.fs, d);
   h += '<div class="mut" style="text-align:center;margin:16px 0 4px;font-size:12px">Обновлено ' + pad(new Date().getHours()) + ':' + pad(new Date().getMinutes()) + ' · обновляется само раз в минуту</div>';
-  $('body').innerHTML = h;
+  $('body').innerHTML = menuHtml() + h;
   bind();
 }
 
@@ -284,14 +313,126 @@ function shifts(fs, d) {
 }
 
 function bind() {
-  var b = document.querySelectorAll('[data-p]'), i;
-  for (i = 0; i < b.length; i++) b[i].onclick = function () {
-    var p = this.getAttribute('data-p');
-    if (p === 'out') return req('POST', '/api/office/logout', {}, function () { challenge = null; $('step1').className = ''; $('step2').className = 'hide'; showLogin(); });
-    period = p; load();
-  };
+  navBind();
   if ($('liveTog')) $('liveTog').onclick = function () { liveAll = !liveAll; render(); };
 }
+
+// ---------- Период: календарь как в Office (пилюля с датами, пресеты, месяц с выбором диапазона, «Найти») ----------
+function addDay(s, n) { var p = s.split('-'); return ymd(new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]) + n)); }
+function monthShift(ym, n) { var p = ym.split('-'); return ymd(new Date(Number(p[0]), Number(p[1]) - 1 + n, 1)).slice(0, 7); }
+var calOpen = false, calSel = null, calAnchor = null, calView = null;
+function presets() {
+  var now = new Date(), t = ymd(now), y = now.getFullYear(), m = now.getMonth(), dow = (now.getDay() + 6) % 7;
+  return [['Сегодня', t, t], ['Вчера', addDay(t, -1), addDay(t, -1)], ['Эта неделя', addDay(t, -dow), t],
+    ['Этот месяц', ymd(new Date(y, m, 1)), ymd(new Date(y, m + 1, 0))], ['Прошлый месяц', ymd(new Date(y, m - 1, 1)), ymd(new Date(y, m, 0))],
+    ['Последние 30 дней', addDay(t, -29), t]];
+}
+function calHtml() {
+  var h = '<div class="rb"><button class="rb-pill' + (calOpen ? ' on' : '') + '" id="calBtn">📅 ' + dmy(rng.from) + ' - ' + dmy(rng.to) + ' <span class="chv">▾</span></button><button class="rb-go" id="calGo">Найти</button>';
+  if (calOpen) {
+    var s = calSel, v = calView, i, ps = presets(), today = ymd(new Date());
+    h += '<div class="rb-pop"><div class="rb-ps">';
+    for (i = 0; i < ps.length; i++) h += '<button data-pr="' + i + '"' + (s.from === ps[i][1] && s.to === ps[i][2] ? ' class="on"' : '') + '>' + ps[i][0] + '</button>';
+    h += '</div><div class="rb-m"><div class="rb-mh"><button class="rb-nav" data-nav="-1">‹</button><b>' + perLabel(v) + '</b><button class="rb-nav" data-nav="1">›</button></div><table class="rb-g"><tr>';
+    var W = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+    for (i = 0; i < 7; i++) h += '<th>' + W[i] + '</th>';
+    h += '</tr>';
+    var first = v + '-01', p = first.split('-'), fdow = (new Date(Number(p[0]), Number(p[1]) - 1, 1).getDay() + 6) % 7, start = addDay(first, -fdow);
+    var cells = Math.ceil((fdow + Number(lastDay(v).slice(8))) / 7) * 7;
+    for (i = 0; i < cells; i++) {
+      var d = addDay(start, i), cls = 'rb-d' + (d.slice(0, 7) !== v ? ' out' : '') + (d >= s.from && d <= s.to ? ' in' : '') + (d === s.from || d === s.to ? ' edge' : '') + (d === today ? ' today' : '');
+      if (i % 7 === 0) h += '<tr>';
+      h += '<td><button class="' + cls + '" data-d="' + d + '">' + Number(d.slice(8)) + '</button></td>';
+      if (i % 7 === 6) h += '</tr>';
+    }
+    h += '</table><div class="mut" style="font-size:12px;margin-top:6px">' + (calAnchor ? 'Выберите конец периода' : 'Нажмите на начало и конец периода') + '</div></div></div>';
+  }
+  return h + '</div>';
+}
+function calBind() {
+  if ($('calBtn')) $('calBtn').onclick = function () { calOpen = !calOpen; calSel = { from: rng.from, to: rng.to }; calAnchor = null; calView = rng.to.slice(0, 7); draw(); };
+  if ($('calGo')) $('calGo').onclick = function () { if (calOpen && calSel) rng = { from: calSel.from, to: calSel.to }; calOpen = false; load(); };
+  var b = document.querySelectorAll('[data-pr]'), i;
+  for (i = 0; i < b.length; i++) b[i].onclick = function () { var p = presets()[Number(this.getAttribute('data-pr'))]; calSel = { from: p[1], to: p[2] }; calAnchor = null; calView = p[2].slice(0, 7); draw(); };
+  b = document.querySelectorAll('[data-nav]');
+  for (i = 0; i < b.length; i++) b[i].onclick = function () { calView = monthShift(calView, Number(this.getAttribute('data-nav'))); draw(); };
+  b = document.querySelectorAll('[data-d]');
+  for (i = 0; i < b.length; i++) b[i].onclick = function () {
+    var d = this.getAttribute('data-d');
+    if (!calAnchor) { calAnchor = d; calSel = { from: d, to: d }; } else { calSel = calAnchor <= d ? { from: calAnchor, to: d } : { from: d, to: calAnchor }; calAnchor = null; }
+    draw();
+  };
+}
+
+// ---------- Меню (три полоски слева от заголовка) ----------
+var menuOpen = false;
+function menuHtml() {
+  if (!menuOpen) return '';
+  var it = [['dash', 'Дашборд'], ['leads', 'Лиды']], h = '<div class="mov" id="mov"></div><div class="menu"><div class="mlogo"><img src="/img/office-192.png" width="30" height="30" alt="" style="border-radius:8px;vertical-align:middle;margin-right:8px">Hunter Office</div>', i;
+  for (i = 0; i < it.length; i++) h += '<button class="mi' + (view === it[i][0] ? ' on' : '') + '" data-v="' + it[i][0] + '">' + it[i][1] + '</button>';
+  return h + '<button class="mi out" id="logout">Выйти</button></div>';
+}
+function header(title, extra) {
+  return '<div class="top"><div class="ttl"><button class="burger" id="burger" aria-label="Меню"><i></i><i></i><i></i></button><h2>' + title + '</h2>' + (extra || '') + '</div>' + calHtml() + '</div>';
+}
+function navBind() {
+  if ($('burger')) $('burger').onclick = function () { menuOpen = true; draw(); };
+  if ($('mov')) $('mov').onclick = function () { menuOpen = false; draw(); };
+  var b = document.querySelectorAll('[data-v]'), i;
+  for (i = 0; i < b.length; i++) b[i].onclick = function () { view = this.getAttribute('data-v'); menuOpen = false; try { location.hash = view === 'leads' ? '#leads' : ''; } catch (e) {} calOpen = false; load(); };
+  if ($('logout')) $('logout').onclick = function () { menuOpen = false; req('POST', '/api/office/logout', {}, function () { challenge = null; $('step1').className = ''; $('step2').className = 'hide'; showLogin(); }); };
+  calBind();
+}
+function draw() { if (view === 'leads') renderLeads(); else render(); }
+
+// ---------- Лиды ----------
+var LST = { new: ['Новый', 'st-new'], registered: ['Регистрация', 'st-reg'], ftd: ['FTD', 'st-ftd'], active: ['Активный', 'st-act'], churned: ['Отвал', 'st-ch'] };
+var leadsData = null, leadsQ = '', leadsStatus = '', qTimer = null;
+function loadLeads() {
+  var url = leadsQ ? '/api/office/leads?q=' + encodeURIComponent(leadsQ) : '/api/office/leads?from=' + rng.from + '&to=' + rng.to;
+  req('GET', url, null, function (st, d) {
+    if (st === 401) return showLogin();
+    if (st !== 200) { $('body').innerHTML = header('Лиды') + '<div class="card err">' + esc(d.error || ('Ошибка ' + st)) + '</div>'; navBind(); return; }
+    leadsData = d; renderLeads();
+  });
+}
+function renderLeads() {
+  var rows = leadsData || [], i, staff = function (r) { return r.lead_role && r.lead_role !== 'lead' && r.lead_role !== 'test'; };
+  var list = [];
+  for (i = 0; i < rows.length; i++) { if (!leadsQ && staff(rows[i])) continue; if (leadsStatus && rows[i].status !== leadsStatus) continue; list.push(rows[i]); }
+  var ORD = { new: 0, registered: 1, ftd: 2, active: 3, churned: 4 };
+  var tms = function (r) { return Date.parse(r.status_at || r.created_at) || 0; };
+  var dk = function (r) { return ymd(new Date(tms(r))); };
+  list.sort(function (a, b) { var x = dk(b), y = dk(a); if (x !== y) return x > y ? 1 : -1; var s = (ORD[a.status] || 0) - (ORD[b.status] || 0); return s || tms(b) - tms(a); });
+  var cnt = {}, k;
+  for (i = 0; i < rows.length; i++) if (!staff(rows[i])) cnt[rows[i].status] = (cnt[rows[i].status] || 0) + 1;
+  var pills = '';
+  for (k in LST) if (LST.hasOwnProperty(k) && cnt[k]) pills += '<span class="st ' + LST[k][1] + '" style="margin-left:8px">' + LST[k][0] + '</span> <b>' + cnt[k] + ' шт</b>';
+  var h = header('Лиды', pills);
+  h += '<div class="lf"><input id="lq" placeholder="Поиск: ник, Telegram ID, Pocket ID" value="' + esc(leadsQ) + '"><select id="ls"><option value="">Все статусы</option>';
+  for (k in LST) if (LST.hasOwnProperty(k)) h += '<option value="' + k + '"' + (leadsStatus === k ? ' selected' : '') + '>' + LST[k][0] + '</option>';
+  h += '</select></div>';
+  if (leadsQ) h += '<div class="mut" style="margin:-6px 0 10px;font-size:12px">Найдено ' + list.length + ' (поиск по всем лидам, период не учитывается)</div>';
+  if (!list.length) h += '<div class="card mut" style="text-align:center">' + (rows.length ? 'Ничего не найдено. Измените фильтры.' : 'Лидов за период нет') + '</div>';
+  else {
+    h += '<div class="scroll"><table><tr><th>Пришёл</th><th class="l">Имя</th><th class="l">Лид</th><th>Telegram ID</th><th>Pocket ID</th><th>Статус</th><th>Владелец</th><th>Ссылка</th><th>FTD</th><th>Депозиты</th><th>Комиссия</th></tr>';
+    var prev = null;
+    for (i = 0; i < list.length; i++) {
+      var r = list[i], st = staff(r) ? ['Сотрудник', 'st-new'] : LST[r.status] || [r.status, 'st-new'], dd = dk(r);
+      h += '<tr' + (prev && prev !== dd ? ' class="dayb"' : '') + '><td>' + Number(dd.slice(8)) + ' ' + MS[Number(dd.slice(5, 7)) - 1] + '</td><td class="l">' + esc(r.first_name || '—') + '</td><td class="l">' + (r.username ? '@' + esc(r.username) : '—') + '</td>' +
+        '<td>' + esc(r.tg_id) + '</td><td>' + esc(r.trader_id || '—') + '</td><td>' + (r.lead_role === 'test' ? '<span class="st st-test">Тест</span> ' : '') + '<span class="st ' + st[1] + '">' + st[0] + '</span>' + (r.banned ? ' ⛔' : '') + '</td>' +
+        '<td>' + esc(r.owner_name || 'не закреплён') + '</td><td>' + esc(r.link_slug || '—') + '</td><td>' + (r.ftd_amount != null ? usd2(r.ftd_amount) : '—') + '</td><td>' + usd2(r.deposits) + '</td><td>' + usd2(r.commission) + '</td></tr>';
+      prev = dd;
+    }
+    h += '</table></div>';
+  }
+  h += '<div class="mut" style="text-align:center;margin:16px 0 4px;font-size:12px">Обновлено ' + pad(new Date().getHours()) + ':' + pad(new Date().getMinutes()) + ' · обновляется само раз в минуту</div>';
+  $('body').innerHTML = menuHtml() + h;
+  navBind();
+  $('lq').oninput = function () { var v = this.value; clearTimeout(qTimer); qTimer = setTimeout(function () { leadsQ = v.replace(/^\s+|\s+$/g, ''); loadLeads(); }, 400); };
+  $('ls').onchange = function () { leadsStatus = this.value; renderLeads(); };
+}
+function usd2(n) { n = Number(n) || 0; var r = Math.round(Math.abs(n) * 100) / 100, s = String(r).split('.'); return (n < 0 ? '−$' : '$') + grp(s[0]) + (s[1] ? ',' + (s[1].length < 2 ? s[1] + '0' : s[1]).replace(/0$/, '') : ''); }
 
 $('lbtn').onclick = function () {
   $('lerr').innerHTML = '';
