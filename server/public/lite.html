@@ -173,6 +173,40 @@ td{white-space:nowrap}
 .sm-vd{margin-top:8px;padding:10px 12px;border-radius:10px;font-size:14px;line-height:1.35}
 .sm-vd.g{background:rgba(61,220,151,.13);color:#3ddc97}.sm-vd.y{background:rgba(255,184,77,.13);color:#ffb84d}.sm-vd.r{background:rgba(255,107,138,.13);color:#ff6b8a}
 .sm-ft{font-size:12px;color:#a89cc8}
+/* Карточка лида: как в Office (lc wide), только flex (Safari 9) */
+.lk-head{display:-webkit-flex;display:flex;-webkit-justify-content:space-between;justify-content:space-between;-webkit-align-items:flex-start;align-items:flex-start}
+.lk-head h3{margin:0;font-size:21px;line-height:1.2}
+.lk-hr{display:-webkit-flex;display:flex;-webkit-align-items:center;align-items:center;-webkit-flex:none;flex:none;margin-left:12px}
+.lk-hr .pill{margin-right:8px}
+.pill{display:inline-block;border-radius:99px;padding:2px 10px;font-size:11px;font-weight:600;white-space:nowrap}
+.p-ok{background:rgba(61,220,151,.13);color:#3ddc97}.p-bad{background:rgba(255,107,138,.13);color:#ff6b8a}.p-pur{background:rgba(155,92,255,.2);color:#c9a6ff}
+.ev-reg{background:rgba(255,213,77,.15);color:#ffd54d}.ev-ftd{background:rgba(61,220,151,.15);color:#3ddc97}.ev-dep{background:rgba(77,163,255,.15);color:#6db6ff}.ev-comm{background:rgba(156,42,77,.4);color:#ff8fae}.ev-bonus{background:rgba(255,255,255,.12);color:#fff}.ev-wd{background:rgba(255,184,77,.13);color:#ffb84d}
+.lk-grid{display:-webkit-flex;display:flex;-webkit-flex-wrap:wrap;flex-wrap:wrap;margin:12px -7px 0}
+.lk-kv{width:33.333%;box-sizing:border-box;padding:0 7px;margin-bottom:9px}
+.lk-kv span{display:block;font-size:11px;color:#a89cc8}.lk-kv b{display:block;font-size:13px;font-weight:600;word-wrap:break-word}
+.lk-cp{background:none;border:0;color:#a89cc8;padding:0 2px;margin-left:6px;vertical-align:-2px;-webkit-appearance:none}
+.lk-two{display:-webkit-flex;display:flex;margin-top:4px}
+.lk-two>div{-webkit-flex:1;flex:1;min-width:0}.lk-two>div:first-child{margin-right:14px}
+.lk-h{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#c9a6ff;margin:2px 0 8px}
+.lk-step{display:-webkit-flex;display:flex;-webkit-align-items:flex-start;align-items:flex-start;opacity:.55;padding:2px 0;margin-bottom:6px}.lk-step.done{opacity:1}
+.lk-dot{width:10px;height:10px;border-radius:50%;background:#34255c;margin:6px 12px 0 0;-webkit-flex:none;flex:none}.lk-step.done .lk-dot{background:#3ddc97}
+.lk-step .mut{font-size:12px}
+.fc-row{display:-webkit-flex;display:flex;-webkit-align-items:center;align-items:center;margin-bottom:8px}
+.fc-row .pill{width:58px;box-sizing:border-box;text-align:center;padding-left:0;padding-right:0;margin-right:8px}
+.fc-row .fc-sum{width:84px;margin-right:8px;font-size:16px;white-space:nowrap}
+.fc-cnt{background:none;border:0;border-bottom:1px dotted #a89cc8;color:#a89cc8;font-size:12px;font-family:inherit;padding:0 1px;-webkit-appearance:none;border-radius:0}
+.fc-pop{position:fixed;z-index:90;background:#251847;border:1px solid #9b5cff;border-radius:12px;padding:10px 12px;min-width:200px;max-height:260px;overflow:auto;-webkit-overflow-scrolling:touch;box-shadow:0 14px 40px rgba(0,0,0,.66);font-size:12px}
+.fc-pop div{display:-webkit-flex;display:flex;-webkit-justify-content:space-between;justify-content:space-between;padding:3px 0}
+.fc-pop div span{margin-right:14px}
+.fc-pop a{color:#c9a6ff;font-weight:700;text-decoration:none;margin-right:10px}
+.tg4{display:-webkit-flex;display:flex;margin:0 -4px}
+.tg-t{-webkit-flex:1;flex:1;margin:0 4px;border:1px solid #34255c;border-radius:10px;padding:6px;text-align:center}
+.tg-t .tg-i{display:block;font-size:17px;line-height:1.2}.tg-t b{display:block;font-size:12.5px}.tg-t span.s{display:block;font-size:11px;color:#a89cc8}
+.tg-t.on{border-color:#3ddc97;background:rgba(61,220,151,.07)}.tg-t.on span.s{color:#3ddc97}.tg-t.next{border-style:dashed}.tg-t.off{opacity:.55}
+.lk-sec{margin-top:14px}
+.lk-ban{margin-top:14px;border:1px solid #ff6b8a;border-radius:12px;padding:12px 14px}
+.lk-act{margin-top:14px}
+.lk-act a{display:inline-block;border:1px solid #9b5cff;color:#c9a6ff;border-radius:10px;padding:9px 16px;font-weight:700;text-decoration:none}
 .mi svg{width:19px;height:19px;vertical-align:-4px;margin-right:12px}
 .cov{position:fixed;left:0;top:0;right:0;bottom:0;background:rgba(0,0,0,.7);z-index:70}
 .cbox{position:fixed;left:50%;top:30px;bottom:30px;width:600px;max-width:94%;-webkit-transform:translateX(-50%);transform:translateX(-50%);z-index:71;background:#1c1233;border:1px solid #34255c;border-radius:16px;padding:20px;overflow-y:auto;-webkit-overflow-scrolling:touch}
@@ -548,9 +582,12 @@ function openStreamer(s) {
 // Карточка всегда видна целиком: по центру экрана, а если выше экрана, уменьшается пропорционально
 function smFit() {
   var md = $('smd'); if (!md) return;
+  md.style.maxHeight = ''; md.style.overflowY = '';
   var vh = window.innerHeight || document.documentElement.clientHeight, k = Math.min(1, (vh - 24) / md.offsetHeight);
+  if (k < 0.8) { k = 0.8; md.style.maxHeight = Math.floor((vh - 24) / k) + 'px'; md.style.overflowY = 'auto'; md.style.webkitOverflowScrolling = 'touch'; }
   var t = 'translate(-50%,-50%) scale(' + k + ')';
   md.style.webkitTransform = t; md.style.transform = t;
+  fcClose();
 }
 window.addEventListener('resize', smFit, false);
 window.addEventListener('orientationchange', function () { setTimeout(smFit, 300); }, false);
@@ -558,51 +595,100 @@ window.addEventListener('orientationchange', function () { setTimeout(smFit, 300
 // ---------- Карточка клиента (по нажатию на Telegram ID), только просмотр ----------
 function dt(v) { if (!v) return '—'; var d = new Date(v); return d.getDate() + ' ' + MS[d.getMonth()] + ' ' + d.getFullYear() + ', ' + pad(d.getHours()) + ':' + pad(d.getMinutes()); }
 function openCard(id) {
-  $('card').innerHTML = '<div class="cov" id="cov"></div><div class="cbox"><div class="mut">Загрузка…</div></div>';
+  fcClose();
+  $('card').innerHTML = '<div class="so" id="cov"></div><div class="sm" id="smd"><div class="mut">Загрузка…</div></div>';
   $('card').className = '';
-  $('cov').onclick = closeCard;
+  $('cov').onclick = closeCard; smFit();
   req('GET', '/api/office/leads/' + encodeURIComponent(id), null, function (st, d) {
-    if (st !== 200) { $('card').innerHTML = '<div class="cov" id="cov"></div><div class="cbox"><div class="err">' + esc(d.error || 'Лид не найден') + '</div><button class="ib" id="cx" style="margin:12px 0 0">Закрыть</button></div>'; $('cov').onclick = closeCard; $('cx').onclick = closeCard; return; }
+    if (st !== 200) { $('smd').innerHTML = '<div class="err">' + esc(d.error || 'Лид не найден') + '</div><button class="ib" id="cx" style="margin:12px 0 0">Закрыть</button>'; $('cx').onclick = closeCard; smFit(); return; }
     renderCard(d);
   });
 }
-function closeCard() { $('card').className = 'hide'; $('card').innerHTML = ''; }
+function closeCard() { fcClose(); $('card').className = 'hide'; $('card').innerHTML = ''; }
+var CN = { UA: 'Украина', RU: 'Россия', KZ: 'Казахстан', BY: 'Беларусь', UZ: 'Узбекистан', KG: 'Киргизия', AZ: 'Азербайджан', AM: 'Армения', GE: 'Грузия', MD: 'Молдова', PL: 'Польша', DE: 'Германия', US: 'США', GB: 'Великобритания', TR: 'Турция', IL: 'Израиль', LT: 'Литва', LV: 'Латвия', EE: 'Эстония', CZ: 'Чехия', ES: 'Испания', IT: 'Италия', FR: 'Франция', TJ: 'Таджикистан', IN: 'Индия' };
+function cname(c) { if (!c) return '—'; var k = String(c).toUpperCase().slice(0, 2); return (CN[k] || k) + ' (' + String(c).toUpperCase() + ')'; }
+// Всплывающий список дат по нажатию на «N шт»: лежит в body, вне карточки (у неё transform)
+var fcData = [];
+function fcClose() { var o = $('fcpop'); if (o) o.parentNode.removeChild(o); }
+function fcOpen(btn, html) {
+  fcClose();
+  var p = document.createElement('div'); p.className = 'fc-pop'; p.id = 'fcpop'; p.innerHTML = html;
+  document.body.appendChild(p);
+  var r = btn.getBoundingClientRect(), w = p.offsetWidth, h = p.offsetHeight, vw = window.innerWidth, vh = window.innerHeight;
+  p.style.left = Math.max(8, Math.min(vw - w - 8, r.right - w)) + 'px';
+  p.style.top = (r.bottom + 8 + h > vh ? Math.max(8, r.top - h - 8) : r.bottom + 8) + 'px';
+  var rc = p.querySelectorAll('[data-card]'), i;
+  for (i = 0; i < rc.length; i++) rc[i].onclick = function (e) { e.preventDefault(); openCard(this.getAttribute('data-card')); };
+}
+document.addEventListener('touchstart', function (e) { var o = $('fcpop'); if (o && !o.contains(e.target) && !(e.target.className && String(e.target.className).indexOf('fc-cnt') >= 0)) fcClose(); }, false);
+document.addEventListener('mousedown', function (e) { var o = $('fcpop'); if (o && !o.contains(e.target) && !(e.target.className && String(e.target.className).indexOf('fc-cnt') >= 0)) fcClose(); }, false);
 function renderCard(d) {
-  var L = d.lead, i, h = '', ev = d.events || [];
-  var st = LST[L.status] || [L.status, 'st-new'];
+  var L = d.lead, i, h = '', ev = d.events || [], F = d.fin || {};
   var first = function (t) { for (var j = 0; j < ev.length; j++) if (ev[j].type === t) return ev[j]; return null; };
-  var kv = function (k, v) { return '<div class="kv"><span class="mut">' + k + '</span><b>' + (v === null || v === undefined || v === '' ? '—' : v) + '</b></div>'; };
-  h += '<div class="chd"><div><h2 style="margin:0">' + esc(L.first_name || (L.username ? '@' + L.username : L.tg_id)) + '</h2>' + (L.username && L.first_name ? '<div class="mut">@' + esc(L.username) + '</div>' : '') + '</div>' +
-    '<div><span class="st ' + st[1] + '">' + st[0] + '</span> <span class="st ' + (L.access ? 'st-ftd' : 'st-new') + '">доступ ' + (L.access ? 'открыт' : 'закрыт') + '</span>' + (L.banned_at ? ' <span class="st st-ch">заблокирован</span>' : '') + ' <button class="ib" id="cx">✕</button></div></div>';
-  var from = L.link_source || L.link_slug || L.origin || 'miniapp-org';
-  h += '<div class="kvs">' + kv('Telegram ID', esc(L.tg_id)) + kv('Pocket ID', esc(L.trader_id || '')) + kv('Откуда пришёл', esc(from)) +
-    kv('Владелец', esc(L.owner_name || 'не закреплён')) + kv('Страна', esc(d.country || '')) + (L.referrer_id ? kv('Пригласил', '<a href="#" data-card="' + esc(L.referrer_id) + '" style="color:#f1ebff;text-decoration:none">' + esc(L.referrer_id) + '</a>') : kv('Часовой пояс', esc(L.tz || ''))) +
-    kv('Промокод', esc(d.promo || '')) + kv('Последний визит', dt(L.last_seen_at)) + (L.referrer_id ? kv('Часовой пояс', esc(L.tz || '')) : '') + '</div>';
-  if (L.banned_at) h += '<div class="err" style="margin-top:8px">Заблокирован ' + dt(L.banned_at) + (L.ban_reason ? ': ' + esc(L.ban_reason) : '') + '</div>';
+  var kv = function (k, v) { return '<div class="lk-kv"><span>' + k + '</span><b>' + (v === null || v === undefined || v === '' ? '—' : v) + '</b></div>'; };
+  var kvc = function (k, v) { return v ? kv(k, esc(v) + '<button class="lk-cp" data-copy="' + esc(v) + '" aria-label="Копировать"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 012-2h9"/></svg></button>') : kv(k, null); };
+  var STP = { new: ['Новый', 'p-pur'], registered: ['Регистрация', 'ev-reg'], ftd: ['FTD', 'ev-ftd'], active: ['Активный', 'ev-dep'], churned: ['Отвал', 'p-bad'] };
+  var sp = STP[L.status] || [L.status, 'p-pur'];
+  var fname = L.first_name || (L.username ? '@' + L.username : String(L.tg_id));
+  var origin = L.link_source || (L.link_slug ? 'ссылка ' + L.link_slug : L.origin || 'miniapp-org');
+  h += '<div class="lk-head"><div style="min-width:0"><h3>' + esc(fname) + '</h3>' + (L.first_name && L.username ? '<div class="mut" style="font-size:13px;margin-top:2px">@' + esc(L.username) + '</div>' : '') + '</div>' +
+    '<div class="lk-hr"><span class="pill ' + sp[1] + '">' + esc(sp[0]) + '</span>' + (L.banned_at ? '<span class="pill p-bad">заблокирован</span>' : L.access ? '<span class="pill p-ok">доступ открыт</span>' : '<span class="pill p-pur">доступ закрыт</span>') +
+    '<button class="sm-x" id="cx" aria-label="Закрыть"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M2 2l10 10M12 2L2 12"/></svg></button></div></div>';
+  h += '<div class="lk-grid">' + kvc('Telegram ID', String(L.tg_id)) + kvc('Pocket ID', L.trader_id);
+  for (i = 0; i < (L.pockets || []).length; i++) h += kvc('Pocket ID ' + (i + 2), L.pockets[i]);
+  h += kv('Откуда пришёл', esc(origin)) + kv('Владелец', esc(L.owner_name || 'не закреплён')) + kv('Страна', esc(cname(d.country))) +
+    (L.referrer_id ? kv('Пригласил', '<a href="#" data-card="' + esc(L.referrer_id) + '" style="color:#f1ebff;text-decoration:none">' + esc(L.referrer_id) + '</a>') : kv('Часовой пояс', esc(L.tz || ''))) +
+    kvc('Промокод', d.promo) + kv('Последний визит', dt(L.last_seen_at)) + (L.referrer_id ? kv('Часовой пояс', esc(L.tz || '')) : '') + '</div>';
   // Путь клиента
-  var steps = [['Нажал «Старт» в боте', first('start') || (L.bot_started ? { created_at: L.created_at } : null)], ['Регистрация', first('reg')], ['Первый депозит', first('ftd')]];
-  var path = '';
-  for (i = 0; i < steps.length; i++) path += '<div class="step' + (steps[i][1] ? ' on' : '') + '"><b>' + steps[i][0] + '</b><span class="mut">' + (steps[i][1] ? dt(steps[i][1].created_at) + (steps[i][1].amount ? ' · ' + usd2(steps[i][1].amount) : '') : 'ещё нет') + '</span></div>';
-  // Финансы
-  var F = d.fin || {}, fin = '', T = [['ftd', 'st-ftd'], ['dep', 'st-act'], ['wd', 'st-test'], ['comm', 'st-ch'], ['bonus', 'st-new']];
-  for (i = 0; i < T.length; i++) { var f = F[T[i][0]]; if (!f || (T[i][0] === 'bonus' && !f.count)) continue; fin += '<div class="fr"><span class="st ' + T[i][1] + '" style="width:58px;text-align:center">' + T[i][0] + '</span><b>' + (f.sum === null ? '—' : usd2(f.sum)) + '</b><span class="mut">' + f.count + ' шт</span></div>'; }
-  fin += '<div class="fr"><span style="width:58px">Рефералов</span><b></b><span class="mut">' + (d.refs || []).length + ' шт</span></div>';
-  h += '<div class="c2c"><div><div class="sec">Путь клиента</div>' + path + '</div><div><div class="sec">Финансы по постбекам</div>' + fin + '</div></div>';
-  // Градации
-  if (d.tier && d.tier.tiers) {
-    var tg = '', IC = ['🥉', '🥈', '🥇', '💎'];
-    for (i = 0; i < d.tier.tiers.length; i++) { var got = i < d.tier.reached; tg += '<div class="tier' + (got ? ' on' : '') + '"><div>' + IC[i] + '</div><b>' + esc(d.tier.tiers[i].name) + '</b><span class="mut">' + (got ? 'достигнута' : i === d.tier.reached ? 'следующая' : 'впереди') + '</span></div>'; }
-    h += '<div class="sec">Градации додепов</div><div class="tiers">' + tg + '</div>';
+  var reg = first('reg'), ftd = first('ftd');
+  var step = function (t, when, extra) { return '<div class="lk-step' + (when ? ' done' : '') + '"><span class="lk-dot"></span><div><b>' + t + '</b><div class="mut">' + (when ? dt(when) + (extra ? ' · ' + extra : '') : 'ещё нет') + '</div></div></div>'; };
+  var path = step('Нажал «Старт» в боте', L.created_at) + step('Регистрация', reg && reg.created_at) + step('Первый депозит', ftd && ftd.created_at, ftd && ftd.amount !== null && ftd.amount !== undefined ? usd2(ftd.amount) : null);
+  // Финансы: «тип · сумма · N шт», по нажатию на количество список дат
+  fcData = [];
+  var frow = function (t) {
+    var f = F[t] || { sum: 0, count: 0, dates: [] };
+    var ds = (f.dates || []).slice().sort(function (a, b) { return Date.parse(b.at) - Date.parse(a.at); }), ph = '';
+    for (var j = 0; j < ds.length; j++) ph += '<div><span class="mut">' + dt(ds[j].at) + '</span>' + (ds[j].amount !== null && ds[j].amount !== undefined ? '<b>' + usd2(ds[j].amount) + '</b>' : '') + '</div>';
+    fcData.push(ph || '<div class="mut">Нет записей</div>');
+    return '<div class="fc-row"><span class="pill ev-' + t + '">' + t + '</span>' + (f.sum === null ? '<span class="fc-sum mut">—</span>' : '<b class="fc-sum">' + usd2(f.sum) + '</b>') + '<button class="fc-cnt" data-fc="' + (fcData.length - 1) + '">' + (f.count || 0) + ' шт</button></div>';
+  };
+  var fin = frow('ftd') + frow('dep') + frow('wd') + (myRole === 'admin' ? frow('comm') : '') + (F.bonus && F.bonus.count ? frow('bonus') : '');
+  var R = d.refs || [], rh = '';
+  for (i = 0; i < R.length; i++) rh += '<div><span class="mut">' + dt(R[i].ftd_at || R[i].start_at) + '</span><span><a href="#" data-card="' + esc(R[i].tg_id) + '">' + esc(R[i].trader_id || R[i].tg_id) + '</a>' + (R[i].commission !== null && R[i].commission !== undefined ? '<b>' + usd2(R[i].commission) + '</b>' : '') + '</span></div>';
+  fcData.push(rh || '<div class="mut">Рефералов нет</div>');
+  fin += '<div class="fc-row"><span style="width:150px;font-weight:600">Рефералов</span><button class="fc-cnt" data-fc="' + (fcData.length - 1) + '">' + R.length + ' шт</button></div>';
+  h += '<div class="lk-two lk-sec"><div><div class="lk-h">Путь клиента</div>' + path + '</div><div><div class="lk-h">Финансы по постбекам</div>' + fin + '</div></div>';
+  // Градации додепов
+  var T = d.tier;
+  if (T && T.tiers) {
+    var TI = ['🥉', '🥈', '🥇', '💎'], tg = '';
+    for (i = 0; i < T.tiers.length; i++) { var t = T.tiers[i], cl = t.reached ? ' on' : i === T.reached ? ' next' : ' off'; tg += '<div class="tg-t' + cl + '"><span class="tg-i">' + TI[i] + '</span><b>' + esc(t.name) + '</b><span class="s">' + (t.reached ? 'достигнута' : i === T.reached ? 'следующая' : 'впереди') + '</span></div>'; }
+    h += '<div class="lk-sec"><div class="lk-h">Градации додепов</div><div class="tg4">' + tg + '</div>';
+    for (i = 0; i < (T.requests || []).length; i++) { var q = T.requests[i]; h += '<div class="mut" style="font-size:12px;margin-top:6px">«' + esc(q.name) + '»: ' + (q.status === 'pending' ? 'запрос бонуса на проверке' : q.status === 'approved' ? 'бонус принят' : 'запрос отклонён' + (q.reject_reason ? ': ' + esc(q.reject_reason) : '')) + '</div>'; }
+    h += '</div>';
   }
   // Подключение
-  if (d.connect) {
-    var C = d.connect;
-    h += '<div class="sec">Подключение</div><div class="kvs">' + kv('Нужно пополнить', usd2(C.required) + ' (от ' + usd2(C.from) + ')') + kv('Внесено', C.deposited === null ? '—' : usd2(C.deposited)) + kv('Акция', C.offer ? esc(C.offer.name) + ' до ' + dt(C.offer.until) : 'нет') + '</div>';
+  var C = d.connect;
+  if (C && !L.access && (L.status === 'new' || L.status === 'registered')) {
+    h += '<div class="lk-sec"><div class="lk-h">Подключение</div><div class="lk-grid" style="margin-top:0">' + kv('Нужно пополнить', usd2(C.required) + ' (от ' + usd2(C.from) + ')') +
+      (C.deposited !== null && C.deposited !== undefined ? kv('Внесено', usd2(C.deposited)) : '') + kv('Акция', C.offer ? esc(C.offer.name) + ' до ' + dmy(C.offer.until).slice(0, 5) : 'нет') + '</div></div>';
   }
-  $('card').innerHTML = '<div class="cov" id="cov"></div><div class="cbox">' + h + '</div>';
+  if (L.banned_at) h += '<div class="lk-ban"><b style="color:#ff6b8a">Лид заблокирован</b><div style="font-size:13px">Причина: ' + esc(L.ban_reason || '—') + '</div><div class="mut" style="font-size:12px">' + dt(L.banned_at) + (L.banned_by_name ? ' · ' + esc(L.banned_by_name) : '') + '</div></div>';
+  h += '<div class="lk-act"><a href="' + (L.username ? 'https://t.me/' + esc(L.username) : 'tg://user?id=' + esc(L.tg_id)) + '" target="_blank" rel="noopener">Профиль в Telegram</a></div>';
+  $('smd').innerHTML = h;
   $('cov').onclick = closeCard; $('cx').onclick = closeCard;
-  var rc = document.querySelectorAll('[data-card]');
+  var rc = $('smd').querySelectorAll('[data-card]');
   for (i = 0; i < rc.length; i++) rc[i].onclick = function (e) { e.preventDefault(); openCard(this.getAttribute('data-card')); };
+  var fb = $('smd').querySelectorAll('[data-fc]');
+  for (i = 0; i < fb.length; i++) fb[i].onclick = function (e) { e.preventDefault(); var k = Number(this.getAttribute('data-fc')); if ($('fcpop') && $('fcpop').getAttribute('data-k') === String(k)) { fcClose(); return; } fcOpen(this, fcData[k]); $('fcpop').setAttribute('data-k', String(k)); };
+  var cp = $('smd').querySelectorAll('[data-copy]');
+  for (i = 0; i < cp.length; i++) cp[i].onclick = function (e) { e.preventDefault(); copyTxt(this.getAttribute('data-copy')); };
+  smFit();
+}
+function copyTxt(v) {
+  var t = document.createElement('textarea'); t.value = v; t.style.position = 'fixed'; t.style.opacity = '0'; document.body.appendChild(t);
+  t.select(); try { t.setSelectionRange(0, 9999); document.execCommand('copy'); } catch (e) {}
+  document.body.removeChild(t);
 }
 
 function usd2(n) { n = Number(n) || 0; var r = Math.round(Math.abs(n) * 100) / 100, s = String(r).split('.'); return (n < 0 ? '−$' : '$') + grp(s[0]) + (s[1] ? ',' + (s[1].length < 2 ? s[1] + '0' : s[1]).replace(/0$/, '') : ''); }
