@@ -587,11 +587,11 @@ function table(cols,rows,empty){
 }
 const td=(v,cls)=>el('td',{class:cls||''},v);
 
-function askC(text){return new Promise(res=>{const prev=document.activeElement;const done=v=>{ov.remove();document.removeEventListener('keydown',kd,true);try{prev&&prev.focus&&prev.focus()}catch{}res(v)};
+function askC(text,extra){return new Promise(res=>{const prev=document.activeElement;const done=v=>{ov.remove();document.removeEventListener('keydown',kd,true);try{prev&&prev.focus&&prev.focus()}catch{}res(v)};
   const kd=e=>{if(e.key==='Escape'){e.preventDefault();e.stopPropagation();done(false)}};
   const ok=el('button',{type:'button',class:'btn',onclick:()=>done(true)},'Да'),no=el('button',{type:'button',class:'btn o',onclick:()=>done(false)},'Отмена');
   const ov=el('div',{class:'lc-overlay ask-ov',role:'alertdialog','aria-modal':'true',style:'z-index:120',onclick:e=>{if(e.target===ov)done(false)}},
-    el('div',{class:'card',style:'max-width:420px;width:100%;display:grid;gap:16px;text-align:center'},el('div',{style:'white-space:pre-line;line-height:1.45'},text),el('div',{style:'display:flex;gap:10px;justify-content:center'},ok,no)));
+    el('div',{class:'card',style:'max-width:420px;width:100%;display:grid;gap:16px;text-align:center'},el('div',{style:'white-space:pre-line;line-height:1.45'},text),extra||null,el('div',{style:'display:flex;gap:10px;justify-content:center'},ok,no)));
   document.body.append(ov);document.addEventListener('keydown',kd,true);ok.focus()})}
 /** Импорт выгрузки постбеков: сначала сводка без записи, потом подтверждение, потом сама загрузка */
 async function runImport(f){
@@ -3305,7 +3305,11 @@ async function accReview(){
     list.sort(by);
     const rows=list.map(r=>[td(r.staff_name),td(new Date(r.day+'T12:00:00').toLocaleDateString('ru-RU',{day:'numeric',month:'short'})),td(r.status==='await'?'—':hmin(r.declared_min)+(r.approved_min&&r.approved_min!==r.declared_min?' → '+hmin(r.approved_min):'')),el('td',{},el('span',{class:'pill '+REPSTATUS[r.status][1]},REPSTATUS[r.status][0]),revBy(r)),
       el('td',{},r.has_screenshot?shotThumb('/api/office/shifts/'+r.id+'/screenshot',{style:'color:var(--acc2)'}).appendChild(document.createTextNode('скриншот')).parentNode:'—'),
-      me.role!=='admin'?td(''):el('td',{},el('button',{class:'btn o s',type:'button',style:'color:var(--bad)',onclick:async()=>{if(!await askC('Удалить отчёт '+r.staff_name+' за '+new Date(r.day+'T12:00:00').toLocaleDateString('ru-RU',{day:'numeric',month:'long'})+' из системы?'+(r.status==='approved'?' Его время пропадёт из расчёта часов и зарплаты.':'')))return;try{await api('/shifts/'+r.id,{method:'DELETE'});toast('Отчёт удалён');accRefresh()}catch(x){toast(x.message)}}},'Удалить'))]);
+      el('td',{style:'white-space:nowrap'},r.status==='approved'?el('button',{class:'btn o s',type:'button',style:'margin-right:6px',onclick:async()=>{
+        const why=el('input',{placeholder:'Причина отказа (необязательно)',maxlength:'500'});
+        if(!await askC('Отклонить зачтённый отчёт '+r.staff_name+' за '+new Date(r.day+'T12:00:00').toLocaleDateString('ru-RU',{day:'numeric',month:'long'})+'?\nЕго время уйдёт из расчёта часов и зарплаты.',why))return;
+        try{await api('/shifts/'+r.id+'/review',{method:'POST',body:{action:'reject',reason:why.value}});toast('Отчёт отклонён');accRefresh()}catch(x){toast(x.message)}}},'Отклонить'):null,
+      me.role!=='admin'?null:el('button',{class:'btn o s',type:'button',style:'color:var(--bad)',onclick:async()=>{if(!await askC('Удалить отчёт '+r.staff_name+' за '+new Date(r.day+'T12:00:00').toLocaleDateString('ru-RU',{day:'numeric',month:'long'})+' из системы?'+(r.status==='approved'?' Его время пропадёт из расчёта часов и зарплаты.':'')))return;try{await api('/shifts/'+r.id,{method:'DELETE'});toast('Отчёт удалён');accRefresh()}catch(x){toast(x.message)}}},'Удалить'))]);
     histHold.replaceChildren(ctrT(table(['Сотрудник','Дата','Время','Статус','Скрин',''],rows,done.length?'Ничего не найдено. Измените фильтры.':'За этот месяц проверенных отчётов нет.')));
   };
   drawHist();
