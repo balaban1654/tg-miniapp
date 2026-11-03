@@ -19,7 +19,7 @@
 <link rel="icon" type="image/png" href="/img/office-192.png">
 <title>Hunter Office Lite</title>
 <!-- Облегчённая версия Office для старых устройств (iPad на iOS 9, Safari 9): без современного JavaScript и CSS Grid.
-     Только просмотр: прибыль, комиссия, зарплаты, расходы, FTD и депозиты, стримеры. Вход тем же логином, паролем и кодом -->
+     Только просмотр: эфир, прибыль, план/факт, воронка, стримеры, зарплаты, расходы и что требует внимания. Вход тем же логином, паролем и кодом -->
 <style>
 body{margin:0;background:#0d0817;color:#f1ebff;font-family:-apple-system,Helvetica,Arial,sans-serif;font-size:16px}
 .wrap{max-width:900px;margin:0 auto;padding:16px}
@@ -42,6 +42,15 @@ button.o{background:transparent;border:1px solid #9b5cff;color:#c9a6ff}
 button.on{background:#9b5cff;color:#fff}
 .bar button{margin:0 6px 8px 0}
 .err{color:#ff6b8a;margin:6px 0}
+.bar2{position:relative;height:8px;border-radius:8px;background:#2a1d4a;margin:8px 0 4px;overflow:visible}
+.bar2 i{display:block;height:8px;border-radius:8px}
+.bar2 u{position:absolute;top:-4px;width:2px;height:16px;background:#f1ebff}
+.pf{padding:8px 0 12px;border-bottom:1px solid #2a1d4a}.pf .v{font-size:24px}
+.sm2{font-size:12px}
+.dot{display:inline-block;width:9px;height:9px;border-radius:9px;background:#3ddc97;margin-right:6px;vertical-align:middle}
+.live{padding:6px 0}
+.att{padding:8px 0;border-bottom:1px solid #2a1d4a}
+.scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
 .hide{display:none}
 </style>
 </head>
@@ -120,38 +129,112 @@ function load() {
   });
 }
 
+function hm(min) { min = Math.max(0, Math.round(Number(min) || 0)); var h = Math.floor(min / 60), m = min % 60; return h + ' ч' + (m ? ' ' + m + ' мин' : ''); }
+function hrs(min) { return (Math.round((Number(min) || 0) / 6) / 10) + ' ч'; }
+function pct(v, g) { return g > 0 ? Math.round(v / g * 100) : null; }
+function dmy(s) { return String(s || '').slice(0, 10).split('-').reverse().join('.'); }
+function bar(p, mark) {
+  var w = Math.max(0, Math.min(100, p || 0)), col = p === null ? '#4a3a7a' : p >= 100 ? '#3ddc97' : p >= 70 ? '#ffb84d' : '#ff6b8a';
+  return '<div class="bar2"><i style="width:' + w + '%;background:' + col + '"></i>' + (mark !== null && mark !== undefined && mark < 99.5 ? '<u style="left:' + Math.min(100, mark) + '%"></u>' : '') + '</div>';
+}
+function row(label, val, cls) { return '<tr><td>' + label + '</td><td class="n ' + (cls || '') + '">' + val + '</td></tr>'; }
+
 function render(d) {
-  var t = d.totals || {}, h = '';
+  var t = d.totals || {}, g = d.goals || null, pace = Number(d.pace) || 0, h = '';
+  var ss = d.streamers || [], i;
+  var mark = g && pace < 0.995 ? pace * 100 : null;
+
+  // Сейчас в эфире
+  var live = [];
+  for (i = 0; i < ss.length; i++) if (ss[i].live) live.push(ss[i]);
+  h += '<div class="card"><h2>Сейчас в эфире</h2>';
+  if (!live.length) h += '<div class="mut">Никто не в эфире</div>';
+  else for (i = 0; i < live.length; i++) h += '<div class="live"><span class="dot"></span><b>' + esc(live[i].name) + '</b> <span class="mut">' + hm(live[i].live.elapsed) + (live[i].minLeft !== null ? ' · до плана смены ' + hm(live[i].minLeft) : '') + '</span></div>';
+  h += '</div>';
+
+  // Чистая прибыль
   var margin = t.commission > 0 ? Math.round(t.net / t.commission * 100) : null;
+  var diff = t.netPlanToDate === null || t.netPlanToDate === undefined ? null : t.net - t.netPlanToDate;
   h += '<div class="card"><h2>Чистая прибыль</h2><div class="big ' + (t.net < 0 ? 'neg' : 'pos') + '">' + usd(t.net) + '</div>' +
+    (diff !== null ? '<div class="' + (diff >= 0 ? 'pos' : 'neg') + '">' + (diff >= 0 ? '▲ на ' + usd(diff) + ' выше' : '▼ на ' + usd(-diff) + ' ниже') + ' плана на эту дату</div>' : '') +
     (margin !== null ? '<div class="mut">Маржа ' + margin + '% от комиссии</div>' : '') +
-    '<table style="margin-top:10px"><tr><td>Комиссия получена</td><td class="n">' + usd(t.commission) + '</td></tr>' +
-    '<tr><td>− Зарплаты и бонусы</td><td class="n neg">' + usd(-(t.salaries || 0)) + '</td></tr>' +
-    '<tr><td>− Расходы</td><td class="n neg">' + usd(-(t.expenses || 0)) + '</td></tr>' +
-    '<tr><td><b>= Чистая прибыль</b></td><td class="n"><b>' + usd(t.net) + '</b></td></tr></table></div>';
+    '<table style="margin-top:10px">' + row('Комиссия получена', usd(t.commission)) + row('− Зарплаты и бонусы', usd(-(t.salaries || 0)), 'neg') +
+    row('− Расходы', usd(-(t.expenses || 0)), 'neg') + row('<b>= Чистая прибыль</b>', '<b>' + usd(t.net) + '</b>') + '</table></div>';
 
-  h += '<div class="card"><h2>Показатели</h2><table class="tiles"><tr>' +
-    tile('FTD', t.ftd || 0) + tile('Сумма FTD', usd(t.ftdSum)) + tile('Все депозиты', usd(t.deposits)) +
-    '</tr><tr>' + tile('Клики', t.clicks || 0) + tile('Регистрации', t.regs || 0) + tile('Комиссия', usd(t.commission)) + '</tr></table></div>';
+  // План / факт
+  var avg = t.ftd ? t.ftdSum / t.ftd : 0;
+  var pf = [
+    ['FTD — первый депозит', t.ftd || 0, g && g.ftd, function (v) { return String(v); }, 'средний FTD ' + usd(avg)],
+    ['Пополнения по FTD', t.ftdSum, g && g.ftdSum, usd, ''],
+    ['Все депозиты (FTD + додепы)', t.deposits, g && g.deposits, usd, 'додепы ' + usd(t.depSum)],
+    ['Комиссия получена', t.commission, g && g.commission, usd, t.deposits ? (Math.round(t.commission / t.deposits * 1000) / 10) + '% от депозитов' : '']
+  ];
+  h += '<div class="card"><h2>План / факт</h2>';
+  for (i = 0; i < pf.length; i++) {
+    var p = pf[i], pp = pct(p[1], p[2]);
+    h += '<div class="pf"><div class="mut">' + p[0] + '</div><div><b class="v">' + p[3](p[1] || 0) + '</b>' + (p[2] ? ' <span class="mut">/ ' + p[3](p[2]) + '</span>' : '') + '</div>' +
+      bar(pp, mark) + '<div class="mut sm2">' + (pp !== null ? pp + '% плана' : 'план не задан') + (mark !== null ? ' · по графику ' + Math.round(mark) + '%' : '') + (p[4] ? ' · ' + p[4] : '') + '</div></div>';
+  }
+  h += '</div>';
 
+  // Воронка
+  var ctr = t.clicks ? Math.round(t.regs / t.clicks * 1000) / 10 : null, rtd = t.regs ? Math.round(t.ftd / t.regs * 1000) / 10 : null, ch = t.ftd ? Math.round((t.churned || 0) / t.ftd * 1000) / 10 : null;
+  h += '<div class="card"><h2>Воронка</h2><table class="tiles"><tr>' + tile('Клики', t.clicks || 0) + tile('Регистрации', t.regs || 0) + tile('FTD', t.ftd || 0) +
+    '</tr><tr>' + tile('Додепы', t.dep || 0) + tile('Отвал', t.churned || 0, t.churned ? 'neg' : '') + tile('Комиссия', usd(t.commission)) + '</tr></table>' +
+    '<div class="mut" style="margin-top:6px">CTR (клик → регистрация): ' + (ctr === null ? '—' : ctr + '%') + ' · RTD (регистрация → FTD): ' + (rtd === null ? '—' : rtd + '%') + ' · Churn: ' + (ch === null ? '—' : ch + '%') + '</div></div>';
+
+  // Стримеры: за период и часы за месяц
+  h += '<div class="card"><h2>Стримеры</h2><div class="scroll"><table><tr><th>Имя</th><th class="n">Часы за месяц</th><th class="n">Клики</th><th class="n">Рег.</th><th class="n">FTD</th><th class="n">Депозиты</th><th class="n">Комиссия</th><th class="n">Зарплата</th></tr>';
+  for (i = 0; i < ss.length; i++) {
+    var s = ss[i], rg = s.range || {}, mo = s.month || {};
+    if (!s.active && !rg.ftd && !rg.salary && !rg.deposits) continue;
+    var hp = pct(mo.hoursMin, mo.planMin);
+    h += '<tr><td>' + (s.live ? '<span class="dot"></span>' : '') + esc(s.name) + (s.role !== 'streamer' ? ' <span class="mut">' + esc(s.role === 'admin' ? 'админ' : s.role === 'teamlead' ? 'тимлид' : s.role) + '</span>' : '') + '</td>' +
+      '<td class="n">' + hrs(mo.hoursMin) + (mo.planMin ? ' <span class="mut">/ ' + hrs(mo.planMin) + (hp !== null ? ' · ' + hp + '%' : '') + '</span>' : '') + '</td>' +
+      '<td class="n">' + (rg.clicks || 0) + '</td><td class="n">' + (rg.regs || 0) + '</td><td class="n">' + (rg.ftd || 0) + '</td>' +
+      '<td class="n">' + usd(rg.deposits) + '</td><td class="n">' + usd(rg.commission) + '</td><td class="n">' + usd(rg.salary) + '</td></tr>';
+  }
+  h += '</table></div></div>';
+
+  // Зарплаты: начислено, выплачено, к выплате
+  var ts = d.teamSalaries || [], sal = '';
+  for (i = 0; i < ss.length; i++) {
+    var r = ss[i].range || {};
+    if (!r.salary && !r.paid) continue;
+    sal += '<tr><td>' + esc(ss[i].name) + '</td><td class="n">' + usd(r.salary) + '</td><td class="n">' + usd(r.paid) + '</td><td class="n">' + usd(Math.max(0, (r.salary || 0) - (r.paid || 0))) + '</td></tr>';
+  }
+  for (i = 0; i < ts.length; i++) sal += '<tr><td>' + esc(ts[i].name) + ' <span class="mut">ставка</span></td><td class="n">' + usd(ts[i].salary) + '</td><td class="n">' + usd(ts[i].paid) + '</td><td class="n">' + usd(Math.max(0, (ts[i].salary || 0) - (ts[i].paid || 0))) + '</td></tr>';
+  h += '<div class="card"><h2>Зарплаты</h2>' + (sal ? '<table><tr><th>Кто</th><th class="n">Начислено</th><th class="n">Выплачено</th><th class="n">К выплате</th></tr>' + sal +
+    '<tr><td><b>Итого начислено</b></td><td class="n"><b>' + usd(t.salaries) + '</b></td><td></td><td></td></tr></table>' : '<div class="mut">Начислений за период нет</div>') +
+    (d.range && !d.range.whole ? '<div class="mut" style="margin-top:6px">Неполный месяц: зарплата считается пропорционально дням.</div>' : '') + '</div>';
+
+  // Расходы
   var ex = d.expenses || [];
   h += '<div class="card"><h2>Расходы</h2>';
   if (!ex.length) h += '<div class="mut">Расходов за период нет</div>';
   else {
     h += '<table>';
-    for (var i = 0; i < ex.length; i++) h += '<tr><td>' + esc(ex[i].comment) + ' <span class="mut">' + esc(String(ex[i].day || '').split('-').reverse().join('.')) + '</span></td><td class="n neg">' + usd(-ex[i].amount) + '</td></tr>';
-    h += '<tr><td><b>Итого</b></td><td class="n neg"><b>' + usd(-(t.expenses || 0)) + '</b></td></tr></table>';
+    for (i = 0; i < ex.length; i++) h += row(esc(ex[i].comment) + ' <span class="mut">' + dmy(ex[i].day) + '</span>', usd(-ex[i].amount), 'neg');
+    h += row('<b>Итого</b>', '<b>' + usd(-(t.expenses || 0)) + '</b>', 'neg') + '</table>';
   }
   h += '</div>';
 
-  var ss = d.streamers || [];
-  h += '<div class="card"><h2>Стримеры</h2><table><tr><th>Имя</th><th class="n">FTD</th><th class="n">Депозиты</th><th class="n">Зарплата</th></tr>';
-  for (var j = 0; j < ss.length; j++) {
-    var s = ss[j], rg = s.range || {};
-    if (!rg.ftd && !rg.salary && !rg.deposits && !s.active) continue;
-    h += '<tr><td>' + esc(s.name) + '</td><td class="n">' + (rg.ftd || 0) + '</td><td class="n">' + usd(rg.deposits) + '</td><td class="n">' + usd(rg.salary) + '</td></tr>';
-  }
-  h += '</table></div>';
+  // Требует внимания
+  var T = d.tasks || {}, at = [];
+  var names = function (a, f) { var o = []; for (var j = 0; j < a.length; j++) o.push(f(a[j])); return o.join(' · '); };
+  if (T.pending && T.pending.length) at.push(['Отчёты ждут проверки', names(T.pending, function (x) { return x.name + ' ' + x.n; })]);
+  if (T.advances && T.advances.length) at.push(['Заявки на аванс', names(T.advances, function (x) { return x.staff_name + ' · ' + usd(x.amount); })]);
+  if (T.lagging && T.lagging.length) at.push(['Отстают от плана по часам', names(T.lagging, function (x) { return x.name + ' ' + hrs(x.hoursMin); })]);
+  if (T.shortfalls && T.shortfalls.length) at.push(['Недобор часов без причины', names(T.shortfalls, function (x) { return x.name + ' ' + x.n; })]);
+  if (T.tasksDone && T.tasksDone.length) at.push(['Задачи ждут принятия', names(T.tasksDone, function (x) { return x.staff_name + ': ' + x.title; })]);
+  if (T.tasksOverdue && T.tasksOverdue.length) at.push(['Просрочены задачи', names(T.tasksOverdue, function (x) { return x.staff_name + ': ' + x.title; })]);
+  if (T.monthWaiting) at.push(['Прошлый месяц ждёт закрытия', T.monthWaiting.pending ? 'не проверено отчётов: ' + T.monthWaiting.pending : 'закройте после правок']);
+  h += '<div class="card"><h2>Требует внимания</h2>';
+  if (!at.length) h += '<div class="pos">Всё в порядке</div>';
+  else for (i = 0; i < at.length; i++) h += '<div class="att"><b>' + esc(at[i][0]) + '</b><div class="mut">' + esc(at[i][1]) + '</div></div>';
+  h += '</div>';
+
+  h += '<div class="mut" style="text-align:center;margin:6px 0 20px">Обновлено ' + new Date().toLocaleTimeString('ru-RU').slice(0, 5) + ' · обновляется само раз в минуту</div>';
   $('body').innerHTML = h;
 }
 
@@ -181,6 +264,8 @@ $('out').onclick = function () { req('POST', '/api/office/logout', {}, function 
 
 // Уже вошли (cookie сессии): сразу данные, иначе форма входа
 req('GET', '/api/office/me', null, function (st) { if (st === 200) showMain(); else showLogin(); });
+// Сами обновляем данные раз в минуту, пока открыта страница с данными
+setInterval(function () { if ($('main').className !== 'hide') load(); }, 60000);
 </script>
 </body>
 </html>
