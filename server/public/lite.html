@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Hunter Office Lite</title>
+<!-- Облегчённая версия Office для старых устройств (iPad на iOS 9, Safari 9): без современного JavaScript и CSS Grid.
+     Только просмотр: прибыль, комиссия, зарплаты, расходы, FTD и депозиты, стримеры. Вход тем же логином, паролем и кодом -->
+<style>
+body{margin:0;background:#0d0817;color:#f1ebff;font-family:-apple-system,Helvetica,Arial,sans-serif;font-size:16px}
+.wrap{max-width:900px;margin:0 auto;padding:16px}
+h1{font-size:22px;margin:4px 0 14px}
+h2{font-size:15px;margin:0 0 10px;color:#c9a6ff;text-transform:uppercase;letter-spacing:1px}
+.card{background:#1c1233;border:1px solid #34255c;border-radius:14px;padding:16px;margin-bottom:14px}
+.mut{color:#a89cc8;font-size:13px}
+.big{font-size:40px;font-weight:bold;margin:4px 0}
+.pos{color:#3ddc97}.neg{color:#ff6b8a}
+table{width:100%;border-collapse:collapse}
+td,th{padding:9px 6px;border-bottom:1px solid #2a1d4a;text-align:left;font-size:15px}
+th{color:#a89cc8;font-size:12px;text-transform:uppercase;font-weight:normal}
+td.n,th.n{text-align:right;white-space:nowrap}
+.tiles td{width:33%;vertical-align:top;border:0;padding:6px}
+.tile{background:#150d26;border:1px solid #34255c;border-radius:12px;padding:12px}
+.tile b{display:block;font-size:24px;margin-top:4px}
+input{width:100%;box-sizing:border-box;padding:12px;margin:6px 0 12px;font-size:17px;border-radius:10px;border:1px solid #34255c;background:#150d26;color:#f1ebff;-webkit-appearance:none}
+button{padding:12px 16px;font-size:16px;font-weight:bold;border:0;border-radius:10px;background:#9b5cff;color:#fff;-webkit-appearance:none}
+button.o{background:transparent;border:1px solid #9b5cff;color:#c9a6ff}
+button.on{background:#9b5cff;color:#fff}
+.bar button{margin:0 6px 8px 0}
+.err{color:#ff6b8a;margin:6px 0}
+.hide{display:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Hunter Office <span class="mut">lite</span></h1>
+
+  <div id="login" class="card hide">
+    <div id="step1">
+      <div class="mut">Логин</div><input id="lg" autocapitalize="off" autocorrect="off">
+      <div class="mut">Пароль</div><input id="pw" type="password">
+    </div>
+    <div id="step2" class="hide">
+      <div class="mut">Код из приложения (или резервный код)</div><input id="code" inputmode="numeric" autocomplete="one-time-code">
+    </div>
+    <div id="lerr" class="err"></div>
+    <button id="lbtn">Войти</button>
+  </div>
+
+  <div id="main" class="hide">
+    <div class="bar">
+      <button class="o" data-p="month">Этот месяц</button><button class="o" data-p="prev">Прошлый месяц</button><button class="o" data-p="today">Сегодня</button><button class="o" id="reload">Обновить</button><button class="o" id="out">Выйти</button>
+    </div>
+    <div id="period" class="mut" style="margin-bottom:10px"></div>
+    <div id="body"><div class="card mut">Загрузка…</div></div>
+  </div>
+</div>
+<script>
+// Только ES5: var, function, XMLHttpRequest. Никаких стрелочных функций, let/const, ?. и fetch
+var challenge = null, period = 'month';
+
+function $(id) { return document.getElementById(id); }
+function req(method, url, body, done) {
+  var x = new XMLHttpRequest();
+  x.open(method, url, true);
+  x.withCredentials = true;
+  if (body) x.setRequestHeader('Content-Type', 'application/json');
+  x.onreadystatechange = function () {
+    if (x.readyState !== 4) return;
+    var data = {};
+    try { data = JSON.parse(x.responseText); } catch (e) { data = {}; }
+    done(x.status, data);
+  };
+  x.send(body ? JSON.stringify(body) : null);
+}
+function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+function usd(n) {
+  n = Number(n) || 0;
+  var neg = n < 0, v = Math.round(Math.abs(n)), s = String(v).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+  return (neg ? '−$' : '$') + s;
+}
+function pad(n) { return (n < 10 ? '0' : '') + n; }
+function ymd(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+function range() {
+  var now = new Date(), y = now.getFullYear(), m = now.getMonth();
+  if (period === 'today') return { from: ymd(now), to: ymd(now) };
+  if (period === 'prev') return { from: ymd(new Date(y, m - 1, 1)), to: ymd(new Date(y, m, 0)) };
+  return { from: ymd(new Date(y, m, 1)), to: ymd(new Date(y, m + 1, 0)) };
+}
+
+function showLogin() { $('main').className = 'hide'; $('login').className = 'card'; }
+function showMain() { $('login').className = 'hide'; $('main').className = ''; load(); }
+
+function tile(label, value, cls) { return '<td><div class="tile"><span class="mut">' + label + '</span><b class="' + (cls || '') + '">' + value + '</b></div></td>'; }
+
+function load() {
+  var bs = document.querySelectorAll('.bar button[data-p]');
+  for (var i = 0; i < bs.length; i++) bs[i].className = bs[i].getAttribute('data-p') === period ? 'on' : 'o';
+  var r = range();
+  $('period').innerHTML = 'Период: ' + r.from.split('-').reverse().join('.') + ' — ' + r.to.split('-').reverse().join('.');
+  $('body').innerHTML = '<div class="card mut">Загрузка…</div>';
+  req('GET', '/api/office/dashboard?from=' + r.from + '&to=' + r.to, null, function (st, d) {
+    if (st === 401) return showLogin();
+    if (st !== 200) { $('body').innerHTML = '<div class="card err">' + esc(d.error || ('Ошибка ' + st)) + '</div>'; return; }
+    render(d);
+  });
+}
+
+function render(d) {
+  var t = d.totals || {}, h = '';
+  var margin = t.commission > 0 ? Math.round(t.net / t.commission * 100) : null;
+  h += '<div class="card"><h2>Чистая прибыль</h2><div class="big ' + (t.net < 0 ? 'neg' : 'pos') + '">' + usd(t.net) + '</div>' +
+    (margin !== null ? '<div class="mut">Маржа ' + margin + '% от комиссии</div>' : '') +
+    '<table style="margin-top:10px"><tr><td>Комиссия получена</td><td class="n">' + usd(t.commission) + '</td></tr>' +
+    '<tr><td>− Зарплаты и бонусы</td><td class="n neg">' + usd(-(t.salaries || 0)) + '</td></tr>' +
+    '<tr><td>− Расходы</td><td class="n neg">' + usd(-(t.expenses || 0)) + '</td></tr>' +
+    '<tr><td><b>= Чистая прибыль</b></td><td class="n"><b>' + usd(t.net) + '</b></td></tr></table></div>';
+
+  h += '<div class="card"><h2>Показатели</h2><table class="tiles"><tr>' +
+    tile('FTD', t.ftd || 0) + tile('Сумма FTD', usd(t.ftdSum)) + tile('Все депозиты', usd(t.deposits)) +
+    '</tr><tr>' + tile('Клики', t.clicks || 0) + tile('Регистрации', t.regs || 0) + tile('Комиссия', usd(t.commission)) + '</tr></table></div>';
+
+  var ex = d.expenses || [];
+  h += '<div class="card"><h2>Расходы</h2>';
+  if (!ex.length) h += '<div class="mut">Расходов за период нет</div>';
+  else {
+    h += '<table>';
+    for (var i = 0; i < ex.length; i++) h += '<tr><td>' + esc(ex[i].comment) + ' <span class="mut">' + esc(String(ex[i].day || '').split('-').reverse().join('.')) + '</span></td><td class="n neg">' + usd(-ex[i].amount) + '</td></tr>';
+    h += '<tr><td><b>Итого</b></td><td class="n neg"><b>' + usd(-(t.expenses || 0)) + '</b></td></tr></table>';
+  }
+  h += '</div>';
+
+  var ss = d.streamers || [];
+  h += '<div class="card"><h2>Стримеры</h2><table><tr><th>Имя</th><th class="n">FTD</th><th class="n">Депозиты</th><th class="n">Зарплата</th></tr>';
+  for (var j = 0; j < ss.length; j++) {
+    var s = ss[j], rg = s.range || {};
+    if (!rg.ftd && !rg.salary && !rg.deposits && !s.active) continue;
+    h += '<tr><td>' + esc(s.name) + '</td><td class="n">' + (rg.ftd || 0) + '</td><td class="n">' + usd(rg.deposits) + '</td><td class="n">' + usd(rg.salary) + '</td></tr>';
+  }
+  h += '</table></div>';
+  $('body').innerHTML = h;
+}
+
+$('lbtn').onclick = function () {
+  $('lerr').innerHTML = '';
+  if (!challenge) {
+    req('POST', '/api/office/login', { login: $('lg').value, password: $('pw').value }, function (st, d) {
+      if (st !== 200) { $('lerr').innerHTML = esc(d.error || 'Ошибка входа'); return; }
+      if (d.need_totp) { challenge = d.challenge; $('step1').className = 'hide'; $('step2').className = ''; $('code').focus(); return; }
+      showMain();
+    });
+  } else {
+    req('POST', '/api/office/login/totp', { challenge: challenge, code: $('code').value.replace(/\s/g, '') }, function (st, d) {
+      if (st !== 200) {
+        $('lerr').innerHTML = esc(d.error || 'Неверный код');
+        if (d.restart) { challenge = null; $('step1').className = ''; $('step2').className = 'hide'; }
+        return;
+      }
+      showMain();
+    });
+  }
+};
+var pb = document.querySelectorAll('.bar button[data-p]');
+for (var k = 0; k < pb.length; k++) pb[k].onclick = function () { period = this.getAttribute('data-p'); load(); };
+$('reload').onclick = function () { load(); };
+$('out').onclick = function () { req('POST', '/api/office/logout', {}, function () { challenge = null; $('step1').className = ''; $('step2').className = 'hide'; showLogin(); }); };
+
+// Уже вошли (cookie сессии): сразу данные, иначе форма входа
+req('GET', '/api/office/me', null, function (st) { if (st === 200) showMain(); else showLogin(); });
+</script>
+</body>
+</html>

@@ -37,6 +37,9 @@ await fraudBackfill().catch((e) => console.error('Проверка фрода п
 // Интерфейс Hunter Office и его API
 const officeHtml = readFileSync(resolve(process.cwd(), 'public/office.html'), 'utf8');
 app.get('/crm', async (_req, reply) => reply.type('text/html; charset=utf-8').header('Cache-Control', 'no-store').send(officeHtml));
+// Облегчённый Office для старых устройств (iPad на iOS 9): прибыль, комиссия, зарплаты, расходы и показатели, только просмотр
+const liteHtml = readFileSync(resolve(process.cwd(), 'public/lite.html'), 'utf8');
+app.get('/lite', async (_req, reply) => reply.type('text/html; charset=utf-8').header('Cache-Control', 'no-store').send(liteHtml));
 // Установка Office как приложения (PWA): манифест и сервис-воркер
 const manifest = JSON.stringify({
   name: 'Hunter Office',
