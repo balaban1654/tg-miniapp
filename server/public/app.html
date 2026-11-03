@@ -368,19 +368,31 @@ html[data-theme=light] .rv-sheet{background:rgba(27,21,48,.35)}
   }
   window.__tr=tr;
   var ATTR=['placeholder','title','aria-label'];
+  // Что перевели, запоминаем: при возврате на русский ставим исходный текст обратно (если приложение его с тех пор не меняло)
+  var ORIG=new WeakMap();
   function node(n){
-    if(n.nodeType===3){var v=n.nodeValue,t=tr(v);if(t!==v)n.nodeValue=t;return}
-    if(n.nodeType!==1||n.tagName==='SCRIPT'||n.tagName==='STYLE')return;
-    for(var a=0;a<ATTR.length;a++){var av=n.getAttribute&&n.getAttribute(ATTR[a]);if(av&&CY.test(av)){var at=tr(av);if(at!==av)n.setAttribute(ATTR[a],at)}}
+    // Текст внутри <script> и <style> не трогаем: это код приложения, а не текст на экране
+    if(n.nodeType===3){var pn=n.parentNode;if(pn&&(pn.nodeName==='SCRIPT'||pn.nodeName==='STYLE'))return;var v=n.nodeValue,t=tr(v);if(t!==v){n.nodeValue=t;ORIG.set(n,[v,t])}return}
+    if(n.nodeType!==1||n.tagName==='SCRIPT'||n.tagName==='STYLE'||n.hasAttribute('data-raw'))return;
+    for(var a=0;a<ATTR.length;a++){var av=n.getAttribute&&n.getAttribute(ATTR[a]);if(av&&CY.test(av)){var at=tr(av);if(at!==av){n.setAttribute(ATTR[a],at);var o=ORIG.get(n)||{};o[ATTR[a]]=[av,at];ORIG.set(n,o)}}}
     if((n.tagName==='INPUT'&&(n.type==='button'||n.type==='submit'))&&CY.test(n.value))n.value=tr(n.value);
     for(var c=n.firstChild;c;c=c.nextSibling)node(c);
   }
   // Язык меняется на лету: window.__setLang('en' | 'ru'), затем приложение перерисовывает экран (render)
-  window.__setLang=function(l){lang=l==='en'?'en':'ru';document.documentElement.setAttribute('lang',lang);if(lang==='en'&&document.body)node(document.body)};
+  function back(n){
+    var o=ORIG.get(n);
+    if(n.nodeType===3){if(o&&n.nodeValue===o[1])n.nodeValue=o[0];ORIG.delete(n);return}
+    if(n.nodeType!==1)return;
+    if(o){for(var k in o)if(n.getAttribute(k)===o[k][1])n.setAttribute(k,o[k][0]);ORIG.delete(n)}
+    for(var c=n.firstChild;c;c=c.nextSibling)back(c);
+  }
+  window.__setLang=function(l){lang=l==='en'?'en':'ru';document.documentElement.setAttribute('lang',lang);if(!document.body)return;if(lang==='en')node(document.body);else back(document.body)};
   document.documentElement.setAttribute('lang',lang);
   new MutationObserver(function(ms){
     if(lang!=='en')return;
     for(var i=0;i<ms.length;i++){var m=ms[i];
+      // Тексты клиентов и админа (отзывы, новости) не переводим: у них своя английская версия из Office
+      var pe=m.target.nodeType===1?m.target:m.target.parentNode;if(pe&&pe.closest&&pe.closest('[data-raw]'))continue;
       if(m.type==='characterData')node(m.target);
       else if(m.type==='attributes')node(m.target);
       else for(var j=0;j<m.addedNodes.length;j++)node(m.addedNodes[j]);
@@ -1713,7 +1725,7 @@ function reviewDialog(done){
 function clampBody(text,cls,style,tail){
   // tail: ссылка в конце текста (например «…читать продолжение»): в свёрнутом виде обрезается вместе с текстом
   // Хвост идёт вплотную к тексту: точки в конце текста убираем, у хвоста свои «...» («просто... читать продолжение»)
-  const body=el('div',{class:(cls||'')+' clamp',style:style||''},tail?String(text).replace(/\s*(\.+|…)\s*$/,''):text,tail||null);
+  const body=el('div',{class:(cls||'')+' clamp',style:style||''},el('span',{'data-raw':''},tail?String(text).replace(/\s*(\.+|…)\s*$/,''):text),tail||null);
   const btn=el('button',{type:'button',class:'rd-more',hidden:''},'Читать далее');
   let open=false;
   btn.onclick=()=>{open=!open;body.classList.toggle('clamp',!open);btn.textContent=open?'Свернуть':'Читать далее'};
@@ -1721,14 +1733,16 @@ function clampBody(text,cls,style,tail){
   requestAnimationFrame(()=>requestAnimationFrame(check));[120,500,1500].forEach(t=>setTimeout(check,t));
   return el('div',{style:'display:grid;gap:4px'},body,btn);
 }
+/** Выбран английский: показываем английские версии новостей и отзывов, если админ их написал */
+const isEn=()=>document.documentElement.getAttribute('lang')==='en';
 function reviewCard(r){
   const photo=r.photo?el('button',{class:'rv-photo',type:'button',onclick:()=>openPhotoView(r.photo),'aria-label':'Открыть фото'},
     el('span',{class:'th'},el('img',{src:r.photo,alt:'',loading:'lazy'}),(()=>{const i=el('i');i.innerHTML=IC_IMG;return i})()),
     el('span',{class:'op'},'Открыть фото')):null;
   return el('div',{class:'card rv'},
-    el('div',{class:'rv-top'},el('div',{class:'ava'},...(()=>{const ch=(r.author||'?').slice(0,1).toUpperCase();if(!r.avatar)return[ch];const im=el('img',{src:r.avatar,alt:'',loading:'lazy'});im.addEventListener('error',()=>im.replaceWith(ch));return[im]})()),el('div',{},el('b',{},r.author),el('div',{class:'sm'},dmy(r.created_at))),r.status==='pending'?el('span',{class:'rv-pend'},'На проверке'):starsEl(r.rating)),
+    el('div',{class:'rv-top'},el('div',{class:'ava'},...(()=>{const ch=(r.author||'?').slice(0,1).toUpperCase();if(!r.avatar)return[ch];const im=el('img',{src:r.avatar,alt:'',loading:'lazy'});im.addEventListener('error',()=>im.replaceWith(ch));return[im]})()),el('div',{},el('b',{'data-raw':''},r.author),el('div',{class:'sm'},dmy(r.created_at))),r.status==='pending'?el('span',{class:'rv-pend'},'На проверке'):starsEl(r.rating)),
     r.status==='pending'?starsEl(r.rating):null,
-    clampBody(r.body,'rv-body'),photo);
+    clampBody(isEn()&&r.body_en?r.body_en:r.body,'rv-body'),photo);
 }
 function reviewsAll(d){
   const close=()=>{v.remove();document.removeEventListener('keydown',onKey)};
@@ -1755,7 +1769,7 @@ async function reviewsBlock(){
 function newsBlock(items){
   if(!items.length)return el('div',{class:'card',style:'display:grid;gap:6px'},el('b',{style:'font-size:14px'},'Скоро здесь появятся новости'),el('div',{class:'sm',style:'line-height:1.5'},'Обновления тренажёра, итоги недели, новые трейдеры и важные объявления команды. Заглядывайте сюда почаще, чтобы ничего не пропустить.'));
   const dt=v=>new Date(v).toLocaleDateString('ru-RU',{day:'numeric',month:'long',year:'numeric'}).replace(/\s*г\.?$/,'');
-  return el('div',{style:'display:grid;gap:10px'},items.map(n=>el('div',{class:'card',style:'display:grid;gap:6px'},el('div',{class:'sm'},dt(n.created_at)),el('b',{style:'font-size:14.5px'},n.title),clampBody(n.body,'','white-space:pre-wrap;line-height:1.5;font-size:13.5px;word-break:break-word',n.url?el('a',{href:n.url,class:'nw-more',onclick:e=>{e.preventDefault();openLink(n.url)}},'... читать продолжение'):null))));
+  return el('div',{style:'display:grid;gap:10px'},items.map(n=>el('div',{class:'card',style:'display:grid;gap:6px'},el('div',{class:'sm'},dt(n.created_at)),el('b',{style:'font-size:14.5px','data-raw':''},isEn()&&n.title_en?n.title_en:n.title),clampBody(isEn()&&(n.body_en||n.title_en)?(n.body_en||n.body):n.body,'','white-space:pre-wrap;line-height:1.5;font-size:13.5px;word-break:break-word',n.url?el('a',{href:n.url,class:'nw-more',onclick:e=>{e.preventDefault();openLink(n.url)}},'... читать продолжение'):null))));
 }
 async function viewMedia(){
   if(!me)await refreshMe();

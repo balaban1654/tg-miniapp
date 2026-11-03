@@ -1013,6 +1013,10 @@ ALTER TABLE leads ADD COLUMN IF NOT EXISTS demo_clicked_at TIMESTAMPTZ;
 
 -- Язык клиента: выбирается при /start (или в Mini App). Пуши уходят на его языке, если у пуша есть английский текст
 ALTER TABLE leads ADD COLUMN IF NOT EXISTS lang TEXT;
+-- Английские версии новостей и отзывов (пишет админ в Office). Пусто: клиентам с English показываем оригинал без перевода
+ALTER TABLE news ADD COLUMN IF NOT EXISTS title_en TEXT NOT NULL DEFAULT '';
+ALTER TABLE news ADD COLUMN IF NOT EXISTS body_en TEXT NOT NULL DEFAULT '';
+ALTER TABLE reviews ADD COLUMN IF NOT EXISTS body_en TEXT NOT NULL DEFAULT '';
 -- Тема Mini App (light/dark), выбранная клиентом в профиле: одна на всех его устройствах
 ALTER TABLE leads ADD COLUMN IF NOT EXISTS theme TEXT;
 ALTER TABLE push_rules ADD COLUMN IF NOT EXISTS text_en TEXT NOT NULL DEFAULT '';

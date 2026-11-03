@@ -4471,15 +4471,19 @@ async function newsAdmin(){
   const rows=await api('/news?team='+mediaTeam);
   let editId=null;
   const title=el('input',{placeholder:'Заголовок',maxlength:'120'}),text=el('textarea',{class:'big',rows:'5',maxlength:'3000',placeholder:'Текст новости'});
+  const titleEn=el('input',{placeholder:'Title',maxlength:'120'}),textEn=el('textarea',{class:'big',rows:'5',maxlength:'3000',placeholder:'News text in English'});
   const link=el('input',{placeholder:'https://t.me/канал/123 (необязательно)',maxlength:'500',inputmode:'url'});
   const err=el('div',{class:'err',role:'alert'});
   const okBtn=el('button',{class:'btn',type:'button'},'Опубликовать');
-  const cancel=el('button',{class:'btn o',type:'button',hidden:'',onclick:()=>{editId=null;title.value='';text.value='';link.value='';okBtn.textContent='Опубликовать';cancel.hidden=true}},'Отмена');
+  const cancel=el('button',{class:'btn o',type:'button',hidden:'',onclick:()=>{editId=null;title.value='';text.value='';titleEn.value='';textEn.value='';link.value='';okBtn.textContent='Опубликовать';cancel.hidden=true}},'Отмена');
   okBtn.onclick=async()=>{err.textContent='';okBtn.disabled=true;
-    try{await api(editId?'/news/'+editId:'/news',{method:editId?'PUT':'POST',body:{title:title.value,body:text.value,url:link.value,team_id:mediaTeam}});toast(editId?'Новость сохранена':'Новость опубликована');render({soft:true})}
+    try{await api(editId?'/news/'+editId:'/news',{method:editId?'PUT':'POST',body:{title:title.value,body:text.value,title_en:titleEn.value,body_en:textEn.value,url:link.value,team_id:mediaTeam}});toast(editId?'Новость сохранена':'Новость опубликована');render({soft:true})}
     catch(x){err.textContent=x.message;okBtn.disabled=false}};
   const form=el('div',{class:'card',style:'display:grid;gap:10px'},el('b',{style:'font-size:14px'},'Новая новость'),
-    el('label',{},'Заголовок',title),el('label',{},'Текст',text),el('label',{},'Ссылка на полный пост (необязательно)',link),
+    el('label',{},'Заголовок',title),el('label',{},'Текст',text),
+    el('label',{},'Заголовок на английском',titleEn),el('label',{},'Текст на английском',textEn),
+    el('div',{class:'mut sm'},'Клиенты, выбравшие English, увидят английскую версию. Если оставить пустым, им покажется русский текст без перевода.'),
+    el('label',{},'Ссылка на полный пост (необязательно)',link),
     el('div',{class:'mut sm'},'Новость сразу появляется в мини-аппе, во вкладке «Медиа», блок «Новости команды». Свежие сверху. Если указать ссылку, под текстом будет «…читать продолжение» с переходом на неё.'),
     el('div',{style:'display:flex;gap:8px;flex-wrap:wrap'},okBtn,cancel),err);
   const dt=v=>new Date(v).toLocaleString('ru-RU',{timeZone:'Europe/Kyiv',day:'numeric',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit'});
@@ -4488,8 +4492,10 @@ async function newsAdmin(){
     const sure=el('span',{hidden:'',style:'display:inline-flex;gap:6px;align-items:center'},el('span',{class:'mut sm'},'Удалить новость?'),
       el('button',{class:'btn s',type:'button',onclick:async()=>{try{await api('/news/'+r.id,{method:'DELETE'});render({soft:true})}catch(x){toast(x.message)}}},'Да'),
       el('button',{class:'btn o s',type:'button',onclick:()=>{sure.hidden=true;del.hidden=false}},'Нет'));
-    const ed=el('button',{class:'btn o s',type:'button',onclick:()=>{editId=r.id;title.value=r.title;text.value=r.body;link.value=r.url||'';okBtn.textContent='Сохранить';cancel.hidden=false;form.scrollIntoView({behavior:'smooth',block:'center'})}},'Изменить');
-    return el('div',{class:'card',style:'display:grid;gap:6px'},el('div',{class:'mut sm'},dt(r.created_at)+(r.author?' · '+r.author:'')),el('b',{},r.title),el('div',{style:'white-space:pre-wrap;line-height:1.5'},r.body),r.url?el('a',{href:r.url,target:'_blank',rel:'noopener',style:'color:var(--acc2);font-size:13px;word-break:break-all'},'…читать продолжение → '+r.url):null,el('div',{style:'display:flex;gap:8px;flex-wrap:wrap;align-items:center'},ed,del,sure));
+    const ed=el('button',{class:'btn o s',type:'button',onclick:()=>{editId=r.id;title.value=r.title;text.value=r.body;titleEn.value=r.title_en||'';textEn.value=r.body_en||'';link.value=r.url||'';okBtn.textContent='Сохранить';cancel.hidden=false;form.scrollIntoView({behavior:'smooth',block:'center'})}},'Изменить');
+    return el('div',{class:'card',style:'display:grid;gap:6px'},el('div',{class:'mut sm'},dt(r.created_at)+(r.author?' · '+r.author:'')),el('b',{},r.title),el('div',{style:'white-space:pre-wrap;line-height:1.5'},r.body),
+      r.title_en||r.body_en?el('div',{style:'display:grid;gap:4px;border-left:3px solid var(--line);padding-left:10px'},el('span',{class:'mut sm'},'English'),r.title_en?el('b',{},r.title_en):null,r.body_en?el('div',{style:'white-space:pre-wrap;line-height:1.5'},r.body_en):null):el('span',{class:'mut sm'},'Английской версии нет'),
+      r.url?el('a',{href:r.url,target:'_blank',rel:'noopener',style:'color:var(--acc2);font-size:13px;word-break:break-all'},'…читать продолжение → '+r.url):null,el('div',{style:'display:flex;gap:8px;flex-wrap:wrap;align-items:center'},ed,del,sure));
   };
   return[form,...(rows.length?rows.map(item):[el('div',{class:'mut'},'Новостей пока нет.')])];
 }
@@ -4497,7 +4503,8 @@ async function reviewsAdmin(){
   const rows=await api('/reviews?team='+mediaTeam);
   if(!rows.some(r=>r.id===reviewEdit))reviewEdit=null;
   const err=el('div',{class:'err',role:'alert'});
-  const fa={author:el('input',{required:'',maxlength:'60',placeholder:'Имя автора'}),rating:ratingSel(5),body:el('textarea',{class:'big',required:'',rows:'3',maxlength:'1500',placeholder:'Текст отзыва',style:'min-height:80px;resize:vertical'})};
+  const fa={author:el('input',{required:'',maxlength:'60',placeholder:'Имя автора'}),rating:ratingSel(5),body:el('textarea',{class:'big',required:'',rows:'3',maxlength:'1500',placeholder:'Текст отзыва',style:'min-height:80px;resize:vertical'}),
+    bodyEn:el('textarea',{class:'big',rows:'3',maxlength:'1500',placeholder:'Review text in English (необязательно)',style:'min-height:80px;resize:vertical'})};
   let photo=null;
   const file=el('input',{type:'file',accept:'image/jpeg,image/png,image/webp',style:'display:none'});
   const pv=el('div',{style:'display:flex;align-items:center;gap:10px;min-height:34px'});
@@ -4508,8 +4515,8 @@ async function reviewsAdmin(){
     if(f.size>5*1024*1024){err.textContent='Фото больше 5 МБ';return}
     err.textContent='';photo=await fileToDataUrl(f);drawPv()});
   const form=el('form',{class:'card form',onsubmit:async e=>{e.preventDefault();err.textContent='';
-    try{await api('/reviews',{method:'POST',body:{author:fa.author.value,rating:fa.rating.value,body:fa.body.value,photo,team_id:mediaTeam}});render({soft:true})}catch(x){err.textContent=x.message}}},
-    el('label',{},'Автор',fa.author),el('label',{},'Оценка',fa.rating),el('label',{style:'grid-column:1/-1'},'Текст',fa.body),el('div',{style:'grid-column:1/-1;display:grid;gap:6px'},el('span',{class:'mut',style:'font-size:12px'},'Фото (необязательно)'),pv,file),
+    try{await api('/reviews',{method:'POST',body:{author:fa.author.value,rating:fa.rating.value,body:fa.body.value,body_en:fa.bodyEn.value,photo,team_id:mediaTeam}});render({soft:true})}catch(x){err.textContent=x.message}}},
+    el('label',{},'Автор',fa.author),el('label',{},'Оценка',fa.rating),el('label',{style:'grid-column:1/-1'},'Текст',fa.body),el('label',{style:'grid-column:1/-1'},'Текст на английском',fa.bodyEn),el('div',{style:'grid-column:1/-1;display:grid;gap:6px'},el('span',{class:'mut',style:'font-size:12px'},'Фото (необязательно)'),pv,file),
     el('div',{style:'grid-column:1/-1;display:flex;gap:10px;align-items:center;flex-wrap:wrap'},el('button',{class:'btn',type:'submit'},'Добавить отзыв'),err));
   const rowErr=el('div',{class:'err',role:'alert'});
   const BS='display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;height:30px;vertical-align:middle;margin-left:6px';
@@ -4519,15 +4526,16 @@ async function reviewsAdmin(){
   const photoCell=r=>r.has_photo?(()=>{const u='/api/office/reviews/'+r.id+'/photo',a=shotThumb(u,{class:'shotc',style:'width:64px;height:64px',title:'Открыть фото'});a.append(el('img',{src:'/api/office/reviews/'+r.id+'/photo',alt:''}));return a})():'—';
   const statusPill=r=>el('span',{class:'pill '+(r.status==='published'?'p-ok':r.status==='pending'?'p-warn':'p-bad')},RV_STATUS[r.status]||r.status);
   function editRow(r){
-    const e={author:el('input',{value:r.author,maxlength:'60','aria-label':'Автор'}),rating:ratingSel(r.rating),body:el('textarea',{class:'big',rows:'3',maxlength:'1500','aria-label':'Текст',style:'min-width:240px;resize:vertical'}),status:el('select',{'aria-label':'Статус'},...Object.entries(RV_STATUS).map(([v,t])=>el('option',{value:v},t)))};
-    e.body.value=r.body;e.status.value=r.status;
+    const e={author:el('input',{value:r.author,maxlength:'60','aria-label':'Автор'}),rating:ratingSel(r.rating),body:el('textarea',{class:'big',rows:'3',maxlength:'1500','aria-label':'Текст',style:'min-width:240px;resize:vertical'}),bodyEn:el('textarea',{class:'big',rows:'3',maxlength:'1500','aria-label':'Текст на английском',placeholder:'Text in English',style:'min-width:240px;resize:vertical'}),status:el('select',{'aria-label':'Статус'},...Object.entries(RV_STATUS).map(([v,t])=>el('option',{value:v},t)))};
+    e.body.value=r.body;e.bodyEn.value=r.body_en||'';e.status.value=r.status;
     let rm=false;
-    const save=act(async()=>{await api('/reviews/'+r.id,{method:'PUT',body:{author:e.author.value,rating:e.rating.value,body:e.body.value,status:e.status.value,remove_photo:rm}});reviewEdit=null});
-    return[el('td',{},el('div',{style:'display:grid;gap:6px;min-width:150px'},e.author,e.rating)),el('td',{},e.body),el('td',{},r.has_photo?el('label',{style:'display:flex;gap:6px;align-items:center;font-size:12px'},el('input',{type:'checkbox',onchange:ev=>{rm=ev.target.checked}}),'Убрать фото'):'—'),el('td',{},e.status),el('td',{style:'white-space:nowrap'},tb('Сохранить',save),tb('Отмена',()=>{reviewEdit=null;render({soft:true})}))];
+    const save=act(async()=>{await api('/reviews/'+r.id,{method:'PUT',body:{author:e.author.value,rating:e.rating.value,body:e.body.value,body_en:e.bodyEn.value,status:e.status.value,remove_photo:rm}});reviewEdit=null});
+    return[el('td',{},el('div',{style:'display:grid;gap:6px;min-width:150px'},e.author,e.rating)),el('td',{},el('div',{style:'display:grid;gap:6px'},e.body,el('span',{class:'mut',style:'font-size:12px'},'Текст на английском'),e.bodyEn)),el('td',{},r.has_photo?el('label',{style:'display:flex;gap:6px;align-items:center;font-size:12px'},el('input',{type:'checkbox',onchange:ev=>{rm=ev.target.checked}}),'Убрать фото'):'—'),el('td',{},e.status),el('td',{style:'white-space:nowrap'},tb('Сохранить',save),tb('Отмена',()=>{reviewEdit=null;render({soft:true})}))];
   }
   const viewRow=r=>[
     td(el('div',{style:'display:grid;gap:3px'},el('b',{},r.author),r.username?el('span',{class:'mut',style:'font-size:12px'},'@'+r.username):el('span',{class:'mut',style:'font-size:12px'},r.by_admin?'добавил админ':''),el('span',{class:'mut',style:'font-size:12px'},new Date(r.created_at).toLocaleDateString('ru-RU')),starsTxt(r.rating))),
-    td(el('div',{style:'white-space:pre-wrap;max-width:520px;line-height:1.45'},r.body)),
+    td(el('div',{style:'display:grid;gap:6px;max-width:520px'},el('div',{style:'white-space:pre-wrap;line-height:1.45'},r.body),
+      r.body_en?el('div',{style:'white-space:pre-wrap;line-height:1.45;border-left:3px solid var(--line);padding-left:8px'},el('div',{class:'mut',style:'font-size:11px'},'English'),r.body_en):el('span',{class:'mut',style:'font-size:12px'},'Английской версии нет'))),
     td(photoCell(r)),td(statusPill(r)),
     el('td',{style:'white-space:nowrap'},
       r.status!=='published'?tb(r.status==='pending'?'Опубликовать':'Показать',act(()=>api('/reviews/'+r.id,{method:'PUT',body:{author:r.author,rating:r.rating,body:r.body,status:'published'}}))):tb('Скрыть',act(()=>api('/reviews/'+r.id,{method:'PUT',body:{author:r.author,rating:r.rating,body:r.body,status:'hidden'}}))),
