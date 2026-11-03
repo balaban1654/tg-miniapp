@@ -133,25 +133,45 @@ tr.dayb td{border-top:2px solid #6a2fe0}
 td{white-space:nowrap}
 .tgid{color:#f1ebff;text-decoration:none;border-bottom:1px dashed #a89cc8}
 .snm{color:#f1ebff;text-decoration:none;border-bottom:1px dashed #a89cc8}
-.sc-st{display:inline-block;padding:4px 10px;border-radius:99px;font-size:12px;font-weight:700;background:rgba(255,107,138,.15);color:#ff6b8a}
-.sc-st.off{background:#150d26;color:#a89cc8}
-.sc-sec{font-size:11px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:#a89cc8;margin:18px 0 10px}
-.sc-bar{position:relative;height:8px;border-radius:8px;background:#150d26;margin:10px 0 8px}
-.sc-bar i{display:block;height:8px;border-radius:8px}
-.sc-bar u{position:absolute;top:-3px;width:2px;height:14px;background:#f1ebff}
-.sc-sg{display:-webkit-flex;display:flex;margin:14px -4px 0}
-.sc-sg div{-webkit-flex:1;flex:1;margin:0 4px;background:#150d26;border:1px solid #34255c;border-radius:10px;padding:10px 12px}
-.sc-sg span{display:block;font-size:12px;color:#a89cc8;margin-bottom:4px}.sc-sg b{font-size:17px}
-.sc-cols{display:-webkit-flex;display:flex;-webkit-flex-wrap:wrap;flex-wrap:wrap;margin:0 -6px}
-.sc-col{width:50%;box-sizing:border-box;padding:0 6px;margin-bottom:10px}
-.sc-ch{font-size:12px;font-weight:700;color:#c9a6ff;margin-bottom:6px}
-.sc-row{display:-webkit-flex;display:flex;-webkit-justify-content:space-between;justify-content:space-between;font-size:14px;padding:5px 0;border-bottom:1px solid rgba(52,37,92,.6)}
-.sc-row span{color:#a89cc8;margin-right:10px}
-.sc-pay{display:-webkit-flex;display:flex;-webkit-justify-content:space-between;justify-content:space-between;-webkit-align-items:center;align-items:center;margin-top:10px;padding:10px 12px;border-radius:10px;background:rgba(155,92,255,.15);font-weight:700}
-.sc-pay b{font-size:18px}
-.sc-dm{color:#a89cc8}.sc-neg{color:#ff6b8a}
-.sc-vd{margin-top:10px;padding:10px 12px;border-radius:10px;font-size:14px;line-height:1.4}
-.sc-vd.g{background:rgba(61,220,151,.12);color:#3ddc97}.sc-vd.y{background:rgba(255,213,77,.12);color:#ffd54d}.sc-vd.r{background:rgba(255,107,138,.12);color:#ff6b8a}
+/* Карточка стримера: как в Office (dx-md), только flex (Safari 9). Если не влезает по высоте, уменьшается целиком */
+.so{position:fixed;left:0;top:0;right:0;bottom:0;z-index:70;background:rgba(5,2,12,.6)}
+.sm{position:fixed;left:50%;top:50%;width:560px;max-width:94%;box-sizing:border-box;z-index:71;background:#1c1233;border:1px solid #34255c;border-radius:16px;padding:20px;box-shadow:0 24px 60px rgba(0,0,0,.6);-webkit-transform-origin:50% 50%;transform-origin:50% 50%}
+.sm .g{margin-top:16px}
+.sm-h{display:-webkit-flex;display:flex;-webkit-align-items:flex-start;align-items:flex-start}
+.sm-av{width:44px;height:44px;border-radius:50%;background:rgba(155,92,255,.2);color:#c9a6ff;display:-webkit-flex;display:flex;-webkit-align-items:center;align-items:center;-webkit-justify-content:center;justify-content:center;-webkit-flex:none;flex:none;margin-right:12px}
+.sm-h h2{margin:0;font-size:22px;line-height:1.2}.sm-h .tg{font-size:13px;color:#a89cc8}
+.sm-sp{-webkit-flex:1;flex:1}
+.sm-st{display:inline-block;font-size:12px;font-weight:700;padding:4px 10px;border-radius:99px;background:rgba(61,220,151,.13);color:#3ddc97;vertical-align:middle}
+.sm-st.off{background:rgba(255,255,255,.08);color:#a89cc8}
+.sm-x{width:32px;height:32px;border:1px solid #34255c;border-radius:8px;background:none;color:#a89cc8;font-size:18px;line-height:1;margin-left:8px;vertical-align:middle;-webkit-appearance:none;font-family:inherit}
+.sm-sec{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#a89cc8}
+.sm-big{font-size:22px;font-weight:700;color:#f1ebff;letter-spacing:-.01em}
+.sm-hd{display:-webkit-flex;display:flex;-webkit-justify-content:space-between;justify-content:space-between;-webkit-align-items:center;align-items:center}
+.sm-cl{font-size:13px;color:#a89cc8;margin-right:14px}
+.sm-bar{position:relative;height:8px;border-radius:99px;background:rgba(255,255,255,.1);margin:13px 0 0}
+.sm-bar i{position:absolute;left:0;top:0;bottom:0;border-radius:99px}
+.sm-bar u{position:absolute;top:-4px;bottom:-4px;width:2px;background:#f1ebff;border-radius:1px}
+.sm-meta{display:-webkit-flex;display:flex;-webkit-justify-content:space-between;justify-content:space-between;font-size:12px;color:#a89cc8;margin-top:13px}
+.sm-sg{display:-webkit-flex;display:flex;margin:16px -5px 0}
+.sm-sg .c{-webkit-flex:1;flex:1;margin:0 5px;border:1px solid #34255c;border-radius:12px;padding:12px;text-align:center}
+.sm-sg .c span{display:block;font-size:12px;color:#a89cc8}.sm-sg .c b{display:block;font-size:19px;white-space:nowrap}
+.sm-sal{display:-webkit-flex;display:flex;margin-top:8px}
+.sm-col{display:-webkit-flex;display:flex;-webkit-flex-direction:column;flex-direction:column}
+.sm-col.l{-webkit-flex:1.25;flex:1.25;margin-right:24px}.sm-col.r{-webkit-flex:1;flex:1}
+.sm-sh{font-size:12px;color:#a89cc8;text-transform:uppercase;letter-spacing:.06em;margin:6px 0}
+.sm-sh.f{margin-top:0}
+.sm-row{display:-webkit-flex;display:flex;-webkit-justify-content:space-between;justify-content:space-between;font-size:13px;color:#a89cc8;padding:3px 0}
+.sm-row b{color:#f1ebff}.sm-col .sm-row{border-bottom:1px solid #34255c;padding:0 0 6px;margin-bottom:6px}
+.sm-dm{color:#a89cc8;font-weight:500}.sm-sl{color:#a89cc8;margin:0 5px;font-weight:400}
+.sm-fill{-webkit-flex:1;flex:1}
+.sm-pay{display:-webkit-flex;display:flex;-webkit-justify-content:space-between;justify-content:space-between;-webkit-align-items:baseline;align-items:baseline;padding-top:4px;font-size:15px;color:#f1ebff}
+.sm-pay b{font-size:18px;white-space:nowrap}.sm-pay .okc{color:#3ddc97}
+.sm-res{display:-webkit-flex;display:flex;-webkit-justify-content:space-between;justify-content:space-between;-webkit-align-items:baseline;align-items:baseline;font-size:16px;color:#f1ebff;border-top:1px solid #34255c;padding-top:8px;margin-top:4px}
+.sm-res b{font-size:22px}
+.sm-neg{color:#ff6b8a!important}
+.sm-vd{margin-top:8px;padding:10px 12px;border-radius:10px;font-size:14px;line-height:1.35}
+.sm-vd.g{background:rgba(61,220,151,.13);color:#3ddc97}.sm-vd.y{background:rgba(255,184,77,.13);color:#ffb84d}.sm-vd.r{background:rgba(255,107,138,.13);color:#ff6b8a}
+.sm-ft{font-size:12px;color:#a89cc8}
 .mi svg{width:19px;height:19px;vertical-align:-4px;margin-right:12px}
 .cov{position:fixed;left:0;top:0;right:0;bottom:0;background:rgba(0,0,0,.7);z-index:70}
 .cbox{position:fixed;left:50%;top:30px;bottom:30px;width:600px;max-width:94%;-webkit-transform:translateX(-50%);transform:translateX(-50%);z-index:71;background:#1c1233;border:1px solid #34255c;border-radius:16px;padding:20px;overflow-y:auto;-webkit-overflow-scrolling:touch}
@@ -487,7 +507,7 @@ function sgn(n) { n = Number(n) || 0; return (n < 0 ? '−' : '+') + usd(Math.ab
 function openStreamer(s) {
   if (!s || !last) return;
   var d = last.d, m = s.month || {}, plan = d.plan || {}, pace = plan.paceMin || 0, hrs = m.hoursMin || 0, planMin = plan.planMin || (plan.hours || 0) * 60 || 1;
-  var lv = lvl(hrs, pace), col = lv === 'pos' ? '#3ddc97' : lv === 'warn' ? '#ffd54d' : '#ff6b8a';
+  var lv = lvl(hrs, pace), col = lv === 'pos' ? '#3ddc97' : lv === 'warn' ? '#ffb84d' : '#ff6b8a';
   var pct = Math.round(hrs / planMin * 100), pp = Math.round(pace / planMin * 100);
   var tot = function (k) { return [m.baseMin, m.baseFull][k] + [m.leadsMin, m.leadsFull][k] + (m.ftdBonus || 0) + (m.dayBonus || 0) + (m.depBonus || 0) + (m.bonus || 0) - (m.penalty || 0); };
   var pay = [Math.max(0, tot(0) - (m.paid || 0)), Math.max(0, tot(1) - (m.paid || 0))];
@@ -495,31 +515,44 @@ function openStreamer(s) {
   var vc = 'g', vt = 'Выгоден', vx = 'приносит $' + ratio.toFixed(1).replace('.', ',') + ' комиссии на каждый $1 зарплаты';
   if (ratio < 1) { vc = 'r'; vt = 'Убыточен'; vx = 'зарплата больше комиссии'; } else if (ratio < 2) { vc = 'y'; vt = 'На грани'; vx = 'комиссия лишь в ' + ratio.toFixed(1).replace('.', ',') + ' раза больше зарплаты'; }
   if (hrs < pace * 0.85 && vc === 'g') vx += '. Но сильно отстаёт по часам, ' + hw(hrs) + ' из ' + plan.hours + ' ч';
-  var row = function (a, b, cls) { return '<div class="sc-row"><span>' + a + '</span><b' + (cls ? ' class="' + cls + '"' : '') + '>' + b + '</b></div>'; };
-  var pair = function (a, b) { return '<span class="sc-dm">' + usd(a) + '</span> / ' + usd(b); };
+  var row = function (a, b, cls) { return '<div class="sm-row"><span>' + a + '</span><b' + (cls ? ' class="' + cls + '"' : '') + '>' + b + '</b></div>'; };
+  var pair = function (a, b, last2) { return '<span class="sm-dm">' + usd(a) + '</span><span class="sm-sl">/</span><span' + (last2 ? ' class="' + last2 + '"' : '') + '>' + usd(b) + '</span>'; };
+  var z = function (v) { return v ? sgn(v) : '$0'; };
   var elapsed = s.live ? Math.max(0, Math.floor((Date.now() - Date.parse(s.live.started_at)) / 60000)) : 0;
-  var h = '<div class="chd"><div><h2 style="margin:0">' + esc(s.name) + '</h2><div class="mut">' + esc(s.tg ? '@' + String(s.tg).replace(/^@/, '') : (s.login || '')) + '</div></div>' +
-    '<div style="text-align:right"><span class="sc-st' + (s.live ? '' : ' off') + '">' + (s.live ? 'в эфире ' + hm(elapsed) : 'не в эфире · ' + esc(offText(s, d.today))) + '</span>' +
-    '<button class="ib" id="cx" style="margin-left:10px">✕</button></div></div>';
-  h += '<div class="sc-row" style="border:0"><span class="sc-sec" style="margin:0">Часы за месяц</span><b style="color:' + col + '">' + (s.live && s.minLeft != null ? '<span class="mut" style="font-weight:600;margin-right:10px">До закрытия: ' + hm(s.minLeft) + '</span>' : '') + hw(hrs) + ' / ' + plan.hours + ' ч</b></div>';
-  h += '<div class="sc-bar"><i style="width:' + Math.min(100, pct) + '%;background:' + col + '"></i><u style="left:' + Math.min(100, pp) + '%"></u></div>';
-  h += '<div class="sc-row" style="border:0;font-size:12px"><span>' + pct + '% плана</span><span>по графику на сегодня ' + hw(pace) + ' ч</span></div>';
-  h += '<div class="sc-sg"><div><span>Смен</span><b>' + (m.shifts || 0) + '</b></div><div><span>FTD</span><b>' + (m.ftd || 0) + '</b></div><div><span>FTD $</span><b>' + usd(m.ftdSum) + '</b></div><div><span>Total $</span><b>' + usd(m.deposits) + '</b></div></div>';
+  var left = s.live && s.minLeft != null ? s.minLeft : null;
   var prem = (m.bonus || 0) - (m.refBonus || 0);
-  h += '<div class="sc-sec">Зарплата за месяц</div><div class="sc-cols">' +
-    '<div class="sc-col"><div class="sc-ch">База</div>' + row('Ставка (' + (m.shifts || 0) + ' смен)', pair(m.baseMin, m.baseFull)) + row('Лиды (' + (m.ftd || 0) + ')', pair(m.leadsMin, m.leadsFull)) + '</div>' +
-    '<div class="sc-col"><div class="sc-ch">Удержания</div>' + row('Штрафы', m.penalty ? sgn(-m.penalty) : '$0', m.penalty ? 'sc-neg' : '') + row('Выплачено (аванс)', m.paid ? sgn(-m.paid) : '$0') + '</div>' +
-    '<div class="sc-col"><div class="sc-ch">Бонусы</div>' + row('FTD (суммы больше)', m.ftdBonus ? sgn(m.ftdBonus) : '$0') + row('Дневной (' + (plan.dayCount || 4) + ' FTD)', m.dayBonus ? sgn(m.dayBonus) : '$0') + row('Додепы (градации)', m.depBonus ? sgn(m.depBonus) : '$0') + row('Премии', prem ? sgn(prem) : '$0') + '</div>' +
-    '<div class="sc-col"><div class="sc-ch">&nbsp;</div>' + row('Рефералы' + (m.refN ? ' (' + m.refN + ')' : ''), m.refBonus ? sgn(m.refBonus) : '$0') +
-    '<div class="sc-pay"><span>К выплате</span><b>' + pair(pay[0], pay[1]) + '</b></div></div></div>';
+  var h = '<div class="sm-h"><div class="sm-av"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></div>' +
+    '<div><h2>' + esc(s.name) + '</h2><div class="tg">' + esc(s.tg ? '@' + String(s.tg).replace(/^@/, '') : (s.login || '')) + '</div></div><div class="sm-sp"></div>' +
+    '<div style="white-space:nowrap"><span class="sm-st' + (s.live ? '' : ' off') + '">' + (s.live ? 'в эфире ' + hm(elapsed) : 'не в эфире · ' + esc(offText(s, d.today))) + '</span><button class="sm-x" id="cx" aria-label="Закрыть">×</button></div></div>';
+  h += '<div class="g"><div class="sm-hd"><span class="sm-sec">Часы за месяц</span><span>' + (left !== null ? '<span class="sm-cl">До закрытия: ' + hm(left) + '</span>' : '') + '<b style="color:' + col + '">' + hw(hrs) + ' / ' + plan.hours + ' ч</b></span></div>' +
+    '<div class="sm-bar"><i style="width:' + Math.min(100, pct) + '%;background:' + col + '"></i><u style="left:' + Math.min(100, pp) + '%"></u></div>' +
+    '<div class="sm-meta"><span>' + pct + '% плана</span><span>по графику на сегодня ' + hw(pace) + ' ч</span></div></div>';
+  h += '<div class="sm-sg"><div class="c"><span>Смен</span><b>' + (m.shifts || 0) + '</b></div><div class="c"><span>FTD</span><b>' + (m.ftd || 0) + '</b></div><div class="c"><span>FTD $</span><b>' + usd(m.ftdSum) + '</b></div><div class="c"><span>Total $</span><b>' + usd(m.deposits) + '</b></div></div>';
+  h += '<div class="g"><div class="sm-big">Зарплата за месяц</div><div class="sm-sal">' +
+    '<div class="sm-col l"><div class="sm-sh f">База</div>' + row('Ставка (' + (m.shifts || 0) + ' смен)', pair(m.baseMin, m.baseFull)) + row('Лиды (' + (m.ftd || 0) + ')', pair(m.leadsMin, m.leadsFull)) +
+      '<div class="sm-sh">Бонусы</div>' + row('FTD (суммы больше)', z(m.ftdBonus)) + row('Дневной (' + (plan.dayCount || 4) + ' FTD)', z(m.dayBonus)) + row('Додепы (градации)', z(m.depBonus)) + row('Премии', z(prem)) + '</div>' +
+    '<div class="sm-col r"><div class="sm-sh f">Удержания</div>' + row('Штрафы', m.penalty ? sgn(-m.penalty) : '$0', m.penalty ? 'sm-neg' : '') + row('Выплачено (аванс)', m.paid ? sgn(-m.paid) : '$0') +
+      '<div class="sm-fill"></div>' + row('Рефералы' + (m.refN ? ' (' + m.refN + ')' : ''), z(m.refBonus)) +
+      '<div class="sm-pay"><span>К выплате</span><b>' + pair(pay[0], pay[1], 'okc') + '</b></div></div></div></div>';
   if (myRole === 'admin' || myRole === 'teamlead')
-    h += '<div class="sc-sec">Выгоден ли сотрудник</div>' + row('Комиссия с лидов', usd(comm)) + row('Зарплата по полным ставкам', '−' + usd(cost), 'sc-neg') +
-      row('<b style="color:#f1ebff">Прибыль с сотрудника</b>', sgn(profit), profit < 0 ? 'sc-neg' : '') + '<div class="sc-vd ' + vc + '"><b>' + vt + '.</b> ' + vx + '.</div>';
-  h += '<div class="mut" style="margin-top:14px;font-size:12px">Данные за ' + esc(perLabel(m.period || d.today.slice(0, 7))) + '</div>';
-  $('card').innerHTML = '<div class="cov" id="cov"></div><div class="cbox">' + h + '</div>';
+    h += '<div class="g"><div class="sm-sec" style="margin-bottom:6px">Выгоден ли сотрудник</div>' + row('Комиссия с лидов', usd(comm)) + row('Зарплата по полным ставкам', '−' + usd(cost), 'sm-neg') +
+      '<div class="sm-res"><span>Прибыль с сотрудника</span><b' + (profit < 0 ? ' class="sm-neg"' : '') + '>' + sgn(profit) + '</b></div>' +
+      '<div class="sm-vd ' + vc + '"><b>' + vt + '.</b> ' + vx + '.</div></div>';
+  h += '<div class="g sm-ft">Данные за ' + esc(perLabel(m.period || d.today.slice(0, 7))) + '</div>';
+  $('card').innerHTML = '<div class="so" id="cov"></div><div class="sm" id="smd">' + h + '</div>';
   $('card').className = '';
   $('cov').onclick = closeCard; $('cx').onclick = closeCard;
+  smFit();
 }
+// Карточка всегда видна целиком: по центру экрана, а если выше экрана, уменьшается пропорционально
+function smFit() {
+  var md = $('smd'); if (!md) return;
+  var vh = window.innerHeight || document.documentElement.clientHeight, k = Math.min(1, (vh - 24) / md.offsetHeight);
+  var t = 'translate(-50%,-50%) scale(' + k + ')';
+  md.style.webkitTransform = t; md.style.transform = t;
+}
+window.addEventListener('resize', smFit, false);
+window.addEventListener('orientationchange', function () { setTimeout(smFit, 300); }, false);
 
 // ---------- Карточка клиента (по нажатию на Telegram ID), только просмотр ----------
 function dt(v) { if (!v) return '—'; var d = new Date(v); return d.getDate() + ' ' + MS[d.getMonth()] + ' ' + d.getFullYear() + ', ' + pad(d.getHours()) + ':' + pad(d.getMinutes()); }
