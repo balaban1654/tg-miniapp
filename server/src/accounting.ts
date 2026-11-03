@@ -655,13 +655,15 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     const me = req.staff!;
     const b = (req.body ?? {}) as Record<string, any>;
     const cur = (await db.query(
-      `SELECT s.id, s.declared_min, to_char(s.day, 'YYYY-MM') AS pm FROM shift_reports s JOIN staff st ON st.id = s.staff_id
+      `SELECT s.id, s.status, s.declared_min, to_char(s.day, 'YYYY-MM') AS pm FROM shift_reports s JOIN staff st ON st.id = s.staff_id
         WHERE s.id = $1 AND (s.status = 'pending' OR ($3 AND s.status = 'approved')) AND ($2::int IS NULL OR (st.parent_id = $2 AND NOT s.team))`,
       // Зачтённый отчёт тоже можно отклонить: его время уходит из расчёта часов и зарплаты
       [Number(req.params.id), teamScope(req), b.action === 'reject'],
     )).rows[0];
     if (!cur) return reply.code(404).send({ error: 'Отчёт не найден или уже проверен' });
-    if (await isClosed(cur.pm)) return reply.code(409).send({ error: 'Месяц отчёта закрыт. Откройте месяц заново в Бухгалтерии, проверьте отчёт и закройте месяц снова.' });
+    // Отклонить отчёт на проверке можно и в закрытом месяце: в расчёт он ещё не входил, закрытые цифры не меняются
+    const keepsClosed = b.action === 'reject' && cur.status === 'pending';
+    if (!keepsClosed && (await isClosed(cur.pm))) return reply.code(409).send({ error: 'Месяц отчёта закрыт. Откройте месяц заново в Бухгалтерии, проверьте отчёт и закройте месяц снова.' });
     if (b.action === 'approve') {
       const min = b.minutes === undefined ? cur.declared_min : Math.trunc(Number(b.minutes));
       if (!Number.isFinite(min) || min < 1 || min > 720) return reply.code(400).send({ error: 'Время от 1 до 720 минут' });
