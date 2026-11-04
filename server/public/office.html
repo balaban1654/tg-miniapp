@@ -150,6 +150,8 @@ main{padding:22px clamp(14px,3vw,32px);display:grid;grid-template-columns:minmax
 .kpi small{color:var(--mut);text-transform:uppercase;letter-spacing:.05em;font-size:10px}
 .kpi b{display:block;font:700 24px var(--fm);margin-top:2px}
 .tbl{overflow-x:auto;border:1px solid var(--line);border-radius:14px}
+@media(min-width:701px){.tbl.sumt table{min-width:0}.tbl.sumt th,.tbl.sumt td{padding:7px 6px;font-size:12px}.tbl.sumt th{font-size:9.5px;letter-spacing:.03em;white-space:normal;line-height:1.25}.tbl.sumt td .sm{font-size:10px}.tbl.sumt td .pill{font-size:9.5px;padding:2px 6px}.tbl.sumt tr.grp td{background:var(--bg2);color:var(--acc2);font:700 10.5px var(--fm);letter-spacing:.06em;text-transform:uppercase;text-align:left!important;padding:6px 12px}}
+@media(max-width:700px){.tbl.sumt tr.grp{display:none!important}}
 table{border-collapse:collapse;width:100%;min-width:560px}
 th,td{padding:10px 14px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}
 /* Таблица «Лиды» на компьютере плотнее: все колонки помещаются в экран, длинные имена обрезаются многоточием (полностью в подсказке) */
@@ -3150,7 +3152,11 @@ async function accRoi(){
 }
 async function accSum(){
   const d=await api('/kpi/summary?period='+accState.period);
-  const R=d.rows.filter(r=>r.staff.active||r.kpi.hoursMin||r.kpi.ftdCount||r.kpi.paid);
+  // Сначала стримеры, от самого продуктивного: больше FTD, при равенстве больше часов, потом больше начислено.
+  // Ниже отдельной группой админы, тимлиды и команда (ставка из «ЗП (команда)»)
+  const isStr=r=>r.staff.role==='streamer';
+  const R=d.rows.filter(r=>r.staff.active||r.kpi.hoursMin||r.kpi.ftdCount||r.kpi.paid)
+    .sort((a,b)=>(isStr(b)-isStr(a))||(isStr(a)?(b.kpi.ftdCount-a.kpi.ftdCount)||(b.kpi.hoursMin-a.kpi.hoursMin):0)||(b.kpi.total-a.kpi.total)||a.staff.name.localeCompare(b.staff.name,'ru'));
   // В итоги входит и заработок клиентов за рефералов (ставка стримерам уже внутри их «Доп.»)
   const RF=d.ref||{earned:0,paid:0,n:0,rows:[]};
   const tot=R.reduce((a,r)=>a+r.kpi.total,0)+RF.earned,paid=R.reduce((a,r)=>a+r.kpi.paid,0)+RF.paid;
@@ -3174,9 +3180,12 @@ async function accSum(){
     return tr});
   const SUMH=['Сотрудник','Часы','Смены','План смен','Лиды (FTD)','План лидов','За смены','За лидов','Бонусы FTD','Дневные','Додепы','Доп.','Ставка (команда)','Итого','Выплачено','К выплате'];
   rows.forEach(tr=>[...tr.children].forEach((c,i)=>c.setAttribute('data-l',SUMH[i]||'')));
-  const tbl=el('div',{class:'tbl ctr sumt'},el('table',{},el('thead',{},el('tr',{},SUMH.map(c=>el('th',{},c)))),el('tbody',{},rows)));
+  const grpRow=t=>el('tr',{class:'grp'},el('td',{colspan:String(SUMH.length)},t));
+  const firstTeam=R.findIndex(r=>!isStr(r));
+  const body=firstTeam>0?[grpRow('Стримеры'),...rows.slice(0,firstTeam),grpRow('Админы, тимлиды и команда'),...rows.slice(firstTeam)]:rows;
+  const tbl=el('div',{class:'tbl ctr sumt'},el('table',{},el('thead',{},el('tr',{},SUMH.map(c=>el('th',{},c)))),el('tbody',{},body)));
   // Телефон: у каждого стримера своя карточка, строки «название ······ сумма» выровнены по обоим краям
-  const trs=[...tbl.querySelectorAll('tbody tr')];
+  const trs=[...tbl.querySelectorAll('tbody tr:not(.grp)')];
   const dim=(()=>{const m=d.period||accState.period||kyivToday().slice(0,7);const[y,mo]=m.split('-').map(Number);return new Date(Date.UTC(y,mo,0)).getUTCDate()})();
   const paceP=(d.period||accState.period)===kyivToday().slice(0,7)?Number(kyivToday().slice(8))/dim*100:100;
   const lvc=p=>p>=paceP?'ok':p>=paceP*.85?'warn':'bad';
