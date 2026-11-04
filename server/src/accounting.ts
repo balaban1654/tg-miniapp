@@ -1,6 +1,7 @@
 import { leadStatusDate, funnelStage, funnelStageDate, churnedAfterFtd } from './leaddate.js';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { db } from './db.js';
+import { refLeadPay } from './referral.js';
 import { announceLive } from './templates.js';
 import { DEFAULT_DEP_TIERS, normTiers, loadDepConfig, leadTierState, type DepTier } from './depbonus.js';
 import type { Role } from './auth.js';
@@ -842,7 +843,8 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
       if (!req.query.all && s.role !== 'streamer' && !s.streams && !team && !k.adjBonus && !k.adjPenalty) continue;
       rows.push({ staff: s, kpi: withTeam(k, team) });
     }
-    return { plan, period, rows };
+    // Рефералы: заработок клиентов за месяц и кто сколько привёл (ставка стримерам уже в «Доп.»)
+    return { plan, period, rows, ref: await refLeadPay(`${period}-01`, new Date(Date.UTC(Number(period.slice(0, 4)), Number(period.slice(5, 7)), 0)).toISOString().slice(0, 10)) };
   });
 
   // Окупаемость сотрудников за месяц: сколько стоил компании (начислено, а если выплатили больше — выплаченное) и сколько комиссии
@@ -1603,6 +1605,9 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
       }
       salaries += teamSal.reduce((a, x) => a + x.salary, 0);
     }
+    // Оплата клиентам за рефералов: тоже выплата людям, идёт в «Зарплаты» и в расход чистой прибыли (админу)
+    const refPay = lead ? null : await refLeadPay(from, to);
+    if (refPay) salaries += refPay.earned;
     const expRows = (
       lead ? { rows: [] } : await db.query(`SELECT id, to_char(day, 'YYYY-MM-DD') AS day, amount::float AS amount, comment FROM expenses WHERE day BETWEEN $1::date AND $2::date ORDER BY day DESC, id DESC`, [from, to])
     ).rows as { id: number; day: string; amount: number; comment: string }[];
@@ -1652,6 +1657,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
         netPlanToDate: goals && !lead ? r2(goals.net * pace) : null,
       },
       teamSalaries: teamSal,
+      refPay: refPay ? { earned: refPay.earned, paid: refPay.paid, n: refPay.n } : null,
       expenses: expRows,
       tasks: {
         pending: out.filter((x) => x.pending).map((x) => ({ id: x.id, name: x.name, n: x.pending })),

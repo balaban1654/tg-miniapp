@@ -1420,6 +1420,8 @@ function dxNet(d){
       const tot=s.range.salary+(t?t.salary:0);
       return el('div',{class:'r'},el('span',{},s.name,el('em',{},(t?'смены и лиды '+usd0(s.range.salary)+' + ставка «ЗП (команда)» '+usd0(t.salary):'начислено')+' · '+payTxt(tot,s.range.paid))),el('b',{},usd0(tot)))}),
     ...[...TS.values()].map(s=>el('div',{class:'r'},el('span',{},s.name,el('em',{},(RLS[s.role]||s.role)+' · ставка из «ЗП (команда)» · '+payTxt(s.salary,s.paid))),el('b',{},usd0(s.salary)))),
+    // Клиентам за приглашённых друзей: общей суммой, без разбивки по людям
+    d.refPay&&(d.refPay.earned||d.refPay.paid)?el('div',{class:'r'},el('span',{},'Оплата за рефералов',el('em',{},'клиентам · рефералов '+d.refPay.n+' · '+payTxt(d.refPay.earned,d.refPay.paid))),el('b',{},usd0(d.refPay.earned))):null,
     el('div',{class:'r'},el('span',{},'Итого начислено'),el('b',{},usd0(t.salaries))));
   const salPop=el('div',{style:'display:grid;gap:8px'},el('div',{class:'dx-hd'},el('span',{class:'dx-lbl'},'Зарплаты за период (начислено)'),el('a',{href:'#/acc/sum',style:'color:var(--acc2);font-weight:700;font-size:12px',onclick:e=>{e.preventDefault();dxGo('acc','sum')}},'Бухгалтерия →')),sal,
     d.range.whole?null:el('div',{class:'mut sm'},'Неполный месяц: зарплата считается пропорционально дням.'));
@@ -3146,7 +3148,9 @@ async function accRoi(){
 async function accSum(){
   const d=await api('/kpi/summary?period='+accState.period);
   const R=d.rows.filter(r=>r.staff.active||r.kpi.hoursMin||r.kpi.ftdCount||r.kpi.paid);
-  const tot=R.reduce((a,r)=>a+r.kpi.total,0),paid=R.reduce((a,r)=>a+r.kpi.paid,0);
+  // В итоги входит и заработок клиентов за рефералов (ставка стримерам уже внутри их «Доп.»)
+  const RF=d.ref||{earned:0,paid:0,n:0,rows:[]};
+  const tot=R.reduce((a,r)=>a+r.kpi.total,0)+RF.earned,paid=R.reduce((a,r)=>a+r.kpi.paid,0)+RF.paid;
   const tiles=el('div',{class:'kpis'},...[['Начислено за месяц',usd2(tot)],['Выплачено',usd2(paid)],['К выплате',usd2(tot-paid)],['Оба плана выполнили',(()=>{const S=R.filter(r=>r.staff.role==='streamer'||r.staff.streams);return S.filter(r=>r.kpi.shiftsDone&&r.kpi.leadsDone).length+' из '+S.length})()]].map(([a,b])=>el('div',{class:'kpi'},el('small',{},a),el('b',{style:'font-size:20px'},b))));
   const detail=el('div',{style:'display:grid;gap:12px'});
   const rows=R.map(r=>{const k=r.kpi;
@@ -3198,7 +3202,15 @@ async function accSum(){
       row('К выплате',usd2(k.due),'strong due'));
     return c});
   const list=el('div',{class:'sumcards'},...cards);
-  return[tiles,R.length?tbl:el('div',{class:'card empty'},'Сотрудников пока нет. Добавьте их в разделе «Сотрудники».'),R.length?list:null,el('div',{class:'mut sm'},'Нажмите на строку, чтобы увидеть разбор начисления.'),detail];
+  // Рефералы: кто из клиентов сколько привёл и заработал за месяц (ставка стримерам за них уже в «Доп.» выше)
+  const refBox=RF.rows.length?el('div',{style:'display:grid;gap:10px;margin-top:10px'},
+    el('div',{class:'head',style:'margin:0'},el('h3',{style:'font-size:15px'},'Рефералы'),el('span',{class:'mut sm'},'привели '+RF.rows.reduce((a,x)=>a+x.invited,0)+' · подключились '+RF.n+' · клиентам начислено '+usd2(RF.earned)+' · выплачено '+usd2(RF.paid)+' · к выплате '+usd2(Math.max(0,RF.earned-RF.paid)))),
+    ctrT(table(['Пригласил','Привёл','Подключились','Заработал','Выплачено','Баланс сейчас'],[...RF.rows.map(x=>[
+      el('td',{},el('button',{type:'button',class:'own-btn',title:'Открыть карточку клиента',onclick:()=>openLeadCard(Number(x.tg_id))},x.name)),
+      td(x.invited,'n'),td(x.connected,'n'),td(usd2(x.earned),'n'),td(x.paid?usd2(-x.paid):'—','n'),td(usd2(x.balance),'n')]),
+      [el('td',{},el('b',{},'Итого')),td(RF.rows.reduce((a,x)=>a+x.invited,0),'n'),td(RF.n,'n'),el('td',{class:'n'},el('b',{},usd2(RF.earned))),td(RF.paid?usd2(-RF.paid):'—','n'),td('')]])),
+    el('div',{class:'mut sm'},'«Привёл» — друзья, которые открыли бота в этом месяце; «Подключились» — сделали первый депозит, за них клиенту начислено. Суммы клиентов входят в «Начислено» и «Выплачено» сверху. «Баланс сейчас» — сколько клиент может вывести на сегодня, за всё время.')):null;
+  return[tiles,R.length?tbl:el('div',{class:'card empty'},'Сотрудников пока нет. Добавьте их в разделе «Сотрудники».'),R.length?list:null,el('div',{class:'mut sm'},'Нажмите на строку, чтобы увидеть разбор начисления.'),detail,refBox];
 }
 
 async function accDetail(box,id){
@@ -3208,7 +3220,7 @@ async function accDetail(box,id){
   const tierNote=k.leadsDone?(k.act.price>plan.price?' ('+n+' лидов, все по повышенной цене)':''):' (план по лидам не выполнен)';
   const steps=[
     step('Ставка за смены',(k.shiftsDone?'План по сменам выполнен':k.hoursDone?'Часы набраны, но FTD '+k.ftdCount+' меньше '+plan.baseMinFtd+': ставка минимальная':'План по сменам не выполнен')+': $'+k.act.baseRate+' × '+Math.min(k.hoursMin,k.planMin)+' ÷ '+k.planMin+' мин'+(k.overtimeMin?'. Переработка '+hmin(k.overtimeMin)+' записана, но не оплачивается':''),usd2(k.act.base)),
-    step('Лиды',n+' FTD × $'+k.act.price+tierNote,usd2(k.act.leadsPay)),
+    step('Лиды',(k.payCount??n)+' FTD × $'+k.act.price+tierNote+(n>(k.payCount??n)?'. Рефералы ('+(n-k.payCount)+') идут в план, но оплачиваются отдельной ставкой в «Доп.»':''),usd2(k.act.leadsPay)),
     step('Бонусы за FTD','Один уровень по сумме первого депозита, с запасом '+Math.round(plan.tol*100)+'% на курс',usd2(k.ftdBonus),'pos2'),
     step('Дневные бонусы',k.dayRows.filter(x=>x.hit).length+' дн. по $'+plan.day.bonus,usd2(k.dayBonus),'pos2'),
     step('Бонусы за додепы','Принятые запросы за градации лидов',usd2(k.depBonus||0),'pos2'),

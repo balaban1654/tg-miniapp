@@ -122,6 +122,38 @@ export async function syncRefRewardsAll(): Promise<void> {
   for (const r of rows) await syncRefReward(r.tg_id).catch((e) => console.warn('ref sync', r.tg_id, e));
 }
 
+/** Заработок клиентов на рефералах за период (даты по Киеву): начислено, выплачено, и по каждому пригласившему.
+ *  Тестовые аккаунты не считаются. Ставка трейдеру сюда не входит: она в зарплате стримера («Доп.») */
+export async function refLeadPay(from: string, to: string): Promise<{
+  earned: number; paid: number; n: number;
+  rows: { tg_id: string; name: string; invited: number; connected: number; earned: number; paid: number; balance: number }[];
+}> {
+  const K = `AT TIME ZONE 'Europe/Kyiv'`;
+  const notTest = (x: string) => `coalesce(${x}.lead_role, 'lead') <> 'test'`;
+  const rows = (await db.query(
+    `WITH inv AS (
+       SELECT d.referrer_id AS rid, count(*)::int AS invited FROM leads d JOIN leads r ON r.tg_id = d.referrer_id
+        WHERE d.referrer_id IS NOT NULL AND ${notTest('d')} AND ${notTest('r')} AND (d.created_at ${K})::date BETWEEN $1::date AND $2::date GROUP BY 1),
+     earn AS (
+       SELECT w.referrer_id AS rid, count(*)::int AS connected, sum(w.lead_amount)::float AS earned FROM referral_rewards w
+         JOIN leads d ON d.tg_id = w.tg_id JOIN leads r ON r.tg_id = w.referrer_id
+        WHERE ${notTest('d')} AND ${notTest('r')} AND (w.created_at ${K})::date BETWEEN $1::date AND $2::date GROUP BY 1),
+     pay AS (
+       SELECT p.tg_id AS rid, sum(p.amount)::float AS paid FROM referral_payouts p JOIN leads r ON r.tg_id = p.tg_id
+        WHERE p.status = 'paid' AND ${notTest('r')} AND (p.decided_at ${K})::date BETWEEN $1::date AND $2::date GROUP BY 1),
+     ids AS (SELECT rid FROM inv UNION SELECT rid FROM earn UNION SELECT rid FROM pay)
+     SELECT ids.rid::text AS tg_id, coalesce(r.first_name, CASE WHEN r.username IS NOT NULL THEN '@' || r.username END, ids.rid::text) AS name,
+            coalesce(inv.invited, 0) AS invited, coalesce(earn.connected, 0) AS connected, coalesce(earn.earned, 0) AS earned, coalesce(pay.paid, 0) AS paid,
+            ((SELECT coalesce(sum(lead_amount), 0) FROM referral_rewards WHERE referrer_id = ids.rid)
+             - (SELECT coalesce(sum(amount), 0) FROM referral_payouts WHERE tg_id = ids.rid AND status IN ('paid','pending')))::float AS balance
+       FROM ids JOIN leads r ON r.tg_id = ids.rid LEFT JOIN inv ON inv.rid = ids.rid LEFT JOIN earn ON earn.rid = ids.rid LEFT JOIN pay ON pay.rid = ids.rid
+      ORDER BY earned DESC, connected DESC, invited DESC, name`,
+    [from, to],
+  )).rows;
+  const earned = r2(rows.reduce((a, x) => a + x.earned, 0)), paid = r2(rows.reduce((a, x) => a + x.paid, 0));
+  return { earned, paid, n: rows.reduce((a, x) => a + x.connected, 0), rows };
+}
+
 /** Баланс пригласившего: начислено минус выплаченное и ждущее выплаты */
 async function balanceOf(tgId: number) {
   const e = Number((await db.query(`SELECT coalesce(sum(lead_amount), 0)::float AS s FROM referral_rewards WHERE referrer_id = $1`, [tgId])).rows[0].s);
