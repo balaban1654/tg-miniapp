@@ -104,7 +104,7 @@ export async function pickFallbackOwner(tgId: number): Promise<number | null> {
   return id;
 }
 
-/** Очередь: меньше получил сегодня (по Киеву) → больше часов в эфире за месяц → больше FTD за месяц */
+/** Очередь: меньше получил сегодня (по Киеву) → больше часов в эфире за месяц → больше FTD за месяц → при полном равенстве случайно */
 async function rankPool(poolSql: string, todaySql: string, key: unknown): Promise<number | null> {
   const TZ = "'Europe/Kyiv'";
   const r = await db.query(
@@ -116,7 +116,7 @@ async function rankPool(poolSql: string, todaySql: string, key: unknown): Promis
                AND to_char(e.created_at AT TIME ZONE ${TZ}, 'YYYY-MM') = to_char(now() AT TIME ZONE ${TZ}, 'YYYY-MM')) AS ftd
        FROM staff s
       WHERE s.id IN (${poolSql}) AND s.role = 'streamer' AND s.active AND s.deleted_at IS NULL
-      ORDER BY today ASC, mins DESC, ftd DESC, s.id ASC LIMIT 1`,
+      ORDER BY today ASC, mins DESC, ftd DESC, random() LIMIT 1`,
     [key],
   );
   return (r.rows[0]?.id as number | undefined) ?? null;
