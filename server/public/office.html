@@ -619,6 +619,8 @@ function showLogin(){me=null;$('#app').hidden=true;$('#login').hidden=false;$('#
 let devMode=false;
 function devStep(on,d){
   devMode=on;loginChallenge=null;$('#lErr').textContent='';
+  // Логин и пароль в этом режиме скрыты и пустые: без этого браузер молча не отправит форму (поля обязательные)
+  $('#loginForm').noValidate=on;
   if(!on){$('#lDev').hidden=true;$('#lSwitch').hidden=true;loginStep(false);return}
   loginStep(true);$('#lBack').hidden=true;$('#lSwitch').hidden=false;
   $('#lDev').hidden=false;$('#lDevName').textContent=d.name+' · '+(ROLE[d.role]||d.role);
