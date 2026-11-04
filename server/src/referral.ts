@@ -36,7 +36,7 @@ export const REF_ALLOWED = (d = 'd') =>
 
 /** Кто может пригласить: тот, кому программа доступна, не заблокирован и не удалён. Возвращает трейдера для друга:
  *  у клиента это его трейдер; если пригласил сам стример или тимлид (его аккаунт в боте), друг закрепляется за ним */
-export async function referrerOf(refId: number, newTgId: number): Promise<{ owner_id: number | null } | null> {
+export async function referrerOf(refId: number, newTgId: number): Promise<{ owner_id: number | null; staff?: boolean } | null> {
   if (refId === newTgId) return null;
   const r = (
     await db.query(
@@ -47,7 +47,7 @@ export async function referrerOf(refId: number, newTgId: number): Promise<{ owne
   if (!r) return null;
   if (!['lead', 'test'].includes(r.role) && r.username) {
     const s = (await db.query(`SELECT id FROM staff WHERE role IN ('streamer','teamlead') AND active AND deleted_at IS NULL AND lower(replace(replace(coalesce(tg_username, ''), 'https://t.me/', ''), '@', '')) = lower($1) LIMIT 1`, [r.username])).rows[0];
-    if (s) return { owner_id: s.id };
+    if (s) return { owner_id: s.id, staff: true };
   }
   return { owner_id: r.owner_id ?? null };
 }
@@ -86,6 +86,40 @@ export async function accrueReferral(tgId: number | string): Promise<void> {
   if (rate.lead > 0) await deliver(String(d.referrer_id), refEn
     ? `🎉 ${friend} made their first deposit via your link. **${usd(rate.lead).replace(',', '.')}** has been added to your referral balance.`
     : `🎉 ${friend} сделал первый депозит по вашей ссылке. На реферальный баланс начислено **${usd(rate.lead)}**.`).catch(() => {});
+}
+
+/** Владельца лида-реферала сменили (вручную, «Взять», раздача): ставка трейдеру переходит к новому владельцу.
+ *  Только пока месяц начисления не закрыт. Админу и тестовым аккаунтам ставка не положена. */
+export async function syncRefReward(tgId: number | string): Promise<void> {
+  const w = (await db.query(
+    `SELECT w.tg_id, w.owner_id, w.staff_amount::float AS staff_amount, w.adjustment_id, to_char(w.created_at AT TIME ZONE 'Europe/Kyiv', 'YYYY-MM') AS period,
+            d.owner_id AS cur_owner, d.lead_role, d.username, d.first_name, r.lead_role AS ref_role, s.role AS cur_role, s.active AS cur_active
+       FROM referral_rewards w JOIN leads d ON d.tg_id = w.tg_id LEFT JOIN leads r ON r.tg_id = w.referrer_id LEFT JOIN staff s ON s.id = d.owner_id
+      WHERE w.tg_id = $1`, [tgId])).rows[0];
+  if (!w || w.owner_id === w.cur_owner) return;
+  if ((await db.query('SELECT 1 FROM month_closes WHERE period = $1', [w.period])).rowCount) return; // закрытый месяц не трогаем
+  if (w.adjustment_id) await db.query('DELETE FROM staff_adjustments WHERE id = $1', [w.adjustment_id]);
+  const test = w.lead_role === 'test' || w.ref_role === 'test';
+  const rate = await refRates();
+  const amount = !test && w.cur_owner && w.cur_role !== 'admin' && w.cur_active ? (w.staff_amount > 0 ? w.staff_amount : rate.staff) : 0;
+  let adj: number | null = null;
+  if (amount > 0) {
+    const who = w.username ? '@' + w.username : w.first_name || String(w.tg_id);
+    adj = (await db.query(
+      `INSERT INTO staff_adjustments (staff_id, period, kind, amount, comment, visible) VALUES ($1, $2, 'bonus', $3, $4, TRUE) RETURNING id`,
+      [w.cur_owner, w.period, amount, '🤝 Реферал: ' + who + ' сделал первый депозит'],
+    )).rows[0].id;
+  }
+  await db.query('UPDATE referral_rewards SET owner_id = $2, staff_amount = $3, adjustment_id = $4 WHERE tg_id = $1', [w.tg_id, w.cur_owner, amount, adj]);
+}
+
+/** При запуске: сверить ставки трейдерам по рефералам незакрытых месяцев с текущими владельцами */
+export async function syncRefRewardsAll(): Promise<void> {
+  const rows = (await db.query(
+    `SELECT w.tg_id FROM referral_rewards w JOIN leads d ON d.tg_id = w.tg_id
+      WHERE w.owner_id IS DISTINCT FROM d.owner_id
+        AND NOT EXISTS (SELECT 1 FROM month_closes c WHERE c.period = to_char(w.created_at AT TIME ZONE 'Europe/Kyiv', 'YYYY-MM'))`)).rows;
+  for (const r of rows) await syncRefReward(r.tg_id).catch((e) => console.warn('ref sync', r.tg_id, e));
 }
 
 /** Баланс пригласившего: начислено минус выплаченное и ждущее выплаты */

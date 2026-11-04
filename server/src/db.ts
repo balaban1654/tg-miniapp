@@ -30,7 +30,17 @@ export async function attachLead(
   let referrer: number | null = null;
   if (refId && !slug && !(await db.query('SELECT 1 FROM leads WHERE tg_id = $1', [tgId])).rowCount) {
     const r = await referrerOf(refId, tgId);
-    if (r) { referrer = refId; ownerId = r.owner_id; origin = 'ref'; }
+    if (r) {
+      referrer = refId; ownerId = r.owner_id; origin = 'ref';
+      // Пригласивший пришёл по ссылке «Случайно»: его друга тоже раздаём по очереди из пула этой ссылки.
+      // Если пригласил сам стример со своего аккаунта, друг остаётся за ним
+      if (!r.staff) {
+        const l = (await db.query(
+          `SELECT coalesce(l.parent_id, l.id) AS root, coalesce(p.rotate, l.rotate) AS rotate
+             FROM leads d JOIN links l ON l.id = d.link_id LEFT JOIN links p ON p.id = l.parent_id WHERE d.tg_id = $1`, [refId])).rows[0];
+        if (l?.rotate) ownerId = (await pickRotationOwner(l.root, tgId)) ?? ownerId;
+      }
+    }
   }
   if (slug) {
     const r = await db.query(

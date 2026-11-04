@@ -16,6 +16,7 @@ import { mainMediaTeam } from './mediaTeams.js';
 import { leadStatusDate, leadListDate, funnelStage, funnelStageDate, churnedAfterFtd } from './leaddate.js';
 import { referralOfficeRoutes, accrueReferral } from './referral.js';
 import { exportTexts } from './i18nFill.js';
+import { syncRefReward } from './referral.js';
 import { connectRoutes, connectInfo, requiredFor, markConnected, TOL } from './connect.js';
 import { toVoice, toVideoNote } from './media.js';
 import { parseReviewPhoto, cleanReviewText, cleanRating } from './reviews.js';
@@ -1051,6 +1052,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
   async function claimLead(me: Staff, tgId: number, ownerId: number | null): Promise<string | null> {
     if (ownerId === null && (me.role === 'streamer' || me.role === 'teamlead')) {
       const claim = await db.query('UPDATE leads SET owner_id = $2 WHERE tg_id = $1 AND owner_id IS NULL RETURNING tg_id', [tgId, me.id]);
+      if (claim.rowCount) await syncRefReward(tgId).catch(() => {});
       if (!claim.rowCount) {
         const o = await db.query('SELECT o.id, o.name FROM leads d JOIN staff o ON o.id = d.owner_id WHERE d.tg_id = $1', [tgId]);
         if (o.rows[0]?.id !== me.id) return `Этого клиента уже взял ${o.rows[0]?.name ?? 'другой стример'}`;
@@ -1058,6 +1060,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     } else if (ownerId !== null && ownerId !== me.id && me.role === 'streamer') {
       // Чужой новый клиент, открытый всем (владелец не ответил вовремя, см. takeOpen): кто ответил, тот его и забирает (ссылка, по которой он пришёл, остаётся)
       await db.query(`UPDATE leads d SET owner_id = $2, taken_from = d.owner_id WHERE d.tg_id = $1 AND d.owner_id = $3 AND ${takeOpen('d', 'd.owner_id')}`, [tgId, me.id, ownerId]);
+      await syncRefReward(tgId).catch(() => {});
     }
     return null;
   }
@@ -1588,6 +1591,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
       if (!(await mine(owner))) return reply.code(403).send({ error: 'Закрепить можно только за стримером своей команды' });
     }
     const r = await db.query('UPDATE leads SET owner_id = $2, taken_from = NULL WHERE tg_id = $1 RETURNING tg_id', [Number(req.params.tgId), owner]);
+    if (r.rowCount) await syncRefReward(Number(req.params.tgId)).catch(() => {});
     if (!r.rowCount) return reply.code(404).send({ error: 'Лид не найден' });
     return { ok: true };
   });
@@ -2553,7 +2557,9 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     for (const id of ids) {
       const owner = await pickFallbackOwner(id);
       if (!owner) return reply.code(409).send({ error: done ? `Раздано ${done}, дальше некому: нет активных стримеров` : 'Нет активных стримеров, раздавать некому' });
-      done += (await db.query(`UPDATE leads SET owner_id = $2 WHERE tg_id = $1 AND owner_id IS NULL`, [id, owner])).rowCount ?? 0;
+      const n1 = (await db.query(`UPDATE leads SET owner_id = $2 WHERE tg_id = $1 AND owner_id IS NULL`, [id, owner])).rowCount ?? 0;
+      if (n1) await syncRefReward(id).catch(() => {});
+      done += n1;
     }
     return { ok: true, assigned: done };
   });

@@ -94,6 +94,7 @@ export interface KpiResult {
   planMin: number;
   shifts: number; // смен = часы ÷ длина смены
   ftdCount: number;
+  payCount: number; // из них оплачиваются как лиды (без рефералов)
   shiftsDone: boolean;
   hoursDone?: boolean; // часы по плану набраны (полная ставка ещё требует FTD не меньше plan.baseMinFtd)
   leadsDone: boolean;
@@ -164,13 +165,13 @@ async function kpiCompute(staffId: number, period: string, plan: KpiPlan): Promi
   );
   const ftd = (
     await db.query(
-      `SELECT coalesce(e.amount, 0)::float AS amount,
+      `SELECT coalesce(e.amount, 0)::float AS amount, (d.referrer_id IS NOT NULL) AS ref,
               to_char((e.created_at AT TIME ZONE '${TZ}') - ($3 || ' hours')::interval, 'YYYY-MM-DD') AS dkey
          FROM events e JOIN leads d ON d.tg_id = e.tg_id
         WHERE d.owner_id = $1 AND d.lead_role = 'lead' AND e.type = 'ftd' AND coalesce(e.raw->>'nopay', '') <> '1' AND to_char(e.created_at AT TIME ZONE '${TZ}', 'YYYY-MM') = $2`,
       [staffId, period, String(plan.day.cutoffH)],
     )
-  ).rows as { amount: number; dkey: string }[];
+  ).rows as { amount: number; ref: boolean; dkey: string }[];
   await birthdayBonus(staffId, period, plan);
   const adj = (await db.query(`SELECT kind, coalesce(sum(amount), 0)::float AS s FROM staff_adjustments WHERE staff_id = $1 AND period = $2 GROUP BY kind`, [staffId, period])).rows;
   const adjBonus = Number(adj.find((x) => x.kind === 'bonus')?.s ?? 0);
@@ -182,6 +183,8 @@ async function kpiCompute(staffId: number, period: string, plan: KpiPlan): Promi
 
   const planMin = plan.hours * 60;
   const n = ftd.length;
+  // Рефералы идут в FTD для плана и порогов цены (40, 50), но в «Лиды» не оплачиваются: за них отдельная ставка за реферала
+  const nPay = ftd.filter((f) => !f.ref).length;
   // План по часам выполнен, только если ещё и FTD не меньше baseMinFtd: иначе часы оплачиваются по минимальной ставке
   const hoursDone = hoursMin >= planMin;
   const shiftsDone = hoursDone && n >= (plan.baseMinFtd || 0);
@@ -190,7 +193,7 @@ async function kpiCompute(staffId: number, period: string, plan: KpiPlan): Promi
   const mode = (m: 'full' | 'min' | 'actual') => {
     const baseRate = m === 'full' ? plan.base : m === 'min' ? plan.baseLow : shiftsDone ? plan.base : plan.baseLow;
     const price = m === 'full' ? tierPrice() : m === 'min' ? plan.priceLow : leadsDone ? tierPrice() : plan.priceLow;
-    return { base: r2((baseRate * Math.min(hoursMin, planMin)) / planMin), baseRate, price, leadsPay: r2(n * price) };
+    return { base: r2((baseRate * Math.min(hoursMin, planMin)) / planMin), baseRate, price, leadsPay: r2(nPay * price) };
   };
   const act = mode('actual');
   const full = mode('full');
@@ -235,6 +238,7 @@ async function kpiCompute(staffId: number, period: string, plan: KpiPlan): Promi
     planMin,
     shifts: Math.floor(hoursMin / (plan.shiftH * 60)),
     ftdCount: n,
+    payCount: nPay,
     shiftsDone,
     hoursDone,
     leadsDone,
@@ -1532,6 +1536,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
           shifts: k.shifts,
           baseMin: k.min.base,
           baseFull: k.full.base,
+          leadsPaid: k.payCount,
           leadsMin: k.min.leadsPay,
           leadsFull: k.full.leadsPay,
           ftdBonus: k.ftdBonus,
@@ -1847,7 +1852,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
         period: refMonth,
         base: [k.min.base, k.full.base],
         leads: [k.min.leadsPay, k.full.leadsPay],
-        leadsN: k.ftdCount,
+        leadsN: k.payCount,
         shifts: k.shifts,
         ftdBonus: k.ftdBonus,
         dayBonus: k.dayBonus,

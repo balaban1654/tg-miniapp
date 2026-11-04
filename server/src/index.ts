@@ -19,6 +19,7 @@ import { seedDefaultRules, startScheduler } from './push.js';
 import { seedTemplates } from './templates.js';
 import { seedReplies } from './replies.js';
 import { applyFill } from './i18nFill.js';
+import { syncRefRewardsAll } from './referral.js';
 import { parseClick } from './clicks.js';
 import { RESERVED_SLUGS, SITE_URL } from './reserved.js';
 
@@ -34,6 +35,7 @@ await seedDefaultRules();
 await seedTemplates();
 await seedReplies();
 await applyFill().catch((e) => console.warn('i18n-fill:', e));
+await syncRefRewardsAll().catch((e) => console.warn('ref sync:', e));
 await fraudBackfill().catch((e) => console.error('Проверка фрода при запуске не удалась', e));
 
 // Интерфейс Hunter Office и его API

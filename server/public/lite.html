@@ -643,7 +643,7 @@ function openStreamer(s) {
     '<div class="sm-meta"><span>' + pct + '% плана</span><span>по графику на сегодня ' + hw(pace) + ' ч</span></div></div>';
   h += '<div class="sm-sg"><div class="c"><span>Смен</span><b>' + (m.shifts || 0) + '</b></div><div class="c"><span>FTD</span><b>' + (m.ftd || 0) + '</b></div><div class="c"><span>FTD $</span><b>' + usd(m.ftdSum) + '</b></div><div class="c"><span>Total $</span><b>' + usd(m.deposits) + '</b></div></div>';
   h += '<div class="g"><div class="sm-big">Зарплата за месяц</div><div class="sm-sal">' +
-    '<div class="sm-col l"><div class="sm-sh f">База</div>' + row('Ставка (' + (m.shifts || 0) + ' смен)', pair(m.baseMin, m.baseFull)) + row('Лиды (' + (m.ftd || 0) + ')', pair(m.leadsMin, m.leadsFull)) +
+    '<div class="sm-col l"><div class="sm-sh f">База</div>' + row('Ставка (' + (m.shifts || 0) + ' смен)', pair(m.baseMin, m.baseFull)) + row('Лиды (' + (m.leadsPaid != null ? m.leadsPaid : (m.ftd || 0)) + ')', pair(m.leadsMin, m.leadsFull)) +
       '<div class="sm-sh">Бонусы</div>' + row('FTD (суммы больше)', z(m.ftdBonus)) + row('Дневной (' + (plan.dayCount || 4) + ' FTD)', z(m.dayBonus)) + row('Додепы (градации)', z(m.depBonus)) + row('Премии', z(prem)) + '</div>' +
     '<div class="sm-col r"><div class="sm-sh f">Удержания</div>' + row('Штрафы', m.penalty ? sgn(-m.penalty) : '$0', m.penalty ? 'sm-neg' : '') + row('Выплачено (аванс)', m.paid ? sgn(-m.paid) : '$0') +
       '<div class="sm-fill"></div>' + row('Рефералы' + (m.refN ? ' (' + m.refN + ')' : ''), z(m.refBonus)) +
