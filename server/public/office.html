@@ -2529,8 +2529,11 @@ async function openLeadCard(tgId){
   const refRow=()=>{const R=d.refs||[];
     const cnt=el('button',{type:'button',class:'fc-cnt',title:'Показать рефералов'},R.length+' шт');
     const show=()=>{document.querySelectorAll('.fc-pop').forEach(x=>x.remove());const r=cnt.getBoundingClientRect();
-      const p=el('div',{class:'fc-pop'},R.length?R.map(x=>el('div',{},el('span',{class:'mut',title:x.ftd_at?'Дата первого депозита':'Открыл бота, первого депозита ещё нет'},fmtDT(x.ftd_at||x.start_at)),
-        el('span',{style:'display:inline-flex;gap:10px;align-items:center'},el('a',{href:'#',style:'color:var(--acc2);font-weight:700',title:x.trader_id?'Pocket ID (Telegram ID '+x.tg_id+')':'Telegram ID: Pocket ID появится после регистрации',onclick:e=>{e.preventDefault();p.remove();openLeadCard(x.tg_id)}},String(x.trader_id||x.tg_id)),x.commission!==null&&x.commission!==undefined?el('b',{},money(x.commission)):null))):el('div',{class:'mut'},'Рефералов нет'));
+      // Этап реферала: старт → дата старта и Telegram ID; регистрация → дата регистрации и Pocket ID; FTD → дата, Pocket ID и сумма FTD
+      const stg=x=>x.ftd_at?['ftd','ev-ftd',x.ftd_at,'Первый депозит']:x.reg_at||x.trader_id?['рег','ev-reg',x.reg_at||x.start_at,'Регистрация']:['старт','p-pur',x.start_at,'Открыл бота'];
+      const p=el('div',{class:'fc-pop'},R.length?R.map(x=>{const[t,c,at,tt]=stg(x),pid=x.trader_id&&(x.reg_at||x.ftd_at||x.trader_id);
+        return el('div',{style:'align-items:center'},el('span',{style:'display:inline-flex;gap:8px;align-items:center'},el('span',{class:'pill '+c,title:tt,style:'min-width:38px;text-align:center'},t),el('span',{class:'mut',title:tt},fmtDT(at))),
+        el('span',{style:'display:inline-flex;gap:10px;align-items:center'},el('a',{href:'#',style:'color:var(--acc2);font-weight:700',title:pid?'Pocket ID (Telegram ID '+x.tg_id+')':'Telegram ID: Pocket ID появится после регистрации',onclick:e=>{e.preventDefault();p.remove();openLeadCard(x.tg_id)}},String(pid?x.trader_id:x.tg_id)),x.ftd_at&&x.ftd_amount!==null&&x.ftd_amount!==undefined?el('b',{title:'Сумма первого депозита'},money(x.ftd_amount)):null))}):el('div',{class:'mut'},'Рефералов нет'));
       document.body.append(p);const w=p.offsetWidth,h=p.offsetHeight;
       p.style.left=Math.max(8,Math.min(innerWidth-w-8,r.right-w))+'px';p.style.top=(r.bottom+8+h>innerHeight?Math.max(8,r.top-h-8):r.bottom+8)+'px';
       p.addEventListener('mouseleave',()=>{if(matchMedia('(hover:hover)').matches)setTimeout(()=>{if(!p.matches(':hover')&&!cnt.matches(':hover'))p.remove()},150)});

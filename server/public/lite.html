@@ -733,7 +733,11 @@ function renderCard(d) {
   };
   var fin = frow('ftd') + frow('dep') + frow('wd') + (myRole === 'admin' ? frow('comm') : '') + (F.bonus && F.bonus.count ? frow('bonus') : '');
   var R = d.refs || [], rh = '';
-  for (i = 0; i < R.length; i++) rh += '<div><span class="mut">' + dt(R[i].ftd_at || R[i].start_at) + '</span><span><a href="#" data-card="' + esc(R[i].tg_id) + '">' + esc(R[i].trader_id || R[i].tg_id) + '</a>' + (R[i].commission !== null && R[i].commission !== undefined ? '<b>' + usd2(R[i].commission) + '</b>' : '') + '</span></div>';
+  for (i = 0; i < R.length; i++) {
+    var x = R[i], sg = x.ftd_at ? ['ftd', 'ev-ftd', x.ftd_at] : (x.reg_at || x.trader_id) ? ['рег', 'ev-reg', x.reg_at || x.start_at] : ['старт', 'p-pur', x.start_at];
+    rh += '<div><span><span class="pill ' + sg[1] + '" style="margin-right:8px">' + sg[0] + '</span><span class="mut">' + dt(sg[2]) + '</span></span><span><a href="#" data-card="' + esc(x.tg_id) + '">' + esc(x.trader_id || x.tg_id) + '</a>' +
+      (x.ftd_at && x.ftd_amount != null ? '<b>' + usd2(x.ftd_amount) + '</b>' : '') + '</span></div>';
+  }
   fcData.push(rh || '<div class="mut">Рефералов нет</div>');
   fin += '<div class="fc-row"><span style="width:150px;margin-right:8px;font-weight:600">Рефералов</span><button class="fc-cnt" data-fc="' + (fcData.length - 1) + '">' + R.length + ' шт</button></div>';
   h += '<div class="lk-two lk-sec"><div><div class="lk-h">Путь клиента</div>' + path + '</div><div><div class="lk-h">Финансы по постбекам</div>' + fin + '</div></div>';

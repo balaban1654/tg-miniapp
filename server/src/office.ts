@@ -2644,14 +2644,17 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     // Бонусы из розыгрышей, которые клиент забрал: сумма, дата и время видны всем ролям
     const gb = (await db.query(`SELECT prize::float AS amount, claimed_at FROM giveaway_draws WHERE tg_id = $1 AND claimed_at IS NOT NULL ORDER BY claimed_at`, [tgId])).rows;
     fin.bonus = { sum: gb.reduce((a, x) => a + Number(x.amount), 0), count: gb.length, dates: gb.map((x) => ({ at: x.claimed_at, amount: Number(x.amount) })) };
-    // Рефералы: кого клиент привёл по своей ссылке. Дата первого депозита у всех ролей, комиссия только админу и тимлиду
-    const showRefComm = me.role === 'admin' || me.role === 'teamlead';
+    // Рефералы: кого клиент привёл по своей ссылке. По этапам: старт (Telegram ID), регистрация (дата и Pocket ID),
+    // первый депозит (дата, Pocket ID и сумма FTD). Сумму FTD видят все роли
     const refs = (
       await db.query(
-        `SELECT d.tg_id, d.trader_id, (SELECT min(e.created_at) FROM events e WHERE e.tg_id = d.tg_id AND e.type = 'ftd') AS ftd_at,
-                coalesce((SELECT min(e.created_at) FROM events e WHERE e.tg_id = d.tg_id AND e.type = 'start'), d.created_at) AS start_at,
-                ${showRefComm ? `(SELECT coalesce(sum(e.amount), 0)::float FROM events e WHERE e.tg_id = d.tg_id AND e.type = 'comm')` : 'NULL'} AS commission
-           FROM leads d WHERE d.referrer_id = $1 ORDER BY d.created_at DESC LIMIT 500`,
+        `SELECT d.tg_id, d.trader_id,
+                (SELECT min(e.created_at) FROM events e WHERE e.tg_id = d.tg_id AND e.type = 'reg') AS reg_at,
+                f.created_at AS ftd_at, f.amount::float AS ftd_amount,
+                coalesce((SELECT min(e.created_at) FROM events e WHERE e.tg_id = d.tg_id AND e.type = 'start'), d.created_at) AS start_at
+           FROM leads d
+           LEFT JOIN LATERAL (SELECT e.created_at, e.amount FROM events e WHERE e.tg_id = d.tg_id AND e.type = 'ftd' ORDER BY e.created_at LIMIT 1) f ON TRUE
+          WHERE d.referrer_id = $1 ORDER BY d.created_at DESC LIMIT 500`,
         [tgId],
       )
     ).rows;
