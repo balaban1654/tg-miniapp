@@ -2788,7 +2788,9 @@ function openShot(url){
   document.body.append(ov);
 }
 function shotThumb(url,props={}){
-  const a=el('a',{href:url,target:'_blank',rel:'noopener',...props,onclick:e=>{e.preventDefault();openShot(url)}});
+  // Без всплывающей подсказки браузера («Нажмите, чтобы увеличить»): скрин и так открывается при наведении. Текст остаётся для экранных читалок
+  const {title,...rest}=props;
+  const a=el('a',{href:url,target:'_blank',rel:'noopener',...rest,...(title?{'aria-label':title}:{}),onclick:e=>{e.preventDefault();openShot(url)}});
   if(matchMedia('(hover:hover)').matches){
     let pop=null;
     const kill=()=>{if(pop){pop.remove();pop=null}};
