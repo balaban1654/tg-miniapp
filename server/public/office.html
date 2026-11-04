@@ -112,7 +112,7 @@ tr.rowc{cursor:pointer}tr.rowc:hover{background:#ffffff08}tr.rowc.on{background:
 .steps2{display:grid;gap:8px}.stepc{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 14px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 14px;align-items:center}.stepc .f{grid-column:1;color:var(--mut);font-size:12px}.stepc .r{grid-row:1/span 2;grid-column:2;font:700 16px var(--fm);text-align:right}
 .totalc{display:flex;justify-content:space-between;align-items:baseline;gap:12px;border-top:1px solid var(--line);padding-top:12px}
 .two2c{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
-.rev{display:grid;grid-template-columns:110px minmax(0,1fr) auto;gap:14px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;align-items:start}
+.rev{display:grid;grid-template-columns:minmax(0,600px) 110px minmax(0,1fr) auto;gap:14px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;align-items:start}
 .dw-btn{width:100%;box-sizing:border-box;text-align:left;background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;color:inherit;font:inherit;cursor:pointer}.dw-btn:hover{border-color:var(--acc)}
 .lc-overlay.dw-ov{z-index:90}.dw-sheet{width:min(360px,100%);background:var(--card);border:1px solid var(--line);border-radius:18px;padding:14px 14px 16px;display:grid;gap:12px;box-shadow:0 20px 60px rgba(0,0,0,.6)}
 .dw-top{display:flex;align-items:center;justify-content:space-between;gap:8px}.dw-top b{font-size:14px}
@@ -138,6 +138,7 @@ tr.rowc{cursor:pointer}tr.rowc:hover{background:#ffffff08}tr.rowc.on{background:
 .fhead2{background:none;border:1px solid transparent;padding:0 12px;font:600 10px var(--fm);letter-spacing:.06em;text-transform:uppercase;color:var(--mut)}
 .fhead2 span{text-align:left;white-space:nowrap}.fhead2 span:nth-child(n+3):nth-child(-n+5){text-align:center}
 .chk{display:flex;justify-content:center}.chk input{width:auto}
+@media(min-width:801px){.rev>.acts2{grid-column:4}}
 @media(max-width:800px){.rev{grid-template-columns:1fr}.frow2{grid-template-columns:1fr}.fhead2{display:none}}
 .rep2 .lc-field{min-width:0}
 @media(max-width:560px){.rep2{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:10px}.rep2.first-full>.lc-field:nth-child(-n+2),.rep2 .full{grid-column:1/-1}.rep2 .lc-field label{font-size:12px}}
@@ -2793,7 +2794,8 @@ function shotThumb(url,props={}){
     const kill=()=>{if(pop){pop.remove();pop=null}};
     a.addEventListener('mouseenter',()=>{
       kill();pop=el('div',{class:'shot-hover'},el('img',{src:url,alt:''}));document.body.append(pop);
-      const r=a.getBoundingClientRect(),w=Math.min(460,innerWidth-24),h=Math.min(560,innerHeight-24);
+      // Справа от миниатюры, чтобы не закрывать текст слева: если места меньше 460, картинка уменьшается (но не уже 300)
+      const r=a.getBoundingClientRect(),right=innerWidth-r.right-24,w=right>=300?Math.min(460,right):Math.min(460,innerWidth-24),h=Math.min(560,innerHeight-24);
       // Картинка целиком: подгоняем под рамку по ширине и высоте, без обрезки
       pop.style.setProperty('--sw',w+'px');pop.style.setProperty('--sh',h+'px');
       const place=()=>{if(!pop)return;const pw=pop.offsetWidth||w,ph=pop.offsetHeight||h;
@@ -3322,12 +3324,13 @@ async function accReview(){
     const total=()=>(Number(hh.value)||0)*60+(Number(mm.value)||0);
     const why=el('input',{placeholder:'Причина отказа (необязательно)',style:'width:240px'});
     const act=async(action,extra)=>{try{await api('/shifts/'+r.id+'/review',{method:'POST',body:{action,...extra}});toast(action==='approve'?'Отчёт зачтён':'Отчёт отклонён');accRefresh()}catch(x){toast(x.message)}};
+    // Сначала то, что заполнил стример, потом миниатюра скрина: открытый скрин не закрывает текст при сверке
     return el('div',{class:'rev'},
-      r.has_screenshot?shotThumb('/api/office/shifts/'+r.id+'/screenshot',{class:'shotc',title:'Нажмите, чтобы увеличить'}).appendChild(el('img',{src:'/api/office/shifts/'+r.id+'/screenshot',alt:'Скриншот',loading:'lazy'})).parentNode
-        :el('div',{class:'shotc',style:'display:grid;place-items:center;text-align:center;font-size:12px;color:var(--mut);padding:6px'},r.team?'Смена команды':'Без скрина'),
       el('div',{class:'meta2'},el('div',{},el('b',{},r.staff_name),' ',el('span',{class:'mut sm'},new Date(r.day+'T12:00:00').toLocaleDateString('ru-RU',{day:'numeric',month:'short'})),' ',el('span',{class:'pill p-pur'},'заявлено '+hmin(r.declared_min)),r.declared_start?el('span',{class:'mut sm',title:'Начало эфира, указанное в отчёте'},' · начало '+new Date(r.declared_start).toLocaleString('ru-RU',{timeZone:'Europe/Kyiv',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})):null),
         el('div',{class:'kv2'},...r.fields.filter(f=>f.value!==null&&f.value!=='').map(f=>el('span',{},f.name+': ',el('b',{},typeof f.value==='number'?f.value.toLocaleString('ru-RU'):f.value)))),
         r.stream_url?el('div',{class:'mut sm'},r.stream_url):null,r.comment?el('div',{class:'sm',style:'white-space:pre-wrap'},(r.team?'Что сделал: ':'')+r.comment):null),
+      r.has_screenshot?shotThumb('/api/office/shifts/'+r.id+'/screenshot',{class:'shotc',title:'Нажмите, чтобы увеличить'}).appendChild(el('img',{src:'/api/office/shifts/'+r.id+'/screenshot',alt:'Скриншот',loading:'lazy'})).parentNode
+        :el('div',{class:'shotc',style:'display:grid;place-items:center;text-align:center;font-size:12px;color:var(--mut);padding:6px'},r.team?'Смена команды':'Без скрина'),
       el('div',{class:'acts2'},el('div',{class:'inl'},hh,el('span',{class:'mut sm'},'ч'),mm,el('span',{class:'mut sm'},'мин'),el('button',{class:'btn s',type:'button',onclick:()=>{const t=total();if(t<1||t>720){toast('Время от 1 минуты до 12 часов');return}act('approve',{minutes:t})}},'Зачесть')),
         el('div',{class:'inl'},why,el('button',{class:'btn o s',type:'button',onclick:()=>act('reject',{reason:why.value})},'Отклонить'))));
   };
