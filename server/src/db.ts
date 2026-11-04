@@ -78,7 +78,7 @@ export async function attachLead(
 }
 
 /** Кому отдать лида со ссылки «Случайно». Среди сотрудников ссылки (активных): у кого сегодня (по Киеву) меньше лидов с этой ссылки,
- *  при равенстве — у кого больше часов в эфире за месяц, затем больше FTD за месяц. Так за день каждый получает по одному от лучшего
+ *  при равенстве — у кого больше часов в эфире за месяц, затем больше FTD за месяц, затем FTD за прошлый месяц. Так за день каждый получает по одному от лучшего
  *  к худшему, потом круг повторяется. Выбор записывается, чтобы очередь знала, кто уже получил */
 export async function pickRotationOwner(rootLinkId: number, tgId: number): Promise<number | null> {
   const id = await rankPool(`SELECT staff_id FROM link_pool WHERE link_id = $1`, `SELECT count(*)::int FROM link_assign a WHERE a.link_id = $1 AND a.staff_id = s.id`, rootLinkId);
@@ -104,7 +104,8 @@ export async function pickFallbackOwner(tgId: number): Promise<number | null> {
   return id;
 }
 
-/** Очередь: меньше получил сегодня (по Киеву) → больше часов в эфире за месяц → больше FTD за месяц → при полном равенстве случайно */
+/** Очередь: меньше получил сегодня (по Киеву) → больше часов в эфире за месяц → больше FTD за месяц →
+ *  больше FTD за прошлый месяц (затем их сумма) → при полном равенстве случайно */
 async function rankPool(poolSql: string, todaySql: string, key: unknown): Promise<number | null> {
   const TZ = "'Europe/Kyiv'";
   const r = await db.query(
@@ -113,10 +114,15 @@ async function rankPool(poolSql: string, todaySql: string, key: unknown): Promis
             (SELECT coalesce(sum(r.approved_min), 0)::int FROM shift_reports r WHERE r.staff_id = s.id AND NOT r.team AND r.status = 'approved'
                AND to_char(r.day, 'YYYY-MM') = to_char(now() AT TIME ZONE ${TZ}, 'YYYY-MM')) AS mins,
             (SELECT count(*)::int FROM events e JOIN leads d ON d.tg_id = e.tg_id WHERE d.owner_id = s.id AND e.type = 'ftd'
-               AND to_char(e.created_at AT TIME ZONE ${TZ}, 'YYYY-MM') = to_char(now() AT TIME ZONE ${TZ}, 'YYYY-MM')) AS ftd
+               AND to_char(e.created_at AT TIME ZONE ${TZ}, 'YYYY-MM') = to_char(now() AT TIME ZONE ${TZ}, 'YYYY-MM')) AS ftd,
+            -- Результат прошлого месяца: решает в начале месяца, когда часов и FTD за новый месяц ещё ни у кого нет
+            pm.n AS prev_ftd, pm.s AS prev_sum
        FROM staff s
+       CROSS JOIN LATERAL (SELECT count(*)::int AS n, coalesce(sum(e.amount), 0)::float AS s FROM events e JOIN leads d ON d.tg_id = e.tg_id
+               WHERE d.owner_id = s.id AND e.type = 'ftd'
+                 AND to_char(e.created_at AT TIME ZONE ${TZ}, 'YYYY-MM') = to_char((now() AT TIME ZONE ${TZ}) - interval '1 month', 'YYYY-MM')) pm
       WHERE s.id IN (${poolSql}) AND s.role = 'streamer' AND s.active AND s.deleted_at IS NULL
-      ORDER BY today ASC, mins DESC, ftd DESC, random() LIMIT 1`,
+      ORDER BY today ASC, mins DESC, ftd DESC, prev_ftd DESC, prev_sum DESC, random() LIMIT 1`,
     [key],
   );
   return (r.rows[0]?.id as number | undefined) ?? null;

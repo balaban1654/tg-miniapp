@@ -1995,7 +1995,7 @@ async function viewLeads(){
   // Админ: раздать всех незакреплённых по очереди активным стримерам (новые закрепляются сами)
   const unownedBtn=me.role==='admin'?el('button',{class:'btn s',type:'button',hidden:''}):null;
   if(unownedBtn)api('/leads/unowned').then(u=>{if(!u.n)return;unownedBtn.hidden=false;unownedBtn.textContent='Раздать незакреплённых ('+u.n+')';
-    unownedBtn.onclick=async()=>{if(!await askC('Раздать '+u.n+' незакреплённых лидов по очереди активным стримерам?\nОчередь та же, что для новых: кто меньше получил сегодня, у кого больше часов и FTD за месяц.'))return;
+    unownedBtn.onclick=async()=>{if(!await askC('Раздать '+u.n+' незакреплённых лидов по очереди активным стримерам?\nОчередь та же, что для новых: кто меньше получил сегодня, у кого больше часов и FTD за месяц. В начале месяца, пока у всех ноль, первым идёт лучший по FTD за прошлый месяц.'))return;
       unownedBtn.disabled=true;try{const r=await api('/leads/unowned/assign',{method:'POST'});toast('Раздано лидов: '+r.assigned);render({soft:true})}catch(x){toast(x.message);unownedBtn.disabled=false}}}).catch(()=>{});
   const bar=el('div',{class:'lf'},q,sel(Object.entries(STATUS).map(([k,v])=>[k,v[0]]),'status','Все статусы'),
     sel(links.map(x=>[x,x]),'link','Все ссылки'),showOwner?sel([['none','Не закреплён'],...owners],'owner','Все владельцы'):null,sel(SORTS,'sort'),
@@ -2142,7 +2142,7 @@ async function viewLinks(){
   const poolPick=sel=>{const set=new Set(sel);return el('div',{class:'pool-pick'},...staff.filter(x=>x.active!==false&&x.role==='streamer').map(x=>{const c=el('input',{type:'checkbox',value:x.id});c.checked=set.has(x.id);return el('label',{},c,x.name)}))};
   const poolIds=box=>[...box.querySelectorAll('input:checked')].map(c=>Number(c.value));
   const poolList=poolPick(staff.filter(x=>x.role==='streamer'&&x.active!==false).map(x=>x.id));
-  const poolBox=el('div',{class:'pool-box',hidden:''},el('div',{class:'mut sm'},'Кому раздавать лидов. За день каждый получает по одному: сначала тот, у кого больше часов в эфире за месяц (потом больше FTD), и дальше по убыванию; когда все получили, круг повторяется. С 00:00 по Киеву очередь начинается заново.'),poolList);
+  const poolBox=el('div',{class:'pool-box',hidden:''},el('div',{class:'mut sm'},'Кому раздавать лидов. За день каждый получает по одному: сначала тот, у кого больше часов в эфире за месяц (потом больше FTD; в начале месяца, пока у всех ноль, лучший по FTD за прошлый месяц; при полном равенстве случайно), и дальше по убыванию; когда все получили, круг повторяется. С 00:00 по Киеву очередь начинается заново.'),poolList);
   const ownerBody=()=>owner.value==='random'?{owner_id:'random',pool:poolIds(poolList)}:{owner_id:owner.value||undefined};
   const err=el('div',{class:'err',role:'alert'});
   const form=el('form',{class:'card form',onsubmit:async e=>{e.preventDefault();err.textContent='';
@@ -2157,7 +2157,7 @@ async function viewLinks(){
   const ownerPicker=(val,pool,withNone)=>{
     const sel=el('select',{},...(withNone?[el('option',{value:'none'},'Не закреплять')]:[]),...staff.filter(x=>x.active!==false).map(x=>el('option',{value:x.id},x.name+' · '+(ROLE[x.role]||x.role))),el('option',{value:'random'},'🎲 Случайно'));
     sel.value=String(val);const pk=poolPick(pool&&pool.length?pool:staff.filter(x=>x.role==='streamer'&&x.active!==false).map(x=>x.id));
-    const box=el('div',{class:'pool-box'},el('div',{class:'mut sm'},'Кому раздавать: за день каждому по одному, от лучшего (больше часов в эфире за месяц, потом больше FTD) к остальным; с 00:00 по Киеву заново.'),pk);
+    const box=el('div',{class:'pool-box'},el('div',{class:'mut sm'},'Кому раздавать: за день каждому по одному, от лучшего (больше часов в эфире за месяц, потом больше FTD, в начале месяца — лучший по FTD за прошлый месяц) к остальным; с 00:00 по Киеву заново.'),pk);
     const sync=()=>{box.hidden=sel.value!=='random'};sel.addEventListener('change',sync);sync();
     return{sel,box,get:()=>sel.value==='random'?{mode:'random',owner_id:'random',pool:poolIds(pk)}:sel.value==='none'?{mode:'none'}:{mode:'owner',owner_id:Number(sel.value)}}};
   const editLinkModal=r=>{
