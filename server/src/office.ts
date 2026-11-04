@@ -2683,7 +2683,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     // Скидку предлагают: админ любому; стример своим лидам; тимлид своим и лидам своей команды
     const connectOk = me.role === 'admin' || (me.role === 'streamer' && ownerId === me.id)
       || (me.role === 'teamlead' && ownerId !== null && (ownerId === me.id || (await db.query('SELECT 1 FROM staff WHERE id = $1 AND parent_id = $2', [ownerId, me.id])).rowCount! > 0));
-    const connect = connectOk && (!r.rows[0].lead_role || r.rows[0].lead_role === 'lead' || r.rows[0].lead_role === 'test') ? await connectInfo(tgId, me.role !== 'admin') : null;
+    const connect = connectOk && (!r.rows[0].lead_role || r.rows[0].lead_role === 'lead' || r.rows[0].lead_role === 'test') ? await connectInfo(tgId, me.role === 'streamer') : null;
     return {
       fin,
       refs,

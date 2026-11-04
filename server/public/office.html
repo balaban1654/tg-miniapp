@@ -2557,8 +2557,10 @@ async function openLeadCard(tgId){
   const connBox=C&&!L.access&&['new','registered'].includes(L.status)?el('div',{style:'display:grid;gap:8px'},el('h4',{class:'lc-h'},'Подключение'),
     el('div',{class:'lc-grid'},kv('Нужно пополнить',cnMoney(C.required)+' (от '+cnMoney(C.from)+')'),...(C.deposited!==null&&C.deposited!==undefined?[kv('Внесено',cnMoney(C.deposited))]:[]),
       C.offer?kv('Акция',C.offer.name+' до '+new Date(C.offer.until).toLocaleDateString('ru-RU',{day:'2-digit',month:'2-digit',timeZone:'Europe/Kyiv'})):kv('Акция','нет')),
-    ...(C.sends||[]).slice(0,2).map(q=>el('div',{class:'mut sm'},fmtDT(q.sent_at)+' · '+q.offer_name+' · '+(q.delivery==='failed'?'не доставлено':q.reverted_at?'отменено (депозит удалён)':q.connected_at?'подключился':new Date(q.expires_at)<new Date()?'срок вышел':'ждём'))),
-    el('div',{},el('button',{class:'btn',type:'button',disabled:C.liveUntil?'':null,title:C.liveUntil?'Акция ещё действует до '+fmtDT(C.liveUntil):'',onclick:()=>connectDialog(L,C,()=>{close();openLeadCard(tgId)})},'Предложить скидку'))):null;
+    ...(C.sends||[]).slice(0,2).map(q=>el('div',{class:'mut sm'},fmtDT(q.sent_at)+' · '+q.offer_name+' · '+(q.delivery==='failed'?'не доставлено':q.delivery==='manual'&&q.connected_at&&!q.reverted_at?'активирована после депозита':q.reverted_at?'отменено (депозит удалён)':q.connected_at?'подключился':new Date(q.expires_at)<new Date()?'срок вышел':'ждём'))),
+    // Депозит уже пришёл (меньше порога): админ и тимлид применяют скидку к внесённому — «Активировать скидку»
+    (()=>{const act=C.hasDeposit&&(me.role==='admin'||me.role==='teamlead');
+      return el('div',{},el('button',{class:'btn',type:'button',disabled:!act&&C.liveUntil?'':null,title:!act&&C.liveUntil?'Акция ещё действует до '+fmtDT(C.liveUntil):act?'Применить скидку к уже внесённому депозиту и открыть доступ':'',onclick:()=>connectDialog(L,C,()=>{close();openLeadCard(tgId)},act)},act?'Активировать скидку':'Предложить скидку'))})()):null;
   box.replaceChildren(...[
     el('div',{class:'lc-head'},el('div',{style:'min-width:0'},el('h3',{style:'font-size:21px;line-height:1.2;overflow:hidden;text-overflow:ellipsis'},fname),L.first_name&&L.username?el('div',{class:'mut',style:'font-size:13px;margin-top:2px'},'@'+L.username):null),
       el('div',{class:'lc-hr'},el('div',{class:'lc-pills'},pill(L.status),L.banned_at?el('span',{class:'pill p-bad'},'заблокирован'):L.access?el('span',{class:'pill p-ok'},'доступ открыт'):el('span',{class:'pill p-pur'},'доступ закрыт')),
@@ -4785,19 +4787,22 @@ function banDialog(L,done){
 }
 
 /** Окно «Предложить скидку» в карточке лида */
-function connectDialog(L,C,done){
+function connectDialog(L,C,done,act){
   document.querySelectorAll('.cn-ov').forEach(x=>x.remove());
   const ov=el('div',{class:'lc-overlay cn-ov',style:'z-index:70',role:'dialog','aria-modal':'true'});
   const close=()=>ov.remove();ov.addEventListener('mousedown',e=>{if(e.target===ov)close()});
   const sel=el('select',{'aria-label':'Акция'},...C.offers.map(o=>el('option',{value:o.id},o.name+' · '+cnMoney(o.required)+' · '+o.days+' дн.')));
   const info=el('div',{class:'mut sm'}),prev=el('div',{}),err=el('div',{class:'err',role:'alert'});
   const upd=()=>{const o=C.offers.find(x=>String(x.id)===sel.value);if(!o)return;
+    if(act){const ok=(C.deposited||0)>=o.required*0.9;send.disabled=!ok;
+      info.replaceChildren('Внесено ',el('b',{},cnMoney(C.deposited||0)),', по этой акции нужно от '+cnMoney(o.required*0.9)+'. ',ok?el('b',{style:'color:var(--ok)'},'Хватает: доступ откроется сразу, лиду придёт пуш о подключении.'):el('b',{style:'color:var(--bad)'},'Не хватает, выберите акцию с большей скидкой.'));
+      prev.replaceChildren();return}
     info.replaceChildren('Лиду достаточно ',el('b',{},cnMoney(o.required)),' (от '+cnMoney(o.required*0.9)+') в течение '+o.days+' дн. После срока порог снова '+cnMoney(C.base)+'.');
     prev.replaceChildren(tgPreview(o.text,o.pct,o.required,o.days))};
+  const send=el('button',{class:'btn',type:'button',onclick:async()=>{err.textContent='';send.disabled=true;try{await api('/connect/offers/'+sel.value+(act?'/activate':'/send'),{method:'POST',body:{tg_id:L.tg_id}});close();toast(act?'Скидка активирована, доступ открыт':'Акция отправлена лиду');done&&done()}catch(x){err.textContent=x.message;send.disabled=false}}},act?'Активировать':'Отправить');
   sel.addEventListener('change',upd);upd();
-  const send=el('button',{class:'btn',type:'button',onclick:async()=>{err.textContent='';send.disabled=true;try{await api('/connect/offers/'+sel.value+'/send',{method:'POST',body:{tg_id:L.tg_id}});close();toast('Акция отправлена лиду');done&&done()}catch(x){err.textContent=x.message;send.disabled=false}}},'Отправить');
   ov.append(el('div',{class:'lc',style:'width:min(520px,100%);display:grid;gap:12px'},
-    el('div',{class:'lc-head'},el('h3',{style:'font-size:17px'},'Предложить скидку'),el('button',{class:'btn o s',type:'button','aria-label':'Закрыть',onclick:close},'✕')),
+    el('div',{class:'lc-head'},el('h3',{style:'font-size:17px'},act?'Активировать скидку':'Предложить скидку'),el('button',{class:'btn o s',type:'button','aria-label':'Закрыть',onclick:close},'✕')),
     C.offers.length?sel:el('div',{class:'mut'},'Нет акций. Создайте во вкладке «Подключение → Акции».'),info,prev,err,el('div',{style:'display:flex;gap:8px'},send,el('button',{class:'btn o',type:'button',onclick:close},'Отмена'))));
   document.body.append(ov);
 }

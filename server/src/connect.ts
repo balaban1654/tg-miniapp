@@ -1,7 +1,8 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { markLeadBlocked } from './leadblock.js';
 import { db } from './db.js';
-import { buildKeyboard, deliver, loadTarget, pickText, renderText, type Button } from './push.js';
+import { buildKeyboard, deliver, loadTarget, pickText, processLead, renderText, type Button } from './push.js';
+import { accrueReferral } from './referral.js';
 
 import type { Role } from './auth.js';
 type Need = (...roles: Role[]) => (req: FastifyRequest, reply: FastifyReply) => Promise<unknown>;
@@ -126,6 +127,8 @@ export async function connectInfo(tgId: number, hideDeposit = false) {
     offers: offers.map((o) => ({ id: o.id, name: o.name, pct: o.discount_pct, days: o.days, text: o.text, required: r2(rq.base * (1 - o.discount_pct / 100)) })),
     sends,
     liveUntil: live,
+    // Депозит уже пришёл, но меньше порога: акцию можно «активировать» задним числом (админ и тимлид)
+    hasDeposit: dep > 0,
   };
 }
 
@@ -265,6 +268,32 @@ export async function connectRoutes(app: FastifyInstance, h: { need: Need; str: 
       }
     })();
     return { ok: true, total: rows.length };
+  });
+
+  // Акцию забыли отправить, а лид уже пополнил меньше порога: применяем скидку к уже внесённому и открываем доступ.
+  // Только админ и тимлид (своей команде). Нужен постбек депозита и сумма не меньше цены по акции (с запасом 10%)
+  app.post<{ Params: { id: string } }>('/connect/offers/:id/activate', { preHandler: h.need('admin', 'teamlead') }, async (req, reply) => {
+    const me = (req as any).staff as { id: number; role: string };
+    const tgId = Number(((req.body ?? {}) as Record<string, unknown>).tg_id);
+    if (!tgId) return reply.code(400).send({ error: 'Не указан лид' });
+    const o = (await db.query(`SELECT id, name, discount_pct, days FROM connect_offers WHERE id = $1 AND active`, [Number(req.params.id)])).rows[0] as Offer | undefined;
+    if (!o) return reply.code(404).send({ error: 'Акция не найдена' });
+    const d = (await db.query(`SELECT d.tg_id FROM leads d WHERE d.tg_id = $1 AND ${NOT_CONNECTED} AND ${teamOf(me)}`, [tgId])).rows[0];
+    if (!d) return reply.code(409).send({ error: 'Лид не найден в вашей команде или уже подключён' });
+    const ev = (await db.query(`SELECT coalesce(sum(amount), 0)::float AS tot, bool_or(type = 'dep') AS dep, count(*)::int AS n FROM events WHERE tg_id = $1 AND type IN ('ftd','dep')`, [tgId])).rows[0];
+    if (!ev.n) return reply.code(409).send({ error: 'Постбека о депозите ещё нет: активировать нечего. Отправьте акцию лиду' });
+    const required = r2((await getMinDeposit()) * (1 - o.discount_pct / 100));
+    if (Number(ev.tot) < required * TOL) return reply.code(409).send({ error: `Внесено ${usd(ev.tot)}, а по акции «${o.name}» нужно от ${usd(required * TOL)}. Выберите акцию с большей скидкой` });
+    // Запись об акции (как отправленной и сразу сработавшей), затем доступ — так же, как при постбеке
+    await db.query(
+      `INSERT INTO connect_sends (offer_id, offer_name, tg_id, discount_pct, required, expires_at, sent_by, delivery, connected_at, connected_amount)
+       VALUES ($1,$2,$3,$4,$5, now() + ($6 || ' days')::interval, $7, 'manual', now(), $8)`,
+      [o.id, o.name, tgId, o.discount_pct, required, String(o.days), me.id, ev.tot],
+    );
+    await db.query(`UPDATE leads SET status = $2, access = (removed_at IS NULL) WHERE tg_id = $1`, [tgId, ev.dep ? 'active' : 'ftd']);
+    await accrueReferral(tgId).catch((e) => console.error('Реферальный бонус: сбой', e));
+    await processLead(tgId).catch(() => {}); // пуши по событию, например «Депозит получен, доступ открыт»
+    return { ok: true };
   });
 
   app.get('/connect/sends', { preHandler: lead }, async (req) => {
