@@ -181,7 +181,7 @@ td{white-space:nowrap}
 .lk-hr .pill{margin-right:8px}
 .pill{display:inline-block;border-radius:99px;padding:2px 10px;font-size:11px;font-weight:600;white-space:nowrap}
 .p-ok{background:rgba(61,220,151,.13);color:#3ddc97}.p-bad{background:rgba(255,107,138,.13);color:#ff6b8a}.p-pur{background:rgba(155,92,255,.2);color:#c9a6ff}
-.ev-reg{background:rgba(255,213,77,.15);color:#ffd54d}.ev-ftd{background:rgba(61,220,151,.15);color:#3ddc97}.ev-dep{background:rgba(77,163,255,.15);color:#6db6ff}.ev-comm{background:rgba(156,42,77,.4);color:#ff8fae}.ev-bonus{background:rgba(255,255,255,.12);color:#fff}.ev-wd{background:rgba(255,184,77,.13);color:#ffb84d}
+.ev-reg{background:rgba(255,213,77,.15);color:#ffd54d}.ev-ftd{background:rgba(61,220,151,.15);color:#3ddc97}.ev-dep{background:rgba(77,163,255,.15);color:#6db6ff}.ev-comm{background:rgba(156,42,77,.4);color:#ff8fae}.ev-bonus{background:rgba(255,255,255,.12);color:#fff}.ev-wd{background:rgba(255,184,77,.13);color:#ffb84d}.ev-ref{background:#fff;color:#1c1233;font-weight:800}
 .lk-grid{display:-webkit-flex;display:flex;-webkit-flex-wrap:wrap;flex-wrap:wrap;margin:12px -7px 0}
 .lk-kv{width:33.333%;box-sizing:border-box;padding:0 7px;margin-bottom:9px}
 .lk-kv span{display:block;font-size:11px;color:#a89cc8}.lk-kv b{display:block;font-size:13px;font-weight:600;word-wrap:break-word}
@@ -739,7 +739,7 @@ function renderCard(d) {
       (x.ftd_at && x.ftd_amount != null ? '<b>' + usd2(x.ftd_amount) + '</b>' : '') + '</span></div>';
   }
   fcData.push(rh || '<div class="mut">Рефералов нет</div>');
-  fin += '<div class="fc-row"><span style="width:150px;margin-right:8px;font-weight:600">Рефералов</span><button class="fc-cnt" data-fc="' + (fcData.length - 1) + '">' + R.length + ' шт</button></div>';
+  fin += '<div class="fc-row"><span class="pill ev-ref">ref</span><b class="fc-sum">' + usd2(d.refEarned || 0) + '</b><button class="fc-cnt" data-fc="' + (fcData.length - 1) + '">' + R.length + ' шт</button></div>';
   h += '<div class="lk-two lk-sec"><div><div class="lk-h">Путь клиента</div>' + path + '</div><div><div class="lk-h">Финансы по постбекам</div>' + fin + '</div></div>';
   // Градации додепов
   var T = d.tier;

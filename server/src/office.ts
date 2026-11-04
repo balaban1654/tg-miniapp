@@ -2687,6 +2687,8 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     return {
       fin,
       refs,
+      // Сколько клиент заработал за приглашённых друзей (реферальный баланс, начислено за всё время)
+      refEarned: Number((await db.query('SELECT coalesce(sum(lead_amount), 0)::float AS s FROM referral_rewards WHERE referrer_id = $1', [tgId])).rows[0].s),
       tier,
       connect,
       lead: r.rows[0],
