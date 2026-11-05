@@ -206,6 +206,7 @@ th.n{text-align:right}
 .lc-list{display:grid;gap:6px}.lc-row{display:grid;grid-template-columns:1fr auto auto;gap:12px;align-items:center;padding:8px 12px;border:1px solid var(--line);border-radius:10px}
 .lf{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.lf input{flex:1 1 220px;min-width:0;width:auto}.lf select{width:auto;flex:1 1 150px;max-width:100%;min-width:0}
 .lc-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:4px}
+.lc-widget{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px;padding-top:10px;border-top:1px solid var(--line)}.lc-widget .btn{padding:4px 10px;font-size:12px}
 
 .ctr tr.band td{text-align:left;font:600 11px var(--fm);letter-spacing:.06em;text-transform:uppercase;color:var(--acc2);background:var(--bg2);border-bottom:1px solid var(--line);padding:8px 14px}
 .cp-btn{background:none;border:0;padding:2px;color:var(--mut);cursor:pointer;display:grid;place-items:center;border-radius:6px}.cp-btn:hover{color:var(--fg);background:var(--card2)}
@@ -2572,13 +2573,7 @@ async function openLeadCard(tgId){
       ...(matchMedia('(min-width:521px)').matches?[kv('Владелец',L.owner_name||'не закреплён'),kv('Страна',countryName(d.country))]:[kv('Страна',countryName(d.country)),kv('Владелец',L.owner_name||'не закреплён')]),
       // Пришёл по реферальной ссылке: на месте часового пояса «Пригласил» (Telegram ID, по нажатию его карточка), пояс ниже
       L.referrer_id?kv('Пригласил',el('a',{href:'#',title:L.referrer_name?'Открыть карточку: '+L.referrer_name:'Открыть карточку',style:'color:var(--fg);text-decoration:none',onclick:e=>{e.preventDefault();document.querySelectorAll('.lc-overlay').forEach(x=>x.remove());openLeadCard(L.referrer_id)}},String(L.referrer_id))):kv('Часовой пояс',L.tz),
-      kvc('Промокод',d.promo),kv('Последний визит',fmtDT(L.last_seen_at)),L.referrer_id?kv('Часовой пояс',L.tz):null,
-      // Виджет для Pocket Option: запускал ли, когда последний раз; админ и тимлид могут отключить
-      kv('Виджет Pocket Option',el('span',{style:'display:inline-flex;gap:8px;align-items:center;flex-wrap:wrap'},
-        L.widget_blocked?el('span',{style:'color:var(--bad)'},'отключён'):L.widget_used_at?el('span',{style:'color:var(--ok)',title:'Последняя загрузка виджета'},'работает · '+fmtDT(L.widget_used_at)):L.widget_has?'код выдан, не запускал':'не подключал',
-        me.role==='admin'||me.role==='teamlead'?el('button',{class:'btn o s',type:'button',style:'padding:2px 8px;font-size:11px',onclick:async()=>{
-          const off=!L.widget_blocked;if(off&&!await askC('Отключить виджет '+fname+'? Текущий код перестанет работать, после включения клиент скопирует новый в Mini App.'))return;
-          try{await api('/leads/'+L.tg_id+'/widget',{method:'POST',body:{blocked:off}});toast(off?'Виджет отключён':'Виджет включён');close();openLeadCard(L.tg_id)}catch(x){toast(x.message)}}},L.widget_blocked?'Включить':'Отключить'):null))),
+      kvc('Промокод',d.promo),kv('Последний визит',fmtDT(L.last_seen_at)),L.referrer_id?kv('Часовой пояс',L.tz):null),
     el('div',{class:'lc-two2'},
       el('div',{},el('h4',{class:'lc-h'},'Путь клиента'),
         el('div',{class:'lc-steps'},step('Нажал «Старт» в боте',START),step('Регистрация',reg&&reg.created_at),step('Первый депозит',ftd&&ftd.created_at,ftd&&ftd.amount!==null?money(ftd.amount):null))),
@@ -2592,7 +2587,13 @@ async function openLeadCard(tgId){
       el('a',{class:'btn o',href:profileUrl(L),target:'_blank',rel:'noopener',style:'text-decoration:none;display:inline-flex;align-items:center'},'Профиль в Telegram'),
       me.role==='admin'||me.role==='teamlead'?(L.banned_at
         ?el('button',{class:'btn o',type:'button',onclick:async()=>{if(!await askC('Разблокировать лида? Ему снова станут доступны Mini App, пуши и сигналы.'))return;try{await api('/leads/'+L.tg_id+'/ban',{method:'DELETE'});toast('Лид разблокирован');close();openLeadCard(L.tg_id)}catch(x){toast(x.message)}}},'Разблокировать')
-        :el('button',{class:'btn o',type:'button',style:'color:var(--bad);border-color:var(--bad)',onclick:()=>banDialog(L,()=>{close();openLeadCard(L.tg_id)})},'Заблокировать')):null)].flat().filter(Boolean));
+        :el('button',{class:'btn o',type:'button',style:'color:var(--bad);border-color:var(--bad)',onclick:()=>banDialog(L,()=>{close();openLeadCard(L.tg_id)})},'Заблокировать')):null),
+    // Виджет для Pocket Option одной строкой под кнопками: состояние, дата последней загрузки; админ и тимлид могут отключить
+    el('div',{class:'lc-widget'},el('span',{class:'mut'},'Виджет Pocket Option:'),
+      L.widget_blocked?el('b',{style:'color:var(--bad)'},'отключён'):L.widget_used_at?el('b',{style:'color:var(--ok)',title:'Последняя загрузка виджета'},'работает · '+fmtDT(L.widget_used_at)):el('b',{},L.widget_has?'код выдан, не запускал':'не подключал'),
+      me.role==='admin'||me.role==='teamlead'?el('button',{class:'btn o s',type:'button',style:'margin-left:auto',onclick:async()=>{
+        const off=!L.widget_blocked;if(off&&!await askC('Отключить виджет '+fname+'? Текущий код перестанет работать, после включения клиент скопирует новый в Mini App.'))return;
+        try{await api('/leads/'+L.tg_id+'/widget',{method:'POST',body:{blocked:off}});toast(off?'Виджет отключён':'Виджет включён');close();openLeadCard(L.tg_id)}catch(x){toast(x.message)}}},L.widget_blocked?'Включить':'Отключить'):null)].flat().filter(Boolean));
   box.classList.add('wide');
 }
 /** Запрос бонуса за градацию додепов: сообщение и скриншот, что с лидом шла работа. Уходит админу на проверку */
