@@ -43,6 +43,11 @@ const officeHtml = readFileSync(resolve(process.cwd(), 'public/office.html'), 'u
 app.get('/crm', async (_req, reply) => reply.type('text/html; charset=utf-8').header('Cache-Control', 'no-store').send(officeHtml));
 // Облегчённый Office для старых устройств (iPad на iOS 9): прибыль, комиссия, зарплаты, расходы и показатели, только просмотр
 const liteHtml = readFileSync(resolve(process.cwd(), 'public/lite.html'), 'utf8');
+// Виджет для Pocket Option. Шаг 1: проверочный файл. Скрипт на странице платформы загружает его разными способами,
+// по результату решаем, хватит ли расширения «User JavaScript and CSS» или нужен Tampermonkey
+app.get('/widget/ping.js', async (_req, reply) =>
+  reply.type('application/javascript; charset=utf-8').header('Access-Control-Allow-Origin', '*').header('Cache-Control', 'no-store')
+    .send("window.__hunterPing = (window.__hunterPing || 0) + 1;"));
 app.get('/lite', async (_req, reply) => reply.type('text/html; charset=utf-8').header('Cache-Control', 'no-store').send(liteHtml));
 // Установка Office как приложения (PWA): манифест и сервис-воркер
 const manifest = JSON.stringify({
