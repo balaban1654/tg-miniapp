@@ -4907,7 +4907,20 @@ async function viewPostbacks(){
   return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Постбеки'),rangeBar(()=>render({soft:true}))),el('div',{style:'display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end;margin:-4px 0 10px'},me.role==='admin'?el('button',{class:'btn s',type:'button',style:'margin-right:auto;display:inline-flex;align-items:center;gap:6px',onclick:()=>pbManualDialog(()=>render({soft:true}))},svgIcon('<path d="M12 5v14M5 12h14"/>',16),'Добавить'):null,cnt,...(me.role==='admin'?[upBtn,upFile,clearBox]:[]),el('button',{class:'btn o s',type:'button',onclick:()=>render({soft:true})},'Обновить')),bar,totBox,holder];
 }
 
-(async()=>{try{me=await api('/me');readHash();showApp()}catch{showLogin()}})();
+// Запуск: пока сервер перезапускается (деплой) или нет сети, показываем «Подключаюсь…» и пробуем снова, а не пустой экран.
+// Окно входа - только когда сервер ответил, что сессии нет (401 обрабатывает api)
+(async function boot(n=0){
+  let note=document.getElementById('bootNote');
+  if(!note){note=document.createElement('div');note.id='bootNote';note.setAttribute('role','status');
+    note.style.cssText='position:fixed;inset:0;display:grid;place-items:center;text-align:center;padding:24px;font:600 15px/1.5 Montserrat,sans-serif;color:#cfc6e6;background:#0b0816;z-index:9999';
+    note.textContent='Подключаюсь к серверу…';document.body.append(note)}
+  try{me=await api('/me');note.remove();readHash();showApp()}
+  catch(e){
+    if(e&&e.message==='auth'){note.remove();return}
+    note.textContent=n<1?'Подключаюсь к серверу…':'Сервер обновляется или нет связи. Пробую снова…';
+    setTimeout(()=>boot(n+1),3000);
+  }
+})();
 </script>
 </body>
 </html>
