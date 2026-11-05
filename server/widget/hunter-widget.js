@@ -2,7 +2,7 @@
 // @name         Pocket Option Trade Tracker (HUNTER TEAM)
 // @namespace    trade-tracker
 // @version      7.20
-// @description  Виджет HUNTER TEAM: счётчик WIN / LOSE, пара и часы платформы. Клик по HUNTER - размытие и лупа, по названию пары - список OTC-пар, по «Итог» - история сделок.
+// @description  Виджет HUNTER TEAM: счётчик WIN / LOSE, пара и часы платформы. Клик по HUNTER - размытие и лупа, по «Итог» - история сделок.
 // @match        https://pocketoption.com/*
 // @match        https://po.trade/*
 // @match        https://*.pocketoption.com/*
@@ -682,8 +682,7 @@
       font-weight: 800;
       letter-spacing: 0.3px;
     }
-    #pott-pair { cursor: pointer; caret-color: transparent; }
-    #pott-pair:hover, #pott-pair.pott-open { color: #b98cff; }
+    #pott-pair { cursor: default; caret-color: transparent; }
     #pott-clock-tz { color: rgba(255,255,255,0.45); margin-left: -2px; }
     #pott-clock-tz:empty { display: none; }
     /* --- Таймзона - кнопка показать/скрыть баланс --- */
@@ -1189,7 +1188,7 @@
     </div>
 
     <div id="pott-pair-card">
-      <input id="pott-pair" maxlength="20" readonly tabindex="-1" title="Выбрать другую пару" />
+      <input id="pott-pair" maxlength="20" readonly tabindex="-1" />
       <div id="pott-clock"><span class="pott-live-dot"></span><span id="pott-clock-text">--:--:--</span><span id="pott-clock-tz"></span></div>
     </div>
 
@@ -2034,12 +2033,9 @@
   // OTC-пары с текущей выплатой. Источники: поток данных сайта (updateAssets) или
   // меню выбора актива на сайте. Последний список хранится, чтобы после перезагрузки
   // он был сразу.
-  const otcAssets = new Map(); // ключ пары -> { name, payout }
+  const otcAssets = new Map(); // ключ пары -> { name, payout }. Список пар и проверка процентов убраны
+  delete state.otcCache; delete state.otcGone;
   let otcUpdatedAt = 0;
-  if (state.otcCache && Array.isArray(state.otcCache.list)) {
-    for (const [name, payout] of state.otcCache.list) otcAssets.set(assetKey(name), { name, payout });
-    otcUpdatedAt = state.otcCache.t || 0;
-  }
   // Процент выплаты по текущей паре прямо с сайта (рядом с названием пары или в блоке выплаты).
   function sitePayout() {
     if (findSiteSearch()) return null; // открыт список активов - там другие проценты
@@ -2071,17 +2067,6 @@
     }
     return null;
   }
-  // Раз в секунду сверяем процент текущей пары с сайтом и правим его в списке.
-  setInterval(() => {
-    if (switching || loadingOtc || !state.pair) return;
-    const v = sitePayout();
-    if (v == null) return;
-    const m = String(state.pair).match(PAIR_REGEX);
-    if (!m || !m[2]) return;
-    const k = assetKey(m[1] + ' OTC');
-    const a = otcAssets.get(k);
-    if (a && a.payout !== v) storeOtc([[a.name, v]], false);
-  }, 1000);
   function otcName(symbol, name) {
     const n = String(name || symbol || '').trim();
     return /otc/i.test(n) ? n.replace(/\s*otc$/i, ' OTC') : n + ' OTC';
@@ -2113,15 +2098,6 @@
     }, 1000);
     try { if (!pairsPop.hidden) renderPairs(); } catch (e) {} // список пар объявлен ниже
   }
-  window.addEventListener('message', (e) => {
-    if (e.source !== window || !e.data || !Array.isArray(e.data.__pottAssets)) return;
-    const rows = [];
-    for (const [symbol, name, payout] of e.data.__pottAssets) {
-      const otc = /_otc$/i.test(symbol) || /\botc\b/i.test(name);
-      if (otc) rows.push([otcName(symbol, name), payout]);
-    }
-    if (rows.length) storeOtc(rows, rows.length > 10);
-  });
 
   /* ================= ПЕРЕКЛЮЧЕНИЕ ЭКРАНОВ («Итог» - история) ================= */
   const views = {
@@ -2338,62 +2314,6 @@
       if (!pairsPop.hidden) renderPairs();
     }
   }
-  // Если пользователь сам открыл меню выбора актива на сайте - заодно обновляем проценты.
-  setInterval(() => {
-    if (switching || loadingOtc || !findSiteSearch()) return;
-    const rows = scrapeSiteOtc();
-    if (rows.length >= 3) { unmarkGone(rows); storeOtc(rows, false); }
-  }, 1000);
-  // --- Незаметная проверка процентов каждые 4 секунды (мобильная версия сайта) ---
-  // Меню пар сайта открывается невидимым (прозрачным и некликабельным), виджет читает
-  // проценты и сразу закрывает его. Пропускаем, если вы сейчас нажимаете что-то на сайте,
-  // открыто другое меню, идёт переключение пары или ввод суммы ставки.
-  const HIDE_QUOTES_CSS = '.pott-quiet .drop-down-modal-wrap:has(.drop-down-modal--quotes-list),' +
-    '.pott-quiet .drop-down-modal--quotes-list { opacity: 0 !important; pointer-events: none !important; transition: none !important; animation: none !important; }';
-  const quietStyle = document.createElement('style');
-  quietStyle.textContent = HIDE_QUOTES_CSS;
-  (document.head || document.documentElement).appendChild(quietStyle);
-  let lastUserInput = 0, quietBusy = false, quietOff = false;
-  ['pointerdown', 'touchstart', 'keydown', 'wheel'].forEach((t) => window.addEventListener(t, (e) => { if (e.isTrusted) lastUserInput = Date.now(); }, true));
-  function quotesModalOpen() { return !!document.querySelector('.drop-down-modal--quotes-list'); }
-  async function quietCheck() {
-    if (quietOff || quietBusy || switching || loadingOtc || writingAmount) return;
-    if (document.visibilityState !== 'visible' || Date.now() - lastUserInput < 2500) return;
-    if (!document.getElementById('modal-root')) return; // только мобильная версия сайта
-    if (quotesModalOpen() || findSiteSearch() || document.querySelector('.drop-down-modal-wrap.active')) return; // уже что-то открыто
-    const opener = findPairOpener();
-    if (!opener) return;
-    quietBusy = true;
-    document.documentElement.classList.add('pott-quiet');
-    try {
-      realClick(opener);
-      const ok = await waitFor(() => quotesModalOpen() && scrapeSiteOtc().length >= 3, 1200);
-      const m = document.querySelector('.drop-down-modal--quotes-list');
-      if (m && parseFloat(getComputedStyle(m).opacity) > 0.05) quietOff = true; // спрятать не получилось - больше не пробуем
-      if (ok) {
-        const rows = scrapeSiteOtc();
-        unmarkGone(rows);
-        storeOtc(rows, false);
-      }
-    } catch (e) {
-    } finally {
-      if (quotesModalOpen()) {
-        realClick(opener);
-        await waitFor(() => !quotesModalOpen(), 600);
-        if (quotesModalOpen()) await closeSiteDrawer(opener);
-      }
-      document.documentElement.classList.remove('pott-quiet');
-      quietBusy = false;
-    }
-  }
-  setInterval(quietCheck, 4000);
-  els.pair.addEventListener('click', () => togglePairs());
-  window.addEventListener('mousedown', (e) => {
-    // Закрываем только по настоящему клику человека (не по кликам, которые виджет делает сам на сайте).
-    if (!e.isTrusted || switching || pairsPop.hidden || pairsPop.contains(e.target) || e.target === els.pair) return;
-    togglePairs(false);
-  }, true);
-  window.addEventListener('resize', placePairs);
 
   // --- Переключение пары на сайте ---
   const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
@@ -2509,7 +2429,6 @@
     if (switching) return;
     if (pairKey(target) === pairKey(state.pair)) { togglePairs(false); return; }
     switching = true;
-    if (quietBusy) await waitFor(() => !quietBusy, 2000); // дождаться фоновой проверки процентов
     const wasSelect = selectMode, wasDraw = drawMode;
     setSelectMode(false); setDrawMode(false);
     pairsStatus.className = '';
