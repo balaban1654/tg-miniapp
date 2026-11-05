@@ -322,6 +322,38 @@ export async function unreviewed(period: string): Promise<number> {
 }
 
 /**
+ * Скриншоты отчётов о сменах за прошлый месяц (и раньше) удаляются 5-го числа после 04:00 по Киеву: месяц уже закрыт,
+ * отчёты проверены, а картинки занимают больше всего места в базе. Ночная копия базы в 03:30 ещё содержит их,
+ * и эта копия остаётся в группе Telegram. Отчёты, время и зарплата не меняются, пропадает только картинка.
+ * Месяц, который не закрыт (есть непроверенные отчёты или админ открыл его заново), не трогаем.
+ */
+export async function autoPurgeShots(): Promise<{ period: string; n: number; mb: number } | null> {
+  const t = (await db.query(`SELECT extract(day FROM now() AT TIME ZONE '${TZ}')::int AS d, extract(hour FROM now() AT TIME ZONE '${TZ}')::int AS h`)).rows[0];
+  if (t.d < 5 || (t.d === 5 && t.h < 4)) return null;
+  const prev = prevPeriod(await currentPeriod());
+  const done = (await db.query(`SELECT value FROM app_settings WHERE key = 'shots_purged'`)).rows[0]?.value as string | undefined;
+  if (done && done >= prev) return null;
+  if (!(await isClosed(prev))) return null;
+  const r = (await db.query(
+    `WITH old AS (SELECT id, octet_length(screenshot) AS b FROM shift_reports
+                   WHERE screenshot IS NOT NULL AND status NOT IN ('pending','live') AND to_char(day, 'YYYY-MM') <= $1),
+          x AS (UPDATE shift_reports s SET screenshot = NULL, screenshot_type = NULL FROM old WHERE s.id = old.id RETURNING old.b)
+     SELECT count(*)::int AS n, coalesce(sum(b), 0)::float AS b FROM x`,
+    [prev],
+  )).rows[0];
+  await db.query(`INSERT INTO app_settings (key, value, updated_at) VALUES ('shots_purged', $1, now()) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()`, [prev]);
+  // Место в базе: VACUUM FULL переписывает таблицу без удалённых картинок и отдаёт место диску (таблица без картинок маленькая)
+  if (r.n) await db.query('VACUUM FULL shift_reports').catch((e) => console.error('VACUUM shift_reports', e));
+  const mb = Math.round((Number(r.b) / 1048576) * 10) / 10;
+  const chat = process.env.ALERT_TG_CHAT_ID || process.env.BACKUP_TG_CHAT_ID;
+  if (r.n && chat && process.env.BOT_TOKEN) {
+    const text = `🧹 Hunter: удалены скриншоты отчётов о сменах за ${prev} и раньше: ${r.n} шт., около ${mb.toLocaleString('ru-RU')} МБ. Отчёты и зарплата не изменились. Картинки остались в копии базы за прошлую ночь.`;
+    await fetch(`https://api.telegram.org/bot${process.env.BOT_TOKEN}/sendMessage`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ chat_id: chat, text }) }).catch(() => {});
+  }
+  return { period: prev, n: r.n, mb };
+}
+
+/**
  * Автозакрытие прошлого месяца в 03:00 первого числа (по Киеву). Ждёт, пока проверены все отчёты месяца,
  * и не трогает месяц, который админ открыл заново.
  */
