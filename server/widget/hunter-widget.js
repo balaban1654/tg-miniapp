@@ -20,6 +20,8 @@
   }
   // Защита от двойного запуска (если скрипт подключён дважды).
   if (document.getElementById('pott-widget')) return;
+  // Клиентам сервер отдаёт виджет без «Догона», размытия и лупы (они только у сотрудников и тестовых аккаунтов).
+  const CLIENT = typeof HUNTER_CLIENT !== 'undefined' && HUNTER_CLIENT === true;
 
 
   /* ================= АВТООПРЕДЕЛЕНИЕ ПАРЫ ================= */
@@ -446,6 +448,34 @@
       accent-color: #a970ff;
       cursor: pointer;
     }
+    .pott-switch { position: relative; display: inline-block; width: 30px; height: 17px; cursor: pointer; }
+    .pott-switch input { position: absolute; opacity: 0; width: 0; height: 0; }
+    .pott-switch i {
+      position: absolute; inset: 0; border-radius: 17px;
+      background: rgba(255,255,255,0.15); transition: background 0.15s ease;
+    }
+    .pott-switch i::after {
+      content: ''; position: absolute; top: 2px; left: 2px; width: 13px; height: 13px;
+      border-radius: 50%; background: #fff; transition: transform 0.15s ease;
+    }
+    .pott-switch input:checked + i { background: #3ddc84; }
+    .pott-switch input:checked + i::after { transform: translateX(13px); }
+    #pott-mg-body { display: flex; flex-direction: column; gap: 7px; transition: opacity 0.15s ease; }
+    #pott-mg-body.pott-off { opacity: 0.45; }
+    .pott-mg-row {
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
+      font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.75);
+    }
+    .pott-mg-row input {
+      width: 70px; height: 26px; padding: 0 8px; border-radius: 6px;
+      border: 1px solid rgba(255,255,255,0.14); background: rgba(255,255,255,0.04);
+      color: #fff; font-size: 12px; font-weight: 700; text-align: right; outline: none;
+    }
+    .pott-mg-row input:focus { border-color: rgba(169,112,255,0.7); }
+    .pott-mg-check { display: flex; align-items: center; gap: 7px; font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.75); cursor: pointer; }
+    .pott-mg-check input { accent-color: #3ddc84; margin: 0; }
+    #pott-mg-status { font-size: 11px; font-weight: 700; color: #fff; }
+    #pott-mg-status.pott-err { color: #ff4d6d; }
     .pott-set-scale {
       display: flex;
       justify-content: space-between;
@@ -1389,7 +1419,7 @@
     gmSet(BLUR_KEY, json);
     lsSet(BLUR_KEY, json);
   }
-  let blurState = loadBlurState();
+  let blurState = CLIENT ? { paths: [], patches: [], magnify: [] } : loadBlurState();
 
   /* --- Построение устойчивого пути до элемента --- */
   function cssEscape(s) {
@@ -2327,7 +2357,7 @@
   ['pointerdown', 'touchstart', 'keydown', 'wheel'].forEach((t) => window.addEventListener(t, (e) => { if (e.isTrusted) lastUserInput = Date.now(); }, true));
   function quotesModalOpen() { return !!document.querySelector('.drop-down-modal--quotes-list'); }
   async function quietCheck() {
-    if (quietOff || quietBusy || switching || loadingOtc) return;
+    if (quietOff || quietBusy || switching || loadingOtc || writingAmount) return;
     if (document.visibilityState !== 'visible' || Date.now() - lastUserInput < 2500) return;
     if (!document.getElementById('modal-root')) return; // только мобильная версия сайта
     if (quotesModalOpen() || findSiteSearch() || document.querySelector('.drop-down-modal-wrap.active')) return; // уже что-то открыто
@@ -2593,7 +2623,16 @@
     <div class="pott-set-head"><span>ПРОЗРАЧНОСТЬ</span><span id="pott-set-alpha-val"></span></div>
     <input type="range" id="pott-set-alpha" min="0" max="90" step="5">
     <div class="pott-set-scale"><span>0%</span><span>90%</span></div>
-`;
+    <div class="pott-set-sep pott-mg-part"></div>
+    <div class="pott-set-head pott-mg-part"><span>ДОГОН</span><label class="pott-switch" title="Включить / выключить"><input type="checkbox" id="pott-mg-on"><i></i></label></div>
+    <div id="pott-mg-body" class="pott-mg-part">
+      <div class="pott-mg-row"><span>Начальная ставка</span><input id="pott-mg-base" inputmode="decimal" autocomplete="off"></div>
+      <div class="pott-mg-row"><span>Ставок в серии</span><input id="pott-mg-steps" inputmode="numeric" autocomplete="off"></div>
+      <div class="pott-mg-row"><span>Множитель</span><input id="pott-mg-k" inputmode="decimal" autocomplete="off" title="Во сколько раз увеличивать ставку после проигрыша"></div>
+      <label class="pott-mg-check" title="WIN - серия закончилась выигрышем, LOSE - вся серия в минус"><input type="checkbox" id="pott-mg-count"> Отмечать WIN / LOSE за серию</label>
+      <div id="pott-mg-status"></div>
+    </div>`;
+  if (CLIENT) settings.querySelectorAll('.pott-mg-part').forEach((el) => { el.style.display = 'none'; });
   document.documentElement.appendChild(settings);
   // Нажатия клавиш внутри окошка не уходят на сайт (чтобы не срабатывали его горячие клавиши),
   // поэтому Esc здесь обрабатываем сами.
@@ -2895,6 +2934,7 @@
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>');
   const quickMag = makeQuick('pott-q-mag', 'Лупа: выделите область - она увеличится. Если лупа включена - выключает её',
     '<svg viewBox="0 0 20 20"><circle cx="8.5" cy="8.5" r="5.5" fill="none" stroke="currentColor" stroke-width="1.8"></circle><line x1="12.6" y1="12.6" x2="17" y2="17" stroke="currentColor" stroke-width="2" stroke-linecap="round"></line></svg>');
+  if (CLIENT) { quickBlur.remove(); quickMag.remove(); }
   function syncQuick() {
     quickBlurIcon.classList.toggle('pott-on', blurEls.select.classList.contains('pott-on'));
     const n = parseInt(blurEls.count.textContent, 10) || 0;
@@ -3118,15 +3158,80 @@
   }, { capture: true, passive: true });
   applyMinimized();
 
-  /* ================= УЧЁТ СДЕЛОК (для итога дня) =================
+  /* ================= ДОГОН (настройка в шестерёнке) =================
+     После проигрыша виджет сам вписывает в поле «Сумма» на сайте увеличенную ставку,
+     после выигрыша или после последней ставки серии - возвращает начальную.
+     Ставки делаете вы сами: виджет меняет только сумму.
      Результат сделки определяется:
        1) по данным сайта о закрытых сделках (поток WebSocket), а если их нет -
-       2) по балансу. «Догон» из виджета убран. */
+       2) по балансу: ставка списалась -> через время экспирации деньги вернулись
+          с прибылью (WIN), вернулась та же сумма (возврат) или не вернулось ничего (LOSE). */
   if (!state.mg || typeof state.mg !== 'object') state.mg = {};
   const mg = state.mg;
-  ['on', 'base', 'k', 'steps', 'step', 'lost', 'countWL', 'mult', 'custom'].forEach((k) => { delete mg[k]; });
+  if (typeof mg.on !== 'boolean' || CLIENT) mg.on = false;
+  // Множитель - одно число (по умолчанию 2). Со старой версии переносим «Своё».
+  if (!(mg.k > 1)) mg.k = mg.mult === 'custom' && mg.custom > 1 ? mg.custom : 2;
+  delete mg.mult; delete mg.custom;
+  if (!(mg.steps >= 2 && mg.steps <= 10)) mg.steps = 4;
+  if (typeof mg.countWL !== 'boolean') mg.countWL = true;
+  if (!(mg.step >= 0)) mg.step = 0;
+  if (!(mg.lost >= 0)) mg.lost = 0;
 
-  // --- Время экспирации на сайте (для учёта сделок по балансу) ---
+  const mgEls = {
+    on: settings.querySelector('#pott-mg-on'),
+    body: settings.querySelector('#pott-mg-body'),
+    base: settings.querySelector('#pott-mg-base'),
+    steps: settings.querySelector('#pott-mg-steps'),
+    k: settings.querySelector('#pott-mg-k'),
+    count: settings.querySelector('#pott-mg-count'),
+    status: settings.querySelector('#pott-mg-status'),
+  };
+
+  // --- Поле «Сумма» и поле «Время» на сайте ---
+  function nearText(el, depth) {
+    let t = '', n = el;
+    for (let i = 0; n && i < depth; i++, n = n.parentElement) t += ' ' + (n.getAttribute && (n.getAttribute('class') || '')) + ' ' + (n.textContent || '').slice(0, 80);
+    return t;
+  }
+  // Сумма ставки на Pocket Option - это не поле ввода, а блок с текстом:
+  // <div class="value__val">16</div> внутри блока «Сумма». Ищем сначала его, потом -
+  // любое поле/блок с числом рядом с надписью «Сумма».
+  const AMOUNT_LABEL = /^(сумма|сумма сделки|amount|investment|инвестиция|инвестиции)$/i;
+  function amountText(el) { return el.tagName === 'INPUT' ? el.value : (el.textContent || ''); }
+  function isAmountEl(el) {
+    if (!el || ownWidget(el) || !siteVisible(el)) return false;
+    if (el.tagName === 'INPUT' && /^(range|checkbox|radio|hidden)$/i.test(el.type)) return false;
+    const t = amountText(el).trim();
+    return t.length < 20 && !/\d{1,2}:\d{2}/.test(t) && !!parseMoney(t);
+  }
+  function nearAmountLabel(el) {
+    let n = el.parentElement;
+    for (let up = 0; n && up < 4; up++, n = n.parentElement) {
+      for (const l of n.querySelectorAll('div, span, label, p')) {
+        if (!l.children.length && AMOUNT_LABEL.test((l.textContent || '').trim())) return true;
+      }
+    }
+    return false;
+  }
+  function findAmountEl() {
+    for (const el of document.querySelectorAll('.block--bet-amount .value__val, .value__val')) {
+      const inner = el.querySelector && el.querySelector('input');
+      if (inner && isAmountEl(inner)) return inner;
+      if (isAmountEl(el) && (el.closest('.block--bet-amount') || nearAmountLabel(el))) return el;
+    }
+    for (const l of document.querySelectorAll('div, span, label, p, h4, h5, h6')) {
+      if (l.children.length || ownWidget(l)) continue;
+      if (!AMOUNT_LABEL.test((l.textContent || '').trim()) || !siteVisible(l)) continue;
+      let n = l.parentElement;
+      for (let up = 0; n && up < 4; up++, n = n.parentElement) {
+        const inp = Array.prototype.find.call(n.querySelectorAll('input'), isAmountEl);
+        if (inp) return inp;
+        const leaf = Array.prototype.find.call(n.querySelectorAll('div, span'), (x) => !x.children.length && x !== l && isAmountEl(x));
+        if (leaf) return leaf;
+      }
+    }
+    return null;
+  }
   function findExpirySeconds() {
     for (const i of document.querySelectorAll('input, div, span')) {
       if (ownWidget(i)) continue;
@@ -3137,6 +3242,338 @@
       if (sec > 0 && sec <= 4 * 3600) return sec;
     }
     return 60;
+  }
+  function readSiteAmount() {
+    const el = findAmountEl();
+    const m = el && parseMoney(amountText(el));
+    return m ? m.value : null;
+  }
+  function siteAmountIs(v) {
+    const el = findAmountEl();
+    const m = el && parseMoney(amountText(el));
+    return !!m && Math.abs(m.value - v) < 0.005;
+  }
+  function pressEnter(el) {
+    const o = { bubbles: true, cancelable: true, key: 'Enter', code: 'Enter', keyCode: 13, which: 13 };
+    el.dispatchEvent(new KeyboardEvent('keydown', o));
+    el.dispatchEvent(new KeyboardEvent('keypress', o));
+    el.dispatchEvent(new KeyboardEvent('keyup', o));
+  }
+  // Вписать текст в поле ввода так, как будто его напечатали.
+  function typeInto(inp, txt) {
+    inp.focus();
+    if (inp.isContentEditable) {
+      document.execCommand('selectAll', false, null);
+      document.execCommand('insertText', false, txt);
+    } else {
+      inp.select && inp.select();
+      document.execCommand('insertText', false, txt);
+      if (inp.value !== txt) setNativeValue(inp, txt);
+    }
+    inp.dispatchEvent(new Event('input', { bubbles: true }));
+    inp.dispatchEvent(new Event('change', { bubbles: true }));
+    pressEnter(inp);
+  }
+  // --- Калькулятор суммы на сайте ---
+  const KEY_CHARS = '0123456789.';
+  function leafText(el) { return el.children.length ? null : (el.textContent || '').trim(); }
+  function clickableIn(el, root) {
+    const c = el.closest('button, [role="button"], [class*="btn"], [class*="key"], [class*="item"]');
+    return c && root.contains(c) && c !== root ? c : el;
+  }
+  // Ищем блок, где есть все кнопки 0-9 и точка (это и есть цифровая клавиатура калькулятора).
+  function findKeypad() {
+    for (const seven of document.querySelectorAll('div, span, button, a')) {
+      if (leafText(seven) !== '7' || ownWidget(seven) || !siteVisible(seven)) continue;
+      let root = seven.parentElement;
+      for (let up = 0; root && up < 4; up++, root = root.parentElement) {
+        const keys = {};
+        for (const x of root.querySelectorAll('div, span, button, a')) {
+          const t = leafText(x);
+          if (t && t.length === 1 && KEY_CHARS.includes(t) && !keys[t] && siteVisible(x)) keys[t] = clickableIn(x, root);
+        }
+        if (Object.keys(keys).length < KEY_CHARS.length) continue;
+        // ⌫ - кнопка без текста (обычно с иконкой) рядом с цифрами.
+        const keyParent = keys['0'].parentElement;
+        let back = null;
+        for (const c of root.querySelectorAll('button, [role="button"], [class*="btn"], [class*="key"], div, span')) {
+          if (!siteVisible(c) || Object.values(keys).includes(c)) continue;
+          const t = (c.textContent || '').trim();
+          const cls = String(c.className || '');
+          const looksBack = /back|del|remove|erase|clear|bksp/i.test(cls) || t === '⌫' || t === '←';
+          if ((t === '' && c.querySelector('svg, i, img') && c.parentElement === keyParent) || (looksBack && t.length <= 1)) { back = c; break; }
+        }
+        return { keys, back, root };
+      }
+    }
+    return null;
+  }
+  function findCalcToggle() {
+    for (const el of document.querySelectorAll('div, span, button, a')) {
+      if (ownWidget(el) || !siteVisible(el)) continue;
+      if (/^(калькулятор|calculator)$/i.test(leafText(el) || '')) return el.closest('button, [role="button"], [class*="head"], [class*="title"]') || el;
+    }
+    return null;
+  }
+  // Кнопки «*» и «÷» калькулятора и число-множитель рядом с ними (на сайте обычно 2).
+  function findMulDiv() {
+    // Мобильная версия Pocket Option: «*» и «÷» - картинки внутри .multiply__btn,
+    // множитель - в .multiply__col, дисплей «$1» - в .start-block.
+    const btns = Array.prototype.filter.call(document.querySelectorAll('.multiply__btn'), (b) => !ownWidget(b) && siteVisible(b));
+    if (btns.length >= 2) {
+      const src = (b) => { const svg = b.querySelector('svg, img'); return svg ? (svg.getAttribute('data-src') || svg.getAttribute('src') || '') : ''; };
+      const mulB = btns.find((b) => /umnoz|multipl|mult/i.test(src(b))) || btns[0];
+      const divB = btns.find((b) => b !== mulB && /delen|divid|div/i.test(src(b))) || btns.find((b) => b !== mulB);
+      const block = mulB.closest('.multiply');
+      let factor = null;
+      const col = block && block.querySelector('.multiply__col');
+      if (col) {
+        const inp = col.querySelector('input');
+        const t = inp ? inp.value : col.textContent;
+        const m = String(t || '').trim().match(/\d+([.,]\d+)?/);
+        if (m) factor = parseFloat(m[0].replace(',', '.'));
+      }
+      const root = mulB.closest('.amount-block') || mulB.closest('.trading-panel-modal__column') || mulB.closest('.trading-panel-modal__in') || block || mulB.parentElement;
+      return { mul: mulB, div: divB, factor: factor || 2, display: null, root };
+    }
+    // Полная версия / другое оформление: «*» и «÷» текстом.
+    let mul = null, div = null;
+    for (const x of document.querySelectorAll('div, span, button, a')) {
+      if (ownWidget(x) || !siteVisible(x)) continue;
+      const t = leafText(x);
+      if (!t) continue;
+      if (!mul && /^[*×✕xX]$/.test(t)) mul = x;
+      if (!div && /^[÷/]$/.test(t)) div = x;
+      if (mul && div) break;
+    }
+    if (!mul || !div) return null;
+    // Общий родитель «*» и «÷» - верхняя строка калькулятора; в ней же дисплей «$1» и множитель «2».
+    let row = mul.parentElement, factor = null, display = null;
+    for (let up = 0; row && up < 4; up++, row = row.parentElement) {
+      if (!row.contains(div)) continue;
+      const leaves = Array.prototype.filter.call(row.querySelectorAll('div, span, input'), (y) => siteVisible(y) && (y.tagName === 'INPUT' || !y.children.length));
+      const singleDigits = leaves.filter((y) => /^\d$/.test((y.tagName === 'INPUT' ? y.value : y.textContent || '').trim())).length;
+      if (singleDigits >= 6) break; // дошли до цифровой клавиатуры - выше не поднимаемся
+      for (const y of leaves) {
+        const t = (y.tagName === 'INPUT' ? y.value : y.textContent || '').trim();
+        if (/^[$€₽]/.test(t)) { if (!display) display = y; continue; }
+        if (!factor && /^\d+([.,]\d+)?$/.test(t) && y !== mul && y !== div) factor = parseFloat(t.replace(',', '.'));
+      }
+      if (factor && display) break;
+    }
+    let root = mul.parentElement;
+    for (let up = 0; up < 4 && root.parentElement && root.parentElement !== document.body; up++) root = root.parentElement;
+    return { mul: clickableIn(mul, root), div: clickableIn(div, root), factor: factor || 2, display, root };
+  }
+  function calcDisplayIs(popup, v) {
+    for (const y of popup.querySelectorAll('div, span')) {
+      if (y.children.length) continue;
+      const t = (y.textContent || '').trim();
+      if (/^[$€₽]/.test(t)) { const m = parseMoney(t); return !!m && Math.abs(m.value - v) < 0.005; }
+    }
+    return false;
+  }
+  // Из cur получить v нажатиями «*» / «÷» (если v = cur × F^n). Возвращает 'ok', 'skip' или 'fail'.
+  async function mulDivTo(md, cur, v) {
+    const F = md.factor;
+    if (!(F > 1)) return 'skip';
+    const n = Math.round(Math.log(v / cur) / Math.log(F));
+    if (!n || Math.abs(cur * Math.pow(F, n) - v) > Math.max(0.01, v * 0.002) || Math.abs(n) > 10) return 'skip';
+    const btn = n > 0 ? md.mul : md.div;
+    const snap = () => (md.root.textContent || '') + '|' + (findAmountEl() ? amountText(findAmountEl()) : '');
+    // Каким способом нажимать - определяем по первому нажатию.
+    const before = snap();
+    const p1 = mg.tapMode ? realTap : realClick, p2 = mg.tapMode ? realClick : realTap;
+    p1(btn);
+    await sleep(150);
+    let press = p1;
+    if (snap() === before) { p2(btn); await sleep(150); if (snap() === before) return 'fail'; press = p2; }
+    for (let i = 1; i < Math.abs(n); i++) { press(btn); await sleep(150); }
+    const ok = await waitFor(() => siteAmountIs(v) || calcDisplayIs(md.root, v), 600);
+    return ok ? 'ok' : 'fail';
+  }
+  async function closeCalc(amountEl, pad) {
+    const isOpen = () => pad.root.isConnected && siteVisible(pad.root);
+    const esc = { bubbles: true, cancelable: true, key: 'Escape', code: 'Escape', keyCode: 27, which: 27 };
+    document.dispatchEvent(new KeyboardEvent('keydown', esc));
+    await sleep(150);
+    if (isOpen()) {
+      // Клик мимо калькулятора (в пустое место страницы).
+      const o = { bubbles: true, cancelable: true, view: window, clientX: 2, clientY: Math.round(window.innerHeight / 2) };
+      let target = document.elementFromPoint(2, Math.round(window.innerHeight / 2)) || document.body;
+      if (ownWidget(target)) target = document.body;
+      ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click'].forEach((t) => {
+        const E = t.startsWith('pointer') && window.PointerEvent ? PointerEvent : MouseEvent;
+        target.dispatchEvent(new E(t, o));
+      });
+      await sleep(150);
+    }
+    if (isOpen()) { realClick(amountEl); await sleep(150); }
+  }
+  let writingAmount = false;
+  async function writeSiteAmount(v) {
+    const el = findAmountEl();
+    if (!el) return 'Не нашёл на сайте сумму ставки';
+    const txt = String(Math.round(v * 100) / 100);
+    if (siteAmountIs(v)) return null;
+    writingAmount = true;
+    const active = document.activeElement;
+    try {
+      if (el.tagName === 'INPUT') {
+        setNativeValue(el, txt);
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+        await sleep(200);
+        if (!siteAmountIs(v)) { typeInto(el, txt); el.blur(); }
+      } else if (el.isContentEditable) {
+        typeInto(el, txt);
+        el.blur();
+      } else {
+        // Блок с текстом: нажимаем на него - сайт открывает калькулятор суммы
+        // (цифры 0-9, точка, ⌫). Стираем старое число и набираем новое кнопками.
+        const block = el.closest('.block') || (el.parentElement && el.parentElement.parentElement) || el.parentElement;
+        // Режимы размытия/лупы перехватили бы эти клики - на время выключаем.
+        const wasSel = selectMode, wasDraw = drawMode;
+        setSelectMode(false); setDrawMode(false);
+        try {
+          // Открываем калькулятор. Пробуем по очереди: клик по блоку суммы
+          // (элемент с data-toggle-dropdown), касание (мобильная версия), клик по самому числу.
+          const opener = el.closest('[data-toggle-dropdown]') || el.closest('.control__value') || el;
+          const curBefore = (parseMoney(amountText(el)) || {}).value || 0;
+          const calcSeen = () => findKeypad() || (findMulDiv() ? 'muldiv' : null) || (findCalcToggle() ? 'toggle' : null);
+          // Способ, который сработал в прошлый раз, пробуем первым.
+          const tapFirst = mg.tapMode === true;
+          const attempts = tapFirst
+            ? [[realTap, opener], [realClick, opener], [realTap, el], [realClick, el]]
+            : [[realClick, opener], [realTap, opener], [realClick, el], [realTap, el]];
+          let first = null, tried = 0;
+          for (const [fn, target] of attempts) {
+            tried++;
+            fn(target);
+            first = await waitFor(calcSeen, 700);
+            if (first) { mg.tapMode = fn === realTap; break; }
+          }
+          console.info('[HUNTER] калькулятор суммы:', first ? 'открыт' : 'не открылся', '| попыток:', tried, '| блок:', opener.className);
+          if (first) {
+            // 1) Если нужная сумма = текущая × множитель калькулятора (или ÷), просто жмём «*» / «÷».
+            const md = findMulDiv();
+            if (md && curBefore > 0) {
+              const res = await mulDivTo(md, curBefore, v);
+              if (res === 'ok') { await closeCalc(el, md); return waitFor(() => siteAmountIs(v), 800).then((ok) => ok ? null : 'Сайт не принял сумму ' + txt); }
+            }
+          }
+          // 2) Иначе набираем число цифрами. Если калькулятор открылся свёрнутым - раскрываем «Калькулятор».
+          let pad = null;
+          if (first && first !== 'toggle' && first !== 'muldiv') pad = first;
+          else if (first === 'toggle' || first === 'muldiv') {
+            pad = await waitFor(findKeypad, 250); // вдруг цифры просто ещё появляются
+            if (!pad) {
+              const toggle = findCalcToggle();
+              if (toggle) {
+                const p1 = mg.tapMode ? realTap : realClick, p2 = mg.tapMode ? realClick : realTap;
+                p1(toggle);
+                pad = await waitFor(findKeypad, 700);
+                if (!pad) { p2(toggle); pad = await waitFor(findKeypad, 700); }
+              }
+            }
+          }
+          if (!first) return 'Калькулятор суммы не открылся (нажатие на «' + (opener.className || 'сумму') + '» не сработало)';
+          if (pad) {
+            if (!pad.back) return 'В калькуляторе сайта не нашёл кнопку стирания ⌫';
+            // Какой способ нажатия понимает калькулятор - проверяем на первой кнопке ⌫.
+            // Смотрим на дисплей калькулятора и поле «Сумма» - меняются ли они от нажатия ⌫.
+            let popup = pad.root;
+            for (let up = 0; up < 4 && popup.parentElement && popup.parentElement !== document.body; up++) popup = popup.parentElement;
+            const snapshot = () => (popup.textContent || '') + '|' + (findAmountEl() ? amountText(findAmountEl()) : '');
+            const before = snapshot();
+            const tryFirst = mg.tapMode ? realTap : realClick, tryNext = mg.tapMode ? realClick : realTap;
+            tryFirst(pad.back);
+            await sleep(80);
+            const press = snapshot() !== before ? tryFirst : tryNext;
+            if (press === tryNext) { tryNext(pad.back); await sleep(60); }
+            for (let n = 0; n < 12; n++) { press(pad.back); await sleep(20); }
+            for (const ch of txt) {
+              if (!pad.keys[ch]) return 'В калькуляторе сайта нет кнопки «' + ch + '»';
+              press(pad.keys[ch]);
+              await sleep(35);
+            }
+            await sleep(150);
+            const typedOk = siteAmountIs(v) || calcDisplayIs(popup, v);
+            await closeCalc(el, pad);
+            if (!typedOk && !(await waitFor(() => siteAmountIs(v), 600))) {
+              const md = findMulDiv();
+              const F = md && md.factor ? md.factor : null;
+              if (F && Math.abs(F - mg.k) > 1e-9) {
+                return 'Калькулятор не принял цифры. Поставьте в калькуляторе сайта множитель ' + fmtMoney(mg.k) +
+                  ' (сейчас ' + fmtMoney(F) + ') - тогда виджет будет менять ставку кнопками «*» и «÷»';
+              }
+              return 'Калькулятор не принял цифры: поставьте на сайте сумму ' + txt +
+                ' вручную - дальше виджет будет менять её кнопками «*» и «÷»';
+            }
+          } else {
+            // Вдруг вместо калькулятора открылось обычное поле ввода.
+            const inp = await waitFor(() => {
+              const a = document.activeElement;
+              if (a && a !== document.body && !ownWidget(a) && (a.tagName === 'INPUT' || a.isContentEditable)) return a;
+              const i = block && Array.prototype.find.call(block.querySelectorAll('input, [contenteditable="true"]'), (x) => siteVisible(x));
+              return i || null;
+            }, 400);
+            if (!inp) return 'Калькулятор открылся, но в нём не нашёл цифры 0-9';
+            typeInto(inp, txt);
+            await sleep(80);
+            if (inp.isConnected && inp.blur) inp.blur();
+          }
+        } finally {
+          setTimeout(() => { if (wasSel) setSelectMode(true); if (wasDraw) setDrawMode(true); }, 300);
+        }
+      }
+    } catch (e) {
+      return 'Ошибка при записи суммы: ' + e.message;
+    } finally {
+      if (active && active.focus && active !== document.body && document.activeElement !== active) { try { active.focus(); } catch (e) {} }
+      setTimeout(() => { writingAmount = false; }, 300);
+    }
+    const ok = await waitFor(() => siteAmountIs(v), 800);
+    return ok ? null : 'Сайт не принял сумму ' + txt;
+  }
+
+  // --- Расчёт следующей ставки ---
+  function currentPayout() {
+    const a = otcAssets.get(assetKey(state.pair));
+    return a && a.payout ? a.payout / 100 : 0.85;
+  }
+  function roundStake(v) {
+    return Math.abs(mg.base - Math.round(mg.base)) < 1e-9 ? Math.ceil(v - 1e-9) : Math.round(v * 100) / 100;
+  }
+  function stakeForStep(step) {
+    if (step <= 0) return mg.base;
+    return roundStake(mg.base * Math.pow(mg.k, step));
+  }
+  async function applyStake() {
+    if (!mg.on || !(mg.base > 0)) return;
+    const v = stakeForStep(mg.step);
+    const err = await writeSiteAmount(v);
+    mgStatus(err);
+  }
+
+  // --- Обработка результата сделки ---
+  // В счётчик идёт результат СЕРИИ: WIN - серия закончилась выигрышем (на любой ставке),
+  // LOSE - все ставки серии проиграли. Промежуточные проигрыши не отмечаются.
+  function onTradeResult(res, stake) {
+    if (!mg.on) return;
+    if (res === 'w') {
+      if (mg.countWL) box.querySelector('#pott-win-plus').click();
+      mg.step = 0; mg.lost = 0;
+    } else if (res === 'l') {
+      mg.lost += stake || stakeForStep(mg.step);
+      mg.step += 1;
+      if (mg.step >= mg.steps) { // серия проиграна целиком - начинаем с начальной ставки
+        if (mg.countWL) box.querySelector('#pott-loss-plus').click();
+        mg.step = 0; mg.lost = 0;
+      }
+    }
+    saveState(state);
+    applyStake();
+    renderMg();
   }
 
   // 1) Данные сайта о закрытых сделках.
@@ -3173,9 +3610,10 @@
       if (d.isWin === true) res = 'w';
       else if (dealsNet) res = d.profit > 0 ? 'w' : d.profit === 0 ? 'd' : 'l';
       else res = d.profit > 0 && Math.abs(d.profit - d.amount) > 1e-9 ? 'w' : Math.abs(d.profit - d.amount) <= 1e-9 ? 'd' : 'l';
-      // Прибыль/убыток сделки - в итог дня .
+      // Прибыль/убыток сделки - в итог дня (считается всегда, даже при выключенном «Догоне»).
       const net = res === 'w' ? (dealsNet ? d.profit : (d.profit > d.amount ? d.profit - d.amount : d.profit)) : res === 'l' ? -d.amount : 0;
       addDayPnl(Math.round(net * 100) / 100, d.closeTime ? d.closeTime * 1000 : Date.now());
+      onTradeResult(res, d.amount);
     }
     if (changed) saveState(state);
   });
@@ -3197,16 +3635,60 @@
       // Списание - открылась сделка на эту сумму.
       pendingTrades.push({ stake: -delta, until: Date.now() + (findExpirySeconds() + 5) * 1000 });
     } else if (pendingTrades.length) {
-      pendingTrades.shift();
+      const t = pendingTrades.shift();
+      onTradeResult(delta > t.stake * 1.001 ? 'w' : 'd', t.stake);
     }
   });
   setInterval(() => {
     if (wsDealsSeen) return;
     while (pendingTrades.length && Date.now() > pendingTrades[0].until) {
-      pendingTrades.shift();
+      const t = pendingTrades.shift();
+      onTradeResult('l', t.stake);
     }
   }, 500);
 
+  // --- Интерфейс в шестерёнке ---
+  function mgStatus(err) {
+    if (err) { mgEls.status.textContent = err; mgEls.status.className = 'pott-err'; return; }
+    mgEls.status.className = '';
+    if (!mg.on) { mgEls.status.textContent = 'Выключен'; return; }
+    mgEls.status.textContent = 'Ставка ' + (mg.step + 1) + ' из ' + mg.steps + ': ' + fmtMoney(stakeForStep(mg.step));
+  }
+  function renderMg() {
+    mgEls.on.checked = mg.on;
+    mgEls.body.classList.toggle('pott-off', !mg.on);
+    if (document.activeElement !== mgEls.base) mgEls.base.value = mg.base > 0 ? mg.base : '';
+    if (document.activeElement !== mgEls.steps) mgEls.steps.value = mg.steps;
+    if (document.activeElement !== mgEls.k) mgEls.k.value = mg.k;
+    mgEls.count.checked = mg.countWL;
+    mgStatus();
+  }
+  mgEls.on.addEventListener('change', () => {
+    mg.on = mgEls.on.checked;
+    mg.step = 0; mg.lost = 0;
+    if (mg.on && !(mg.base > 0)) mg.base = readSiteAmount() || 0;
+    saveState(state);
+    if (mg.on) applyStake();
+    renderMg();
+  });
+  mgEls.base.addEventListener('change', () => {
+    const m = parseMoney(mgEls.base.value);
+    if (m && m.value > 0) { mg.base = m.value; mg.step = 0; mg.lost = 0; saveState(state); applyStake(); }
+    renderMg();
+  });
+  mgEls.steps.addEventListener('change', () => {
+    const n = parseInt(mgEls.steps.value, 10);
+    if (n >= 2 && n <= 10) { mg.steps = n; if (mg.step >= n) { mg.step = 0; mg.lost = 0; applyStake(); } saveState(state); }
+    renderMg();
+  });
+  mgEls.k.addEventListener('change', () => {
+    const v = parseFloat(String(mgEls.k.value).replace(',', '.'));
+    if (v > 1 && v <= 10) { mg.k = Math.round(v * 100) / 100; saveState(state); applyStake(); }
+    renderMg();
+  });
+  mgEls.count.addEventListener('change', () => { mg.countWL = mgEls.count.checked; saveState(state); renderMg(); });
+  [mgEls.base, mgEls.steps, mgEls.k].forEach((i) => i.addEventListener('keydown', (e) => { if (e.key === 'Enter') i.blur(); }));
+  renderMg();
 
   /* ================= ПОЯВЛЕНИЕ ПОСЛЕ ЗАГРУЗКИ САЙТА =================
      Показываем всё разом, когда: страница загружена, в шапке появился баланс

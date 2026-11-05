@@ -2097,7 +2097,7 @@ function widgetTile(){
     how.onclick=()=>{steps.hidden=!steps.hidden;how.textContent=steps.hidden?'Как установить':'Свернуть'};
     box.replaceChildren(
       el('b',{style:'font:700 15px var(--fd)'},'🧩 Виджет для Pocket Option'),
-      el('div',{class:'sm',style:'line-height:1.45'},'Счётчик WIN и LOSE, пара и часы платформы, баланс сессии, размытие и лупа. Обновляется сам, переустанавливать не нужно.'),
+      el('div',{class:'sm',style:'line-height:1.45'},'Счётчик WIN и LOSE, пара и часы платформы, баланс сессии. Обновляется сам, переустанавливать не нужно.'),
       el('button',{class:'btn',type:'button',onclick:async()=>{try{await navigator.clipboard.writeText(d.loader)}catch{const t=el('textarea',{style:'position:fixed;opacity:0'});t.value=d.loader;document.body.append(t);t.select();try{document.execCommand('copy')}catch{}t.remove()}toast('Код виджета скопирован')}},'Скопировать код'),
       el('div',{class:'sm',style:'color:var(--mut)'},'Код личный: не передавайте его другим.'),
       how,steps);

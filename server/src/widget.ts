@@ -61,12 +61,13 @@ export async function widgetRoutes(app: FastifyInstance): Promise<void> {
     reply.type('application/javascript; charset=utf-8').header('Access-Control-Allow-Origin', '*').header('Cache-Control', 'no-store');
     const key = String(req.query.key ?? '');
     if (!/^[A-Za-z0-9_-]{16,40}$/.test(key)) return notice('HUNTER: ключ виджета неверный. Скопируйте код заново в профиле Mini App.');
-    const d = (await db.query(`SELECT d.tg_id, d.widget_blocked, ${ALLOWED} AS ok FROM leads d WHERE d.widget_key = $1`, [key])).rows[0];
+    const d = (await db.query(`SELECT d.tg_id, d.widget_blocked, coalesce(d.lead_role, 'lead') <> 'lead' AS staff, ${ALLOWED} AS ok FROM leads d WHERE d.widget_key = $1`, [key])).rows[0];
     if (!d) return notice('HUNTER: ключ виджета больше не действует. Скопируйте код заново в профиле Mini App.');
     if (d.widget_blocked) return notice('HUNTER: виджет для вас отключён. Напишите в поддержку.');
     if (!d.ok) return notice('HUNTER: виджет доступен клиентам с первым депозитом от $45. Откройте Mini App, чтобы узнать подробнее.');
     if (!widgetCode) return notice('HUNTER: виджет временно недоступен, попробуйте позже.');
     await db.query('UPDATE leads SET widget_used_at = now() WHERE tg_id = $1', [d.tg_id]).catch(() => {});
-    return widgetCode;
+    // Клиентам - без «Догона», размытия и лупы: виджет видит флаг HUNTER_CLIENT. Сотрудникам и тестовым - полный
+    return d.staff ? widgetCode : 'var HUNTER_CLIENT = true;\n' + widgetCode;
   });
 }
