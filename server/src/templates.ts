@@ -177,11 +177,12 @@ export async function dispatchTemplate(key: TemplateKey, d: Dispatch): Promise<{
 
 const lastLive = new Map<number, number>();
 
-/** Стример открыл смену: шлём «Стример в прямом эфире». Повтор от одного стримера не чаще раза в 30 минут */
+/** Стример открыл смену: шлём «Стример в прямом эфире». Повтор от одного стримера не чаще раза в 5 минут
+ *  (бывает, что выкидывает с эфира и стример открывает смену заново с новой ссылкой) */
 export async function announceLive(staffId: number, streamUrl: string): Promise<void> {
   try {
     const prev = lastLive.get(staffId) ?? 0;
-    if (Date.now() - prev < 30 * 60_000) return;
+    if (Date.now() - prev < 5 * 60_000) return;
     const st = (await db.query('SELECT name, live_channel FROM staff WHERE id = $1', [staffId])).rows[0];
     if (!st) return;
     const r = await dispatchTemplate('live', { vars: { 'стример': st.name }, streamUrl, ownerId: staffId, staffChannel: st.live_channel, createdBy: staffId });
