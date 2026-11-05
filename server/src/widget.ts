@@ -23,8 +23,12 @@ const notice = (text: string) =>
   `d.style.cssText='position:fixed;z-index:2147483647;right:12px;bottom:12px;max-width:300px;padding:10px 14px;border-radius:10px;background:#1c1233;color:#fff;font:600 13px/1.45 sans-serif;box-shadow:0 8px 30px rgba(0,0,0,.5)';` +
   `d.textContent=${JSON.stringify(text)};(document.body||document.documentElement).appendChild(d);setTimeout(function(){d.remove()},15000)})();`;
 
-/** Кому можно выдать виджет: клиент с доступом или аккаунт сотрудника, не заблокирован, не удалён */
-const ALLOWED = `(coalesce(d.lead_role, 'lead') NOT IN ('lead','test') OR d.access) AND d.banned_at IS NULL AND d.removed_at IS NULL`;
+/** Кому можно выдать виджет: клиент в статусе «Активный» или с первым депозитом от $45; стример, весь админ-состав
+ *  и тестовые аккаунты (любая роль, кроме обычного лида). Заблокированным и удалённым — нет */
+const ALLOWED = `(coalesce(d.lead_role, 'lead') <> 'lead'
+    OR coalesce(d.status_before_block, d.status) = 'active'
+    OR EXISTS (SELECT 1 FROM events e WHERE e.tg_id = d.tg_id AND e.type = 'ftd' AND e.amount >= 45))
+  AND d.banned_at IS NULL AND d.removed_at IS NULL`;
 
 /** Загрузчик для расширения: ключ уже вставлен. GM_* передаём в виджет, если расширение их даёт */
 export function loaderCode(key: string): string {
@@ -60,7 +64,7 @@ export async function widgetRoutes(app: FastifyInstance): Promise<void> {
     const d = (await db.query(`SELECT d.tg_id, d.widget_blocked, ${ALLOWED} AS ok FROM leads d WHERE d.widget_key = $1`, [key])).rows[0];
     if (!d) return notice('HUNTER: ключ виджета больше не действует. Скопируйте код заново в профиле Mini App.');
     if (d.widget_blocked) return notice('HUNTER: виджет для вас отключён. Напишите в поддержку.');
-    if (!d.ok) return notice('HUNTER: виджет доступен после подключения. Откройте Mini App, чтобы узнать подробнее.');
+    if (!d.ok) return notice('HUNTER: виджет доступен клиентам с первым депозитом от $45. Откройте Mini App, чтобы узнать подробнее.');
     if (!widgetCode) return notice('HUNTER: виджет временно недоступен, попробуйте позже.');
     await db.query('UPDATE leads SET widget_used_at = now() WHERE tg_id = $1', [d.tg_id]).catch(() => {});
     return widgetCode;
