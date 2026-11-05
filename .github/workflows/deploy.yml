@@ -44,10 +44,13 @@ jobs:
             install -m 755 /opt/hunter/deploy/backup.sh /usr/local/bin/hunter-backup
             install -m 755 /opt/hunter/deploy/watchdog.sh /usr/local/bin/hunter-watch
             printf "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\n30 3 * * * root /usr/local/bin/hunter-backup >> /var/log/hunter-backup.log 2>&1\n*/5 * * * * root /usr/local/bin/hunter-watch >> /var/log/hunter-watch.log 2>&1\n" > /etc/cron.d/hunter-backup
-            chmod 644 /etc/cron.d/hunter-backup'
+            chmod 644 /etc/cron.d/hunter-backup
+            find /var/backups/hunter -maxdepth 1 -name "hunter_*.sql.gz" -mtime +3 -delete 2>/dev/null || true
+            find /var/backups/hunter -maxdepth 1 -name "before-change_*.sql.gz" -mtime +14 -delete 2>/dev/null || true
+            du -sh /var/backups/hunter 2>/dev/null || true'
 
       # Разовая копия перед рискованными изменениями данных: срабатывает, если в сообщении коммита есть [backup].
-      # Копия вида before-change_*.sql.gz не удаляется автоматической очисткой (она трогает только hunter_*)
+      # Копия вида before-change_*.sql.gz хранится 14 дней (обычные hunter_* — 3 дня, все копии есть в группе Telegram)
       - name: Резервная копия базы перед изменениями ([backup] в коммите)
         if: contains(github.event.head_commit.message, '[backup]')
         run: |
@@ -62,4 +65,4 @@ jobs:
       - name: Запуск приложения
         run: |
           ssh -i ~/.ssh/id_deploy "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
-            "cd /opt/hunter && docker compose -f docker-compose.prod.yml up -d --build && docker image prune -f"
+            "cd /opt/hunter && docker compose -f docker-compose.prod.yml up -d --build && docker image prune -f && { docker builder prune -f --filter until=72h >/dev/null 2>&1 || true; df -h / | tail -1; }"
