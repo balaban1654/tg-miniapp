@@ -139,7 +139,7 @@ main{flex:1;padding:6px 16px 96px;display:grid;gap:12px;align-content:start}
 .pshead b{font:700 16px var(--fd);white-space:nowrap}
 .pshead span{font-size:11px;text-align:right}
 .pslist{background:var(--card);border-radius:18px;overflow-y:auto;overflow-x:hidden;max-height:372px;-webkit-overflow-scrolling:touch}
-.clamp{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:4;line-clamp:4;overflow:hidden}.rd-more{background:none;border:0;color:var(--acc2);font:700 12.5px var(--fd);padding:0;cursor:pointer;justify-self:start}
+.clamp{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:4;line-clamp:4;overflow:hidden}.rd-more{background:none;border:0;color:var(--acc2);font:700 12.5px var(--fd);padding:0;cursor:pointer;justify-self:start}.rd-row{display:flex;align-items:center;gap:18px;flex-wrap:wrap}.rd-row:not(:has(button:not([hidden]))){display:none}
 .psstat{margin-top:10px;background:var(--card);border-radius:16px;padding:14px;display:grid;gap:10px}.psstat .t3{display:grid;grid-template-columns:repeat(3,1fr);text-align:center}.psstat .t3 b{display:block;font:800 20px var(--fd)}.psstat .t3 span{font-size:11px;color:var(--mut)}.psbar{display:flex;height:10px;border-radius:6px;overflow:hidden;background:#ffffff12}.psbar i{display:block;height:100%}.pscells{display:grid;gap:6px}.pscell{background:var(--card2);border-radius:12px;padding:8px 4px;text-align:center}.pscell b{display:block;font:800 16px var(--fd)}.pscell span{font-size:10.5px;color:var(--mut)}.psstat .sm{text-align:center;font-size:11.5px}
 .ps{overflow:hidden;transition:height .45s cubic-bezier(.2,.8,.2,1),opacity .45s ease}.ps-in{padding:14px 16px;display:grid;gap:8px}.ps+.ps{border-top:1px solid #ffffff10}
 .pbadge{border:1px solid;border-radius:8px;padding:4px 12px;font-size:13px;font-weight:600;white-space:nowrap}
@@ -313,7 +313,6 @@ svg{max-width:100%}
 .rf-li{display:flex;justify-content:space-between;gap:10px;align-items:center;font-size:13px;padding:8px 0;border-top:1px solid var(--line)}.rf-li:first-child{border-top:0}
 .rf-p{background:#ffb84d22;color:#ffb84d;padding:4px 12px;border-radius:999px;font-size:12px;font-weight:700}
 
-.nw-more{color:inherit;font:inherit;text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:3px;text-decoration-color:currentColor;transition:color .15s}.nw-more:hover,.nw-more:active,.nw-more:focus-visible{color:var(--acc2,#c9a6ff)}
 
 /* Светлая тема (Профиль → Тема): та же вёрстка, другая палитра. Включается атрибутом data-theme="light" у <html> */
 html[data-theme=light]{--bg:#f6f4fb;--bg2:#efeaf9;--card:#ffffff;--card2:#f3effc;--line:#e3dcf3;--fg:#1b1530;--mut:#6d6585;--acc:#7c3aed;--acc2:#7c3aed;--acc3:#6a2fe0;--ok:#13996a;--warn:#d97706;--bad:#e11d48;color-scheme:light}
@@ -1722,17 +1721,19 @@ function reviewDialog(done){
     el('div',{class:'rv-form'},el('h3',{},'Ваш отзыв'),el('div',{class:'sm',style:'text-align:center'},'Оценка'),pick,ta,att,file,err,send,el('button',{class:'btn o',type:'button',onclick:close},'Отмена')));
   document.body.append(sh);
 }
-/** Длинный текст сворачивается до 4 строк, кнопка «Читать далее» появляется только если текст не поместился */
-function clampBody(text,cls,style,tail){
-  // tail: ссылка в конце текста (например «…читать продолжение»): в свёрнутом виде обрезается вместе с текстом
-  // Хвост идёт вплотную к тексту: точки в конце текста убираем, у хвоста свои «...» («просто... читать продолжение»)
-  const body=el('div',{class:(cls||'')+' clamp',style:style||''},el('span',{'data-raw':''},tail?String(text).replace(/\s*(\.+|…)\s*$/,''):text),tail||null);
+/** Длинный текст сворачивается до 4 строк, кнопка «Читать далее» появляется только если текст не поместился.
+ *  url: ссылка на пост. Кнопка «Перейти к посту» стоит справа от «Свернуть» в развёрнутом виде,
+ *  а если текст и так помещается целиком - сразу под ним */
+function clampBody(text,cls,style,url){
+  const body=el('div',{class:(cls||'')+' clamp',style:style||''},el('span',{'data-raw':''},text));
   const btn=el('button',{type:'button',class:'rd-more',hidden:''},'Читать далее');
-  let open=false;
-  btn.onclick=()=>{open=!open;body.classList.toggle('clamp',!open);btn.textContent=open?'Свернуть':'Читать далее'};
-  const check=()=>{if(open||!body.isConnected)return;btn.hidden=!(body.scrollHeight>body.clientHeight+1)};
+  const go=url?el('button',{type:'button',class:'rd-more rd-go',hidden:'',onclick:()=>openLink(url)},'Перейти к посту'):null;
+  let open=false,fits=false;
+  const sync=()=>{btn.hidden=fits;if(go)go.hidden=!(open||fits)};
+  btn.onclick=()=>{open=!open;body.classList.toggle('clamp',!open);btn.textContent=open?'Свернуть':'Читать далее';sync()};
+  const check=()=>{if(open||!body.isConnected)return;fits=!(body.scrollHeight>body.clientHeight+1);sync()};
   requestAnimationFrame(()=>requestAnimationFrame(check));[120,500,1500].forEach(t=>setTimeout(check,t));
-  return el('div',{style:'display:grid;gap:4px'},body,btn);
+  return el('div',{style:'display:grid;gap:4px'},body,el('div',{class:'rd-row'},btn,go));
 }
 /** Выбран английский: показываем английские версии новостей и отзывов, если админ их написал */
 const isEn=()=>document.documentElement.getAttribute('lang')==='en';
@@ -1770,7 +1771,7 @@ async function reviewsBlock(){
 function newsBlock(items){
   if(!items.length)return el('div',{class:'card',style:'display:grid;gap:6px'},el('b',{style:'font-size:14px'},'Скоро здесь появятся новости'),el('div',{class:'sm',style:'line-height:1.5'},'Обновления тренажёра, итоги недели, новые трейдеры и важные объявления команды. Заглядывайте сюда почаще, чтобы ничего не пропустить.'));
   const dt=v=>new Date(v).toLocaleDateString('ru-RU',{day:'numeric',month:'long',year:'numeric'}).replace(/\s*г\.?$/,'');
-  return el('div',{style:'display:grid;gap:10px'},items.map(n=>el('div',{class:'card',style:'display:grid;gap:6px'},el('div',{class:'sm'},dt(n.created_at)),el('b',{style:'font-size:14.5px','data-raw':''},isEn()&&n.title_en?n.title_en:n.title),clampBody(isEn()&&(n.body_en||n.title_en)?(n.body_en||n.body):n.body,'','white-space:pre-wrap;line-height:1.5;font-size:13.5px;word-break:break-word',n.url?el('a',{href:n.url,class:'nw-more',onclick:e=>{e.preventDefault();openLink(n.url)}},'... читать продолжение'):null))));
+  return el('div',{style:'display:grid;gap:10px'},items.map(n=>el('div',{class:'card',style:'display:grid;gap:6px'},el('div',{class:'sm'},dt(n.created_at)),el('b',{style:'font-size:14.5px','data-raw':''},isEn()&&n.title_en?n.title_en:n.title),clampBody(isEn()&&(n.body_en||n.title_en)?(n.body_en||n.body):n.body,'','white-space:pre-wrap;line-height:1.5;font-size:13.5px;word-break:break-word',n.url||null))));
 }
 async function viewMedia(){
   if(!me)await refreshMe();
