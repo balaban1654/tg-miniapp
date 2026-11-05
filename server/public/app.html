@@ -2076,8 +2076,34 @@ function viewProfile(){
     el('div',{class:'card',style:'display:grid;grid-template-columns:minmax(0,1fr);gap:10px'},rows.filter(([k,v])=>!(k==='Pocket ID'&&!v)).map(([k,v,cp])=>el('div',{class:'row'},el('span',{class:'sm'},k),
       el('span',{style:'display:inline-flex;align-items:center;gap:8px'},cp?hiddenId(v):el('b',{class:'mono'},v instanceof Node?v:String(v)),cp?copyBtn(v):null)))),
     refTile(),
+    widgetTile(),
     me.leadRole==='admin'?el('button',{class:'btn gw-open',type:'button',onclick:()=>viewGiveaway()},'🎁 Провести розыгрыш'):null,
     el('button',{class:'back',type:'button',onclick:()=>go('home')},'‹ На главную')]);
+}
+/** Виджет HUNTER TEAM для Pocket Option: личный загрузчик для расширения «User JavaScript and CSS».
+ *  Показывается тем, кому виджет положен (подключённые клиенты и сотрудники); сам код виджета на сервере и обновляется у всех сразу */
+const UJS_URL='https://chromewebstore.google.com/detail/user-javascript-and-css/nbhcbdghjpllgmfilhnhkllmkecfmpld';
+function widgetTile(){
+  const box=el('div',{class:'card',style:'display:grid;gap:10px',hidden:''});
+  api('/widget').then(d=>{
+    if(!d||!d.ok||!box.isConnected)return;
+    const steps=el('ol',{class:'sm',style:'margin:0;padding-left:18px;display:grid;gap:6px;line-height:1.45',hidden:''},
+      el('li',{},'Установите в Chrome расширение ',el('a',{href:UJS_URL,style:'color:var(--acc2)',onclick:e=>{e.preventDefault();openLink(UJS_URL)}},'«User JavaScript and CSS»'),'.'),
+      el('li',{},'Откройте его и нажмите «добавить новое».'),
+      el('li',{},'В поле «URL паттерн» впишите ',el('b',{class:'mono'},'https://*.pocketoption.com/*')),
+      el('li',{},'Вставьте скопированный код и нажмите «Сохранить».'),
+      el('li',{},'Откройте Pocket Option: виджет появится справа.'));
+    const how=el('button',{type:'button',class:'rd-more',style:'justify-self:start'},'Как установить');
+    how.onclick=()=>{steps.hidden=!steps.hidden;how.textContent=steps.hidden?'Как установить':'Свернуть'};
+    box.replaceChildren(
+      el('b',{style:'font:700 15px var(--fd)'},'🧩 Виджет для Pocket Option'),
+      el('div',{class:'sm',style:'line-height:1.45'},'Счётчик WIN и LOSE, пара и часы платформы, баланс сессии, размытие и лупа. Обновляется сам, переустанавливать не нужно.'),
+      el('button',{class:'btn',type:'button',onclick:async()=>{try{await navigator.clipboard.writeText(d.loader)}catch{const t=el('textarea',{style:'position:fixed;opacity:0'});t.value=d.loader;document.body.append(t);t.select();try{document.execCommand('copy')}catch{}t.remove()}toast('Код виджета скопирован')}},'Скопировать код'),
+      el('div',{class:'sm',style:'color:var(--mut)'},'Код личный: не передавайте его другим.'),
+      how,steps);
+    box.hidden=false;
+  }).catch(()=>{});
+  return box;
 }
 /** Реферальная программа: пока в разработке, отсчёт до запуска 1-го числа в 22:00 по Киеву (ближайшее, ещё не прошедшее) */
 // Запуск перенесён на сутки: 2 ноября 2026, 22:00 по Киеву (20:00 UTC). Когда пройдёт — отсчёт до 1-го числа следующего месяца

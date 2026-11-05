@@ -15,6 +15,8 @@ COPY server/package*.json ./
 RUN npm ci --omit=dev
 COPY --from=build /app/dist ./dist
 COPY server/public ./public
+# Виджет для Pocket Option: отдаётся по личному ключу (src/widget.ts), не из открытой папки
+COPY server/widget ./widget
 COPY db/schema.sql ./schema.sql
 # Английские версии текстов из Office: вписываются при запуске (см. src/i18nFill.ts)
 COPY server/i18n-fill.json ./i18n-fill.json

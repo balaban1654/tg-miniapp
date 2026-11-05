@@ -1028,6 +1028,11 @@ ALTER TABLE leads ADD COLUMN IF NOT EXISTS lang TEXT;
 ALTER TABLE news ADD COLUMN IF NOT EXISTS title_en TEXT NOT NULL DEFAULT '';
 ALTER TABLE news ADD COLUMN IF NOT EXISTS body_en TEXT NOT NULL DEFAULT '';
 ALTER TABLE reviews ADD COLUMN IF NOT EXISTS body_en TEXT NOT NULL DEFAULT '';
+-- Виджет HUNTER TEAM для Pocket Option: личный ключ загрузчика, последняя загрузка, отключение из Office
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS widget_key TEXT;
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS widget_used_at TIMESTAMPTZ;
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS widget_blocked BOOLEAN NOT NULL DEFAULT FALSE;
+CREATE UNIQUE INDEX IF NOT EXISTS leads_widget_key ON leads (widget_key) WHERE widget_key IS NOT NULL;
 -- Тема Mini App (light/dark), выбранная клиентом в профиле: одна на всех его устройствах
 ALTER TABLE leads ADD COLUMN IF NOT EXISTS theme TEXT;
 ALTER TABLE push_rules ADD COLUMN IF NOT EXISTS text_en TEXT NOT NULL DEFAULT '';

@@ -573,5 +573,18 @@ window.HUNTER_EN = {
   'К боту не привязан счёт Pocket Option. Выберите вывод на USDT BEP20': 'No Pocket Option account is linked to the bot. Choose USDT BEP20',
   'На балансе пока нет средств': 'There are no funds on the balance yet',
   'Сейчас на балансе': 'Current balance',
-  'Нет доступа': 'No access'
+  'Нет доступа': 'No access',
+  // Виджет для Pocket Option (профиль)
+  '🧩 Виджет для Pocket Option': '🧩 Pocket Option widget',
+  'Счётчик WIN и LOSE, пара и часы платформы, баланс сессии, размытие и лупа. Обновляется сам, переустанавливать не нужно.': 'WIN and LOSE counter, platform pair and clock, session balance, blur and magnifier. Updates itself, no need to reinstall.',
+  'Скопировать код': 'Copy code',
+  'Код личный: не передавайте его другим.': 'The code is personal: do not share it.',
+  'Код виджета скопирован': 'Widget code copied',
+  'Как установить': 'How to install',
+  'Свернуть': 'Collapse',
+  'Установите в Chrome расширение ': 'Install the Chrome extension ',
+  'Откройте его и нажмите «добавить новое».': 'Open it and click “add new”.',
+  'В поле «URL паттерн» впишите ': 'In the “URL pattern” field enter ',
+  'Вставьте скопированный код и нажмите «Сохранить».': 'Paste the copied code and click “Save”.',
+  'Откройте Pocket Option: виджет появится справа.': 'Open Pocket Option: the widget will appear on the right.'
 };

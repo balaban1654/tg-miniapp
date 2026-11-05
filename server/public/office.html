@@ -2572,7 +2572,13 @@ async function openLeadCard(tgId){
       ...(matchMedia('(min-width:521px)').matches?[kv('Владелец',L.owner_name||'не закреплён'),kv('Страна',countryName(d.country))]:[kv('Страна',countryName(d.country)),kv('Владелец',L.owner_name||'не закреплён')]),
       // Пришёл по реферальной ссылке: на месте часового пояса «Пригласил» (Telegram ID, по нажатию его карточка), пояс ниже
       L.referrer_id?kv('Пригласил',el('a',{href:'#',title:L.referrer_name?'Открыть карточку: '+L.referrer_name:'Открыть карточку',style:'color:var(--fg);text-decoration:none',onclick:e=>{e.preventDefault();document.querySelectorAll('.lc-overlay').forEach(x=>x.remove());openLeadCard(L.referrer_id)}},String(L.referrer_id))):kv('Часовой пояс',L.tz),
-      kvc('Промокод',d.promo),kv('Последний визит',fmtDT(L.last_seen_at)),L.referrer_id?kv('Часовой пояс',L.tz):null),
+      kvc('Промокод',d.promo),kv('Последний визит',fmtDT(L.last_seen_at)),L.referrer_id?kv('Часовой пояс',L.tz):null,
+      // Виджет для Pocket Option: запускал ли, когда последний раз; админ и тимлид могут отключить
+      kv('Виджет Pocket Option',el('span',{style:'display:inline-flex;gap:8px;align-items:center;flex-wrap:wrap'},
+        L.widget_blocked?el('span',{style:'color:var(--bad)'},'отключён'):L.widget_used_at?el('span',{style:'color:var(--ok)',title:'Последняя загрузка виджета'},'работает · '+fmtDT(L.widget_used_at)):L.widget_has?'код выдан, не запускал':'не подключал',
+        me.role==='admin'||me.role==='teamlead'?el('button',{class:'btn o s',type:'button',style:'padding:2px 8px;font-size:11px',onclick:async()=>{
+          const off=!L.widget_blocked;if(off&&!await askC('Отключить виджет '+fname+'? Текущий код перестанет работать, после включения клиент скопирует новый в Mini App.'))return;
+          try{await api('/leads/'+L.tg_id+'/widget',{method:'POST',body:{blocked:off}});toast(off?'Виджет отключён':'Виджет включён');close();openLeadCard(L.tg_id)}catch(x){toast(x.message)}}},L.widget_blocked?'Включить':'Отключить'):null))),
     el('div',{class:'lc-two2'},
       el('div',{},el('h4',{class:'lc-h'},'Путь клиента'),
         el('div',{class:'lc-steps'},step('Нажал «Старт» в боте',START),step('Регистрация',reg&&reg.created_at),step('Первый депозит',ftd&&ftd.created_at,ftd&&ftd.amount!==null?money(ftd.amount):null))),

@@ -21,6 +21,7 @@ import { seedReplies } from './replies.js';
 import { applyFill } from './i18nFill.js';
 import { syncRefRewardsAll } from './referral.js';
 import { parseClick } from './clicks.js';
+import { widgetRoutes } from './widget.js';
 import { RESERVED_SLUGS, SITE_URL } from './reserved.js';
 
 const app = Fastify({ logger: true, trustProxy: true });
@@ -45,6 +46,7 @@ app.get('/crm', async (_req, reply) => reply.type('text/html; charset=utf-8').he
 const liteHtml = readFileSync(resolve(process.cwd(), 'public/lite.html'), 'utf8');
 // Виджет для Pocket Option. Шаг 1: проверочный файл. Скрипт на странице платформы загружает его разными способами,
 // по результату решаем, хватит ли расширения «User JavaScript and CSS» или нужен Tampermonkey
+await widgetRoutes(app);
 app.get('/widget/ping.js', async (_req, reply) =>
   reply.type('application/javascript; charset=utf-8').header('Access-Control-Allow-Origin', '*').header('Cache-Control', 'no-store')
     .send("window.__hunterPing = (window.__hunterPing || 0) + 1;"));

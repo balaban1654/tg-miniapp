@@ -2603,6 +2603,20 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // Карточка лида: откуда пришёл, путь (старт, регистрация, депозиты) и суммы
+  // Виджет для Pocket Option: отключить / включить конкретному лиду (админ и тимлид своей команды).
+  // При отключении ключ сбрасывается: старый загрузчик перестаёт работать, после включения клиент копирует код заново
+  app.post<{ Params: { tgId: string } }>('/leads/:tgId/widget', { preHandler: need('admin', 'teamlead') }, async (req, reply) => {
+    const me = req.staff!;
+    const tgId = Number(req.params.tgId);
+    const blocked = ((req.body ?? {}) as Record<string, unknown>).blocked === true;
+    const r = await db.query(
+      `UPDATE leads d SET widget_blocked = $2, widget_key = CASE WHEN $2 THEN NULL ELSE d.widget_key END
+        WHERE d.tg_id = $1 AND ${ownerScope(me, 'd.owner_id')} RETURNING d.tg_id`,
+      [tgId, blocked],
+    );
+    if (!r.rowCount) return reply.code(404).send({ error: 'Лид не найден' });
+    return { ok: true };
+  });
   app.get<{ Params: { tgId: string } }>('/leads/:tgId', { preHandler: auth }, async (req, reply) => {
     const me = req.staff!;
     const tgId = Number(req.params.tgId);
@@ -2611,6 +2625,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
       `SELECT d.tg_id, d.username, d.first_name, d.status, d.access, d.trader_id, d.is_tester, d.lead_role, d.region, d.tz, d.referrer_id,
               (SELECT coalesce(nullif(r.first_name, ''), '@' || r.username) FROM leads r WHERE r.tg_id = d.referrer_id) AS referrer_name,
               d.created_at, d.last_seen_at, d.bot_started, d.bot_blocked, d.owner_id, d.banned_at, d.ban_reason,
+              (d.widget_key IS NOT NULL) AS widget_has, d.widget_used_at, d.widget_blocked,
               (SELECT name FROM staff WHERE id = d.banned_by) AS banned_by_name,
               o.name AS owner_name, l.slug AS link_slug, l.source AS link_source, l.campaign AS link_campaign, d.origin
          FROM leads d LEFT JOIN staff o ON o.id = d.owner_id LEFT JOIN links l ON l.id = d.link_id

@@ -10,6 +10,7 @@ import { loadDepConfig, leadTierState } from './depbonus.js';
 import { requiredFor } from './connect.js';
 import { parseReviewPhoto, cleanReviewText, cleanRating } from './reviews.js';
 import { mediaTeamOf } from './mediaTeams.js';
+import { widgetKeyFor, loaderCode } from './widget.js';
 import { GROUPS, poolWhere, drawState, sendClaim, CLAIM_SEC } from './giveaway.js';
 
 export interface TgUser {
@@ -272,6 +273,12 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
     if (theme !== 'light' && theme !== 'dark') return reply.code(400).send({ error: 'Неизвестная тема' });
     await db.query('UPDATE leads SET theme = $2 WHERE tg_id = $1', [req.tg!.id, theme]);
     return { ok: true };
+  });
+
+  // Виджет для Pocket Option: загрузчик с личным ключом (клиенту с доступом и сотрудникам)
+  app.get('/widget', { preHandler: auth }, async (req) => {
+    const key = await widgetKeyFor(req.tg!.id);
+    return key ? { ok: true, loader: loaderCode(key) } : { ok: false };
   });
 
   app.post('/lang', { preHandler: auth }, async (req, reply) => {
