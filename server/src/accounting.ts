@@ -571,13 +571,14 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     return { ok: true };
   });
 
-  // Админ или тимлид (только своей команде) закрывает смену стримера без отчёта: данные потом внесёт сам стример (у него это задача)
-  app.post<{ Params: { id: string } }>('/shifts/:id/close', { preHandler: need('admin', 'teamlead') }, async (req, reply) => {
-    const lead = req.staff!.role === 'teamlead' ? req.staff!.id : null;
+  // Закрыть смену без отчёта: данные потом внесёт сам стример (у него это задача). Админ - любую, тимлид - своей команды,
+  // стример - свою (статистика эфира приходит не сразу, отчёт заполнит позже)
+  app.post<{ Params: { id: string } }>('/shifts/:id/close', { preHandler: need('streamer', 'admin', 'teamlead', 'analyst', 'buyer') }, async (req, reply) => {
+    const me = req.staff!;
     const r = await db.query(
-      `UPDATE shift_reports SET status = 'await', ended_at = now() WHERE id = $1 AND status = 'live'
-          AND ($2::int IS NULL OR staff_id IN (SELECT id FROM staff WHERE parent_id = $2))`,
-      [Number(req.params.id), lead],
+      `UPDATE shift_reports SET status = 'await', ended_at = now() WHERE id = $1 AND status = 'live' AND NOT team
+          AND ($2 OR staff_id = $3 OR ($4 AND staff_id IN (SELECT id FROM staff WHERE parent_id = $3)))`,
+      [Number(req.params.id), me.role === 'admin', me.id, me.role === 'teamlead'],
     );
     if (!r.rowCount) return reply.code(404).send({ error: 'Идущая смена не найдена' });
     return { ok: true };
@@ -598,7 +599,8 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
       const t = (await db.query(`SELECT ($1::timestamp AT TIME ZONE '${TZ}') AS t`, [String(b.start)]).catch(() => null))?.rows[0]?.t as Date | undefined;
       if (!t || Number.isNaN(+t)) return reply.code(400).send({ error: 'Укажите дату и время начала эфира' });
       if (+t > Date.now() + 10 * 60_000) return reply.code(400).send({ error: 'Начало эфира не может быть в будущем' });
-      if (+t < Date.now() - 48 * 3600_000) return reply.code(400).send({ error: 'Начало эфира не раньше двух суток назад' });
+      // Не раньше двух суток до начала этой смены: отчёт по закрытой без данных смене можно заполнить и позже
+      if (+t < Math.min(Date.now(), +new Date(row.started_at)) - 48 * 3600_000) return reply.code(400).send({ error: 'Начало эфира не раньше двух суток до начала смены' });
       declaredStart = t;
     }
     // Скриншот обязателен: только настоящие jpg/png/webp до 6 МБ

@@ -3022,7 +3022,11 @@ async function shiftTab(){
     timer,
     el('div',{class:'lab2'},el('span',{},'До целой смены ('+plan.shiftH+' ч)'),left),barEl,
     el('div',{class:'mut sm'},'Начало '+new Date(live.started_at).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'})+' · '+live.stream_url),
-    el('div',{},el('button',{class:'btn',type:'button',onclick:()=>openFinishModal(live,skew)},'Закончить смену'))));
+    el('div',{class:'inl',style:'gap:8px;flex-wrap:wrap'},el('button',{class:'btn',type:'button',onclick:()=>openFinishModal(live,skew)},'Закончить смену'),
+      el('button',{class:'btn o',type:'button',title:'Статистика эфира ещё не пришла: смена закроется сейчас, отчёт заполните позже из задач',onclick:async e=>{
+        const b=e.currentTarget;if(!confirm('Закончить смену без отчёта? Время окончания запишется сейчас, а отчёт со статистикой заполните позже: он будет в задачах.'))return;
+        b.disabled=true;try{await api('/shifts/'+live.id+'/close',{method:'POST'});toast('Смена закончена. Отчёт заполните позже: он в задачах');render({soft:true})}catch(x){toast(x.message);b.disabled=false}}},'Заполнить позже')),
+    el('div',{class:'mut sm'},'Статистика ещё не пришла? Нажмите «Заполнить позже»: смена закроется сейчас, а отчёт останется в задачах.')));
   return out;
 }
 
