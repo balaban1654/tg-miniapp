@@ -1147,6 +1147,18 @@ let dxLiveAll=(()=>{try{return localStorage.getItem('dxLiveAll')==='1'}catch{ret
 /* Карточка стримера: на компьютере по наведению, на телефоне по нажатию */
 let dxHoverT=null;
 const dxCanHover=()=>matchMedia('(hover:hover) and (pointer:fine)').matches;
+/** Подтверждение в стиле Office вместо окна браузера. Возвращает true, если нажали основную кнопку */
+function askConfirm(title,text,okLabel='Да',cancelLabel='Отмена'){
+  return new Promise(res=>{
+    const done=v=>{ov.remove();document.removeEventListener('keydown',key,true);res(v)};
+    const key=e=>{if(e.key==='Escape'){e.preventDefault();done(false)}};
+    const ok=el('button',{class:'btn',type:'button',onclick:()=>done(true)},okLabel);
+    const ov=el('div',{class:'lc-overlay',role:'dialog','aria-modal':'true','aria-label':title,onclick:e=>{if(e.target===ov)done(false)}},
+      el('div',{class:'lc',style:'width:min(420px,100%);gap:12px'},el('h3',{style:'font-size:16px'},title),text?el('div',{class:'mut',style:'line-height:1.5'},text):null,
+        el('div',{class:'inl',style:'justify-content:flex-end;gap:8px'},el('button',{class:'btn o',type:'button',onclick:()=>done(false)},cancelLabel),ok)));
+    document.addEventListener('keydown',key,true);document.body.append(ov);ok.focus();
+  });
+}
 function dxCloseModal(){document.querySelectorAll('.dx-ovl').forEach(x=>x.remove());document.querySelectorAll('.dx-nm.on').forEach(x=>x.classList.remove('on'))}
 function dxAttachCard(btn,s,d,skew){
   const clr=()=>{clearTimeout(dxHoverT);dxHoverT=null};
@@ -3024,7 +3036,7 @@ async function shiftTab(){
     el('div',{class:'mut sm'},'Начало '+new Date(live.started_at).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'})+' · '+live.stream_url),
     el('div',{class:'inl',style:'gap:8px;flex-wrap:wrap'},el('button',{class:'btn',type:'button',onclick:()=>openFinishModal(live,skew)},'Закончить смену'),
       el('button',{class:'btn o',type:'button',title:'Статистика эфира ещё не пришла: смена закроется сейчас, отчёт заполните позже из задач',onclick:async e=>{
-        const b=e.currentTarget;if(!confirm('Закончить смену без отчёта? Время окончания запишется сейчас, а отчёт со статистикой заполните позже: он будет в задачах.'))return;
+        const b=e.currentTarget;if(!await askConfirm('Закончить смену без отчёта?','Время окончания запишется сейчас, а отчёт со статистикой заполните позже: он будет в задачах.','Закончить смену'))return;
         b.disabled=true;try{await api('/shifts/'+live.id+'/close',{method:'POST'});toast('Смена закончена. Отчёт заполните позже: он в задачах');render({soft:true})}catch(x){toast(x.message);b.disabled=false}}},'Заполнить позже')),
     el('div',{class:'mut sm'},'Статистика ещё не пришла? Нажмите «Заполнить позже»: смена закроется сейчас, а отчёт останется в задачах.')));
   return out;
