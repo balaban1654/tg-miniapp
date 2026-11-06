@@ -284,7 +284,7 @@ textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10
  .side{position:sticky;top:0;z-index:60;flex-wrap:nowrap;background:#0a0613}
  .burger{display:grid;place-items:center;flex:none;width:42px;height:42px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--fg);cursor:pointer;padding:0}
  .burger[aria-expanded=true]{border-color:var(--acc);color:var(--acc2)}
- .m-bell{display:flex;flex:none;margin-right:8px}.m-bell:empty{display:none}
+ .m-bell{display:flex;flex:none;margin-right:8px}.m-bell:empty{display:none}.bell-d{display:none!important}
  .side-menu{display:none;position:absolute;left:0;right:0;top:100%;z-index:70;flex-direction:column;gap:10px;padding:10px max(10px,env(safe-area-inset-left,0px)) 14px;background:#0a0613;border-bottom:1px solid var(--line);box-shadow:0 18px 44px rgba(0,0,0,.6);max-height:calc(100vh - 70px);max-height:calc(100dvh - 70px);overflow-y:auto;overscroll-behavior:contain}
  .side.open .side-menu{display:flex}
  .side-menu .nav{grid-auto-flow:row;overflow:visible;flex:none;order:0;max-width:none;width:100%}
@@ -979,7 +979,7 @@ async function render(opt){
   const wasTab=leadsPrevTab;leadsPrevTab=tab;if(tab==='leads'&&wasTab!=='leads')leadsState.staffOpen=false;
   document.querySelectorAll('.dx-ovl').forEach(x=>x.remove());
   document.querySelectorAll('body > .dx-pop').forEach(x=>x.remove());dxReg.length=0;
-  if(!(opt&&opt.soft&&tab==='home'))$('#mBell')?.replaceChildren();bellPlace=null;
+
   pushHash();
   // Обновление того же раздела (после «Сохранить» и т. п.) идёт на месте: без «Загрузка…» и без прыжка наверх
   const soft=opt&&typeof opt.soft==='boolean'?opt.soft:tab===renderedTab;renderedTab=tab;
@@ -1004,6 +1004,7 @@ async function render(opt){
     else if(tab==='plans')m.replaceChildren(...await viewPlans());
     else if(tab==='mytasks')m.replaceChildren(...await viewMyTasks());
   }catch(x){if(x.message!=='auth')m.replaceChildren(el('div',{class:'err'},x.message))}
+  if(tab!=='home')refreshHeaderBell();else if(bellSrc)mountHeaderBell();
   if(soft){
     window.scrollTo(0,y);m.scrollTop=mt;
     // Картинки и таблицы дорисовываются позже и укорачивают страницу: возвращаем прежнее место ещё несколько раз, пока человек сам не прокрутил
@@ -1115,16 +1116,29 @@ function rangeBar(onApply){
   draw();pop.hidden=true;
   return el('div',{class:'rb'},pill,go,pop);
 }
-// Колокольчик: на компьютере слева от календаря, в мобильной версии - в шапке слева от кнопки меню
-const bellMq=matchMedia('(max-width:760px)');let bellPlace=null;bellMq.addEventListener('change',()=>bellPlace&&bellPlace());
-// Начали прокручивать страницу - список уведомлений закрывается (прокрутка внутри самого списка его не закрывает)
-let bellScrollY=null;
-window.addEventListener('scroll',()=>{const open=document.querySelector('.dx-pop.bell:not([hidden])');if(!open){bellScrollY=null;return}
-  if(bellScrollY===null){bellScrollY=scrollY;return}if(Math.abs(scrollY-bellScrollY)>12){bellScrollY=null;dxCloseAll()}},{passive:true});
+// Колокольчик: на компьютере - слева от календаря на дашборде; в мобильной версии - всегда в шапке слева от кнопки меню,
+// на любом разделе. Данные шапки берём у дашборда, а на других разделах подгружаем сами (не чаще раза в 2 минуты)
+const bellMq=matchMedia('(max-width:760px)');
+let bellSrc=null,bellAt=0,bellLoading=null;
+function mountHeaderBell(){const slot=$('#mBell');if(!slot)return;slot.replaceChildren(...(bellSrc&&me?[dxBell(bellSrc())]:[]))}
+function mineBell(list){const m=myTaskItemsFrom(list);return{items:m,n:m.filter(x=>!x.dataset.done).length}}
+function teamBell(d,list){const tk=dxTasks(d),m=myTaskItemsFrom(list);return{items:[...tk.items,...m],n:tk.n+m.filter(x=>!x.dataset.done).length}}
+async function loadBellSrc(){
+  const r=me.role;
+  if(r==='admin'||r==='teamlead'){const d=await api('/dashboard'+dxQuery());const ml=r==='teamlead'?await api('/tasks/mine').catch(()=>[]):[];bellSrc=r==='admin'?()=>dxTasks(d):()=>teamBell(d,ml)}
+  else if(r==='streamer'){const c=dxCur();const d=await api('/my/dashboard?from='+c.from+'&to='+c.to);d.alerts.chats=(await api('/chats').catch(()=>[])).filter(x=>x.waiting);bellSrc=()=>smTasks(d)}
+  else{const ml=await api('/tasks/mine').catch(()=>[]);bellSrc=()=>mineBell(ml)}
+  bellAt=Date.now();
+}
+async function refreshHeaderBell(force){
+  if(!me||!bellMq.matches)return;
+  if(force||!bellSrc||Date.now()-bellAt>120000){if(!bellLoading)bellLoading=loadBellSrc().catch(()=>{}).finally(()=>{bellLoading=null});await bellLoading}
+  if(!document.querySelector('.dx-pop.bell:not([hidden])'))mountHeaderBell();
+}
+bellMq.addEventListener('change',()=>{if(bellMq.matches)refreshHeaderBell()});
+setInterval(()=>{if(me&&tab!=='home'&&!document.querySelector('.dx-pop.bell:not([hidden])'))refreshHeaderBell(true)},120000);
 function dxHead(sub,onApply,bell){
-  const rng=rangeBar(onApply);
-  if(bell){bellPlace=()=>{const slot=$('#mBell');if(tab!=='home')return;if(bellMq.matches&&slot)slot.replaceChildren(bell);else{rng.prepend(bell);slot&&slot.replaceChildren()}};
-    if(bellMq.matches&&$('#mBell')){if(tab==='home')$('#mBell').replaceChildren(bell)}else rng.prepend(bell)}
+  const rng=rangeBar(onApply);if(bell){bell.classList.add('bell-d');rng.prepend(bell)}
   return el('div',{class:'dx-top'},el('div',{class:'dx-ttl'},el('h2',{},'Дашборд'),(me.role==='admin'||me.role==='teamlead')?dxOnline():null,el('span',{class:'dx-sub'},sub)),rng);
 }
 /** Колокольчик «Требует внимания» слева от календаря: число на значке, список открывается по нажатию */
@@ -1535,7 +1549,7 @@ async function adminDash(){
     document.querySelectorAll('[data-live]').forEach(n=>{n.textContent=hm(Math.max(0,Math.floor((Date.now()+skew-Date.parse(n.dataset.live))/60000)))});
     if(!document.querySelector('.dx-ovl')&&dxReg.every(([,p])=>p.hidden)&&Date.now()+skew-Date.parse(d.now)>90000)render({soft:true});
   },20000);
-  return[el('div',{class:'dx'},dxHead(dxRangeLabel({from:d.range.from,to:d.range.to},d.today),()=>render({soft:true}),dxBell(dxTasks(d))),dxLive(d,skew),el('div',{class:'dx-cols'},el('div',{class:'dx-col'},dxPlanFact(d)),el('div',{class:'dx-col'},dxNet(d))),fs)];
+  return[el('div',{class:'dx'},dxHead(dxRangeLabel({from:d.range.from,to:d.range.to},d.today),()=>render({soft:true}),(bellSrc=()=>dxTasks(d),bellAt=Date.now(),dxBell(bellSrc()))),dxLive(d,skew),el('div',{class:'dx-cols'},el('div',{class:'dx-col'},dxPlanFact(d)),el('div',{class:'dx-col'},dxNet(d))),fs)];
 }
 
 /* ---------- Дашборд тимлида: его команда онлайн, общие показатели команды и его зарплата ---------- */
@@ -1549,8 +1563,8 @@ async function leadDash(){
     document.querySelectorAll('[data-live]').forEach(n=>{n.textContent=hm(Math.max(0,Math.floor((Date.now()+skew-Date.parse(n.dataset.live))/60000)))});
     if(!document.querySelector('.dx-ovl')&&dxReg.every(([,p])=>p.hidden)&&Date.now()+skew-Date.parse(d.now)>90000)render({soft:true});
   },20000);
-  const tk=dxTasks(d),mine=await myTaskItems();
-  const bell=dxBell({items:[...tk.items,...mine],n:tk.n+mine.filter(x=>!x.dataset.done).length});
+  const ml=await api('/tasks/mine').catch(()=>[]);
+  bellSrc=()=>teamBell(d,ml);bellAt=Date.now();const bell=dxBell(bellSrc());
   return[el('div',{class:'dx'},dxHead(dxRangeLabel({from:d.range.from,to:d.range.to},d.today),()=>render({soft:true}),bell),dxLive(d,skew),
     el('div',{class:'dx-cols'},el('div',{class:'dx-col'},dxPlanFact(d)),el('div',{class:'dx-col'},dxLeadPay(d))),fs)];
 }
@@ -1901,13 +1915,13 @@ async function streamerDash(){
     if(dxReg.every(([,p])=>p.hidden)&&Date.now()+skew-Date.parse(d.now)>90000)render({soft:true});
   },20000);
   const strip=d.colleagues.length?el('div',{class:'card dx-live'},...d.colleagues.map(c=>dxLiveCard(c,d,skew))):null;
-  return[el('div',{class:'dx'},dxHead(dxRangeLabel({from:d.range.from,to:d.range.to},d.today),()=>render({soft:true}),dxBell(smTasks(d))),strip,
+  return[el('div',{class:'dx'},dxHead(dxRangeLabel({from:d.range.from,to:d.range.to},d.today),()=>render({soft:true}),(bellSrc=()=>smTasks(d),bellAt=Date.now(),dxBell(bellSrc()))),strip,
     el('div',{class:'dx-cols'},el('div',{class:'dx-col'},smMetrics(d),smLeads(d)),el('div',{class:'dx-col'},smSalary(d))),smLast(d))];
 }
 /* задачи для остальных ролей */
 /** Мои задачи пунктами колокольчика (тимлид, аналитик, медиабайер) */
-async function myTaskItems(){
-  const list=await api('/tasks/mine').catch(()=>[]);const today=kyivToday();
+function myTaskItemsFrom(list){
+  const today=kyivToday();
   return list.map(t=>{const done=t.status==='done',over=!done&&t.due&&t.due<today;
     return el('button',{type:'button',class:'dx-tk','data-done':done?'1':null,title:done?'Вернуть в работу':'Отметить выполненной',onclick:async()=>{try{await api('/tasks/'+t.id+(done?'/undo':'/done'),{method:'POST'});toast(done?'Задача снова в работе':'Задача отправлена на проверку');render({soft:true})}catch(x){toast(x.message)}}},
       el('span',{class:'dx-ic '+(done?'ok':'a')},svgIcon(IC_CHECK,18)),el('span',{class:'dx-tx'},el('span',{class:'tt',style:done?'text-decoration:line-through;color:var(--mut)':''},t.title),el('span',{class:'ts',style:over?'color:var(--bad)':''},done?'Отправлено на проверку':[t.details,t.due?'до '+dxDay(t.due):''].filter(Boolean).join(' · ')||'Без срока')))});
@@ -1944,8 +1958,8 @@ async function viewHome(){
   const r=dxCur();
   const s=await api('/stats?from='+r.from+'&to='+r.to);const b=s.byStatus;
   const k=(t,v)=>el('div',{class:'kpi'},el('small',{},t),el('b',{},String(v)));
-  const mine=await myTaskItems();
-  return[el('div',{class:'dx'},dxHead(dxRangeLabel(r),()=>render({soft:true}),dxBell({items:mine,n:mine.filter(x=>!x.dataset.done).length})),
+  const ml=await api('/tasks/mine').catch(()=>[]);bellSrc=()=>mineBell(ml);bellAt=Date.now();
+  return[el('div',{class:'dx'},dxHead(dxRangeLabel(r),()=>render({soft:true}),dxBell(bellSrc())),
     el('div',{class:'kpis'},k('Клики по ссылкам',s.clicks),k('Лиды',s.total),k('Регистрации',(b.registered||0)+(b.ftd||0)+(b.active||0)),k('FTD',(b.ftd||0)+(b.active||0)),k('Отвал',s.churned||0)),
     el('div',{class:'kpis'},k('Депозиты',money(s.deposits)),k('Выводы',money(s.withdrawals))))];
 }
