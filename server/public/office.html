@@ -353,7 +353,7 @@ textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10
 .dx-seg button{border:0;background:none;color:var(--mut);padding:6px 12px;border-radius:7px;cursor:pointer;font-size:13px}.dx-seg button.on{background:var(--acc);color:#fff;font-weight:700}
 .dx-ib{display:grid;place-items:center;width:38px;height:38px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--mut);cursor:pointer;padding:0}.dx-ib:hover,.dx-ib.on{color:var(--acc2);border-color:var(--acc)}
 .dx-ib.sm2{width:30px;height:30px;border-radius:8px}
-.dx-ib.dx-bell{width:42px;height:42px;border-radius:12px;position:relative;color:var(--fg)}.dx-ib.dx-bell svg{width:20px;height:20px}.dx-ib.dx-bell.has{border-color:var(--acc)}.dx-bdg{position:absolute;top:-7px;right:-7px;min-width:20px;height:20px;padding:0 6px;border-radius:10px;background:var(--bad);color:#fff;font:800 11px/20px Montserrat,sans-serif;text-align:center;box-shadow:0 0 0 2px var(--bg)}@keyframes bdgBlink{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.25;transform:scale(.82)}}.dx-bdg{animation:bdgBlink 1.1s ease-in-out infinite}@media(prefers-reduced-motion:reduce){.dx-bdg{animation-duration:2.4s}}
+.dx-ib.dx-bell{width:42px;height:42px;border-radius:12px;position:relative;color:var(--fg)}.dx-ib.dx-bell svg{width:20px;height:20px}.dx-ib.dx-bell.has{border-color:var(--acc)}.dx-bdg{position:absolute;top:-7px;right:-7px;min-width:20px;height:20px;padding:0 6px;border-radius:10px;background:var(--bad);color:#fff;font:800 11px/20px Montserrat,sans-serif;text-align:center;box-shadow:0 0 0 2px var(--bg)}@keyframes bellRing{0%,46%,100%{transform:rotate(0)}4%{transform:rotate(16deg)}10%{transform:rotate(-14deg)}16%{transform:rotate(11deg)}22%{transform:rotate(-8deg)}28%{transform:rotate(5deg)}34%{transform:rotate(-3deg)}40%{transform:rotate(1deg)}}.dx-bell.ring svg{transform-origin:50% 12%;animation:bellRing 1.8s ease-in-out infinite}@media(prefers-reduced-motion:reduce){.dx-bell.ring svg{animation-duration:4s}}
 .dx-pop.bell{width:min(440px,calc(100vw - 24px));max-height:min(70vh,560px);overflow-y:auto}.dx-bl .dx-tk{padding:11px 2px}.dx-bl .dx-tk:last-child{border-bottom:0}.dx-bl .dx-ok{padding:18px 4px;text-align:center}
 .dx-pw{position:relative;display:inline-flex}
 .pp{position:relative}.pp-list{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:60;max-height:300px;overflow:auto;background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:4px;box-shadow:0 14px 36px rgba(0,0,0,.5)}.pp-list::-webkit-scrollbar{width:10px}.pp-list::-webkit-scrollbar-track{background:transparent;margin:8px 0}.pp-list::-webkit-scrollbar-thumb{background:#8b5cf666;border-radius:99px;border:3px solid transparent;background-clip:padding-box}.pp-list::-webkit-scrollbar-thumb:hover{background-color:#a78bfa99}.pp-list::-webkit-scrollbar-button{display:none;height:0}@supports not selector(::-webkit-scrollbar){.pp-list{scrollbar-width:thin;scrollbar-color:#8b5cf666 transparent}}.pp-i{padding:8px 12px;border-radius:8px;cursor:pointer}.pp-i:hover,.pp-i.hl{background:#ffffff14}.pp-i.on{color:var(--acc2);font-weight:600}
@@ -1124,6 +1124,11 @@ function dxBell(t){
   const w=dxPopBtn('Требует внимания',IC_BELL,el('div',{style:'display:grid;gap:2px'},el('div',{class:'dx-lbl'},'Требует внимания'),list),'wide bell','dx-bell');
   const b=w.querySelector('button');b.classList.remove('sm2');
   if(t.n){b.classList.add('has');b.append(el('span',{class:'dx-bdg'},t.n>99?'99+':String(t.n)));b.title=b.ariaLabel='Требует внимания: '+t.n}
+  // Звонит, пока есть непросмотренные уведомления: открыли список - успокоился, появилось новое - звонит снова
+  const sig=t.items.filter(x=>!x.dataset.done).map(x=>x.textContent.trim()).sort().join('|');
+  const KEY='bell_seen_'+(me&&me.id);let seen='';try{seen=localStorage.getItem(KEY)||''}catch{}
+  if(t.n&&sig!==seen)b.classList.add('ring');
+  b.addEventListener('click',()=>{b.classList.remove('ring');try{localStorage.setItem(KEY,sig)}catch{}});
   return w;
 }
 /* Плашка «онлайн»: сколько людей прямо сейчас с открытым Mini App (обновляется раз в 15 с) */
