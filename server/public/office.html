@@ -286,7 +286,10 @@ textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10
  .burger[aria-expanded=true]{border-color:var(--acc);color:var(--acc2)}
  .m-bell{display:flex;flex:none;margin-right:8px;gap:8px;align-items:center}.m-bell button.dx-onl{padding:0 11px}.m-bell .onl-w{display:none}.m-bell:empty{display:none}.bell-d{display:none!important}
  .side-menu{display:none;position:absolute;left:0;right:0;top:100%;z-index:70;flex-direction:column;gap:10px;padding:10px max(10px,env(safe-area-inset-left,0px)) 14px;background:#0a0613;border-bottom:1px solid var(--line);box-shadow:0 18px 44px rgba(0,0,0,.6);max-height:calc(100vh - 70px);max-height:calc(100dvh - 70px);overflow-y:auto;overscroll-behavior:contain}
- .side.open .side-menu{display:flex}
+ .side.open .side-menu{display:flex;position:fixed;top:var(--mtop,70px);bottom:0;max-height:none;overflow:hidden;border-bottom:0;box-shadow:none;padding-bottom:max(14px,env(safe-area-inset-bottom,0px))}
+ .side.open .side-menu .nav{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;align-content:start}
+ .side.open .side-menu .me{flex:none}
+ body.menu-open{overflow:hidden}body.menu-open #actBar{display:none}
  .side-menu .nav{grid-auto-flow:row;overflow:visible;flex:none;order:0;max-width:none;width:100%}
  .side-menu .nav button{width:100%;justify-content:flex-start;padding:12px 12px;font-size:15px}
  .side-menu .me{margin:0;flex:none;display:grid;gap:10px;padding:10px 4px 0;border-top:1px solid var(--line);width:100%}
@@ -2424,7 +2427,8 @@ function stopPoll(){if(poll){clearInterval(poll);poll=null}}
 /* Мобильное меню: гамбургер справа раскрывает весь список пунктов, внизу имя, настройки и выход */
 (function(){
   const side=document.querySelector('.side'),btn=document.getElementById('burger');if(!side||!btn)return;
-  const set=o=>{side.classList.toggle('open',o);btn.setAttribute('aria-expanded',o?'true':'false')};
+  // Открытое меню на телефоне - на весь экран под шапкой: страница под ним не прокручивается
+  const set=o=>{if(o)side.style.setProperty('--mtop',Math.round(side.getBoundingClientRect().bottom)+'px');side.classList.toggle('open',o);document.body.classList.toggle('menu-open',o);btn.setAttribute('aria-expanded',o?'true':'false')};
   btn.addEventListener('click',e=>{e.stopPropagation();set(!side.classList.contains('open'))});
   document.addEventListener('click',e=>{if(!side.classList.contains('open'))return;
     // путь клика берём из события: меню перерисовывается, и e.target к этому моменту уже вынут из страницы
