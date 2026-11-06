@@ -1339,6 +1339,29 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
 
   type Agg = { reg: number; ftd: number; ftdSum: number; dep: number; depSum: number; comm: number; wdSum: number };
   const emptyAgg = (): Agg => ({ reg: 0, ftd: 0, ftdSum: 0, dep: 0, depSum: 0, comm: 0, wdSum: 0 });
+  // По дням для графика «План / факт»: события лидов выбранных владельцев (у тимлида - его команда)
+  type DayRow = { d: string; regs: number; ftd: number; ftdSum: number; deposits: number; wd: number; comm: number };
+  const dailyEvents = async (from: string, to: string, owners: number[]): Promise<DayRow[]> => {
+    const rows = (await db.query(
+      `SELECT to_char((e.created_at AT TIME ZONE '${TZ}')::date, 'YYYY-MM-DD') AS d, e.type, count(*)::int AS n, coalesce(sum(e.amount), 0)::float AS s
+         FROM events e JOIN leads d ON d.tg_id = e.tg_id
+        WHERE d.owner_id = ANY($3::int[]) AND d.lead_role = 'lead' AND e.type IN ('reg','ftd','dep','comm','wd')
+          AND (e.created_at AT TIME ZONE '${TZ}')::date BETWEEN $1::date AND $2::date
+        GROUP BY 1, 2`,
+      [from, to, owners],
+    )).rows as { d: string; type: string; n: number; s: number }[];
+    const by = new Map<string, DayRow>();
+    for (const r of rows) {
+      const x = by.get(r.d) ?? { d: r.d, regs: 0, ftd: 0, ftdSum: 0, deposits: 0, wd: 0, comm: 0 };
+      if (r.type === 'reg') x.regs = r.n;
+      else if (r.type === 'ftd') { x.ftd = r.n; x.ftdSum = r2(r.s); x.deposits = r2(x.deposits + r.s); }
+      else if (r.type === 'dep') x.deposits = r2(x.deposits + r.s);
+      else if (r.type === 'wd') x.wd = r2(r.s);
+      else x.comm = r2(r.s);
+      by.set(r.d, x);
+    }
+    return [...by.values()].sort((a, b) => a.d.localeCompare(b.d));
+  };
   const aggEvents = async (from: string, to: string): Promise<Map<number, Agg>> => {
     const rows = (
       await db.query(
@@ -1695,6 +1718,8 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
         net,
         netPlanToDate: goals && !lead ? r2(goals.net * pace) : null,
       },
+      // По дням для графика плитки «План / факт»; тимлиду без комиссии
+      daily: (await dailyEvents(from, to, ids)).map((x) => (lead ? { ...x, comm: 0 } : x)),
       teamSalaries: teamSal,
       refPay: refPay ? { earned: refPay.earned, paid: refPay.paid, n: refPay.n } : null,
       expenses: expRows,
@@ -1888,6 +1913,14 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
       today_: { minutes: todayMin, shiftMin, minLeft: Math.max(0, shiftMin - todayMin), live },
       // Сумма только по FTD: додепы и комиссию стример не видит
       funnel: { clicks, regs: ev.reg, ftd: ev.ftd, ftdSum: r2(ev.ftdSum), churned: churnedN },
+      // По дням для графика: зачтённые минуты эфира и его лиды (только FTD-суммы - додепы стример не видит)
+      daily: await (async () => {
+        const ev2 = (await dailyEvents(from, to, [me.id])).map((x) => ({ d: x.d, regs: x.regs, ftd: x.ftd, ftdSum: x.ftdSum, minutes: 0 }));
+        const mins = (await db.query(`SELECT to_char(day, 'YYYY-MM-DD') AS d, coalesce(sum(approved_min), 0)::int AS m FROM shift_reports WHERE staff_id = $1 AND status = 'approved' AND NOT team AND day BETWEEN $2::date AND $3::date GROUP BY 1`, [me.id, from, to])).rows as { d: string; m: number }[];
+        const by = new Map(ev2.map((x) => [x.d, x]));
+        for (const r of mins) { const x = by.get(r.d) ?? { d: r.d, regs: 0, ftd: 0, ftdSum: 0, minutes: 0 }; x.minutes = r.m; by.set(r.d, x); }
+        return [...by.values()].sort((a, b) => a.d.localeCompare(b.d));
+      })(),
       // Просмотры, подписчики и т. д. только самого стримера за период
       social: { fields: socialFs.fields, totals: socialFs.fields.map((f: string) => socialFs.rows.filter((r) => r.staff_id === me.id).reduce((a, r) => a + (r.sums[f] ?? 0), 0)) },
       clicksSince,
