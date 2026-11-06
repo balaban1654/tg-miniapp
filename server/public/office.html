@@ -359,6 +359,7 @@ textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10
 .dx-seg button{border:0;background:none;color:var(--mut);padding:6px 12px;border-radius:7px;cursor:pointer;font-size:13px}.dx-seg button.on{background:var(--acc);color:#fff;font-weight:700}
 .dx-ib{display:grid;place-items:center;width:38px;height:38px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--mut);cursor:pointer;padding:0}.dx-ib:hover,.dx-ib.on{color:var(--acc2);border-color:var(--acc)}
 .dx-ib.sm2{width:30px;height:30px;border-radius:8px}
+.pf-g{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:4px}.pf-c{display:flex;gap:12px;align-items:center;background:var(--card2);border-radius:12px;padding:10px 12px;min-width:0}.pf-ring{width:64px;height:64px;flex:none;color:var(--fg)}.pf-t{min-width:0}.pf-t .dx-lbl{font-size:10.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.pf-v{font-weight:800;font-size:20px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.pf-v small{font-size:12px;font-weight:600;color:var(--mut)}.pf-n{font-size:11.5px;font-weight:700;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.pf-n.ok{color:var(--ok)}.pf-n.warn{color:var(--warn)}.pf-n.bad{color:var(--bad)}@media(max-width:560px){.pf-g{gap:8px}.pf-c{flex-direction:column;align-items:flex-start;gap:8px;padding:10px}.pf-ring{width:50px;height:50px}.pf-v{font-size:15px}}
 .dx-ib.dx-bell{width:42px;height:42px;border-radius:12px;position:relative;color:var(--fg)}.dx-ib.dx-bell svg{width:20px;height:20px}.dx-ib.dx-bell.has{border-color:var(--acc)}.dx-bdg{position:absolute;top:-7px;right:-7px;min-width:20px;height:20px;padding:0 6px;border-radius:10px;background:var(--bad);color:#fff;font:800 11px/20px Montserrat,sans-serif;text-align:center;box-shadow:0 0 0 2px var(--bg)}@keyframes bellRing{0%,46%,100%{transform:rotate(0)}4%{transform:rotate(16deg)}10%{transform:rotate(-14deg)}16%{transform:rotate(11deg)}22%{transform:rotate(-8deg)}28%{transform:rotate(5deg)}34%{transform:rotate(-3deg)}40%{transform:rotate(1deg)}}.dx-bell.ring svg{transform-origin:50% 12%;animation:bellRing 1.8s ease-in-out infinite}@media(prefers-reduced-motion:reduce){.dx-bell.ring svg{animation-duration:4s}}
 .dx-pop.bell{width:min(440px,calc(100vw - 24px));max-height:min(70vh,560px);overflow-y:auto}.dx-bl .dx-tk{padding:11px 2px}.dx-bl .dx-tk.seen{opacity:.6}.dx-bl .dx-tk.seen:hover{opacity:1}.dx-bl .dx-tk:last-child{border-bottom:0}.dx-bl .dx-ok{padding:18px 4px;text-align:center}
 .dx-pw{position:relative;display:inline-flex}
@@ -1487,6 +1488,29 @@ function dxRings(d){
   const cv=(c,a,b)=>el('div',{class:'dx-cv'},el('b',{},a),el('span',{},el('i',{style:'background:'+c}),b));
   return el('div',{class:'dx-rings'},dxRingCopy(p1,p2,n0(t.ftd)+' / '+n0(g.ftd),usd0(t.deposits)+' / '+usd0(g.deposits)),el('div',{class:'dx-rg',role:'img','aria-label':'Все депозиты '+Math.round(p1*100)+'% плана, FTD '+Math.round(p2*100)+'% плана'},svg,el('div',{class:'ctr'},cv('var(--ok)',n0(t.ftd)+' / '+n0(g.ftd),'FTD'),cv('var(--acc)',usd0(t.deposits)+' / '+usd0(g.deposits),'депозиты'))));
 }
+/** План / факт кольцами 2×3: кольцо в цвете пункта, белая риска - где должны быть сегодня, цвет подписи - темп.
+ *  Где плана нет (выводы; регистрации без цели), кольцо показывает долю: регистрации в FTD, выводы от депозитов */
+function dxRingGrid(d){
+  const g=d.goals,t=d.totals,pace=d.pace,showMark=g&&pace<0.995;
+  const avg=t.ftd?t.ftdSum/t.ftd:0,pc=x=>Math.round(x*100),dShare=t.deposits?t.depSum/t.deposits:0,cShare=t.deposits?t.commission/t.deposits:0,rtd=t.regs?t.ftd/t.regs:0,wd=t.withdrawals||0,wShare=t.deposits?wd/t.deposits:0;
+  const L=[
+    {n:'Регистрации',v:t.regs||0,goal:g&&g.regs,f:n0,c:'#5ab0ff',note:'в FTD: '+n0(t.ftd)+' (RTD '+pc(rtd)+'%)',alt:[rtd,pc(rtd)+'%','Доля регистраций, ставших FTD']},
+    {n:'FTD',v:t.ftd,goal:g&&g.ftd,f:n0,c:'#9b5cff',note:g&&g.ftd&&showMark?'к сегодня нужно '+n0(g.ftd*pace):'средний '+usd0(avg)},
+    {n:'Пополнения по FTD',v:t.ftdSum,goal:g&&g.ftdSum,f:usd0,c:'#c084fc',note:'средний FTD '+usd0(avg)},
+    {n:'Все депозиты',v:t.deposits,goal:g&&g.deposits,f:usd0,c:'#3ddc97',note:'додепы '+usd0(t.depSum)+' · '+pc(dShare)+'%'},
+    {n:'Выводы',v:wd,goal:0,f:usd0,c:'#ff8a5c',note:pc(wShare)+'% от депозитов',alt:[wShare,pc(wShare)+'%','Выводы от всех депозитов']},
+    ...(d.leadPay?[]:[{n:'Комиссия',v:t.commission,goal:g&&g.commission,f:usd0,c:'#f5c542',note:(cShare*100).toFixed(1).replace('.',',')+'% от депозитов'}])];
+  const ring=(r,txt,col,mark)=>{const sz=64,R=26,C=2*Math.PI*R;
+    const s=document.createElementNS('http://www.w3.org/2000/svg','svg');s.setAttribute('viewBox','0 0 64 64');s.setAttribute('class','pf-ring');
+    s.innerHTML='<circle cx="32" cy="32" r="'+R+'" fill="none" stroke="'+col+'" stroke-opacity=".18" stroke-width="7"/><circle cx="32" cy="32" r="'+R+'" fill="none" stroke="'+col+'" stroke-width="7" stroke-linecap="round" stroke-dasharray="'+(C*Math.max(0,Math.min(1,r))).toFixed(1)+' '+C.toFixed(1)+'" transform="rotate(-90 32 32)"/>'+
+      (mark?'<line x1="32" y1="0.5" x2="32" y2="9.5" stroke="#fff" stroke-width="2" transform="rotate('+(pace*360).toFixed(1)+' 32 32)"/>':'')+
+      '<text x="32" y="37" text-anchor="middle" fill="currentColor" font-weight="800" font-size="14">'+txt+'</text>';return s};
+  return el('div',{class:'pf-g'},...L.map(x=>{
+    const has=x.goal>0,r=has?x.v/x.goal:(x.alt?x.alt[0]:0),cls=has?(r>=pace?'ok':r>=pace*.85?'warn':'bad'):'';
+    return el('div',{class:'pf-c',title:has?x.n+': '+pc(r)+'% плана'+(showMark?', по графику '+pc(pace)+'%':''):(x.alt?x.alt[2]:x.n)},ring(r,has?pc(r)+'%':(x.alt?x.alt[1]:'—'),x.c,has&&showMark),
+      el('div',{class:'pf-t'},el('div',{class:'dx-lbl'},x.n),el('div',{class:'pf-v'},x.f(x.v),has?el('small',{},' / '+x.f(x.goal)):null),el('div',{class:'pf-n '+cls},x.note)));
+  }));
+}
 function dxPlanFact(d){
   const g=d.goals,t=d.totals,pace=d.pace,showMark=g&&pace<0.995;
   const title=d.range.whole&&!d.range.all?'План / факт за месяц':'План / факт';
@@ -1505,12 +1529,7 @@ function dxPlanFact(d){
   const wrap=el('div',{class:'dx-flip'});
   const fb=flipBtn(),fbm=flipBtn();fb.classList.add('only-d');fbm.classList.add('only-m');icons.push(fbm);
   const front=el('div',{class:'card dx-pf'},el('div',{class:'dx-hd'},el('div',{class:'l'},el('span',{class:'dx-lbl'},title.endsWith(' за месяц')?[title.slice(0,-9),el('span',{class:'dx-ext'},' за месяц')]:title),...icons),el('div',{style:'display:flex;align-items:center;gap:10px;margin-left:auto'},showMark?el('span',{class:'mut mark',style:'font-size:12px'},'метка: план на сегодня'):null,fb)),
-    ...rows.map(([n,v,goal,f,note])=>{
-      const pct=goal>0?v/goal*100:null,cls=pct===null?'':pct>=pace*100?'ok':pct>=pace*85?'warn':'bad';
-      return el('div',{class:'dx-m'},el('div',{class:'dx-lbl'},n),el('div',{class:'v'},f(v),goal>0?el('small',{},' / '+f(goal)):null),
-        pct!==null?el('div',{class:'dx-bar'},el('i',{style:'width:'+Math.min(100,pct)+'%'}),showMark?el('u',{style:'left:'+(pace*100)+'%'}):null):null,
-        el('div',{class:'dx-meta'},el('span',{class:cls},pct!==null?Math.round(pct)+'% плана':''),el('span',{},note)));
-    }));
+    dxRingGrid(d));
   const show=back=>{
     if(!back){wrap.replaceChildren(front);wrap.classList.remove('back');return}
     const h=front.offsetHeight;const bk=dxTeamBack(d);bk.style.minHeight=h+'px';
@@ -1820,7 +1839,7 @@ async function plansTasks(){
 async function plansGoals(){
   const p=await api('/kpi/settings');
   const num=(v,min)=>el('input',{type:'number',min:min??'0',step:'any',value:String(v)});
-  const f={hours:num(p.hours,1),shiftH:num(p.shiftH,.5),leads:num(p.leads),gf:num(p.goals.ftd),gs:num(p.goals.ftdSum),gd:num(p.goals.deposits),gc:num(p.goals.commission),gn:num(p.goals.net)};
+  const f={hours:num(p.hours,1),shiftH:num(p.shiftH,.5),leads:num(p.leads),gr:num(p.goals.regs||0),gf:num(p.goals.ftd),gs:num(p.goals.ftdSum),gd:num(p.goals.deposits),gc:num(p.goals.commission),gn:num(p.goals.net)};
   const lab=(t,i)=>el('label',{},t,i);
   const err1=el('div',{class:'err',role:'alert'}),err2=el('div',{class:'err',role:'alert'});
   const save=async(body,err,msg)=>{err.textContent='';try{await api('/kpi/settings',{method:'PUT',body});toast(msg);plansRefresh()}catch(x){err.textContent=x.message}};
@@ -1830,8 +1849,8 @@ async function plansGoals(){
       el('div',{},el('button',{class:'btn',type:'button',onclick:()=>save({hours:+f.hours.value,shiftH:+f.shiftH.value,leads:+f.leads.value},err1,'План стримера сохранён')},'Сохранить')),
       el('div',{class:'mut sm'},'Эти цифры видят стримеры в «Моих показателях» и они же идут в расчёт KPI. Ставки и бонусы настраиваются в Бухгалтерии, вкладка «KPI-план».')),
     el('div',{class:'card',style:'display:grid;gap:12px'},el('h4',{},'Цели компании на месяц (план/факт на дашборде)'),
-      el('div',{class:'lc-two'},lab('FTD, штук',f.gf),lab('Пополнения по FTD, $',f.gs),lab('Все депозиты (FTD и додепы), $',f.gd),lab('Комиссия, $',f.gc),lab('Чистая прибыль, $',f.gn)),err2,
-      el('div',{},el('button',{class:'btn',type:'button',onclick:()=>save({goals:{ftd:+f.gf.value,ftdSum:+f.gs.value,deposits:+f.gd.value,commission:+f.gc.value,net:+f.gn.value}},err2,'Цели сохранены')},'Сохранить')),
+      el('div',{class:'lc-two'},lab('Регистрации, штук (0 — без плана)',f.gr),lab('FTD, штук',f.gf),lab('Пополнения по FTD, $',f.gs),lab('Все депозиты (FTD и додепы), $',f.gd),lab('Комиссия, $',f.gc),lab('Чистая прибыль, $',f.gn)),err2,
+      el('div',{},el('button',{class:'btn',type:'button',onclick:()=>save({goals:{regs:+f.gr.value,ftd:+f.gf.value,ftdSum:+f.gs.value,deposits:+f.gd.value,commission:+f.gc.value,net:+f.gn.value}},err2,'Цели сохранены')},'Сохранить')),
       el('div',{class:'mut sm'},'Для периода меньше месяца цели пересчитываются пропорционально дням. Метка на полоске показывает, где вы должны быть сегодня.')),
     await teamGoalsCard()];
 }

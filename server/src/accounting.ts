@@ -34,6 +34,7 @@ export interface KpiPlan {
 
 /** Цели месяца: по ним на дашборде считается план/факт */
 export interface Goals {
+  regs: number; // регистрации, штук (0 - плана нет)
   ftd: number; // FTD, штук
   ftdSum: number; // пополнения по FTD, $
   deposits: number; // все депозиты (FTD и додепы), $
@@ -70,7 +71,7 @@ export const DEFAULT_PLAN: KpiPlan = {
   leadAll: 200,
   depTiers: DEFAULT_DEP_TIERS,
   depStart: null,
-  goals: { ftd: 50, ftdSum: 4500, deposits: 9500, commission: 6000, net: 3900 },
+  goals: { regs: 0, ftd: 50, ftdSum: 4500, deposits: 9500, commission: 6000, net: 3900 },
 };
 
 const TZ = 'Europe/Kyiv';
@@ -431,6 +432,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
       depTiers: cur.depTiers,
       depStart: cur.depStart,
       goals: {
+        regs: n(b.goals?.regs, cur.goals.regs, 0, 1e6),
         ftd: n(b.goals?.ftd, cur.goals.ftd, 0, 1e6),
         ftdSum: n(b.goals?.ftdSum, cur.goals.ftdSum, 0, 1e9),
         deposits: n(b.goals?.deposits, cur.goals.deposits, 0, 1e9),
@@ -1335,14 +1337,14 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     return mo === 12 ? `${y + 1}-01` : `${y}-${String(mo + 1).padStart(2, '0')}`;
   };
 
-  type Agg = { reg: number; ftd: number; ftdSum: number; dep: number; depSum: number; comm: number };
-  const emptyAgg = (): Agg => ({ reg: 0, ftd: 0, ftdSum: 0, dep: 0, depSum: 0, comm: 0 });
+  type Agg = { reg: number; ftd: number; ftdSum: number; dep: number; depSum: number; comm: number; wdSum: number };
+  const emptyAgg = (): Agg => ({ reg: 0, ftd: 0, ftdSum: 0, dep: 0, depSum: 0, comm: 0, wdSum: 0 });
   const aggEvents = async (from: string, to: string): Promise<Map<number, Agg>> => {
     const rows = (
       await db.query(
         `SELECT d.owner_id, e.type, count(*)::int AS n, coalesce(sum(e.amount), 0)::float AS s
            FROM events e JOIN leads d ON d.tg_id = e.tg_id
-          WHERE d.owner_id IS NOT NULL AND d.lead_role = 'lead' AND e.type IN ('reg','ftd','dep','comm')
+          WHERE d.owner_id IS NOT NULL AND d.lead_role = 'lead' AND e.type IN ('reg','ftd','dep','comm','wd')
             AND (e.created_at AT TIME ZONE '${TZ}')::date BETWEEN $1::date AND $2::date
           GROUP BY d.owner_id, e.type`,
         [from, to],
@@ -1358,7 +1360,8 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
       } else if (r.type === 'dep') {
         a.dep = r.n;
         a.depSum = r.s;
-      } else a.comm = r.s;
+      } else if (r.type === 'wd') a.wdSum = r.s;
+      else a.comm = r.s;
       m.set(r.owner_id, a);
     }
     return m;
@@ -1370,7 +1373,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     const teamN = Number((await db.query(`SELECT count(*)::int AS n FROM staff WHERE role = 'streamer' AND active AND deleted_at IS NULL AND parent_id = $1`, [leadId])).rows[0].n);
     const allN = Number((await db.query(`SELECT count(*)::int AS n FROM staff WHERE role = 'streamer' AND active AND deleted_at IS NULL`)).rows[0].n);
     const share = g.ftd > 0 ? (plan.leads * teamN) / g.ftd : allN ? teamN / allN : 0;
-    const auto = { ftd: plan.leads * teamN, ftdSum: r2(g.ftdSum * share), deposits: r2(g.deposits * share) };
+    const auto = { ftd: plan.leads * teamN, ftdSum: r2(g.ftdSum * share), deposits: r2(g.deposits * share), regs: Math.round(g.regs * share) };
     const set = (await db.query('SELECT ftd::float AS ftd, ftd_sum::float AS ftd_sum, deposits::float AS deposits FROM team_goals WHERE staff_id = $1', [leadId])).rows[0] ?? {};
     return {
       teamN,
@@ -1379,6 +1382,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
       ftd: set.ftd ?? auto.ftd,
       ftdSum: set.ftd_sum ?? auto.ftdSum,
       deposits: set.deposits ?? auto.deposits,
+      regs: auto.regs,
     };
   };
   app.get('/team-goals', { preHandler: admin }, async () => {
@@ -1446,8 +1450,8 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     }
     const goalFactor = allTime ? null : months.reduce((a, x) => a + x.w, 0);
     const g = plan.goals;
-    const goalsAll = goalFactor === null ? null : { ftd: g.ftd * goalFactor, ftdSum: g.ftdSum * goalFactor, deposits: g.deposits * goalFactor, commission: g.commission * goalFactor, net: g.net * goalFactor };
-    let goals = goalFactor === null || lead ? null : { ftd: g.ftd * goalFactor, ftdSum: g.ftdSum * goalFactor, deposits: g.deposits * goalFactor, commission: g.commission * goalFactor, net: g.net * goalFactor };
+    const goalsAll = goalFactor === null ? null : { regs: g.regs * goalFactor, ftd: g.ftd * goalFactor, ftdSum: g.ftdSum * goalFactor, deposits: g.deposits * goalFactor, commission: g.commission * goalFactor, net: g.net * goalFactor };
+    let goals = goalFactor === null || lead ? null : { regs: g.regs * goalFactor, ftd: g.ftd * goalFactor, ftdSum: g.ftdSum * goalFactor, deposits: g.deposits * goalFactor, commission: g.commission * goalFactor, net: g.net * goalFactor };
     // Где должны быть сегодня: доля прошедших дней периода
     const pace = ref >= to ? 1 : Math.max(0, Math.min(1, (daysBetween(from, ref) + 1) / rangeDays));
 
@@ -1458,7 +1462,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     // Если админ прописал план команды в «Планах», берём его
     if (lead && goalFactor !== null) {
       const tg = (await teamGoals(lead, plan))!;
-      goals = { ftd: tg.ftd * goalFactor, ftdSum: tg.ftdSum * goalFactor, deposits: tg.deposits * goalFactor, commission: 0, net: 0 };
+      goals = { regs: tg.regs * goalFactor, ftd: tg.ftd * goalFactor, ftdSum: tg.ftdSum * goalFactor, deposits: tg.deposits * goalFactor, commission: 0, net: 0 };
     }
 
     const evRange = await aggEvents(from, to);
@@ -1559,7 +1563,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
         minLeft: lv ? Math.max(0, plan.shiftH * 60 - doneToday) : null,
         todayMin: doneToday,
         pending: pendingBy.get(s.id) ?? 0,
-        range: { clicks: clicks.get(s.id) ?? 0, regs: a.reg, ftd: a.ftd, churned: churned.get(s.id) ?? 0, ftdSum: a.ftdSum, dep: a.dep, depSum: a.depSum, deposits: a.ftdSum + a.depSum, commission: a.comm, salary: r2(salary), paid: r2(paid) },
+        range: { clicks: clicks.get(s.id) ?? 0, regs: a.reg, ftd: a.ftd, churned: churned.get(s.id) ?? 0, ftdSum: a.ftdSum, dep: a.dep, depSum: a.depSum, deposits: a.ftdSum + a.depSum, withdrawals: a.wdSum, commission: a.comm, salary: r2(salary), paid: r2(paid) },
         month: {
           period: refMonth,
           ftd: am.ftd,
@@ -1684,6 +1688,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
         dep: sum((x) => x.range.dep),
         depSum: sum((x) => x.range.depSum),
         deposits: sum((x) => x.range.deposits),
+        withdrawals: sum((x) => x.range.withdrawals),
         commission: r2(commission),
         salaries: r2(salaries),
         expenses,
