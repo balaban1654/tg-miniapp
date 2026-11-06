@@ -37,6 +37,8 @@ import {
   loginOk,
   setSessionCookie,
   staffFromRequest,
+  sessionOwner,
+  setSessionActAs,
   verifyPassword,
   DEVICE_COOKIE,
   rememberDevice,
@@ -153,6 +155,11 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     if (!me) return reply.code(401).send({ error: 'Требуется вход' });
     if (roles.length && !roles.includes(me.role)) return reply.code(403).send({ error: 'Нет доступа' });
     req.staff = me;
+    // Админ смотрит глазами сотрудника: пароль и 2FA сотрудника менять нельзя, 2FA сотрудника не требуется
+    if (me.actor) {
+      if (/^\/api\/office\/profile\/(password|2fa)/.test(req.url)) return reply.code(403).send({ error: 'В режиме «как сотрудник» пароль и 2FA не меняются. Вернитесь к себе.' });
+      return;
+    }
     // Обязательная 2FA: пока не включена, пускаем только на /me, настройку 2FA и выход
     if (!me.totp && TOTP_REQUIRED.includes(me.role) && !/^\/api\/office\/(me|logout|profile\/2fa)/.test(req.url)) {
       return reply.code(403).send({ error: 'Включите двухфакторную защиту', code: 'totp_setup' });
@@ -263,6 +270,34 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
   });
 
   const NAV_ROLES: Role[] = ['streamer', 'teamlead', 'analyst', 'buyer'];
+  // ----- Режим «как сотрудник»: админ выбирает сотрудника и видит Office его глазами, без пароля и 2FA -----
+  // Решает настоящий владелец сессии: даже когда сейчас выбран стример, вернуться к себе или выбрать другого можно
+  const realAdmin = async (req: FastifyRequest) => {
+    const o = await sessionOwner(req);
+    return o && o.role === 'admin' && o.totp ? o : null;
+  };
+  app.get('/act-as/staff', async (req, reply) => {
+    const o = await realAdmin(req);
+    if (!o) return reply.code(403).send({ error: 'Нет доступа' });
+    const rows = (await db.query(
+      `SELECT s.id, s.name, s.role, s.streams, p.name AS parent_name FROM staff s LEFT JOIN staff p ON p.id = s.parent_id
+        WHERE s.active AND s.deleted_at IS NULL ORDER BY CASE s.role WHEN 'admin' THEN 0 WHEN 'teamlead' THEN 1 WHEN 'streamer' THEN 2 ELSE 3 END, s.name`,
+    )).rows;
+    return { me: o.id, actingAs: o.as_staff_id && o.as_staff_id !== o.id ? o.as_staff_id : null, staff: rows };
+  });
+  app.post('/act-as', async (req, reply) => {
+    const o = await realAdmin(req);
+    if (!o) return reply.code(403).send({ error: 'Нет доступа' });
+    const raw = (req.body as any)?.staff_id;
+    const id = raw === null || raw === undefined || raw === '' ? null : Number(raw);
+    if (id !== null && id !== o.id) {
+      if (!Number.isInteger(id) || !(await db.query('SELECT 1 FROM staff WHERE id = $1 AND active AND deleted_at IS NULL', [id])).rowCount) return reply.code(404).send({ error: 'Сотрудник не найден' });
+      await setSessionActAs(req, id);
+      req.log.info({ admin: o.id, as: id }, 'Режим «как сотрудник»');
+    } else await setSessionActAs(req, null);
+    return { ok: true };
+  });
+
   app.get('/me', { preHandler: auth }, async (req) => {
     const me = req.staff!;
     // Стримеры, тимлидеры, аналитики и медиабайеры видят меню, которое для их роли настроил админ

@@ -1040,3 +1040,6 @@ ALTER TABLE bot_replies ADD COLUMN IF NOT EXISTS text_en TEXT NOT NULL DEFAULT '
 ALTER TABLE push_templates ADD COLUMN IF NOT EXISTS text_en TEXT NOT NULL DEFAULT '';
 ALTER TABLE broadcasts ADD COLUMN IF NOT EXISTS text_en TEXT NOT NULL DEFAULT '';
 ALTER TABLE connect_offers ADD COLUMN IF NOT EXISTS text_en TEXT NOT NULL DEFAULT '';
+
+-- Админ смотрит Office глазами сотрудника: сессия админа работает от имени выбранного сотрудника
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS as_staff_id INT REFERENCES staff(id) ON DELETE SET NULL;

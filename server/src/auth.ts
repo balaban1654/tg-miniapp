@@ -17,6 +17,8 @@ export interface Staff {
   totp: boolean;
   streams: boolean;
   nav_layout: unknown;
+  /** Админ, который сейчас смотрит Office глазами этого сотрудника (режим «как сотрудник»); иначе нет */
+  actor?: { id: number; name: string } | null;
 }
 
 /** Роли, которым 2FA обязательна: без неё доступны только настройка 2FA и выход */
@@ -94,16 +96,36 @@ export async function destroySession(token: string): Promise<void> {
   await db.query('DELETE FROM sessions WHERE token_hash = $1', [sha(token)]);
 }
 
-export async function staffFromRequest(req: FastifyRequest): Promise<Staff | null> {
+const STAFF_COLS = `s.id, s.login, s.name, s.role, s.parent_id, (s.totp_secret IS NOT NULL) AS totp, s.streams, s.nav_layout`;
+
+/** Настоящий владелец сессии (без учёта режима «как сотрудник») и выбранный им сотрудник */
+export async function sessionOwner(req: FastifyRequest): Promise<(Staff & { as_staff_id: number | null }) | null> {
   const token = req.cookies[COOKIE];
   if (!token) return null;
   const r = await db.query(
-    `SELECT s.id, s.login, s.name, s.role, s.parent_id, (s.totp_secret IS NOT NULL) AS totp, s.streams, s.nav_layout
-       FROM sessions x JOIN staff s ON s.id = x.staff_id
+    `SELECT ${STAFF_COLS}, x.as_staff_id FROM sessions x JOIN staff s ON s.id = x.staff_id
       WHERE x.token_hash = $1 AND x.expires_at > now() AND s.active`,
     [sha(token)],
   );
   return r.rows[0] ?? null;
+}
+
+/** Выбрать сотрудника, глазами которого админ смотрит Office (null - вернуться к себе) */
+export async function setSessionActAs(req: FastifyRequest, staffId: number | null): Promise<void> {
+  const token = req.cookies[COOKIE];
+  if (token) await db.query('UPDATE sessions SET as_staff_id = $2 WHERE token_hash = $1', [sha(token), staffId]);
+}
+
+export async function staffFromRequest(req: FastifyRequest): Promise<Staff | null> {
+  const owner = await sessionOwner(req);
+  if (!owner) return null;
+  const { as_staff_id, ...me } = owner;
+  // Режим «как сотрудник» доступен только админу: дальше все запросы идут от имени выбранного сотрудника
+  if (as_staff_id && me.role === 'admin' && as_staff_id !== me.id) {
+    const t = (await db.query(`SELECT ${STAFF_COLS} FROM staff s WHERE s.id = $1 AND s.active AND s.deleted_at IS NULL`, [as_staff_id])).rows[0];
+    if (t) return { ...t, actor: { id: me.id, name: me.name } };
+  }
+  return { ...me, actor: null };
 }
 
 /** Простой ограничитель попыток входа: 10 неудач за 15 минут на пару ip+login. */

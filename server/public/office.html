@@ -499,7 +499,7 @@ textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10
 .pool-box{grid-column:1/-1;display:grid;gap:8px}.pool-pick{display:flex;flex-wrap:wrap;gap:8px 16px}.pool-pick label{display:inline-flex!important;flex-direction:row!important;align-items:center;gap:6px;cursor:pointer;font-size:14px}.pool-pick input{width:16px;height:16px;margin:0}
 .org-row{display:grid;grid-template-columns:minmax(200px,1fr) 2fr;gap:12px;align-items:start;padding-top:12px;border-top:1px solid var(--line)}.org-row>*{min-width:0}.org-row select{flex:1 1 220px;width:auto;min-width:0;max-width:420px}@media(max-width:700px){.org-row{grid-template-columns:1fr}}
 .mc-ava{width:56px;height:56px;border-radius:50%;background:var(--card2);border:2px solid var(--acc);overflow:hidden;flex:none}.mc-ava img{width:100%;height:100%;object-fit:cover;display:block}
-.me-cont{display:flex;gap:8px}.me-ci{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;background:var(--card2);border:1px solid var(--line);color:var(--acc2);transition:background .15s,color .15s}.me-ci:hover{background:var(--acc);color:#fff}
+.me-tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.me-row #meName:has(.me-sel){flex:1;min-width:0;display:block}.gear.me-tb{width:36px;height:36px;border-radius:10px;padding:0}.gear.me-tb svg{width:18px;height:18px}.me-sel{width:100%;min-width:0;font-size:12px;padding:7px 24px 7px 9px;border-radius:10px;text-overflow:ellipsis}#actBar{position:fixed;right:16px;bottom:16px;opacity:.97;z-index:80;display:flex;align-items:center;gap:10px;flex-wrap:wrap;max-width:calc(100vw - 32px);padding:9px 10px 9px 14px;border-radius:12px;background:#ffd54d;color:#1b1530;font-weight:700;font-size:13px;box-shadow:0 10px 30px rgba(0,0,0,.45)}#actBar .btn{background:#1b1530;color:#fff;border-color:#1b1530}.me-cont{display:flex;gap:8px}.me-ci{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;background:var(--card2);border:1px solid var(--line);color:var(--acc2);transition:background .15s,color .15s}.me-ci:hover{background:var(--acc);color:#fff}
 .pw-wrap{position:relative;display:block}.pw-wrap input{padding-right:44px;width:100%}.pw-eye{position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:0;padding:6px;color:var(--mut);cursor:pointer;display:grid;place-items:center;border-radius:8px}.pw-eye:hover{color:var(--fg)}
 </style>
 </head>
@@ -531,7 +531,7 @@ textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10
     <button class="burger" id="burger" type="button" aria-label="Меню" aria-expanded="false" aria-controls="sideMenu"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
     <div class="side-menu" id="sideMenu">
     <nav class="nav" id="nav"></nav>
-    <div class="me"><div class="me-cont" id="meCont" hidden></div><div class="me-row"><span id="meName"></span><button class="gear" id="meGear" type="button" title="Моя карточка" aria-label="Моя карточка"></button><button class="gear" id="meNav" type="button" title="Настроить меню" aria-label="Настроить меню" hidden></button></div><button class="btn o s" id="installBtn" type="button" hidden title="Установить приложение" aria-label="Установить приложение"><svg class="iic" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg><span class="ilbl">Установить приложение</span></button><button class="btn o s" id="logout" type="button">Выйти</button></div>
+    <div class="me"><div class="me-tools"><div class="me-cont" id="meCont" hidden></div><button class="gear me-tb" id="meGear" type="button" title="Моя карточка" aria-label="Моя карточка"></button><button class="gear me-tb" id="meNav" type="button" title="Настроить меню" aria-label="Настроить меню" hidden></button></div><div class="me-row"><span id="meName"></span></div><button class="btn o s" id="installBtn" type="button" hidden title="Установить приложение" aria-label="Установить приложение"><svg class="iic" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg><span class="ilbl">Установить приложение</span></button><button class="btn o s" id="logout" type="button">Выйти</button></div>
       </div>
   </aside>
   <main id="main"></main>
@@ -651,11 +651,33 @@ const ICONS={
   connect:'<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>',
   newsig:'<circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/>'};
 const icon=k=>{const s=document.createElementNS('http://www.w3.org/2000/svg','svg');s.setAttribute('viewBox','0 0 24 24');s.setAttribute('width','18');s.setAttribute('height','18');s.setAttribute('fill','none');s.setAttribute('stroke','currentColor');s.setAttribute('stroke-width','2');s.setAttribute('stroke-linecap','round');s.setAttribute('stroke-linejoin','round');s.setAttribute('aria-hidden','true');s.innerHTML=ICONS[k]||'';return s};
+/** Строка с именем. У админа (и пока он смотрит глазами сотрудника) это выбор: «смотреть Office как» любой сотрудник */
+async function actAs(id){try{await api('/act-as',{method:'POST',body:{staff_id:id}});location.hash='#/home';location.reload()}catch(x){toast(x.message)}}
+function drawMeName(){
+  const box=$('#meName');
+  if(!(me.role==='admin'||me.actor)){box.replaceChildren(me.name,el('span',{class:'mrole'},' · '+ROLE[me.role]));return}
+  const sel=el('select',{class:'me-sel','aria-label':'Смотреть Office как сотрудник',title:'Выберите сотрудника: Office откроется его глазами, действия будут от его имени'},el('option',{value:String(me.id)},me.name));
+  box.replaceChildren(sel);
+  api('/act-as/staff').then(d=>{
+    const G=[['admin','Админы'],['teamlead','Тимлидеры'],['streamer','Стримеры'],['other','Другие']];
+    // В узком меню влезает только имя: роль видна по группе списка, команда стримера - во всплывающей подсказке
+    const opt=x=>el('option',{value:String(x.id),title:(ROLE[x.role]||x.role)+(x.parent_name?' · команда '+x.parent_name:'')},x.name);
+    sel.replaceChildren(...G.map(([k,t])=>{const l=d.staff.filter(x=>k==='other'?!['admin','teamlead','streamer'].includes(x.role):x.role===k);return l.length?el('optgroup',{label:t},...l.map(opt)):null}).filter(Boolean));
+    sel.value=String(d.actingAs||d.me);
+    sel.onchange=()=>{const v=Number(sel.value);actAs(v===d.me?null:v)};
+  }).catch(()=>{});
+}
+function drawActBar(){
+  document.getElementById('actBar')?.remove();
+  if(!me.actor)return;
+  document.body.append(el('div',{id:'actBar',role:'status'},el('span',{},'Вы смотрите как '+me.name+' · '+(ROLE[me.role]||me.role)+'. Действия идут от его имени'),
+    el('button',{class:'btn s',type:'button',onclick:()=>actAs(null)},'Вернуться к себе ('+me.actor.name+')')));
+}
 function showApp(){
-  if(me.totp===false&&['admin','teamlead'].includes(me.role)){$('#login').hidden=true;$('#app').hidden=true;twofaDialog(true);return}
+  if(me.totp===false&&['admin','teamlead'].includes(me.role)&&!me.actor){$('#login').hidden=true;$('#app').hidden=true;twofaDialog(true);return}
   document.querySelectorAll('.tf-overlay').forEach(x=>x.remove());
   $('#login').hidden=true;$('#app').hidden=false;
-  $('#meName').replaceChildren(me.name,el('span',{class:'mrole'},' · '+ROLE[me.role]));
+  drawMeName();drawActBar();
   const gb=$('#meGear');if(gb&&!gb.firstChild){gb.append(svgIcon(GEAR,16));gb.onclick=()=>openStaffCard(null)}
   drawContacts();
   const nb=$('#meNav');if(nb){if(!nb.firstChild){nb.append(svgIcon('<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><path d="M14 17.5h7M17.5 14v7"/>',16));nb.onclick=openNavEditor}nb.hidden=me.role!=='admin'}
