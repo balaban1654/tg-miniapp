@@ -295,6 +295,9 @@ textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10
  .onl-ov{top:var(--mtop,64px);padding:0;display:flex;align-items:stretch;justify-content:stretch;background:#0a0613;backdrop-filter:none}
  .onl-ov .onl-box{width:100%;max-height:none;height:100%;border-radius:0;border:0;box-shadow:none;padding:14px max(14px,env(safe-area-inset-left,0px)) max(14px,env(safe-area-inset-bottom,0px))}
  .dx-pop.bell{position:fixed!important;left:0!important;right:0!important;top:var(--mtop,64px)!important;bottom:0;width:auto!important;max-height:none!important;border-radius:0;border:0;box-shadow:none;background:var(--card);display:block;padding:14px max(14px,env(safe-area-inset-left,0px)) max(14px,env(safe-area-inset-bottom,0px));overflow-y:auto;overscroll-behavior:contain}
+ .full-m{top:var(--mtop,64px)!important;padding:0!important;display:flex!important;align-items:stretch!important;justify-content:stretch!important;background:#0a0613!important;backdrop-filter:none!important;overflow:hidden!important}
+ .full-m>.lc,.full-m>.dx-md{width:100%!important;max-width:none!important;max-height:none!important;height:100%;margin:0!important;border-radius:0!important;border:0!important;box-shadow:none!important;overflow-y:auto;overscroll-behavior:contain;padding-bottom:max(16px,env(safe-area-inset-bottom,0px))!important}
+ body:has(.full-m){overflow:hidden}body:has(.full-m) #actBar{display:none}
  body:has(.onl-ov),body:has(.dx-pop.bell:not([hidden])){overflow:hidden}
  body:has(.onl-ov) #actBar,body:has(.dx-pop.bell:not([hidden])) #actBar{display:none}
  .side-menu .nav{grid-auto-flow:row;overflow:visible;flex:none;order:0;max-width:none;width:100%}
@@ -1391,7 +1394,8 @@ function dxModal(btn,s,d,skew,mode){
       el('div',{class:'dx-row res'},el('span',{},'Прибыль с сотрудника'),el('b',{style:'color:'+(profit<0?'var(--bad)':'var(--fg)')},sgn0(profit))),
       el('div',{class:'dx-vd '+vcls},el('b',{},vt+'. '),vx+'.')),
     el('div',{class:'dx-hd'},el('span',{class:'mut sm'},'Данные за '+perLabel(m.period)),me.role!=='admin'?null:el('a',{href:'#/acc/sum',style:'color:var(--acc2);font-weight:700;font-size:12px',onclick:e=>{e.preventDefault();dxCloseModal();dxGo('acc','sum')}},'Открыть в Бухгалтерии →')));
-  const ov=el('div',{class:'dx-ovl'+(mode==='hover'?' hv':'')},md);
+  if(mode!=='hover')setMtop();
+  const ov=el('div',{class:'dx-ovl'+(mode==='hover'?' hv':' full-m')},md);
   if(mode==='hover'){
     const r=btn.getBoundingClientRect(),w=Math.min(560,innerWidth-32);
     md.style.width=w+'px';md.style.left=Math.max(16,Math.min(r.left,innerWidth-w-16))+'px';md.style.top=Math.max(12,Math.min(r.bottom+10,innerHeight-220))+'px';
@@ -2752,7 +2756,7 @@ const REGION_NAME={ru:'RU, СНГ',ww:'EU, Мир'};
 async function openLeadCard(tgId){
   document.querySelectorAll('.lc-overlay').forEach(x=>x.remove());
   if(me.role==='streamer')setTimeout(updateBadge,1500); // уведомление по этому клиенту погасло, обновляем цифру у «Дашборда»
-  const ov=el('div',{class:'lc-overlay',role:'dialog','aria-modal':'true'});
+  setMtop();const ov=el('div',{class:'lc-overlay full-m',role:'dialog','aria-modal':'true'});
   const close=()=>{ov.remove();document.removeEventListener('keydown',onKey)};
   const onKey=e=>{if(e.key==='Escape')close()};
   document.addEventListener('keydown',onKey);
