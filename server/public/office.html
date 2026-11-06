@@ -353,7 +353,8 @@ textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10
 .dx-seg button{border:0;background:none;color:var(--mut);padding:6px 12px;border-radius:7px;cursor:pointer;font-size:13px}.dx-seg button.on{background:var(--acc);color:#fff;font-weight:700}
 .dx-ib{display:grid;place-items:center;width:38px;height:38px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--mut);cursor:pointer;padding:0}.dx-ib:hover,.dx-ib.on{color:var(--acc2);border-color:var(--acc)}
 .dx-ib.sm2{width:30px;height:30px;border-radius:8px}
-.dx-ib.dx-bell{width:42px;height:42px;border-radius:12px;position:relative;color:var(--fg)}.dx-ib.dx-bell svg{width:20px;height:20px}.dx-ib.dx-bell.has{border-color:var(--acc)}.dx-bdg{position:absolute;top:-7px;right:-7px;min-width:20px;height:20px;padding:0 6px;border-radius:10px;background:var(--bad);color:#fff;font:800 11px/20px Montserrat,sans-serif;text-align:center;box-shadow:0 0 0 2px var(--bg)}.dx-pop.bell{width:min(440px,calc(100vw - 24px));max-height:min(70vh,560px);overflow-y:auto}.dx-bl .dx-tk{padding:11px 2px}.dx-bl .dx-tk:last-child{border-bottom:0}.dx-bl .dx-ok{padding:18px 4px;text-align:center}
+.dx-ib.dx-bell{width:42px;height:42px;border-radius:12px;position:relative;color:var(--fg)}.dx-ib.dx-bell svg{width:20px;height:20px}.dx-ib.dx-bell.has{border-color:var(--acc)}.dx-bdg{position:absolute;top:-7px;right:-7px;min-width:20px;height:20px;padding:0 6px;border-radius:10px;background:var(--bad);color:#fff;font:800 11px/20px Montserrat,sans-serif;text-align:center;box-shadow:0 0 0 2px var(--bg)}@keyframes bdgBlink{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.25;transform:scale(.82)}}.dx-bdg{animation:bdgBlink 1.1s ease-in-out infinite}@media(prefers-reduced-motion:reduce){.dx-bdg{animation-duration:2.4s}}
+.dx-pop.bell{width:min(440px,calc(100vw - 24px));max-height:min(70vh,560px);overflow-y:auto}.dx-bl .dx-tk{padding:11px 2px}.dx-bl .dx-tk:last-child{border-bottom:0}.dx-bl .dx-ok{padding:18px 4px;text-align:center}
 .dx-pw{position:relative;display:inline-flex}
 .pp{position:relative}.pp-list{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:60;max-height:300px;overflow:auto;background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:4px;box-shadow:0 14px 36px rgba(0,0,0,.5)}.pp-list::-webkit-scrollbar{width:10px}.pp-list::-webkit-scrollbar-track{background:transparent;margin:8px 0}.pp-list::-webkit-scrollbar-thumb{background:#8b5cf666;border-radius:99px;border:3px solid transparent;background-clip:padding-box}.pp-list::-webkit-scrollbar-thumb:hover{background-color:#a78bfa99}.pp-list::-webkit-scrollbar-button{display:none;height:0}@supports not selector(::-webkit-scrollbar){.pp-list{scrollbar-width:thin;scrollbar-color:#8b5cf666 transparent}}.pp-i{padding:8px 12px;border-radius:8px;cursor:pointer}.pp-i:hover,.pp-i.hl{background:#ffffff14}.pp-i.on{color:var(--acc2);font-weight:600}
 .dx-pop{position:absolute;left:0;top:0;z-index:75;background:var(--card2);border:1px solid var(--line);border-radius:14px;padding:14px;box-shadow:0 18px 44px rgba(0,0,0,.55);text-transform:none;letter-spacing:0;font-weight:400;font-size:14px;color:var(--fg);width:min(360px,calc(100vw - 32px));display:grid;gap:10px}
@@ -1265,7 +1266,9 @@ function dxModal(btn,s,d,skew,mode){
     md.style.top=(r.bottom+10+h<=innerHeight-12?r.bottom+10:r.top-10-h>=12?r.top-10-h:Math.max(12,innerHeight-12-h))+'px'}
   if(mode!=='hover')x.focus();
 }
-function dxGo(t,sub,period){tab=t;if(period&&t==='acc')accState.period=period;if(sub&&t==='acc')accState.tab=sub;if(sub&&t==='plans')plansState.tab=sub;showApp()}
+function dxGo(t,sub,period){
+  if(me.role==='teamlead'&&(t==='acc'||t==='plans')){tab='staff';staffState.tab=t==='plans'?'tasks':({review:'review',why:'why'}[sub]||'team');showApp();return}
+  tab=t;if(period&&t==='acc')accState.period=period;if(sub&&t==='acc')accState.tab=sub;if(sub&&t==='plans')plansState.tab=sub;showApp()}
 
 
 /* Копирование воронки картинкой: model={ctr,rtd,stages:[{name,total,segs:[{t,w,c}]}],note} */
@@ -1525,7 +1528,9 @@ async function leadDash(){
     document.querySelectorAll('[data-live]').forEach(n=>{n.textContent=hm(Math.max(0,Math.floor((Date.now()+skew-Date.parse(n.dataset.live))/60000)))});
     if(!document.querySelector('.dx-ovl')&&dxReg.every(([,p])=>p.hidden)&&Date.now()+skew-Date.parse(d.now)>90000)render({soft:true});
   },20000);
-  return[el('div',{class:'dx'},dxHead(dxRangeLabel({from:d.range.from,to:d.range.to},d.today),()=>render({soft:true})),dxLive(d,skew),
+  const tk=dxTasks(d),mine=await myTaskItems();
+  const bell=dxBell({items:[...tk.items,...mine],n:tk.n+mine.filter(x=>!x.dataset.done).length});
+  return[el('div',{class:'dx'},dxHead(dxRangeLabel({from:d.range.from,to:d.range.to},d.today),()=>render({soft:true}),bell),dxLive(d,skew),
     el('div',{class:'dx-cols'},el('div',{class:'dx-col'},dxPlanFact(d)),el('div',{class:'dx-col'},dxLeadPay(d))),fs)];
 }
 function dxLeadPay(d){
@@ -1879,14 +1884,12 @@ async function streamerDash(){
     el('div',{class:'dx-cols'},el('div',{class:'dx-col'},smMetrics(d),smLeads(d)),el('div',{class:'dx-col'},smSalary(d))),smLast(d))];
 }
 /* задачи для остальных ролей */
-async function simpleTasksCard(){
-  const list=await api('/tasks/mine').catch(()=>[]);
-  if(!list.length)return null;
-  const today=kyivToday();
-  return el('div',{class:'card',style:'display:grid;gap:8px'},el('div',{class:'dx-lbl'},'Мои задачи'),...list.map(t=>{
-    const done=t.status==='done',over=!done&&t.due&&t.due<today;
-    return el('button',{type:'button',class:'dx-tk',onclick:async()=>{try{await api('/tasks/'+t.id+(done?'/undo':'/done'),{method:'POST'});render({soft:true})}catch(x){toast(x.message)}}},
-      el('span',{class:'dx-ic '+(done?'ok':'a')},svgIcon(IC_CHECK,18)),el('span',{class:'dx-tx'},el('span',{class:'tt',style:done?'text-decoration:line-through;color:var(--mut)':''},t.title),el('span',{class:'ts',style:over?'color:var(--bad)':''},done?'Отправлено на проверку':[t.details,t.due?'до '+dxDay(t.due):''].filter(Boolean).join(' · ')||'Без срока')))}));
+/** Мои задачи пунктами колокольчика (тимлид, аналитик, медиабайер) */
+async function myTaskItems(){
+  const list=await api('/tasks/mine').catch(()=>[]);const today=kyivToday();
+  return list.map(t=>{const done=t.status==='done',over=!done&&t.due&&t.due<today;
+    return el('button',{type:'button',class:'dx-tk','data-done':done?'1':null,title:done?'Вернуть в работу':'Отметить выполненной',onclick:async()=>{try{await api('/tasks/'+t.id+(done?'/undo':'/done'),{method:'POST'});toast(done?'Задача снова в работе':'Задача отправлена на проверку');render({soft:true})}catch(x){toast(x.message)}}},
+      el('span',{class:'dx-ic '+(done?'ok':'a')},svgIcon(IC_CHECK,18)),el('span',{class:'dx-tx'},el('span',{class:'tt',style:done?'text-decoration:line-through;color:var(--mut)':''},t.title),el('span',{class:'ts',style:over?'color:var(--bad)':''},done?'Отправлено на проверку':[t.details,t.due?'до '+dxDay(t.due):''].filter(Boolean).join(' · ')||'Без срока')))});
 }
 
 /** Стример: все его задачи, у пункта меню цифра незакрытых */
@@ -1920,8 +1923,8 @@ async function viewHome(){
   const r=dxCur();
   const s=await api('/stats?from='+r.from+'&to='+r.to);const b=s.byStatus;
   const k=(t,v)=>el('div',{class:'kpi'},el('small',{},t),el('b',{},String(v)));
-  const kpi=await simpleTasksCard();
-  return[el('div',{class:'dx'},dxHead(dxRangeLabel(r),()=>render({soft:true})),kpi,
+  const mine=await myTaskItems();
+  return[el('div',{class:'dx'},dxHead(dxRangeLabel(r),()=>render({soft:true}),dxBell({items:mine,n:mine.filter(x=>!x.dataset.done).length})),
     el('div',{class:'kpis'},k('Клики по ссылкам',s.clicks),k('Лиды',s.total),k('Регистрации',(b.registered||0)+(b.ftd||0)+(b.active||0)),k('FTD',(b.ftd||0)+(b.active||0)),k('Отвал',s.churned||0)),
     el('div',{class:'kpis'},k('Депозиты',money(s.deposits)),k('Выводы',money(s.withdrawals))))];
 }

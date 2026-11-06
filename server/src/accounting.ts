@@ -1698,15 +1698,16 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
         advances,
         lagging,
         shortfalls: out.filter((x) => shortBy.get(x.id)).map((x) => ({ id: x.id, name: x.name, n: shortBy.get(x.id) as number })),
-        monthWaiting: await (async () => {
+        // Тимлиду - только его команда: закрытие месяца и чужие задачи ему не показываем
+        monthWaiting: lead ? null : await (async () => {
           const prev = prevPeriod(await currentPeriod());
           if (await isClosed(prev)) return null;
           const hold = ((await db.query('SELECT 1 FROM month_holds WHERE period = $1', [prev])).rowCount ?? 0) > 0;
           const pending = await unreviewed(prev);
           return pending > 0 || hold ? { period: prev, pending, hold } : null;
         })(),
-        tasksDone: (await db.query(`SELECT t.id, s.name AS staff_name, t.title FROM staff_tasks t JOIN staff s ON s.id = t.staff_id WHERE t.status = 'done' ORDER BY t.done_at`)).rows,
-        tasksOverdue: (await db.query(`SELECT t.id, s.name AS staff_name, t.title FROM staff_tasks t JOIN staff s ON s.id = t.staff_id WHERE t.status = 'open' AND t.due < $1::date ORDER BY t.due`, [today])).rows,
+        tasksDone: (await db.query(`SELECT t.id, s.name AS staff_name, t.title FROM staff_tasks t JOIN staff s ON s.id = t.staff_id WHERE t.status = 'done' AND ($1::int IS NULL OR s.parent_id = $1) ORDER BY t.done_at`, [lead])).rows,
+        tasksOverdue: (await db.query(`SELECT t.id, s.name AS staff_name, t.title FROM staff_tasks t JOIN staff s ON s.id = t.staff_id WHERE t.status = 'open' AND t.due < $1::date AND ($2::int IS NULL OR s.parent_id = $2) ORDER BY t.due`, [today, lead])).rows,
       },
     };
   });
