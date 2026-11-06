@@ -1393,10 +1393,13 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
   // План команды тимлида на месяц: заданный админом или автоматический (план по лидам × активные стримеры, суммы долей плана компании)
   const teamGoals = async (leadId: number, plan: KpiPlan) => {
     const g = plan.goals;
+    // Авто (пустое поле): план компании делится между тимлидами пропорционально числу активных стримеров в их командах.
+    // Сумма планов всех команд = план компании
     const teamN = Number((await db.query(`SELECT count(*)::int AS n FROM staff WHERE role = 'streamer' AND active AND deleted_at IS NULL AND parent_id = $1`, [leadId])).rows[0].n);
-    const allN = Number((await db.query(`SELECT count(*)::int AS n FROM staff WHERE role = 'streamer' AND active AND deleted_at IS NULL`)).rows[0].n);
-    const share = g.ftd > 0 ? (plan.leads * teamN) / g.ftd : allN ? teamN / allN : 0;
-    const auto = { ftd: plan.leads * teamN, ftdSum: r2(g.ftdSum * share), deposits: r2(g.deposits * share), regs: Math.round(g.regs * share) };
+    const allN = Number((await db.query(`SELECT count(*)::int AS n FROM staff s JOIN staff t ON t.id = s.parent_id AND t.role = 'teamlead' AND t.active AND t.deleted_at IS NULL
+                                          WHERE s.role = 'streamer' AND s.active AND s.deleted_at IS NULL`)).rows[0].n);
+    const share = allN ? teamN / allN : 0;
+    const auto = { ftd: Math.round(g.ftd * share), ftdSum: r2(g.ftdSum * share), deposits: r2(g.deposits * share), regs: Math.round(g.regs * share) };
     const set = (await db.query('SELECT ftd::float AS ftd, ftd_sum::float AS ftd_sum, deposits::float AS deposits, regs::float AS regs FROM team_goals WHERE staff_id = $1', [leadId])).rows[0] ?? {};
     return {
       teamN,
@@ -1485,8 +1488,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     const scopeLead = lead && !tgl!.company ? lead : null;
     const staffRows = (await db.query(`SELECT id, name, login, tg_username, active, role FROM staff WHERE (role = 'streamer' OR streams) AND ($1::int IS NULL OR parent_id = $1) AND deleted_at IS NULL ORDER BY id`, [scopeLead])).rows as { id: number; name: string; login: string; tg_username: string | null; active: boolean; role: string }[];
     const ids = staffRows.map((s) => s.id);
-    // План команды тимлида: FTD = план по лидам × активные стримеры команды; суммы пополнений и депозитов
-    // берутся из плана компании в той же доле, что FTD команды от FTD компании (без плана FTD: по доле стримеров)
+    // План команды тимлида: доля плана компании по числу активных стримеров в команде (см. teamGoals)
     // Если админ прописал план команды в «Планах», берём его
     if (lead && goalFactor !== null) {
       const tg = tgl!;
