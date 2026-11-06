@@ -91,6 +91,7 @@ table{width:100%;border-collapse:collapse;background:#1c1233;border:1px solid #3
 th{font-weight:600;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#a89cc8;background:#150d26;padding:10px 12px;text-align:center}
 td{padding:11px 12px;border-top:1px solid #34255c;text-align:center}
 td.l,th.l{text-align:left}
+td.nm2{line-height:1.25;max-width:180px}td.nm2 div{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}td.nm2 .nm2-u{font-size:11px;color:#a89cc8;margin-top:2px}
 .ptr{position:fixed;left:0;right:0;top:0;height:80px;z-index:0;text-align:center;color:#c9a6ff;font-size:18px;font-weight:700;display:-webkit-flex;display:flex;-webkit-align-items:center;align-items:center;-webkit-justify-content:center;justify-content:center;opacity:0}
 /* Дашборд лежит поверх полосы и при свайпе плавно съезжает вниз (сдвигом, без перестройки страницы) */
 .wrap{position:relative;z-index:1;background:#000;min-height:100vh;box-sizing:border-box}
@@ -535,11 +536,11 @@ function renderLeads() {
   if (leadsQ) h += '<div class="mut" style="margin:-6px 0 10px;font-size:12px">Найдено ' + list.length + ' (поиск по всем лидам, период не учитывается)</div>';
   if (!list.length) h += '<div class="card mut" style="text-align:center">' + (rows.length ? 'Ничего не найдено. Измените фильтры.' : 'Лидов за период нет') + '</div>';
   else {
-    h += '<div class="scroll"><table><tr><th>Пришёл</th><th class="l">Имя</th><th class="l">Лид</th><th>Telegram ID</th><th>Pocket ID</th><th>Статус</th><th>Владелец</th><th>Ссылка</th><th>FTD</th><th>Депозиты</th><th>Комиссия</th></tr>';
+    h += '<div class="scroll"><table><tr><th>Пришёл</th><th class="l">Имя / ТГ</th><th>Telegram ID</th><th>Pocket ID</th><th>Статус</th><th>Владелец</th><th>Ссылка</th><th>FTD</th><th>Депозиты</th><th>Комиссия</th></tr>';
     var prev = null;
     for (i = 0; i < list.length; i++) {
       var r = list[i], st = staff(r) ? ['Сотрудник', 'st-new'] : LST[r.status] || [r.status, 'st-new'], dd = dk(r);
-      h += '<tr' + (prev && prev !== dd ? ' class="dayb"' : '') + '><td>' + Number(dd.slice(8)) + ' ' + MS[Number(dd.slice(5, 7)) - 1] + '</td><td class="l">' + esc(r.first_name || '—') + '</td><td class="l">' + (r.username ? '@' + esc(r.username) : '—') + '</td>' +
+      h += '<tr' + (prev && prev !== dd ? ' class="dayb"' : '') + '><td>' + Number(dd.slice(8)) + ' ' + MS[Number(dd.slice(5, 7)) - 1] + '</td><td class="l nm2">' + (r.first_name || !r.username ? '<div>' + esc(r.first_name || '—') + '</div>' : '') + (r.username ? '<div class="nm2-u">@' + esc(r.username) + '</div>' : '') + '</td>' +
         '<td><a href="#" class="tgid" data-card="' + esc(r.tg_id) + '">' + esc(r.tg_id) + '</a></td><td>' + esc(r.trader_id || '—') + '</td><td>' + (r.lead_role === 'test' ? '<span class="st st-test">Тест</span> ' : '') + '<span class="st ' + st[1] + '">' + st[0] + '</span>' + (r.banned ? ' ⛔' : '') + '</td>' +
         '<td>' + esc(r.owner_name || 'не закреплён') + '</td><td>' + esc(r.link_slug || '—') + '</td><td>' + (r.ftd_amount != null ? usd2(r.ftd_amount) : '—') + '</td><td>' + usd2(r.deposits) + '</td><td>' + usd2(r.commission) + '</td></tr>';
       prev = dd;
