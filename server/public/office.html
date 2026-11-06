@@ -353,6 +353,7 @@ textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10
 .dx-seg button{border:0;background:none;color:var(--mut);padding:6px 12px;border-radius:7px;cursor:pointer;font-size:13px}.dx-seg button.on{background:var(--acc);color:#fff;font-weight:700}
 .dx-ib{display:grid;place-items:center;width:38px;height:38px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--mut);cursor:pointer;padding:0}.dx-ib:hover,.dx-ib.on{color:var(--acc2);border-color:var(--acc)}
 .dx-ib.sm2{width:30px;height:30px;border-radius:8px}
+.dx-ib.dx-bell{width:42px;height:42px;border-radius:12px;position:relative;color:var(--fg)}.dx-ib.dx-bell svg{width:20px;height:20px}.dx-ib.dx-bell.has{border-color:var(--acc)}.dx-bdg{position:absolute;top:-7px;right:-7px;min-width:20px;height:20px;padding:0 6px;border-radius:10px;background:var(--bad);color:#fff;font:800 11px/20px Montserrat,sans-serif;text-align:center;box-shadow:0 0 0 2px var(--bg)}.dx-pop.bell{width:min(440px,calc(100vw - 24px));max-height:min(70vh,560px);overflow-y:auto}.dx-bl .dx-tk{padding:11px 2px}.dx-bl .dx-tk:last-child{border-bottom:0}.dx-bl .dx-ok{padding:18px 4px;text-align:center}
 .dx-pw{position:relative;display:inline-flex}
 .pp{position:relative}.pp-list{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:60;max-height:300px;overflow:auto;background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:4px;box-shadow:0 14px 36px rgba(0,0,0,.5)}.pp-list::-webkit-scrollbar{width:10px}.pp-list::-webkit-scrollbar-track{background:transparent;margin:8px 0}.pp-list::-webkit-scrollbar-thumb{background:#8b5cf666;border-radius:99px;border:3px solid transparent;background-clip:padding-box}.pp-list::-webkit-scrollbar-thumb:hover{background-color:#a78bfa99}.pp-list::-webkit-scrollbar-button{display:none;height:0}@supports not selector(::-webkit-scrollbar){.pp-list{scrollbar-width:thin;scrollbar-color:#8b5cf666 transparent}}.pp-i{padding:8px 12px;border-radius:8px;cursor:pointer}.pp-i:hover,.pp-i.hl{background:#ffffff14}.pp-i.on{color:var(--acc2);font-weight:600}
 .dx-pop{position:absolute;left:0;top:0;z-index:75;background:var(--card2);border:1px solid var(--line);border-radius:14px;padding:14px;box-shadow:0 18px 44px rgba(0,0,0,.55);text-transform:none;letter-spacing:0;font-weight:400;font-size:14px;color:var(--fg);width:min(360px,calc(100vw - 32px));display:grid;gap:10px}
@@ -1057,6 +1058,7 @@ const IC_RECEIPT='<path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6
 const IC_CAL='<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M8 3v4M16 3v4M3 10h18"/>';
 const IC_EXT='<path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>';
 const IC_CHEV='<path d="M9 6l6 6-6 6"/>';
+const IC_BELL='<path d="M6 9a6 6 0 0 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9"/><path d="M10 20a2.2 2.2 0 0 0 4 0"/>';
 
 /* ---------- Выбор периода: один и тот же в шапке у всех ролей ---------- */
 let dxRange=null; // {from,to} по Киеву; null означает текущий месяц
@@ -1110,8 +1112,18 @@ function rangeBar(onApply){
   draw();pop.hidden=true;
   return el('div',{class:'rb'},pill,go,pop);
 }
-function dxHead(sub,onApply){
-  return el('div',{class:'dx-top'},el('div',{class:'dx-ttl'},el('h2',{},'Дашборд'),(me.role==='admin'||me.role==='teamlead')?dxOnline():null,el('span',{class:'dx-sub'},sub)),rangeBar(onApply));
+function dxHead(sub,onApply,bell){
+  const rng=rangeBar(onApply);if(bell)rng.prepend(bell);
+  return el('div',{class:'dx-top'},el('div',{class:'dx-ttl'},el('h2',{},'Дашборд'),(me.role==='admin'||me.role==='teamlead')?dxOnline():null,el('span',{class:'dx-sub'},sub)),rng);
+}
+/** Колокольчик «Требует внимания» слева от календаря: число на значке, список открывается по нажатию */
+function dxBell(t){
+  const list=el('div',{class:'dx-bl'},...(t.items.length?t.items:[el('div',{class:'dx-ok'},'Всё в порядке. Отличная работа')]));
+  list.addEventListener('click',e=>{if(e.target.closest('.dx-tk'))setTimeout(dxCloseAll,0)});
+  const w=dxPopBtn('Требует внимания',IC_BELL,el('div',{style:'display:grid;gap:2px'},el('div',{class:'dx-lbl'},'Требует внимания'),list),'wide bell','dx-bell');
+  const b=w.querySelector('button');b.classList.remove('sm2');
+  if(t.n){b.classList.add('has');b.append(el('span',{class:'dx-bdg'},t.n>99?'99+':String(t.n)));b.title=b.ariaLabel='Требует внимания: '+t.n}
+  return w;
 }
 /* Плашка «онлайн»: сколько людей прямо сейчас с открытым Mini App (обновляется раз в 15 с) */
 let dxOnlineT=null,dxOnlineLast=null;
@@ -1486,8 +1498,8 @@ function dxTasks(d){
   if(T.monthWaiting)rows.push([T.monthWaiting.pending||'!',T.monthWaiting.pending?'w':'r','Месяц '+perLabel(T.monthWaiting.period)+' ждёт закрытия',T.monthWaiting.hold?'Открыт заново: закройте его после правок':T.monthWaiting.pending+' отчётов не проверено. После проверки закроется сам','acc','review',T.monthWaiting.period]);
   if((T.tasksDone||[]).length)rows.push([T.tasksDone.length,'w','Задачи ждут принятия',names(T.tasksDone,x=>x.staff_name+': '+x.title),'plans','tasks']);
   if((T.tasksOverdue||[]).length)rows.push([T.tasksOverdue.length,'r','Просрочены задачи',names(T.tasksOverdue,x=>x.staff_name+': '+x.title),'plans','tasks']);
-  const list=el('div',{class:'dx-tl'},...(rows.length?rows.map(([n,c,t,s,tb,sub,per])=>el('button',{type:'button',class:'dx-tk',onclick:()=>dxGo(tb,sub,per)},el('b',{class:'dx-bd '+c},String(n)),el('span',{class:'dx-tx'},el('span',{class:'tt'},t),el('span',{class:'ts'},s)),svgIcon(IC_CHEV,16))):[el('div',{class:'dx-ok'},'Всё в порядке: задач нет')]));
-  return el('div',{class:'card dx-tasks'},el('div',{class:'dx-lbl'},'Требует внимания'),list);
+  const list=el('div',{class:'dx-tl'},...(rows.length?rows.map(([n,c,t,s,tb,sub,per])=>el('button',{type:'button',class:'dx-tk',onclick:()=>{dxCloseAll();dxGo(tb,sub,per)}},el('b',{class:'dx-bd '+c},String(n)),el('span',{class:'dx-tx'},el('span',{class:'tt'},t),el('span',{class:'ts'},s)),svgIcon(IC_CHEV,16))):[el('div',{class:'dx-ok'},'Всё в порядке: задач нет')]));
+  return{items:rows.length?[...list.children]:[],n:rows.length};
 }
 async function adminDash(){
   dxReg.length=0;dxCloseModal();
@@ -1499,7 +1511,7 @@ async function adminDash(){
     document.querySelectorAll('[data-live]').forEach(n=>{n.textContent=hm(Math.max(0,Math.floor((Date.now()+skew-Date.parse(n.dataset.live))/60000)))});
     if(!document.querySelector('.dx-ovl')&&dxReg.every(([,p])=>p.hidden)&&Date.now()+skew-Date.parse(d.now)>90000)render({soft:true});
   },20000);
-  return[el('div',{class:'dx'},dxHead(dxRangeLabel({from:d.range.from,to:d.range.to},d.today),()=>render({soft:true})),dxLive(d,skew),el('div',{class:'dx-cols'},el('div',{class:'dx-col'},dxPlanFact(d)),el('div',{class:'dx-col'},dxNet(d),dxTasks(d))),fs)];
+  return[el('div',{class:'dx'},dxHead(dxRangeLabel({from:d.range.from,to:d.range.to},d.today),()=>render({soft:true}),dxBell(dxTasks(d))),dxLive(d,skew),el('div',{class:'dx-cols'},el('div',{class:'dx-col'},dxPlanFact(d)),el('div',{class:'dx-col'},dxNet(d))),fs)];
 }
 
 /* ---------- Дашборд тимлида: его команда онлайн, общие показатели команды и его зарплата ---------- */
@@ -1839,10 +1851,11 @@ function smTasks(d){
   d.tasks.forEach(t=>{
     const done=t.status==='done',over=!done&&t.due&&t.due<d.today;
     const sub=done?'Отправлено на проверку. Нажмите, чтобы вернуть в работу':[t.details,t.due?'до '+dxDay(t.due):''].filter(Boolean).join(' · ')||'Без срока';
-    items.push(el('button',{type:'button',class:'dx-tk',title:done?'Вернуть в работу':'Отметить выполненной',onclick:async()=>{try{await api('/tasks/'+t.id+(done?'/undo':'/done'),{method:'POST'});toast(done?'Задача снова в работе':'Задача отправлена на проверку');render({soft:true});setTasksBadge()}catch(x){toast(x.message)}}},
+    items.push(el('button',{type:'button',class:'dx-tk','data-done':done?'1':null,title:done?'Вернуть в работу':'Отметить выполненной',onclick:async()=>{try{await api('/tasks/'+t.id+(done?'/undo':'/done'),{method:'POST'});toast(done?'Задача снова в работе':'Задача отправлена на проверку');render({soft:true});setTasksBadge()}catch(x){toast(x.message)}}},
       el('span',{class:'dx-ic '+(done?'ok':'a')},svgIcon(IC_CHECK,18)),el('span',{class:'dx-tx'},el('span',{class:'tt',style:done?'text-decoration:line-through;color:var(--mut)':''},t.title),el('span',{class:'ts',style:over?'color:var(--bad)':''},sub))));
   });
-  return el('div',{class:'card dx-tasks'},el('div',{class:'dx-lbl'},'Требует внимания'),el('div',{class:'dx-tl'},...(items.length?items:[el('div',{class:'dx-ok'},'Всё в порядке. Отличная работа')])));
+  // Выполненные задачи (ждут проверки) в списке остаются, но в число на колокольчике не входят
+  return{items,n:items.filter(x=>!x.dataset.done).length};
 }
 function smLast(d){
   const cols=['Дата','Время','Статус',...d.fields];
@@ -1862,8 +1875,8 @@ async function streamerDash(){
     if(dxReg.every(([,p])=>p.hidden)&&Date.now()+skew-Date.parse(d.now)>90000)render({soft:true});
   },20000);
   const strip=d.colleagues.length?el('div',{class:'card dx-live'},...d.colleagues.map(c=>dxLiveCard(c,d,skew))):null;
-  return[el('div',{class:'dx'},dxHead(dxRangeLabel({from:d.range.from,to:d.range.to},d.today),()=>render({soft:true})),strip,
-    el('div',{class:'dx-cols'},el('div',{class:'dx-col'},smMetrics(d),smLeads(d)),el('div',{class:'dx-col'},smSalary(d),smTasks(d))),smLast(d))];
+  return[el('div',{class:'dx'},dxHead(dxRangeLabel({from:d.range.from,to:d.range.to},d.today),()=>render({soft:true}),dxBell(smTasks(d))),strip,
+    el('div',{class:'dx-cols'},el('div',{class:'dx-col'},smMetrics(d),smLeads(d)),el('div',{class:'dx-col'},smSalary(d))),smLast(d))];
 }
 /* задачи для остальных ролей */
 async function simpleTasksCard(){
