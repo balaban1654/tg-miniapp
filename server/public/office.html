@@ -279,11 +279,12 @@ textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10
 .dx-ib.only-m{display:none}
 @media(max-width:760px){.only-d,.dx-hd .mark{display:none!important}.dx-ib.only-m{display:grid}.dx-ext{display:none}.dx-hd{flex-wrap:nowrap}.dx-hd .l{flex:1 1 auto;min-width:0;flex-wrap:wrap;gap:6px 8px}.dx-hd .l .dx-lbl{flex:1 1 auto;min-width:0}.dx-hd .l .dx-pw,.dx-hd .l>.dx-ib{flex:none}}
 @media(max-width:560px){.dx-pop,.dx-pop.wide{width:min(340px,calc(100vw - 24px));padding:10px;gap:8px}.dx-pop .dx-rg{width:min(100%,220px)}.dx-seg2{min-height:24px}.dx-seg2 span{height:24px;padding:0 5px;font-size:10.5px}.dx-fsh b{font-size:14px}.dx-pop .dx-lbl{font-size:11px}}
-.burger{display:none}.side-menu{display:contents}
+.burger{display:none}.side-menu{display:contents}.m-bell{display:none}
 @media(max-width:760px){
  .side{position:sticky;top:0;z-index:60;flex-wrap:nowrap;background:#0a0613}
  .burger{display:grid;place-items:center;flex:none;width:42px;height:42px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--fg);cursor:pointer;padding:0}
  .burger[aria-expanded=true]{border-color:var(--acc);color:var(--acc2)}
+ .m-bell{display:flex;flex:none;margin-right:8px}.m-bell:empty{display:none}
  .side-menu{display:none;position:absolute;left:0;right:0;top:100%;z-index:70;flex-direction:column;gap:10px;padding:10px max(10px,env(safe-area-inset-left,0px)) 14px;background:#0a0613;border-bottom:1px solid var(--line);box-shadow:0 18px 44px rgba(0,0,0,.6);max-height:calc(100vh - 70px);max-height:calc(100dvh - 70px);overflow-y:auto;overscroll-behavior:contain}
  .side.open .side-menu{display:flex}
  .side-menu .nav{grid-auto-flow:row;overflow:visible;flex:none;order:0;max-width:none;width:100%}
@@ -530,7 +531,7 @@ textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10
 <div id="app" hidden>
   <aside class="side">
     <div class="brand" id="homeBrand" role="link" tabindex="0" title="На дашборд"><div class="logo"><img src="/img/logo-256.webp" alt="H" draggable="false"></div><b style="font:700 14px var(--fd)">Hunter Office</b></div>
-    <button class="burger" id="burger" type="button" aria-label="Меню" aria-expanded="false" aria-controls="sideMenu"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+    <div class="m-bell" id="mBell"></div><button class="burger" id="burger" type="button" aria-label="Меню" aria-expanded="false" aria-controls="sideMenu"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
     <div class="side-menu" id="sideMenu">
     <nav class="nav" id="nav"></nav>
     <div class="me"><div class="me-tools"><div class="me-cont" id="meCont" hidden></div><button class="gear me-tb" id="meGear" type="button" title="Моя карточка" aria-label="Моя карточка"></button><button class="gear me-tb" id="meNav" type="button" title="Настроить меню" aria-label="Настроить меню" hidden></button></div><div class="me-row"><span id="meName"></span></div><button class="btn o s" id="installBtn" type="button" hidden title="Установить приложение" aria-label="Установить приложение"><svg class="iic" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg><span class="ilbl">Установить приложение</span></button><button class="btn o s" id="logout" type="button">Выйти</button></div>
@@ -978,6 +979,7 @@ async function render(opt){
   const wasTab=leadsPrevTab;leadsPrevTab=tab;if(tab==='leads'&&wasTab!=='leads')leadsState.staffOpen=false;
   document.querySelectorAll('.dx-ovl').forEach(x=>x.remove());
   document.querySelectorAll('body > .dx-pop').forEach(x=>x.remove());dxReg.length=0;
+  if(!(opt&&opt.soft&&tab==='home'))$('#mBell')?.replaceChildren();bellPlace=null;
   pushHash();
   // Обновление того же раздела (после «Сохранить» и т. п.) идёт на месте: без «Загрузка…» и без прыжка наверх
   const soft=opt&&typeof opt.soft==='boolean'?opt.soft:tab===renderedTab;renderedTab=tab;
@@ -1113,8 +1115,12 @@ function rangeBar(onApply){
   draw();pop.hidden=true;
   return el('div',{class:'rb'},pill,go,pop);
 }
+// Колокольчик: на компьютере слева от календаря, в мобильной версии - в шапке слева от кнопки меню
+const bellMq=matchMedia('(max-width:760px)');let bellPlace=null;bellMq.addEventListener('change',()=>bellPlace&&bellPlace());
 function dxHead(sub,onApply,bell){
-  const rng=rangeBar(onApply);if(bell)rng.prepend(bell);
+  const rng=rangeBar(onApply);
+  if(bell){bellPlace=()=>{const slot=$('#mBell');if(bellMq.matches&&slot)slot.replaceChildren(bell);else{rng.prepend(bell);slot&&slot.replaceChildren()}};
+    if(bellMq.matches&&$('#mBell'))$('#mBell').replaceChildren(bell);else rng.prepend(bell)}
   return el('div',{class:'dx-top'},el('div',{class:'dx-ttl'},el('h2',{},'Дашборд'),(me.role==='admin'||me.role==='teamlead')?dxOnline():null,el('span',{class:'dx-sub'},sub)),rng);
 }
 /** Колокольчик «Требует внимания» слева от календаря: число на значке, список открывается по нажатию */
