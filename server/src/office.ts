@@ -1689,7 +1689,23 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     return Number.isInteger(id) && (await db.query('SELECT 1 FROM media_teams WHERE id = $1', [id])).rowCount ? id : null;
   };
   // Сколько людей прямо сейчас с открытым Mini App (для плашки «онлайн» на дашборде)
-  app.get('/online', { preHandler: need('admin', 'teamlead') }, async () => onlineNow());
+  // Сколько сейчас с открытым Mini App и кто именно. Тимлиду поимённо - только клиенты его команды, остальные числом
+  app.get('/online', { preHandler: need('admin', 'teamlead') }, async (req) => {
+    const o = onlineNow();
+    const lead = req.staff!.role === 'teamlead' ? req.staff!.id : null;
+    const ids = o.ids.map((x) => x.id);
+    const rows = ids.length
+      ? (await db.query(
+          `SELECT d.tg_id::text AS tg_id, d.first_name, d.username, d.lead_role, d.status, st.name AS owner_name
+             FROM leads d LEFT JOIN staff st ON st.id = d.owner_id
+            WHERE d.tg_id = ANY($1::bigint[]) AND ($2::int IS NULL OR d.owner_id = $2 OR st.parent_id = $2)`,
+          [ids, lead],
+        )).rows
+      : [];
+    const at = new Map(o.ids.map((x) => [String(x.id), x.at]));
+    rows.sort((a, b) => (at.get(b.tg_id) ?? 0) - (at.get(a.tg_id) ?? 0));
+    return { total: o.total, staff: o.staff, list: rows, hidden: Math.max(0, o.total - rows.length) };
+  });
 
   app.get('/media/teams', { preHandler: need('admin') }, async () => {
     await mainMediaTeam();

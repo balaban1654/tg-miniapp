@@ -162,15 +162,17 @@ function tgHandle(url: string): string | null {
 
 /** Кто сейчас с открытым Mini App (по отметкам /ping за последние 70 секунд) */
 const appOnline = new Map<number, { at: number; staff: boolean }>();
-export function onlineNow(): { total: number; staff: number } {
+export function onlineNow(): { total: number; staff: number; ids: { id: number; at: number }[] } {
   const edge = Date.now() - 70_000;
   let total = 0, staff = 0;
+  const ids: { id: number; at: number }[] = [];
   for (const [id, v] of appOnline) {
     if (v.at < edge) { appOnline.delete(id); continue; }
     total++;
     if (v.staff) staff++;
+    ids.push({ id, at: v.at });
   }
-  return { total, staff };
+  return { total, staff, ids };
 }
 
 export async function appRoutes(app: FastifyInstance): Promise<void> {

@@ -284,7 +284,7 @@ textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10
  .side{position:sticky;top:0;z-index:60;flex-wrap:nowrap;background:#0a0613}
  .burger{display:grid;place-items:center;flex:none;width:42px;height:42px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--fg);cursor:pointer;padding:0}
  .burger[aria-expanded=true]{border-color:var(--acc);color:var(--acc2)}
- .m-bell{display:flex;flex:none;margin-right:8px}.m-bell:empty{display:none}.bell-d{display:none!important}
+ .m-bell{display:flex;flex:none;margin-right:8px;gap:8px;align-items:center}.m-bell button.dx-onl{padding:0 11px}.m-bell .onl-w{display:none}.m-bell:empty{display:none}.bell-d{display:none!important}
  .side-menu{display:none;position:absolute;left:0;right:0;top:100%;z-index:70;flex-direction:column;gap:10px;padding:10px max(10px,env(safe-area-inset-left,0px)) 14px;background:#0a0613;border-bottom:1px solid var(--line);box-shadow:0 18px 44px rgba(0,0,0,.6);max-height:calc(100vh - 70px);max-height:calc(100dvh - 70px);overflow-y:auto;overscroll-behavior:contain}
  .side.open .side-menu{display:flex}
  .side-menu .nav{grid-auto-flow:row;overflow:visible;flex:none;order:0;max-width:none;width:100%}
@@ -347,7 +347,7 @@ textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10
 /* дашборд админа */
 .dx{display:grid;gap:16px;min-width:0}
 .dx-top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
-.dx-ttl{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}.dx-ttl h2{font-size:24px}.dx-onl{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:#3ddc971a;border:1px solid #3ddc9744;color:var(--ok);font-size:12px;font-weight:600;white-space:nowrap}.dx-onl b{font-weight:800}.dx-onl i{width:7px;height:7px;border-radius:50%;background:var(--ok);box-shadow:0 0 8px var(--ok);animation:onlb 1.4s ease-in-out infinite}@keyframes onlb{0%,100%{opacity:1}50%{opacity:.2}}
+.dx-ttl{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}.dx-ttl h2{font-size:24px}.dx-onl{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:#3ddc971a;border:1px solid #3ddc9744;color:var(--ok);font-size:12px;font-weight:600;white-space:nowrap}.dx-onl b{font-weight:800}button.dx-onl{font-family:inherit;cursor:pointer;height:42px;padding:0 14px;border-radius:12px;font-size:13px}button.dx-onl:hover,button.dx-onl.on{border-color:var(--ok);background:#3ddc9726}.onl-dot{flex:none;width:10px;height:10px;border-radius:50%;background:var(--ok);box-shadow:0 0 8px var(--ok);margin:0 6px}.dx-onl i{width:7px;height:7px;border-radius:50%;background:var(--ok);box-shadow:0 0 8px var(--ok);animation:onlb 1.4s ease-in-out infinite}@keyframes onlb{0%,100%{opacity:1}50%{opacity:.2}}
 .dx-sub{color:var(--mut);font-size:14px}
 .dx-rng{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-left:auto}
 .dx-seg{display:flex;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:3px;gap:2px}
@@ -1120,7 +1120,7 @@ function rangeBar(onApply){
 // на любом разделе. Данные шапки берём у дашборда, а на других разделах подгружаем сами (не чаще раза в 2 минуты)
 const bellMq=matchMedia('(max-width:760px)');
 let bellSrc=null,bellAt=0,bellLoading=null;
-function mountHeaderBell(){const slot=$('#mBell');if(!slot)return;slot.replaceChildren(...(bellSrc&&me?[dxBell(bellSrc())]:[]))}
+function mountHeaderBell(){const slot=$('#mBell');if(!slot)return;slot.replaceChildren(...(me&&(me.role==='admin'||me.role==='teamlead')?[dxOnline()]:[]),...(bellSrc&&me?[dxBell(bellSrc())]:[]))}
 function mineBell(list){const m=myTaskItemsFrom(list);return{items:m,n:m.filter(x=>!x.dataset.done).length}}
 function teamBell(d,list){const tk=dxTasks(d),m=myTaskItemsFrom(list);return{items:[...tk.items,...m],n:tk.n+m.filter(x=>!x.dataset.done).length}}
 async function loadBellSrc(){
@@ -1139,7 +1139,8 @@ bellMq.addEventListener('change',()=>{if(bellMq.matches)refreshHeaderBell()});
 setInterval(()=>{if(me&&tab!=='home'&&!document.querySelector('.dx-pop.bell:not([hidden])'))refreshHeaderBell(true)},120000);
 function dxHead(sub,onApply,bell){
   const rng=rangeBar(onApply);if(bell){bell.classList.add('bell-d');rng.prepend(bell)}
-  return el('div',{class:'dx-top'},el('div',{class:'dx-ttl'},el('h2',{},'Дашборд'),(me.role==='admin'||me.role==='teamlead')?dxOnline():null,el('span',{class:'dx-sub'},sub)),rng);
+  if(me.role==='admin'||me.role==='teamlead'){const o=dxOnline();o.classList.add('bell-d');rng.prepend(o)}
+  return el('div',{class:'dx-top'},el('div',{class:'dx-ttl'},el('h2',{},'Дашборд'),el('span',{class:'dx-sub'},sub)),rng);
 }
 /** Колокольчик «Требует внимания» слева от календаря: число на значке, список открывается по нажатию */
 function dxBell(t){
@@ -1164,12 +1165,33 @@ function dxBell(t){
 /* Плашка «онлайн»: сколько людей прямо сейчас с открытым Mini App (обновляется раз в 15 с) */
 let dxOnlineT=null,dxOnlineLast=null;
 function dxOnline(){
+  // Кнопка «онлайн N» рядом с колокольчиком: по нажатию список тех, кто сейчас в Mini App, нажатие на строку - карточка
   const n=el('b',{},dxOnlineLast?String(dxOnlineLast.total):'…');
-  const pill=el('span',{class:'dx-onl',title:'Сейчас с открытым Mini App'},el('i'),'онлайн ',n);
-  const upd=async()=>{if(!pill.isConnected&&dxOnlineLast){clearInterval(dxOnlineT);dxOnlineT=null;return}
-    try{const r=await api('/online');dxOnlineLast=r;n.textContent=String(r.total);pill.title='Сейчас с открытым Mini App: '+r.total+(r.staff?' (из них сотрудников '+r.staff+')':'')}catch{}};
-  clearInterval(dxOnlineT);upd();dxOnlineT=setInterval(upd,15000);
-  return pill;
+  const btn=el('button',{type:'button',class:'dx-onl',title:'Сейчас с открытым Mini App. Нажмите, чтобы увидеть, кто','aria-expanded':'false'},el('i'),el('span',{class:'onl-w'},'онлайн'),n);
+  const body=el('div',{class:'dx-bl'});
+  const p=el('div',{class:'dx-pop wide bell',hidden:''},el('div',{style:'display:grid;gap:2px'},el('div',{class:'dx-lbl'},'Сейчас в Mini App'),body));
+  const ROLE_RU={admin:'админ',moder:'модер',streamer:'стример',analyst:'аналитик',buyer:'медиабайер',test:'тест'};
+  const draw=r=>{
+    const rows=(r.list||[]).map(x=>{const nm=x.first_name||(x.username?'@'+x.username:'ID '+x.tg_id),rl=x.lead_role&&x.lead_role!=='lead'?ROLE_RU[x.lead_role]||x.lead_role:null;
+      return el('button',{type:'button',class:'dx-tk',title:'Открыть карточку',onclick:()=>{dxCloseAll();openLeadCard(Number(x.tg_id))}},el('span',{class:'onl-dot'}),
+        el('span',{class:'dx-tx'},el('span',{class:'tt'},nm,rl?el('span',{class:'pill p-pur',style:'margin-left:8px;font-size:10.5px'},rl):null),
+          el('span',{class:'ts'},[x.username&&x.first_name?'@'+x.username:null,'ID '+x.tg_id,x.owner_name?'владелец '+x.owner_name:null].filter(Boolean).join(' · '))),svgIcon(IC_CHEV,16))});
+    body.replaceChildren(...(rows.length?rows:[el('div',{class:'dx-ok'},r.total?'':'Сейчас никого нет')]).filter(x=>x.textContent!==''||x.tagName==='BUTTON'),
+      ...(r.hidden?[el('div',{class:'mut sm',style:'padding:10px 2px 2px'},(rows.length?'И ещё ':'')+r.hidden+' — клиенты других команд')]:[]));
+  };
+  const setAll=r=>document.querySelectorAll('.dx-onl b').forEach(b=>{b.textContent=String(r.total)});
+  btn.addEventListener('click',async e=>{e.stopPropagation();const open=p.hidden;dxCloseAll();if(!open)return;
+    if(p.parentNode!==document.body)document.body.append(p);
+    if(dxOnlineLast)draw(dxOnlineLast);else body.replaceChildren(el('div',{class:'mut sm'},'Загрузка…'));
+    p.hidden=false;btn.classList.add('on');btn.setAttribute('aria-expanded','true');dxPlace(btn,p);bellScrollY=scrollY;
+    try{const r=await api('/online');dxOnlineLast=r;setAll(r);draw(r);dxPlace(btn,p)}catch(x){body.replaceChildren(el('div',{class:'err'},x.message))}});
+  p.addEventListener('click',e=>e.stopPropagation());
+  dxReg.push([btn,p]);
+  // Обновление раз в 15 с, пока на странице есть кнопка «онлайн». Первый раз - после того как кнопка встанет на место
+  const upd=async()=>{if(!document.querySelector('.dx-onl')){clearInterval(dxOnlineT);dxOnlineT=null;return}
+    try{const r=await api('/online');dxOnlineLast=r;setAll(r);if(!p.hidden)draw(r)}catch{}};
+  setTimeout(()=>{if(!dxOnlineT){upd();dxOnlineT=setInterval(upd,15000)}else if(dxOnlineLast)setAll(dxOnlineLast);else upd()},0);
+  return el('span',{class:'dx-pw onl-w2'},btn,p);
 }
 function dxRangeLabel(r,today){
   const t=today||kyivToday();
