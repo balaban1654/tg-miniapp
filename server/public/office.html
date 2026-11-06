@@ -297,6 +297,10 @@ textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10
  .dx-pop.bell{position:fixed!important;left:0!important;right:0!important;top:var(--mtop,64px)!important;bottom:0;width:auto!important;max-height:none!important;border-radius:0;border:0;box-shadow:none;background:var(--card);display:block;padding:14px max(14px,env(safe-area-inset-left,0px)) max(14px,env(safe-area-inset-bottom,0px));overflow-y:auto;overscroll-behavior:contain}
  .full-m{top:var(--mtop,64px)!important;padding:0!important;display:flex!important;align-items:stretch!important;justify-content:stretch!important;background:#0a0613!important;backdrop-filter:none!important;overflow:hidden!important}
  .full-m>.lc,.full-m>.dx-md{width:100%!important;max-width:none!important;max-height:none!important;height:100%;margin:0!important;border-radius:0!important;border:0!important;box-shadow:none!important;overflow-y:auto;overscroll-behavior:contain;padding-bottom:max(16px,env(safe-area-inset-bottom,0px))!important}
+ /* Открытый чат на телефоне: на весь экран под шапкой, переписка листается, поле ответа внизу */
+ .chat-wrap.open{position:fixed;left:0;right:0;top:var(--mtop,64px);bottom:0;z-index:55;height:auto!important;min-height:0;background:var(--bg);display:flex;flex-direction:column;padding:0}
+ .chat-wrap.open .chat-thread{display:grid;flex:1 1 auto;height:auto!important;min-height:0;border:0;border-radius:0;grid-template-rows:auto minmax(0,1fr) auto;padding-bottom:env(safe-area-inset-bottom,0px)}
+ body:has(.chat-wrap.open){overflow:hidden}body:has(.chat-wrap.open) #actBar{display:none}
  body:has(.full-m){overflow:hidden}body:has(.full-m) #actBar{display:none}
  body:has(.onl-ov),body:has(.dx-pop.bell:not([hidden])){overflow:hidden}
  body:has(.onl-ov) #actBar,body:has(.dx-pop.bell:not([hidden])) #actBar{display:none}
@@ -4160,7 +4164,7 @@ async function viewChats(){
       await loadList();window.scrollTo(0,0);
     }catch(e){toast(e.message)}
   }
-  async function openChat(id){active=id;wrap.classList.add('open');window.scrollTo(0,0);msgs.dataset.init='';err.textContent='';try{await loadThread();await loadList()}catch(e){err.textContent=e.message}}
+  async function openChat(id){active=id;setMtop();wrap.classList.add('open');window.scrollTo(0,0);msgs.dataset.init='';err.textContent='';try{await loadThread();await loadList()}catch(e){err.textContent=e.message}}
   async function send(){
     const text=ta.value.trim();if((!text&&!queue.length)||!active)return;
     if(rec)return;
