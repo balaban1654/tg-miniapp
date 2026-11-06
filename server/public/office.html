@@ -352,6 +352,7 @@ textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10
 .dx{display:grid;gap:16px;min-width:0}
 .dx-top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
 .dx-ttl{display:flex;flex-direction:column;gap:4px;min-width:0}.dx-ttl h2{font-size:24px}.dx-onl{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:#3ddc971a;border:1px solid #3ddc9744;color:var(--ok);font-size:12px;font-weight:600;white-space:nowrap}.dx-onl b{font-weight:800}button.dx-onl{font-family:inherit;cursor:pointer;height:42px;padding:0 14px;border-radius:12px;font-size:13px}button.dx-onl:hover,button.dx-onl.on{border-color:var(--ok);background:#3ddc9726}.onl-box{width:min(520px,100%);max-height:min(80vh,720px);display:flex;flex-direction:column;gap:10px;overflow:hidden}.onl-box .onl-list{overflow-y:auto;overscroll-behavior:contain;min-height:0;flex:1 1 auto}.onl-ov{z-index:90}
+.dx-bdg.live{background:#ff3b6b}.dx-ib.dx-livb{color:#ff7a99}.dx-ib.dx-livb.has{border-color:#ff3b6b88}.lv-r{align-items:center}.lv-r.nc{cursor:default}.lv-r.nc:hover .tt{color:inherit}.lv-open{margin-left:6px;color:#ff7a99;font-weight:700;font-size:12px;text-decoration:none}.lv-open:hover{text-decoration:underline}.lv-rk{flex:none;width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-weight:800;font-size:12px;background:var(--card2);color:var(--acc2)}.lv-rk.m0{background:#f5c54233;color:#f5c542}.lv-rk.m1{background:#c9d2dc33;color:#dfe6ee}.lv-rk.m2{background:#d0884733;color:#e9a46a}.lv-tx{flex:1;min-width:0;display:grid;gap:5px}.lv-top{display:flex;justify-content:space-between;align-items:center;gap:8px}.lv-top b{font-size:14px}.lv-f{font-size:11px;color:var(--mut);white-space:nowrap}.lv-f b{font-size:14px}.lv-h{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;font-size:11.5px}.lv-h .dx-bar{margin:0}.lv-on{color:#ff7a99!important;font-weight:700}
 .onl-dot{flex:none;width:10px;height:10px;border-radius:50%;background:var(--ok);box-shadow:0 0 8px var(--ok);margin:0 6px}.dx-onl i{width:7px;height:7px;border-radius:50%;background:var(--ok);box-shadow:0 0 8px var(--ok);animation:onlb 1.4s ease-in-out infinite}@keyframes onlb{0%,100%{opacity:1}50%{opacity:.2}}
 .dx-sub{color:var(--mut);font-size:14px}
 .dx-rng{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-left:auto}
@@ -1125,14 +1126,14 @@ function rangeBar(onApply){
 // Колокольчик: на компьютере - слева от календаря на дашборде; в мобильной версии - всегда в шапке слева от кнопки меню,
 // на любом разделе. Данные шапки берём у дашборда, а на других разделах подгружаем сами (не чаще раза в 2 минуты)
 const bellMq=matchMedia('(max-width:760px)');
-let bellSrc=null,bellAt=0,bellLoading=null;
-function mountHeaderBell(){const slot=$('#mBell');if(!slot)return;slot.replaceChildren(...(me&&(me.role==='admin'||me.role==='teamlead')?[dxOnline()]:[]),...(bellSrc&&me?[dxBell(bellSrc())]:[]))}
+let bellSrc=null,bellAt=0,bellLoading=null,liveSrc=null;
+function mountHeaderBell(){const slot=$('#mBell');if(!slot)return;const lead=me&&(me.role==='admin'||me.role==='teamlead');slot.replaceChildren(...(lead?[dxOnline()]:[]),...(liveRoles()&&liveSrc?[dxLiveBtn()]:[]),...(bellSrc&&me?[dxBell(bellSrc())]:[]))}
 function mineBell(list){const m=myTaskItemsFrom(list);return{items:m,n:m.filter(x=>!x.dataset.done).length}}
 function teamBell(d,list){const tk=dxTasks(d),m=myTaskItemsFrom(list);return{items:[...tk.items,...m],n:tk.n+m.filter(x=>!x.dataset.done).length}}
 async function loadBellSrc(){
   const r=me.role;
-  if(r==='admin'||r==='teamlead'){const d=await api('/dashboard'+dxQuery());const ml=r==='teamlead'?await api('/tasks/mine').catch(()=>[]):[];bellSrc=r==='admin'?()=>dxTasks(d):()=>teamBell(d,ml)}
-  else if(r==='streamer'){const c=dxCur();const d=await api('/my/dashboard?from='+c.from+'&to='+c.to);d.alerts.chats=(await api('/chats').catch(()=>[])).filter(x=>x.waiting);bellSrc=()=>smTasks(d)}
+  if(r==='admin'||r==='teamlead'){const d=await api('/dashboard'+dxQuery());liveSrc={d,skew:Date.parse(d.now)-Date.now()};const ml=r==='teamlead'?await api('/tasks/mine').catch(()=>[]):[];bellSrc=r==='admin'?()=>dxTasks(d):()=>teamBell(d,ml)}
+  else if(r==='streamer'){const c=dxCur();const d=await api('/my/dashboard?from='+c.from+'&to='+c.to);liveSrc=liveFromColleagues(d,Date.parse(d.now)-Date.now());d.alerts.chats=(await api('/chats').catch(()=>[])).filter(x=>x.waiting);bellSrc=()=>smTasks(d)}
   else{const ml=await api('/tasks/mine').catch(()=>[]);bellSrc=()=>mineBell(ml)}
   bellAt=Date.now();
 }
@@ -1151,6 +1152,7 @@ function dxGreet(){
 }
 function dxHead(sub,onApply,bell){
   const rng=rangeBar(onApply);if(bell){bell.classList.add('bell-d');rng.prepend(bell)}
+  if(liveRoles()&&liveSrc){const lb=dxLiveBtn();lb.classList.add('bell-d');rng.prepend(lb)}
   if(me.role==='admin'||me.role==='teamlead'){const o=dxOnline();o.classList.add('bell-d');rng.prepend(o)}
   return el('div',{class:'dx-top'},el('div',{class:'dx-ttl'},el('h2',{},dxGreet()),el('span',{class:'dx-sub'},sub)),rng);
 }
@@ -1176,6 +1178,54 @@ function dxBell(t){
 }
 /* Плашка «онлайн»: сколько людей прямо сейчас с открытым Mini App (обновляется раз в 15 с) */
 let dxOnlineT=null,dxOnlineLast=null;
+/** Кнопка «В эфире»: значок трансляции, красное число - сколько стримеров сейчас в эфире. По нажатию - окно со стримерами */
+const IC_LIVE='<circle cx="12" cy="12" r="2.2" fill="currentColor"/><path d="M8.5 8.5a5 5 0 0 0 0 7M15.5 8.5a5 5 0 0 1 0 7M5.6 5.6a9 9 0 0 0 0 12.8M18.4 5.6a9 9 0 0 1 0 12.8"/>';
+let liveSort='ftd';
+function liveList(d){return d.streamers.concat(d.adminsLive||[]).filter(s=>(s.active||s.live)&&(s.role!=='admin'||s.live))}
+function liveFromColleagues(d,skew){
+  const st=d.colleagues.map(c=>({id:c.id,name:c.name,role:c.role,active:true,live:c.live,lastEnd:c.lastEnd,lastMin:c.lastMin,month:{hoursMin:c.hoursMin||0,ftd:c.ftd||0},noCard:true}));
+  return{d:{streamers:st,adminsLive:[],plan:d.plan,pace:d.plan.pace,today:d.today},skew};
+}
+const liveRoles=()=>me&&['admin','teamlead','streamer'].includes(me.role);
+function dxLiveBtn(){
+  const {d}=liveSrc,n=liveList(d).filter(s=>s.live).length;
+  const b=el('button',{type:'button',class:'dx-ib dx-bell dx-livb'+(n?' has':''),title:n?'Сейчас в эфире: '+n+'. Нажмите, чтобы открыть список стримеров':'Стримеры: никто сейчас не в эфире','aria-label':'Стримеры, в эфире '+n});
+  b.append(svgIcon(IC_LIVE,20));if(n)b.append(el('span',{class:'dx-bdg live'},String(n)));
+  b.addEventListener('click',e=>{e.stopPropagation();dxCloseAll();openLiveList()});
+  return el('span',{class:'dx-pw'},b);
+}
+/** Окно «Стримеры» (как «Сейчас в Mini App»): от лучшего к худшему, LIVE, часы с риской плана; строка - карточка стримера */
+function openLiveList(){
+  if(!liveSrc)return;const {d,skew}=liveSrc,pl=d.plan,pace=pl.paceMin;
+  const close=()=>{document.querySelectorAll('.onl-ov.liv').forEach(x=>x.remove());document.removeEventListener('keydown',onKey)};
+  const onKey=e=>{if(e.key==='Escape')close()};
+  close();
+  const list=liveList(d),nLive=list.filter(s=>s.live).length;
+  const body=el('div',{class:'dx-bl onl-list'});
+  const sortBtn=(k,t)=>el('button',{type:'button',class:'btn s'+(liveSort===k?'':' o'),onclick:()=>{liveSort=k;draw()}},t);
+  const sorts=el('div',{style:'display:flex;gap:6px'});
+  const draw=()=>{
+    sorts.replaceChildren(sortBtn('ftd','по FTD'),sortBtn('hours','по часам'));
+    const key=s=>liveSort==='hours'?[-(s.month.hoursMin||0),-(s.month.ftd||0)]:[-(s.month.ftd||0),-(s.month.hoursMin||0)];
+    const sorted=list.slice().sort((a,b)=>{const x=key(a),y=key(b);return x[0]-y[0]||x[1]-y[1]||(a.live?0:1)-(b.live?0:1)||String(a.name).localeCompare(b.name)});
+    body.replaceChildren(...sorted.map((s,i)=>{
+      const hrs=s.month.hoursMin||0,lvl=dxLvl(hrs,pace),f=s.month.ftd||0;
+      const note=s.live?hm(Math.max(0,Math.floor((Date.now()+skew-Date.parse(s.live.started_at))/60000)))+' в эфире':dxOffText(s,d.today);
+      const row=el(s.noCard?'div':'button',{type:s.noCard?null:'button',class:'dx-tk lv-r'+(s.noCard?' nc':''),title:s.noCard?'':'Открыть карточку'},
+        el('span',{class:'lv-rk'+(i<3?' m'+i:'')},String(i+1)),
+        el('span',{class:'lv-tx'},
+          el('span',{class:'lv-top'},el('b',{},s.name,s.live?el('span',{class:'pf-live'},el('i'),'LIVE'):null,s.live&&s.live.stream_url?el('a',{class:'lv-open',href:s.live.stream_url,target:'_blank',rel:'noopener',title:'Открыть эфир',onclick:e=>e.stopPropagation()},'(открыть)'):null),el('span',{class:'lv-f'},el('b',{class:f>=pl.leads*d.pace?'ok':f>=pl.leads*d.pace*.7?'warn':'bad'},String(f)),' FTD')),
+          s.role==='streamer'?el('span',{class:'lv-h'},el('span',{class:'dx-bar'},el('i',{style:'width:'+Math.min(100,hrs/pl.planMin*100)+'%;background:var(--'+lvl+')'}),el('u',{style:'left:'+Math.min(100,pace/pl.planMin*100)+'%'})),el('span',{class:'mut'},hw(hrs)+' / '+pl.hours+' ч')):null,
+          el('span',{class:'ts'+(s.live?' lv-on':'')},note)),
+        s.noCard?null:svgIcon(IC_CHEV,16));
+      if(!s.noCard)row.addEventListener('click',e=>{e.stopPropagation();close();dxModal(row,s,d,skew,'tap')});
+      return row}));
+  };
+  const ov=el('div',{class:'lc-overlay onl-ov liv',role:'dialog','aria-modal':'true','aria-label':'Стримеры',onclick:e=>{if(e.target===ov)close()}},
+    el('div',{class:'lc onl-box'},el('div',{class:'lc-head'},el('h3',{style:'font-size:17px'},'Стримеры ',nLive?el('span',{class:'pill p-bad'},nLive+' в эфире'):el('span',{class:'pill'},'никто не в эфире')),
+      el('button',{class:'btn o s',type:'button','aria-label':'Закрыть',onclick:close},'✕')),sorts,body));
+  draw();document.body.append(ov);document.addEventListener('keydown',onKey);
+}
 function dxOnline(){
   // Кнопка «онлайн N» рядом с колокольчиком: по нажатию список тех, кто сейчас в Mini App, нажатие на строку - карточка
   const n=el('b',{},dxOnlineLast?String(dxOnlineLast.total):'…');
@@ -1620,7 +1670,7 @@ async function adminDash(){
     document.querySelectorAll('[data-live]').forEach(n=>{n.textContent=hm(Math.max(0,Math.floor((Date.now()+skew-Date.parse(n.dataset.live))/60000)))});
     if(!document.querySelector('.dx-ovl')&&dxReg.every(([,p])=>p.hidden)&&Date.now()+skew-Date.parse(d.now)>90000)render({soft:true});
   },20000);
-  return[el('div',{class:'dx'},dxHead(dxHeadLabel({from:d.range.from,to:d.range.to},d.today),()=>render({soft:true}),(bellSrc=()=>dxTasks(d),bellAt=Date.now(),dxBell(bellSrc()))),dxLive(d,skew),el('div',{class:'dx-cols'},el('div',{class:'dx-col'},dxPlanFact(d)),el('div',{class:'dx-col'},dxNet(d))),fs)];
+  return[el('div',{class:'dx'},dxHead(dxHeadLabel({from:d.range.from,to:d.range.to},d.today),()=>render({soft:true}),(liveSrc={d,skew},bellSrc=()=>dxTasks(d),bellAt=Date.now(),dxBell(bellSrc()))),el('div',{class:'dx-cols'},el('div',{class:'dx-col'},dxPlanFact(d)),el('div',{class:'dx-col'},dxNet(d))),fs)];
 }
 
 /* ---------- Дашборд тимлида: его команда онлайн, общие показатели команды и его зарплата ---------- */
@@ -1635,8 +1685,8 @@ async function leadDash(){
     if(!document.querySelector('.dx-ovl')&&dxReg.every(([,p])=>p.hidden)&&Date.now()+skew-Date.parse(d.now)>90000)render({soft:true});
   },20000);
   const ml=await api('/tasks/mine').catch(()=>[]);
-  bellSrc=()=>teamBell(d,ml);bellAt=Date.now();const bell=dxBell(bellSrc());
-  return[el('div',{class:'dx'},dxHead(dxHeadLabel({from:d.range.from,to:d.range.to},d.today),()=>render({soft:true}),bell),dxLive(d,skew),
+  liveSrc={d,skew};bellSrc=()=>teamBell(d,ml);bellAt=Date.now();const bell=dxBell(bellSrc());
+  return[el('div',{class:'dx'},dxHead(dxHeadLabel({from:d.range.from,to:d.range.to},d.today),()=>render({soft:true}),bell),
     el('div',{class:'dx-cols'},el('div',{class:'dx-col'},dxPlanFact(d)),el('div',{class:'dx-col'},dxLeadPay(d))),fs)];
 }
 function dxLeadPay(d){
@@ -1991,8 +2041,9 @@ async function streamerDash(){
     document.querySelectorAll('[data-live]').forEach(n=>{n.textContent=hm(Math.max(0,Math.floor((Date.now()+skew-Date.parse(n.dataset.live))/60000)))});
     if(dxReg.every(([,p])=>p.hidden)&&Date.now()+skew-Date.parse(d.now)>90000)render({soft:true});
   },20000);
-  const strip=d.colleagues.length?el('div',{class:'card dx-live'},...d.colleagues.map(c=>dxLiveCard(c,d,skew))):null;
-  return[el('div',{class:'dx'},dxHead(dxHeadLabel({from:d.range.from,to:d.range.to},d.today),()=>render({soft:true}),(bellSrc=()=>smTasks(d),bellAt=Date.now(),dxBell(bellSrc()))),strip,
+  // Коллеги - в кнопке «В эфире» в шапке (только список, без карточек)
+  liveSrc=liveFromColleagues(d,skew);
+  return[el('div',{class:'dx'},dxHead(dxHeadLabel({from:d.range.from,to:d.range.to},d.today),()=>render({soft:true}),(bellSrc=()=>smTasks(d),bellAt=Date.now(),dxBell(bellSrc()))),
     el('div',{class:'dx-cols'},el('div',{class:'dx-col'},smMetrics(d)),el('div',{class:'dx-col'},smSalary(d))),smLast(d))];
 }
 /* задачи для остальных ролей */
