@@ -1117,6 +1117,10 @@ function rangeBar(onApply){
 }
 // Колокольчик: на компьютере слева от календаря, в мобильной версии - в шапке слева от кнопки меню
 const bellMq=matchMedia('(max-width:760px)');let bellPlace=null;bellMq.addEventListener('change',()=>bellPlace&&bellPlace());
+// Начали прокручивать страницу - список уведомлений закрывается (прокрутка внутри самого списка его не закрывает)
+let bellScrollY=null;
+window.addEventListener('scroll',()=>{const open=document.querySelector('.dx-pop.bell:not([hidden])');if(!open){bellScrollY=null;return}
+  if(bellScrollY===null){bellScrollY=scrollY;return}if(Math.abs(scrollY-bellScrollY)>12){bellScrollY=null;dxCloseAll()}},{passive:true});
 function dxHead(sub,onApply,bell){
   const rng=rangeBar(onApply);
   if(bell){bellPlace=()=>{const slot=$('#mBell');if(bellMq.matches&&slot)slot.replaceChildren(bell);else{rng.prepend(bell);slot&&slot.replaceChildren()}};
@@ -1134,7 +1138,7 @@ function dxBell(t){
   const sig=t.items.filter(x=>!x.dataset.done).map(x=>x.textContent.trim()).sort().join('|');
   const KEY='bell_seen_'+(me&&me.id);let seen='';try{seen=localStorage.getItem(KEY)||''}catch{}
   if(t.n&&sig!==seen)b.classList.add('ring');
-  b.addEventListener('click',()=>{b.classList.remove('ring');try{localStorage.setItem(KEY,sig)}catch{}});
+  b.addEventListener('click',()=>{b.classList.remove('ring');bellScrollY=scrollY;try{localStorage.setItem(KEY,sig)}catch{}});
   return w;
 }
 /* Плашка «онлайн»: сколько людей прямо сейчас с открытым Mini App (обновляется раз в 15 с) */
