@@ -291,6 +291,11 @@ textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10
  .side.open .side-menu .nav{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;align-content:start}
  .side.open .side-menu .me{flex:none}
  body.menu-open{overflow:hidden}body.menu-open #actBar{display:none}
+ .onl-ov{top:var(--mtop,64px);padding:0;display:flex;align-items:stretch;justify-content:stretch;background:#0a0613;backdrop-filter:none}
+ .onl-ov .onl-box{width:100%;max-height:none;height:100%;border-radius:0;border:0;box-shadow:none;padding:14px max(14px,env(safe-area-inset-left,0px)) max(14px,env(safe-area-inset-bottom,0px))}
+ .dx-pop.bell{position:fixed!important;left:0!important;right:0!important;top:var(--mtop,64px)!important;bottom:0;width:auto!important;max-height:none!important;border-radius:0;border:0;box-shadow:none;background:var(--card);display:block;padding:14px max(14px,env(safe-area-inset-left,0px)) max(14px,env(safe-area-inset-bottom,0px));overflow-y:auto;overscroll-behavior:contain}
+ body:has(.onl-ov),body:has(.dx-pop.bell:not([hidden])){overflow:hidden}
+ body:has(.onl-ov) #actBar,body:has(.dx-pop.bell:not([hidden])) #actBar{display:none}
  .side-menu .nav{grid-auto-flow:row;overflow:visible;flex:none;order:0;max-width:none;width:100%}
  .side-menu .nav button{width:100%;justify-content:flex-start;padding:12px 12px;font-size:15px}
  .side-menu .me{margin:0;flex:none;display:grid;gap:10px;padding:10px 4px 0;border-top:1px solid var(--line);width:100%}
@@ -1126,8 +1131,11 @@ function rangeBar(onApply){
 // Колокольчик: на компьютере - слева от календаря на дашборде; в мобильной версии - всегда в шапке слева от кнопки меню,
 // на любом разделе. Данные шапки берём у дашборда, а на других разделах подгружаем сами (не чаще раза в 2 минуты)
 const bellMq=matchMedia('(max-width:760px)');
+// Низ мобильной шапки: от него открываются на весь экран меню, «Онлайн», «Стримеры» и уведомления
+const setMtop=()=>{const sd=document.querySelector('.side');if(sd)document.documentElement.style.setProperty('--mtop',Math.round(sd.getBoundingClientRect().bottom)+'px')};
+addEventListener('resize',setMtop);
 let bellSrc=null,bellAt=0,bellLoading=null,liveSrc=null;
-function mountHeaderBell(){const slot=$('#mBell');if(!slot)return;const lead=me&&(me.role==='admin'||me.role==='teamlead');slot.replaceChildren(...(lead?[dxOnline()]:[]),...(liveRoles()&&liveSrc?[dxLiveBtn()]:[]),...(bellSrc&&me?[dxBell(bellSrc())]:[]))}
+function mountHeaderBell(){const slot=$('#mBell');if(!slot)return;setMtop();const lead=me&&(me.role==='admin'||me.role==='teamlead');slot.replaceChildren(...(lead?[dxOnline()]:[]),...(liveRoles()&&liveSrc?[dxLiveBtn()]:[]),...(bellSrc&&me?[dxBell(bellSrc())]:[]))}
 function mineBell(list){const m=myTaskItemsFrom(list);return{items:m,n:m.filter(x=>!x.dataset.done).length}}
 function teamBell(d,list){const tk=dxTasks(d),m=myTaskItemsFrom(list);return{items:[...tk.items,...m],n:tk.n+m.filter(x=>!x.dataset.done).length}}
 async function loadBellSrc(){
@@ -1172,7 +1180,7 @@ function dxBell(t){
   const b=w.querySelector('button');b.classList.remove('sm2');
   const bdg=fresh.length?el('span',{class:'dx-bdg'},fresh.length>99?'99+':String(fresh.length)):null;
   if(bdg){b.classList.add('has','ring');b.append(bdg);b.title=b.ariaLabel='Требует внимания: '+fresh.length+' новых'}
-  b.addEventListener('click',()=>{b.classList.remove('ring','has');bdg&&bdg.remove();bellScrollY=scrollY;
+  b.addEventListener('click',()=>{setMtop();document.querySelectorAll('.onl-ov').forEach(x=>x.remove());b.classList.remove('ring','has');bdg&&bdg.remove();bellScrollY=scrollY;
     try{localStorage.setItem(KEY,JSON.stringify(live.map(key)))}catch{}});
   return w;
 }
@@ -1191,7 +1199,7 @@ function dxLiveBtn(){
   const {d}=liveSrc,n=liveList(d).filter(s=>s.live).length;
   const b=el('button',{type:'button',class:'dx-ib dx-bell dx-livb'+(n?' has':''),title:n?'Сейчас в эфире: '+n+'. Нажмите, чтобы открыть список стримеров':'Стримеры: никто сейчас не в эфире','aria-label':'Стримеры, в эфире '+n});
   b.append(svgIcon(IC_LIVE,20));if(n)b.append(el('span',{class:'dx-bdg live'},String(n)));
-  b.addEventListener('click',e=>{e.stopPropagation();dxCloseAll();openLiveList()});
+  b.addEventListener('click',e=>{e.stopPropagation();dxCloseAll();const o=document.querySelector('.onl-ov.liv');document.querySelectorAll('.onl-ov:not(.liv)').forEach(x=>x.remove());if(o){o.remove();return}setMtop();openLiveList()});
   return el('span',{class:'dx-pw'},b);
 }
 /** Окно «Стримеры» (как «Сейчас в Mini App»): от лучшего к худшему, LIVE, часы с риской плана; строка - карточка стримера */
@@ -1245,7 +1253,7 @@ function dxOnline(){
   // Список - окном по центру с размытым фоном (как карточка лида): листается, закрывается кликом по фону или Esc
   const onKey=e=>{if(e.key==='Escape')closeOnl()};
   const closeOnl=()=>{document.querySelectorAll('.onl-ov').forEach(x=>x.remove());document.removeEventListener('keydown',onKey);btn.classList.remove('on')};
-  btn.addEventListener('click',async e=>{e.stopPropagation();dxCloseAll();closeOnl();
+  btn.addEventListener('click',async e=>{e.stopPropagation();dxCloseAll();if(document.querySelector('.onl-ov:not(.liv)')){closeOnl();return}closeOnl();setMtop();
     body=el('div',{class:'dx-bl onl-list'},el('div',{class:'mut sm'},'Загрузка…'));
     const ov=el('div',{class:'lc-overlay onl-ov',role:'dialog','aria-modal':'true','aria-label':'Сейчас в Mini App',onclick:e=>{if(e.target===ov)closeOnl()}},
       el('div',{class:'lc onl-box'},el('div',{class:'lc-head'},el('h3',{style:'font-size:17px'},'Сейчас в Mini App ',el('span',{class:'pill p-ok onl-cnt'},dxOnlineLast?String(dxOnlineLast.total):'…')),
@@ -2531,7 +2539,7 @@ function stopPoll(){if(poll){clearInterval(poll);poll=null}}
 (function(){
   const side=document.querySelector('.side'),btn=document.getElementById('burger');if(!side||!btn)return;
   // Открытое меню на телефоне - на весь экран под шапкой: страница под ним не прокручивается
-  const set=o=>{if(o)side.style.setProperty('--mtop',Math.round(side.getBoundingClientRect().bottom)+'px');side.classList.toggle('open',o);document.body.classList.toggle('menu-open',o);btn.setAttribute('aria-expanded',o?'true':'false')};
+  const set=o=>{if(o){document.querySelectorAll('.onl-ov').forEach(x=>x.remove());dxCloseAll()}if(o)side.style.setProperty('--mtop',Math.round(side.getBoundingClientRect().bottom)+'px');side.classList.toggle('open',o);document.body.classList.toggle('menu-open',o);btn.setAttribute('aria-expanded',o?'true':'false')};
   btn.addEventListener('click',e=>{e.stopPropagation();set(!side.classList.contains('open'))});
   document.addEventListener('click',e=>{if(!side.classList.contains('open'))return;
     // путь клика берём из события: меню перерисовывается, и e.target к этому моменту уже вынут из страницы
