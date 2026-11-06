@@ -2927,7 +2927,22 @@ const perShift=(p,d)=>{let[y,m]=p.split('-').map(Number);m+=d;if(m<1){m=12;y--}i
 const planPill=ok=>el('span',{class:'pill '+(ok?'p-ok':'p-bad')},ok?'выполнен':'не выполнен');
 const bar=(pct,done)=>el('div',{class:'pbar2'},el('i',{class:done?'done':'',style:'width:'+Math.max(0,Math.min(100,pct))+'%'}));
 const pbRow=(label,val,pct,done,note)=>el('div',{class:'pl2'},el('div',{class:'lab2'},el('span',{},label),el('b',{class:'mono'},val)),bar(pct,done),note?el('span',{class:'sm warnt'},note):null);
-const fileDataUrl=f=>new Promise((ok,no)=>{const r=new FileReader();r.onload=()=>ok(r.result);r.onerror=()=>no(new Error('Не удалось прочитать файл'));r.readAsDataURL(f)});
+const readDataUrl=f=>new Promise((ok,no)=>{const r=new FileReader();r.onload=()=>ok(r.result);r.onerror=()=>no(new Error('Не удалось прочитать файл'));r.readAsDataURL(f)});
+/** Скриншот для отчёта: перед отправкой уменьшаем до 2000 px по длинной стороне и сжимаем в JPEG.
+ *  Скриншот с телефона весит несколько МБ и долго грузится; после сжатия обычно 200-500 КБ, цифры читаются.
+ *  Маленькие файлы и всё, что не получилось сжать, отправляем как есть */
+async function fileDataUrl(f){
+  if(!f)return null;
+  if(!/^image\//.test(f.type||'')||f.size<350*1024)return readDataUrl(f);
+  try{
+    const img=await new Promise((ok,no)=>{const u=URL.createObjectURL(f),i=new Image();i.onload=()=>{URL.revokeObjectURL(u);ok(i)};i.onerror=()=>{URL.revokeObjectURL(u);no(new Error('img'))};i.src=u});
+    const k=Math.min(1,2000/Math.max(img.naturalWidth,img.naturalHeight));
+    const c=document.createElement('canvas');c.width=Math.max(1,Math.round(img.naturalWidth*k));c.height=Math.max(1,Math.round(img.naturalHeight*k));
+    const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.drawImage(img,0,0,c.width,c.height);
+    const out=c.toDataURL('image/jpeg',0.85);
+    return out.length*0.75<f.size?out:readDataUrl(f);
+  }catch{return readDataUrl(f)}
+}
 /** «принял Имя» / «отклонил Имя» под статусом отчёта */
 const revBy=r=>r.reviewed_by_name&&(r.status==='approved'||r.status==='rejected')?el('div',{class:'mut sm',style:'margin-top:3px'},(r.status==='approved'?'принял ':'отклонил ')+r.reviewed_by_name):null;
 const REPSTATUS={await:['ждёт отчёта','p-warn'],pending:['на проверке','p-warn'],approved:['зачтён','p-ok'],rejected:['отклонён','p-bad']};
