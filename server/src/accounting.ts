@@ -1886,7 +1886,8 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
       me: { id: me.id, name: me.name },
       month: { period: refMonth, hoursMin: k.hoursMin, totalMin: k.hoursMin + (refMonth === today.slice(0, 7) ? t.pendingToday + elapsed : 0), shifts: k.shifts, planShifts: plan.hours / plan.shiftH, ftd: k.ftdCount },
       today_: { minutes: todayMin, shiftMin, minLeft: Math.max(0, shiftMin - todayMin), live },
-      funnel: { clicks, regs: ev.reg, ftd: ev.ftd, churned: churnedN },
+      // Сумма только по FTD: додепы и комиссию стример не видит
+      funnel: { clicks, regs: ev.reg, ftd: ev.ftd, ftdSum: r2(ev.ftdSum), churned: churnedN },
       // Просмотры, подписчики и т. д. только самого стримера за период
       social: { fields: socialFs.fields, totals: socialFs.fields.map((f: string) => socialFs.rows.filter((r) => r.staff_id === me.id).reduce((a, r) => a + (r.sums[f] ?? 0), 0)) },
       clicksSince,

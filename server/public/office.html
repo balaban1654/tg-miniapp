@@ -359,7 +359,7 @@ textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10
 .dx-seg button{border:0;background:none;color:var(--mut);padding:6px 12px;border-radius:7px;cursor:pointer;font-size:13px}.dx-seg button.on{background:var(--acc);color:#fff;font-weight:700}
 .dx-ib{display:grid;place-items:center;width:38px;height:38px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--mut);cursor:pointer;padding:0}.dx-ib:hover,.dx-ib.on{color:var(--acc2);border-color:var(--acc)}
 .dx-ib.sm2{width:30px;height:30px;border-radius:8px}
-.pf-g{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:4px}.pf-c{display:flex;gap:12px;align-items:center;background:var(--card2);border-radius:12px;padding:10px 12px;min-width:0}.pf-ring{width:64px;height:64px;flex:none;color:var(--fg)}.pf-t{min-width:0}.pf-t .dx-lbl{font-size:10.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.pf-v{font-weight:800;font-size:20px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.pf-v small{font-size:12px;font-weight:600;color:var(--mut)}.pf-n{font-size:11.5px;font-weight:700;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.pf-n.ok{color:var(--ok)}.pf-n.warn{color:var(--warn)}.pf-n.bad{color:var(--bad)}@media(max-width:560px){.pf-g{gap:8px}.pf-c{flex-direction:column;align-items:flex-start;gap:8px;padding:10px}.pf-ring{width:50px;height:50px}.pf-v{font-size:15px}}
+.pf-g{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:4px}.pf-c{display:flex;gap:12px;align-items:center;background:var(--card2);border-radius:12px;padding:10px 12px;min-width:0}.pf-ring{width:64px;height:64px;flex:none;color:var(--fg)}.pf-t{min-width:0}.pf-t .dx-lbl{font-size:10.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.pf-v{font-weight:800;font-size:20px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.pf-v small{font-size:12px;font-weight:600;color:var(--mut)}.pf-n{font-size:11.5px;font-weight:700;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.pf-st{display:grid;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}.pf-live{display:inline-flex;align-items:center;gap:4px;color:#ff5ca8;margin-left:6px}.pf-live i{width:6px;height:6px;border-radius:50%;background:#ff5ca8;box-shadow:0 0 6px #ff5ca8;animation:onlb 1.4s ease-in-out infinite}.pf-n.ok{color:var(--ok)}.pf-n.warn{color:var(--warn)}.pf-n.bad{color:var(--bad)}@media(max-width:560px){.pf-g{gap:8px}.pf-c{flex-direction:column;align-items:flex-start;gap:8px;padding:10px}.pf-ring{width:50px;height:50px}.pf-v{font-size:15px}.pf-n{white-space:normal;overflow:visible}.pf-t{width:100%}}
 .dx-ib.dx-bell{width:42px;height:42px;border-radius:12px;position:relative;color:var(--fg)}.dx-ib.dx-bell svg{width:20px;height:20px}.dx-ib.dx-bell.has{border-color:var(--acc)}.dx-bdg{position:absolute;top:-7px;right:-7px;min-width:20px;height:20px;padding:0 6px;border-radius:10px;background:var(--bad);color:#fff;font:800 11px/20px Montserrat,sans-serif;text-align:center;box-shadow:0 0 0 2px var(--bg)}@keyframes bellRing{0%,46%,100%{transform:rotate(0)}4%{transform:rotate(16deg)}10%{transform:rotate(-14deg)}16%{transform:rotate(11deg)}22%{transform:rotate(-8deg)}28%{transform:rotate(5deg)}34%{transform:rotate(-3deg)}40%{transform:rotate(1deg)}}.dx-bell.ring svg{transform-origin:50% 12%;animation:bellRing 1.8s ease-in-out infinite}@media(prefers-reduced-motion:reduce){.dx-bell.ring svg{animation-duration:4s}}
 .dx-pop.bell{width:min(440px,calc(100vw - 24px));max-height:min(70vh,560px);overflow-y:auto}.dx-bl .dx-tk{padding:11px 2px}.dx-bl .dx-tk.seen{opacity:.6}.dx-bl .dx-tk.seen:hover{opacity:1}.dx-bl .dx-tk:last-child{border-bottom:0}.dx-bl .dx-ok{padding:18px 4px;text-align:center}
 .dx-pw{position:relative;display:inline-flex}
@@ -1490,6 +1490,15 @@ function dxRings(d){
 }
 /** План / факт кольцами 2×3: кольцо в цвете пункта, белая риска - где должны быть сегодня, цвет подписи - темп.
  *  Где плана нет (выводы; регистрации без цели), кольцо показывает долю: регистрации в FTD, выводы от депозитов */
+/** Кольцо плитки «План / факт»: r - доля 0..1, txt - подпись внутри, col - цвет пункта, mark - доля «план на сегодня» (риска) */
+function pfRing(r,txt,col,mark){const R=26,C=2*Math.PI*R;
+  const s=document.createElementNS('http://www.w3.org/2000/svg','svg');s.setAttribute('viewBox','0 0 64 64');s.setAttribute('class','pf-ring');
+  s.innerHTML='<circle cx="32" cy="32" r="'+R+'" fill="none" stroke="'+col+'" stroke-opacity=".18" stroke-width="7"/>'+(r===null?'':'<circle cx="32" cy="32" r="'+R+'" fill="none" stroke="'+col+'" stroke-width="7" stroke-linecap="round" stroke-dasharray="'+(C*Math.max(0,Math.min(1,r))).toFixed(1)+' '+C.toFixed(1)+'" transform="rotate(-90 32 32)"/>')+
+    (mark!=null?'<line x1="32" y1="0.5" x2="32" y2="9.5" stroke="#fff" stroke-width="2" transform="rotate('+(mark*360).toFixed(1)+' 32 32)"/>':'')+
+    '<text x="32" y="'+(r===null?39:37)+'" text-anchor="middle" fill="'+(r===null?col:'currentColor')+'" font-weight="800" font-size="'+(r===null?20:14)+'">'+txt+'</text>';return s}
+function pfCell(ring,label,value,goal,note,cls,title){
+  return el('div',{class:'pf-c',title:title||''},ring,el('div',{class:'pf-t'},el('div',{class:'dx-lbl'},label),el('div',{class:'pf-v'},value,goal?el('small',{},' / '+goal):null),el('div',{class:'pf-n '+(cls||'')},note)));
+}
 function dxRingGrid(d){
   const g=d.goals,t=d.totals,pace=d.pace,showMark=g&&pace<0.995;
   const avg=t.ftd?t.ftdSum/t.ftd:0,pc=x=>Math.round(x*100),dShare=t.deposits?t.depSum/t.deposits:0,cShare=t.deposits?t.commission/t.deposits:0,rtd=t.regs?t.ftd/t.regs:0,wd=t.withdrawals||0,wShare=t.deposits?wd/t.deposits:0;
@@ -1902,22 +1911,28 @@ function smRings(d){
   return el('div',{class:'dx-rings'},dxRingCopy(p1,p2,n0(T.ftd)+' / '+n0(T.ftdGoal),usd0(T.deposits)+' / '+usd0(T.depositsGoal)),el('div',{class:'dx-rg',role:'img','aria-label':'Депозиты команды '+Math.round(p1*100)+'% плана, FTD '+Math.round(p2*100)+'% плана'},svg,el('div',{class:'ctr'},cv('var(--ok)',n0(T.ftd)+' / '+n0(T.ftdGoal),'FTD'),cv('var(--acc)',usd0(T.deposits)+' / '+usd0(T.depositsGoal),'депозиты'))));
 }
 function smMetrics(d){
-  const m=d.month,pl=d.plan,pace=pl.pace*100,mark=pace<99.5?pace:null,t=d.today_;
-  const lv=pct=>pct>=pace?'ok':pct>=pace*.85?'warn':'bad';
-  const hp=m.hoursMin/pl.planMin*100,sp=m.shifts/m.planShifts*100,lp=m.ftd/pl.leads*100;
-  const toGo=pl.leads-m.ftd;
+  // Слева эфир (сегодня, всего, закрытые смены), справа лиды (регистрации, FTD, сумма FTD); ниже - лиды по статусам
+  const m=d.month,pl=d.plan,pace=pl.pace,mark=pace<0.995?pace:null,t=d.today_,f=d.funnel;
+  const lv=r=>r>=pace?'ok':r>=pace*.85?'warn':'bad',pc=x=>Math.round(x*100);
+  const hr=m.hoursMin/pl.planMin,sr=m.shifts/m.planShifts,lr=m.ftd/pl.leads,tr=t.shiftMin?t.minutes/t.shiftMin:0,rtd=f.regs?f.ftd/f.regs:0;
+  const toGo=pl.leads-m.ftd,left=t.shiftMin-((m.totalMin??m.hoursMin)%t.shiftMin),avg=f.ftd?(f.ftdSum||0)/f.ftd:0;
+  const L=[
+    pfCell(pfRing(tr,pc(tr)+'%','#ff5ca8',null),t.live?['Сегодня в эфире ',el('span',{class:'pf-live'},el('i'),'LIVE')]:'Сегодня в эфире',hm(t.minutes),fmtH(t.shiftMin)+' ч','до закрытия смены '+hm(left),'warn'),
+    pfCell(pfRing(rtd,pc(rtd)+'%','#f5c542',null),'Регистрации',n0(f.regs),null,'в FTD: '+n0(f.ftd)+' (RTD '+pc(rtd)+'%)','','Кольцо: доля регистраций, ставших FTD'),
+    pfCell(pfRing(hr,pc(hr)+'%','#5ab0ff',mark),'Всего в эфире',hw(m.hoursMin),pl.hours+' ч','по графику '+hw(pl.paceMin)+' ч',lv(hr)),
+    pfCell(pfRing(lr,pc(lr)+'%','#9b5cff',mark),'FTD',n0(m.ftd),String(pl.leads),toGo>0?'ещё '+toGo+' до плана':'план выполнен',lv(lr)),
+    pfCell(pfRing(sr,pc(sr)+'%','#3ddc97',mark),'Закрытые смены',n0(m.shifts),n0(m.planShifts),'смена = '+fmtH(pl.shiftH*60)+' ч',lv(sr)),
+    pfCell(pfRing(null,'$','#c084fc',null),'Всего FTD $',usd0(f.ftdSum||0),null,'средний FTD '+usd0(avg),'')];
   return el('div',{class:'card dx-pf'},el('div',{class:'dx-hd'},el('div',{class:'l'},el('span',{class:'dx-lbl'},'Мои показатели',el('span',{class:'dx-ext'},' за '+(d.range.whole?'месяц':perLabel(m.period).toLowerCase()))),dxPopBtn('Общий план команды',IC_RINGS,smRings(d),'pl'),dxPopBtn('Воронка',IC_FUNNEL,smFunnel(d),'pl wide'),dxPopBtn('Просмотры, подписчики, комментарии и лайки',IC_HEART,smSocial(d),'pl')),mark!==null?el('span',{class:'mut mark',style:'font-size:12px'},'метка: план на сегодня'):null),
-    smTile('Сегодня в эфире',hm(t.minutes),'/ '+fmtH(t.shiftMin)+' ч',t.minutes/t.shiftMin*100,null,t.live?'идёт эфир':'','','ok'),
-    smTile('Часы в эфире',hw(m.hoursMin),'/ '+pl.hours+' ч',hp,mark,Math.round(hp)+'% плана','по графику '+hw(pl.paceMin)+' ч',lv(hp)),
-    smTile('Закрытых смен',String(m.shifts),'/ '+n0(m.planShifts),sp,mark,Math.round(sp)+'% плана','смена = '+fmtH(pl.shiftH*60)+' ч',lv(sp),'до закрытия смены '+hm(t.shiftMin-((m.totalMin??m.hoursMin)%t.shiftMin)),'warn'),
-    smTile('Лиды (FTD)',String(m.ftd),'/ '+pl.leads,lp,mark,Math.round(lp)+'% плана',toGo>0?'ещё '+toGo+' до плана':'план выполнен',lv(lp)));
+    el('div',{class:'pf-g'},...L),smLeadsStrip(d));
 }
-function smLeads(d){
+/** «Мои лиды по статусам» - полосой внутри плитки «Мои показатели» */
+function smLeadsStrip(d){
   const b=d.byStatus,total=Object.values(b).reduce((a,x)=>a+x,0),f=d.funnel;
   const segs=Object.keys(DXS).filter(k=>b[k]).map(k=>el('span',{style:'flex:'+b[k]+' 1 auto;background:'+DXS[k][1]},DXS[k][0]+' '+b[k]));
   const pc=v=>v===null?'—':v.toFixed(1).replace('.',',')+'%';
-  return el('div',{class:'card',style:'display:grid;gap:12px'},el('div',{class:'dx-lbl'},'Мои лиды по статусам'),
-    el('div',{class:'dx-seg2',style:'height:30px',role:'img','aria-label':Object.keys(DXS).filter(k=>b[k]).map(k=>DXS[k][0]+' '+b[k]).join(', ')},...(segs.length?segs:[el('span',{style:'flex:1;background:#ffffff1a;color:var(--mut)'},'Лидов за период нет')])),
+  return el('div',{class:'pf-st'},el('div',{class:'dx-lbl'},'Мои лиды по статусам'),
+    el('div',{class:'dx-seg2',style:'height:24px',role:'img','aria-label':Object.keys(DXS).filter(k=>b[k]).map(k=>DXS[k][0]+' '+b[k]).join(', ')},...(segs.length?segs:[el('span',{style:'flex:1;background:#ffffff1a;color:var(--mut)'},'Лидов за период нет')])),
     el('div',{class:'dx-row',style:'flex-wrap:wrap;gap:8px 18px;justify-content:space-between'},el('span',{},'Всего лидов ',el('b',{},String(total))),el('span',{},'RTD ',el('b',{},pc(f.regs?f.ftd/f.regs*100:null))),el('span',{title:'Доля ушедших из FTD: заблокировали бота после первого депозита'},'Отвал ',el('b',{},pc((b.ftd||0)+(b.active||0)+(b.churned||0)?(b.churned||0)/((b.ftd||0)+(b.active||0)+(b.churned||0))*100:null)))));
 }
 function smSalary(d){
@@ -1978,7 +1993,7 @@ async function streamerDash(){
   },20000);
   const strip=d.colleagues.length?el('div',{class:'card dx-live'},...d.colleagues.map(c=>dxLiveCard(c,d,skew))):null;
   return[el('div',{class:'dx'},dxHead(dxHeadLabel({from:d.range.from,to:d.range.to},d.today),()=>render({soft:true}),(bellSrc=()=>smTasks(d),bellAt=Date.now(),dxBell(bellSrc()))),strip,
-    el('div',{class:'dx-cols'},el('div',{class:'dx-col'},smMetrics(d),smLeads(d)),el('div',{class:'dx-col'},smSalary(d))),smLast(d))];
+    el('div',{class:'dx-cols'},el('div',{class:'dx-col'},smMetrics(d)),el('div',{class:'dx-col'},smSalary(d))),smLast(d))];
 }
 /* задачи для остальных ролей */
 /** Мои задачи пунктами колокольчика (тимлид, аналитик, медиабайер) */
