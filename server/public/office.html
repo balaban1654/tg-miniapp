@@ -3087,11 +3087,7 @@ async function shiftTab(){
     timer,
     el('div',{class:'lab2'},el('span',{},'До целой смены ('+plan.shiftH+' ч)'),left),barEl,
     el('div',{class:'mut sm'},'Начало '+new Date(live.started_at).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'})+' · '+live.stream_url),
-    el('div',{class:'inl',style:'gap:8px;flex-wrap:wrap'},el('button',{class:'btn',type:'button',onclick:()=>openFinishModal(live,skew)},'Закончить смену'),
-      el('button',{class:'btn o',type:'button',title:'Статистика эфира ещё не пришла: смена закроется сейчас, отчёт заполните позже из задач',onclick:async e=>{
-        const b=e.currentTarget;if(!await askConfirm('Закончить смену без отчёта?','Время окончания запишется сейчас, а отчёт со статистикой заполните позже: он будет в задачах.','Закончить смену'))return;
-        b.disabled=true;try{await api('/shifts/'+live.id+'/close',{method:'POST'});toast('Смена закончена. Отчёт заполните позже: он в задачах');render({soft:true})}catch(x){toast(x.message);b.disabled=false}}},'Заполнить позже')),
-    el('div',{class:'mut sm'},'Статистика ещё не пришла? Нажмите «Заполнить позже»: смена закроется сейчас, а отчёт останется в задачах.')));
+    el('div',{},el('button',{class:'btn',type:'button',onclick:()=>openFinishModal(live,skew,{later:true})},'Закончить смену'))));
   return out;
 }
 
@@ -3137,6 +3133,9 @@ async function openFinishModal(live,skew,opts={}){
   document.addEventListener('paste',onPaste);
   new MutationObserver((_,o)=>{if(!file.isConnected){document.removeEventListener('paste',onPaste);o.disconnect()}}).observe(document.body,{childList:true,subtree:true});
   const err=el('div',{class:'err',role:'alert'});
+  // Смена ещё идёт, а статистика эфира не пришла: закрыть смену сейчас, отчёт останется в задачах
+  const laterBtn=el('button',{class:'btn o',type:'button',title:'Смена закроется сейчас, отчёт заполните позже из задач',onclick:async()=>{
+    laterBtn.disabled=true;try{await api('/shifts/'+live.id+'/close',{method:'POST'});close();toast('Смена закончена. Отчёт заполните позже: он в задачах');render({soft:true})}catch(x){err.textContent=x.message;laterBtn.disabled=false}}},'Заполнить позже');
   const send=el('button',{class:'btn',type:'button',onclick:async()=>{
     err.textContent='';
     if(totalMin()<1||totalMin()>720){err.textContent='Укажите время эфира: от 1 минуты до 12 часов';return}
@@ -3154,7 +3153,8 @@ async function openFinishModal(live,skew,opts={}){
       el('div',{class:'lc-field full'},el('label',{},'Длительность эфира (подставилась с таймера)'),time),
       ...inputs.map(x=>el('div',{class:'lc-field'+(x.d.kind==='link'?' full':'')},el('label',{},x.d.name+(x.d.required?' *':'')),x.i))),
     el('div',{class:'lc-field'},el('label',{},'Комментарий'),comment),
-    file,el('div',{class:'drop-row'},drop,pasteBtn),prev,err,el('div',{class:'lc-actions'},send));
+    file,el('div',{class:'drop-row'},drop,pasteBtn),prev,err,el('div',{class:'lc-actions'},send,opts.later?laterBtn:null),
+    opts.later?el('div',{class:'mut sm'},'Статистика ещё не пришла? «Заполнить позже»: смена закроется сейчас, а отчёт останется в задачах.'):null);
 }
 
 async function reportsTab(){
