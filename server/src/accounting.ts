@@ -1397,15 +1397,17 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     const allN = Number((await db.query(`SELECT count(*)::int AS n FROM staff WHERE role = 'streamer' AND active AND deleted_at IS NULL`)).rows[0].n);
     const share = g.ftd > 0 ? (plan.leads * teamN) / g.ftd : allN ? teamN / allN : 0;
     const auto = { ftd: plan.leads * teamN, ftdSum: r2(g.ftdSum * share), deposits: r2(g.deposits * share), regs: Math.round(g.regs * share) };
-    const set = (await db.query('SELECT ftd::float AS ftd, ftd_sum::float AS ftd_sum, deposits::float AS deposits FROM team_goals WHERE staff_id = $1', [leadId])).rows[0] ?? {};
+    const set = (await db.query('SELECT ftd::float AS ftd, ftd_sum::float AS ftd_sum, deposits::float AS deposits, regs::float AS regs FROM team_goals WHERE staff_id = $1', [leadId])).rows[0] ?? {};
     return {
       teamN,
       auto,
-      set: { ftd: set.ftd ?? null, ftdSum: set.ftd_sum ?? null, deposits: set.deposits ?? null },
+      set: { ftd: set.ftd ?? null, ftdSum: set.ftd_sum ?? null, deposits: set.deposits ?? null, regs: set.regs ?? null },
+      // Все четыре поля - ровно 0: у тимлида на дашборде общий план и результат компании
+      company: set.ftd === 0 && set.ftd_sum === 0 && set.deposits === 0 && set.regs === 0,
       ftd: set.ftd ?? auto.ftd,
       ftdSum: set.ftd_sum ?? auto.ftdSum,
       deposits: set.deposits ?? auto.deposits,
-      regs: auto.regs,
+      regs: set.regs ?? auto.regs,
     };
   };
   app.get('/team-goals', { preHandler: admin }, async () => {
@@ -1420,14 +1422,14 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     if (!(await db.query(`SELECT 1 FROM staff WHERE id = $1 AND role = 'teamlead'`, [id])).rowCount) return reply.code(404).send({ error: 'Тимлидер не найден' });
     const b = (req.body ?? {}) as Record<string, unknown>;
     const v = (x: unknown) => (x === null || x === undefined || x === '' ? null : Number.isFinite(Number(x)) && Number(x) >= 0 && Number(x) <= 1e9 ? Number(x) : NaN);
-    const [ftd, ftdSum, deposits] = [v(b.ftd), v(b.ftdSum), v(b.deposits)];
-    if ([ftd, ftdSum, deposits].some((x) => Number.isNaN(x))) return reply.code(400).send({ error: 'Проверьте числа: от 0 и больше' });
-    if (ftd === null && ftdSum === null && deposits === null) await db.query('DELETE FROM team_goals WHERE staff_id = $1', [id]);
+    const [ftd, ftdSum, deposits, regs] = [v(b.ftd), v(b.ftdSum), v(b.deposits), v(b.regs)];
+    if ([ftd, ftdSum, deposits, regs].some((x) => Number.isNaN(x))) return reply.code(400).send({ error: 'Проверьте числа: от 0 и больше' });
+    if (ftd === null && ftdSum === null && deposits === null && regs === null) await db.query('DELETE FROM team_goals WHERE staff_id = $1', [id]);
     else
       await db.query(
-        `INSERT INTO team_goals (staff_id, ftd, ftd_sum, deposits, updated_at) VALUES ($1,$2,$3,$4,now())
-         ON CONFLICT (staff_id) DO UPDATE SET ftd = $2, ftd_sum = $3, deposits = $4, updated_at = now()`,
-        [id, ftd, ftdSum, deposits],
+        `INSERT INTO team_goals (staff_id, ftd, ftd_sum, deposits, regs, updated_at) VALUES ($1,$2,$3,$4,$5,now())
+         ON CONFLICT (staff_id) DO UPDATE SET ftd = $2, ftd_sum = $3, deposits = $4, regs = $5, updated_at = now()`,
+        [id, ftd, ftdSum, deposits, regs],
       );
     return { ok: true };
   });
@@ -1478,14 +1480,19 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     // Где должны быть сегодня: доля прошедших дней периода
     const pace = ref >= to ? 1 : Math.max(0, Math.min(1, (daysBetween(from, ref) + 1) / rangeDays));
 
-    const staffRows = (await db.query(`SELECT id, name, login, tg_username, active, role FROM staff WHERE (role = 'streamer' OR streams) AND ($1::int IS NULL OR parent_id = $1) AND deleted_at IS NULL ORDER BY id`, [lead])).rows as { id: number; name: string; login: string; tg_username: string | null; active: boolean; role: string }[];
+    // План команды тимлида; если в нём все поля 0 - тимлид видит общий план и результат компании (все стримеры)
+    const tgl = lead ? (await teamGoals(lead, plan))! : null;
+    const scopeLead = lead && !tgl!.company ? lead : null;
+    const staffRows = (await db.query(`SELECT id, name, login, tg_username, active, role FROM staff WHERE (role = 'streamer' OR streams) AND ($1::int IS NULL OR parent_id = $1) AND deleted_at IS NULL ORDER BY id`, [scopeLead])).rows as { id: number; name: string; login: string; tg_username: string | null; active: boolean; role: string }[];
     const ids = staffRows.map((s) => s.id);
     // План команды тимлида: FTD = план по лидам × активные стримеры команды; суммы пополнений и депозитов
     // берутся из плана компании в той же доле, что FTD команды от FTD компании (без плана FTD: по доле стримеров)
     // Если админ прописал план команды в «Планах», берём его
     if (lead && goalFactor !== null) {
-      const tg = (await teamGoals(lead, plan))!;
-      goals = { regs: tg.regs * goalFactor, ftd: tg.ftd * goalFactor, ftdSum: tg.ftdSum * goalFactor, deposits: tg.deposits * goalFactor, commission: 0, net: 0 };
+      const tg = tgl!;
+      goals = tg.company
+        ? { regs: g.regs * goalFactor, ftd: g.ftd * goalFactor, ftdSum: g.ftdSum * goalFactor, deposits: g.deposits * goalFactor, commission: 0, net: 0 }
+        : { regs: tg.regs * goalFactor, ftd: tg.ftd * goalFactor, ftdSum: tg.ftdSum * goalFactor, deposits: tg.deposits * goalFactor, commission: 0, net: 0 };
     }
 
     const evRange = await aggEvents(from, to);
@@ -1720,6 +1727,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
       },
       // По дням для графика плитки «План / факт»; тимлиду без комиссии
       daily: (await dailyEvents(from, to, ids)).map((x) => (lead ? { ...x, comm: 0 } : x)),
+      planScope: lead && tgl!.company ? 'company' : lead ? 'team' : 'company',
       teamSalaries: teamSal,
       refPay: refPay ? { earned: refPay.earned, paid: refPay.paid, n: refPay.n } : null,
       expenses: expRows,

@@ -1043,3 +1043,6 @@ ALTER TABLE connect_offers ADD COLUMN IF NOT EXISTS text_en TEXT NOT NULL DEFAUL
 
 -- Админ смотрит Office глазами сотрудника: сессия админа работает от имени выбранного сотрудника
 ALTER TABLE sessions ADD COLUMN IF NOT EXISTS as_staff_id INT REFERENCES staff(id) ON DELETE SET NULL;
+
+-- План команды тимлида: цель по регистрациям
+ALTER TABLE team_goals ADD COLUMN IF NOT EXISTS regs NUMERIC;
