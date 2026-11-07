@@ -75,6 +75,10 @@ export async function postbackRoutes(app: FastifyInstance): Promise<void> {
     if (traderId && !lead.rows[0].trader_id && !oldPocket) {
       await db.query('UPDATE leads SET trader_id = $2 WHERE tg_id = $1 AND trader_id IS NULL', [tgId, traderId]);
     }
+    // Ещё один Pocket ID того же человека (вторая регистрация, депозит с другого аккаунта): пишем в карточку списком, основной не меняем
+    if (traderId && lead.rows[0].trader_id && lead.rows[0].trader_id !== traderId && !oldPocket) {
+      await db.query('INSERT INTO lead_pockets (trader_id, tg_id) SELECT $1, $2 WHERE NOT EXISTS (SELECT 1 FROM leads WHERE trader_id = $1) ON CONFLICT DO NOTHING', [traderId, tgId]);
+    }
     // Новая регистрация после «Разрешить новую регистрацию»: Pocket ID уже стал основным (выше), статус снова «Регистрация».
     // Событие второй регистрации не пишем: человек один, регистрация в статистике остаётся одна (первая)
     if (event === 'reg' && lead.rows[0].rereg_at && !oldPocket) {

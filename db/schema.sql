@@ -1050,3 +1050,11 @@ ALTER TABLE team_goals ADD COLUMN IF NOT EXISTS regs NUMERIC;
 -- «Разрешить новую регистрацию»: лид забыл доступ к аккаунту Pocket Option. Старый Pocket ID уходит в lead_pockets,
 -- лид снова видит шаг 1; следующая регистрация становится основной и вторую регистрацию в статистику не добавляет
 ALTER TABLE leads ADD COLUMN IF NOT EXISTS rereg_at TIMESTAMPTZ;
+
+-- Все Pocket ID лида в карточку: из журнала постбеков (дубли регистраций с другим Pocket ID раньше терялись)
+INSERT INTO lead_pockets (trader_id, tg_id)
+SELECT DISTINCT ON (p.query->>'trader_id') p.query->>'trader_id', p.tg_id FROM postback_log p JOIN leads d ON d.tg_id = p.tg_id
+ WHERE coalesce(p.query->>'trader_id', '') <> '' AND (p.result LIKE 'ok%' OR p.result LIKE 'дубль%')
+   AND NOT EXISTS (SELECT 1 FROM leads x WHERE x.trader_id = p.query->>'trader_id')
+ ORDER BY p.query->>'trader_id', p.created_at
+ON CONFLICT DO NOTHING;

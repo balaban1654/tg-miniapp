@@ -2664,6 +2664,20 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     try { await bot.api.sendMessage(tgId, text); } catch { sent = false; }
     return { ok: true, sent };
   });
+  // Какой из Pocket ID лида основной: выбранный из списка становится основным, прежний основной уходит в список
+  app.patch<{ Params: { tgId: string } }>('/leads/:tgId/main-pocket', { preHandler: need('admin', 'teamlead') }, async (req, reply) => {
+    const tgId = Number(req.params.tgId);
+    const trader = str((req.body as any)?.trader_id, 40);
+    if (!(await banAllowed(req.staff!, tgId))) return reply.code(403).send({ error: 'Это лид не вашей команды' });
+    const L = (await db.query('SELECT trader_id, rereg_at, status FROM leads WHERE tg_id = $1', [tgId])).rows[0];
+    if (!L) return reply.code(404).send({ error: 'Лид не найден' });
+    if (!(await db.query('SELECT 1 FROM lead_pockets WHERE trader_id = $1 AND tg_id = $2', [trader, tgId])).rowCount) return reply.code(400).send({ error: 'Такого Pocket ID у лида нет' });
+    await db.query('DELETE FROM lead_pockets WHERE trader_id = $1 AND tg_id = $2', [trader, tgId]);
+    if (L.trader_id) await db.query('INSERT INTO lead_pockets (trader_id, tg_id) VALUES ($1,$2) ON CONFLICT DO NOTHING', [L.trader_id, tgId]);
+    // Ждал новую регистрацию: выбор основного её завершает, лид снова в «Регистрации»
+    await db.query(`UPDATE leads SET trader_id = $2, rereg_at = NULL, status = CASE WHEN rereg_at IS NOT NULL AND status = 'new' THEN 'registered' ELSE status END WHERE tg_id = $1`, [tgId, trader]);
+    return { ok: true };
+  });
   app.delete<{ Params: { tgId: string } }>('/leads/:tgId/ban', { preHandler: need('admin', 'teamlead') }, async (req, reply) => {
     if (!(await banAllowed(req.staff!, Number(req.params.tgId)))) return reply.code(403).send({ error: 'Это лид не вашей команды' });
     await db.query('UPDATE leads SET banned_at = NULL, ban_reason = NULL, banned_by = NULL WHERE tg_id = $1', [Number(req.params.tgId)]);
