@@ -55,10 +55,10 @@ export async function postbackRoutes(app: FastifyInstance): Promise<void> {
     const idValid = Number.isSafeInteger(tgId) && tgId > 0;
     let lead: { rowCount: number | null; rows: any[] } = { rowCount: 0, rows: [] };
     if (idValid) {
-      lead = await db.query('SELECT tg_id, status, status_before_block, access, trader_id, owner_id FROM leads WHERE tg_id = $1', [tgId]);
+      lead = await db.query('SELECT tg_id, status, status_before_block, access, trader_id, owner_id, rereg_at FROM leads WHERE tg_id = $1', [tgId]);
     }
     if (!lead.rowCount && traderId) {
-      lead = await db.query('SELECT tg_id, status, status_before_block, access, trader_id, owner_id FROM leads WHERE trader_id = $1 OR tg_id = (SELECT tg_id FROM lead_pockets WHERE trader_id = $1) LIMIT 1', [traderId]);
+      lead = await db.query('SELECT tg_id, status, status_before_block, access, trader_id, owner_id, rereg_at FROM leads WHERE trader_id = $1 OR tg_id = (SELECT tg_id FROM lead_pockets WHERE trader_id = $1) LIMIT 1', [traderId]);
       if (lead.rowCount) tgId = Number(lead.rows[0].tg_id);
     }
     if (!lead.rowCount) {
@@ -70,8 +70,17 @@ export async function postbackRoutes(app: FastifyInstance): Promise<void> {
       // Отвечаем «принято», иначе партнёрка будет повторять запрос. Событие чужого клиента нам не нужно
       return { ok: true, ignored: true, reason: why };
     }
-    if (traderId && !lead.rows[0].trader_id) {
+    // Старый Pocket ID после «Разрешить новую регистрацию» лежит в lead_pockets: основным его обратно не ставим
+    const oldPocket = traderId ? !!(await db.query('SELECT 1 FROM lead_pockets WHERE trader_id = $1 AND tg_id = $2', [traderId, tgId])).rowCount : false;
+    if (traderId && !lead.rows[0].trader_id && !oldPocket) {
       await db.query('UPDATE leads SET trader_id = $2 WHERE tg_id = $1 AND trader_id IS NULL', [tgId, traderId]);
+    }
+    // Новая регистрация после «Разрешить новую регистрацию»: Pocket ID уже стал основным (выше), статус снова «Регистрация».
+    // Событие второй регистрации не пишем: человек один, регистрация в статистике остаётся одна (первая)
+    if (event === 'reg' && lead.rows[0].rereg_at && !oldPocket) {
+      await db.query(`UPDATE leads SET rereg_at = NULL, status = CASE WHEN status = 'new' THEN 'registered' ELSE status END WHERE tg_id = $1`, [tgId]);
+      await log(event, q, tgId, 'ok: новая регистрация (повторная, в статистику не добавлена)');
+      return { ok: true, rereg: true };
     }
     // Лид без владельца. Пришёл по ссылке стримера — у него уже есть владелец, его не трогаем (в том числе при регистрации через общую демо-ссылку).
     // Органика (сам нашёл бота или с сайта): владелец по настройкам «Органика» (например, «Случайно»); если там «Не закреплять» — по коду кампании {ac}

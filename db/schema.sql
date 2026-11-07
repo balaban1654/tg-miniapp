@@ -1046,3 +1046,7 @@ ALTER TABLE sessions ADD COLUMN IF NOT EXISTS as_staff_id INT REFERENCES staff(i
 
 -- План команды тимлида: цель по регистрациям
 ALTER TABLE team_goals ADD COLUMN IF NOT EXISTS regs NUMERIC;
+
+-- «Разрешить новую регистрацию»: лид забыл доступ к аккаунту Pocket Option. Старый Pocket ID уходит в lead_pockets,
+-- лид снова видит шаг 1; следующая регистрация становится основной и вторую регистрацию в статистику не добавляет
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS rereg_at TIMESTAMPTZ;

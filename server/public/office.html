@@ -2939,7 +2939,7 @@ async function openLeadCard(tgId){
       return el('div',{},el('button',{class:'btn',type:'button',disabled:!act&&C.liveUntil?'':null,title:!act&&C.liveUntil?'Акция ещё действует до '+fmtDT(C.liveUntil):act?'Применить скидку к уже внесённому депозиту и открыть доступ':'',onclick:()=>connectDialog(L,C,()=>{close();openLeadCard(tgId)},act)},act?'Активировать скидку':'Предложить скидку'))})()):null;
   box.replaceChildren(...[
     el('div',{class:'lc-head'},el('div',{style:'min-width:0'},el('h3',{style:'font-size:21px;line-height:1.2;overflow:hidden;text-overflow:ellipsis'},fname),L.first_name&&L.username?el('div',{class:'mut',style:'font-size:13px;margin-top:2px'},'@'+L.username):null),
-      el('div',{class:'lc-hr'},el('div',{class:'lc-pills'},pill(L.status),L.banned_at?el('span',{class:'pill p-bad'},'заблокирован'):L.access?el('span',{class:'pill p-ok'},'доступ открыт'):el('span',{class:'pill p-pur'},'доступ закрыт')),
+      el('div',{class:'lc-hr'},el('div',{class:'lc-pills'},pill(L.status),L.rereg_at?el('span',{class:'pill p-pur',title:'Новая регистрация разрешена '+fmtDT(L.rereg_at)+'. Старый Pocket ID в карточке вторым'},'ждёт новой регистрации'):null,L.banned_at?el('span',{class:'pill p-bad'},'заблокирован'):L.access?el('span',{class:'pill p-ok'},'доступ открыт'):el('span',{class:'pill p-pur'},'доступ закрыт')),
         el('button',{class:'btn o s',type:'button','aria-label':'Закрыть',onclick:close},'✕'))),
     el('div',{class:'lc-grid'},
       kvc('Telegram ID',L.tg_id),kvc('Pocket ID',L.trader_id),...(L.pockets||[]).map((x,i)=>kvc('Pocket ID '+(i+2),x)),kv('Откуда пришёл',origin),
@@ -2961,7 +2961,11 @@ async function openLeadCard(tgId){
       el('a',{class:'btn o',href:profileUrl(L),target:'_blank',rel:'noopener',style:'text-decoration:none;display:inline-flex;align-items:center'},'Профиль в Telegram'),
       me.role==='admin'||me.role==='teamlead'?(L.banned_at
         ?el('button',{class:'btn o',type:'button',onclick:async()=>{if(!await askC('Разблокировать лида? Ему снова станут доступны Mini App, пуши и сигналы.'))return;try{await api('/leads/'+L.tg_id+'/ban',{method:'DELETE'});toast('Лид разблокирован');close();openLeadCard(L.tg_id)}catch(x){toast(x.message)}}},'Разблокировать')
-        :el('button',{class:'btn o',type:'button',style:'color:var(--bad);border-color:var(--bad)',onclick:()=>banDialog(L,()=>{close();openLeadCard(L.tg_id)})},'Заблокировать')):null),
+        :el('button',{class:'btn o',type:'button',style:'color:var(--bad);border-color:var(--bad)',onclick:()=>banDialog(L,()=>{close();openLeadCard(L.tg_id)})},'Заблокировать')):null,
+      // Забыл доступ к аккаунту Pocket Option: старая регистрация остаётся, лид снова видит шаг 1 и регистрируется заново
+      (me.role==='admin'||me.role==='teamlead')&&L.status==='registered'&&!L.access?el('button',{class:'btn o',type:'button',onclick:async()=>{
+        if(!await askC('Разрешить '+fname+' новую регистрацию? Старая регистрация останется в базе, её Pocket ID перейдёт в карточку вторым. Лид снова увидит шаг «Зарегистрироваться», бот напишет ему об этом.'))return;
+        try{const r=await api('/leads/'+L.tg_id+'/rereg',{method:'POST'});toast(r.sent?'Готово: лид может зарегистрироваться заново, бот ему написал':'Готово, но написать лиду не удалось (бот заблокирован?)');close();openLeadCard(L.tg_id)}catch(x){toast(x.message)}}},'Разрешить новую регистрацию'):null),
     // Виджет для Pocket Option одной строкой под кнопками: состояние, дата последней загрузки; админ и тимлид могут отключить
     el('div',{class:'lc-widget'},el('span',{class:'mut'},'Виджет Pocket Option:'),
       L.widget_blocked?el('b',{style:'color:var(--bad)'},'отключён'):L.widget_used_at?el('b',{style:'color:var(--ok)',title:'Последняя загрузка виджета'},'работает · '+fmtDT(L.widget_used_at)):el('b',{},L.widget_has?'код выдан, не запускал':'не подключал'),
