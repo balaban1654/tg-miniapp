@@ -1,3 +1,4 @@
+import { setPlanReportApp, startPlanReport } from './planReport.js';
 import { startBlockCheck } from './leadblock.js';
 import { monoHookRoutes, startMonoWorker } from './mono.js';
 import { fraudBackfill } from './fraud.js';
@@ -172,6 +173,9 @@ setTimeout(purgeTick, 60_000);
 setTimeout(closeTick, 30_000);
 // monobank: фоновая загрузка счетов и операций (если админ сохранил токен)
 startMonoWorker(app.log);
+// Каждый день в 12:00 по Киеву: «План / факт» в общую группу (группа задаётся /plan_here)
+setPlanReportApp(app);
+startPlanReport(app.log);
 // Раз в сутки проверяем всех лидов на блокировку бота (первая проверка через минуту после запуска, если её ещё не было)
 if (process.env.DISABLE_BOT !== '1') startBlockCheck(app.log);
 if (process.env.DISABLE_BOT !== '1') {

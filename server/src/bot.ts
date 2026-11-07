@@ -1,3 +1,4 @@
+import { sendPlanReport, setPlanChat } from './planReport.js';
 import { InlineKeyboard } from 'grammy';
 import { config } from './config.js';
 import { attachLead, db } from './db.js';
@@ -42,6 +43,17 @@ bot.command('notify', async (ctx) => {
   await save('support_notify_thread', thread ? String(thread) : '');
   await save('support_notify_error', '');
   await ctx.reply('✅ Готово: уведомления о новых сообщениях в поддержку будут приходить сюда.');
+});
+
+/** /plan_here в общей группе: сюда каждый день в 12:00 по Киеву приходит «План / факт». Сразу шлём первый отчёт. Только админ группы */
+bot.command('plan_here', async (ctx) => {
+  if (ctx.chat.type === 'private') return ctx.reply('Отправьте /plan_here в общей группе: туда будет приходить «План / факт».');
+  const m = await ctx.getChatMember(ctx.from!.id).catch(() => null);
+  if (!m || !['creator', 'administrator'].includes(m.status)) return ctx.reply('Назначить группу для «План / факт» может только админ группы.');
+  await setPlanChat(ctx.chat.id, ctx.msg.is_topic_message ? ctx.msg.message_thread_id ?? null : null);
+  await ctx.reply('✅ Готово: «План / факт» будет приходить сюда каждый день в 12:00 по Киеву. Первый отчёт ниже.');
+  const err = await sendPlanReport();
+  if (err) await ctx.reply('Не удалось собрать отчёт: ' + err);
 });
 
 /** Узнать id чата: нужно один раз, чтобы указать группу для копий базы (BACKUP_TG_CHAT_ID). Работает и в группе. */
