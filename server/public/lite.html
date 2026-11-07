@@ -246,7 +246,7 @@ td{white-space:nowrap}
 .tg-t .tg-i{display:block;font-size:17px;line-height:1.2}.tg-t b{display:block;font-size:12.5px}.tg-t span.s{display:block;font-size:11px;color:#a89cc8}
 .tg-t.on{border-color:#3ddc97;background:rgba(61,220,151,.07)}.tg-t.on span.s{color:#3ddc97}.tg-t.next{border-style:dashed}.tg-t.off{opacity:.55}
 .lk-sec{margin-top:14px}
-.lk-ban{margin-top:14px;border:1px solid #ff6b8a;border-radius:12px;padding:12px 14px}
+.lk-pb{border:1px solid #34255c;background:#251847;color:#c9a6ff;font:inherit;font-weight:700;font-size:10px;line-height:14px;padding:0 4px;border-radius:5px;margin-left:6px;vertical-align:1px;-webkit-appearance:none}.lk-pm{position:absolute;left:7px;top:100%;z-index:5;background:#1c1233;border:1px solid #34255c;border-radius:12px;padding:8px;box-shadow:0 12px 30px rgba(0,0,0,.5);white-space:nowrap}.lk-pr{display:-webkit-flex;display:flex;-webkit-align-items:center;align-items:center;padding:6px 4px;font-size:13px;font-weight:600}.lk-pr span{-webkit-flex:1;flex:1;margin-right:6px}.lk-mk{margin-left:8px;border:1px solid #9b5cff;background:none;color:#c9a6ff;font:inherit;font-size:11px;font-weight:700;padding:3px 8px;border-radius:8px;-webkit-appearance:none}.lk-act{display:-webkit-flex;display:flex;-webkit-flex-wrap:wrap;flex-wrap:wrap;margin-top:16px}.lk-act>*{margin:0 10px 8px 0}.lk-btn{display:inline-block;border:1px solid #9b5cff;background:none;color:#c9a6ff;font:inherit;font-weight:700;font-size:14px;padding:9px 14px;border-radius:12px;text-decoration:none;-webkit-appearance:none}.lk-btn.lk-sm{font-size:12px;padding:5px 10px;border-radius:9px;margin-left:auto}.lk-btn.pri{background:#9b5cff;color:#fff}.lk-aw{position:relative;display:inline-block}.lk-am{position:absolute;left:0;bottom:100%;margin-bottom:6px;z-index:6;background:#1c1233;border:1px solid #34255c;border-radius:12px;padding:6px;min-width:250px;box-shadow:0 12px 30px rgba(0,0,0,.5)}.lk-am button{display:block;width:100%;text-align:left;border:0;background:none;color:#f1ebff;font:inherit;font-weight:600;font-size:14px;padding:10px 12px;border-radius:8px;-webkit-appearance:none}.lk-am button.bad{color:#ff6b8a}.lk-ask{border:1px solid #34255c;border-radius:12px;padding:12px 14px;margin-top:4px;font-size:14px;line-height:1.4}.lk-ask input{display:block;width:100%;box-sizing:border-box;margin-top:10px}.lk-ab{margin-top:10px}.lk-ab .lk-btn{margin-right:8px}.lk-err{color:#ff6b8a;font-size:13px;margin-top:6px}.lk-wd{display:-webkit-flex;display:flex;-webkit-align-items:center;align-items:center;border-top:1px solid #34255c;margin-top:8px;padding-top:12px;font-size:13px}.lk-wd b{margin-left:6px}.ltoast{display:none;position:fixed;left:50%;bottom:24px;-webkit-transform:translateX(-50%);transform:translateX(-50%);z-index:90;background:#251847;border:1px solid #9b5cff;color:#f1ebff;border-radius:12px;padding:10px 16px;font-size:14px;font-weight:600}.lk-ban{margin-top:14px;border:1px solid #ff6b8a;border-radius:12px;padding:12px 14px}
 .lk-act{margin-top:14px}
 .lk-act a{display:inline-block;border:1px solid #9b5cff;color:#c9a6ff;border-radius:10px;padding:9px 16px;font-weight:700;text-decoration:none}
 .p-warn{background:rgba(255,184,77,.13);color:#ffb84d}
@@ -935,10 +935,10 @@ function renderPb() {
     h += '<div class="scroll"><table><tr><th>Время</th><th>Событие</th><th>Telegram ID</th><th>Pocket ID</th><th>Сумма</th><th>Результат</th></tr>';
     for (i = 0; i < list.length; i++) {
       var r2 = list[i], q2 = r2.query || {}, tg = r2.tg_id || (/^\d{5,15}$/.test(String(q2.click_id || '')) ? q2.click_id : ''), res = String(r2.result || '');
-      var rc = res === 'ok' ? 'p-ok' : (res.indexOf('дубль') === 0 || res.indexOf('пропущен') === 0) ? 'p-warn' : 'p-bad';
+      var rc = res === 'ok' || res.indexOf('ok:') === 0 ? 'p-ok' : (res.indexOf('дубль') === 0 || res.indexOf('пропущен') === 0) ? 'p-warn' : 'p-bad';
       var sm = q2.commission || q2.sumdep || q2.wdr_sum || q2.amount || q2.sum;
       h += '<tr><td>' + pbTime(r2.created_at) + '</td><td><span class="pill ev-' + esc(r2.event) + '">' + esc(r2.event) + '</span></td>' +
-        '<td>' + (tg ? '<a href="#" class="tgid" data-card="' + esc(tg) + '">' + esc(tg) + '</a>' : '—') + '</td><td>' + esc(q2.trader_id || '—') + '</td><td>' + (sm ? esc(sm) : '—') + '</td>' +
+        '<td>' + (tg ? '<a href="#" class="tgid" data-card="' + esc(tg) + '">' + esc(tg) + '</a><button class="lk-cp" data-copy="' + esc(tg) + '" aria-label="Копировать"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg></button>' : '—') + '</td><td>' + (q2.trader_id ? esc(q2.trader_id) + '<button class="lk-cp" data-copy="' + esc(q2.trader_id) + '" aria-label="Копировать"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg></button>' : '—') + '</td><td>' + (sm ? esc(sm) : '—') + '</td>' +
         '<td><span class="pill ' + rc + '">' + esc(res) + '</span></td></tr>';
     }
     var ev1 = []; for (var kk in tot) if (tot.hasOwnProperty(kk)) ev1.push(kk);
@@ -950,6 +950,8 @@ function renderPb() {
   if (!fresh) return;
   $('pq').oninput = function () { var v = this.value; clearTimeout(pbTimer); pbTimer = setTimeout(function () { pbF.q = v; renderPb(); var x = $('pq'); if (x) { x.focus(); try { x.setSelectionRange(v.length, v.length); } catch (e) {} } }, 300); };
   $('pev').onchange = function () { pbF.ev = this.value; renderPb(); };
+  var pcp = document.querySelectorAll('#body [data-copy]');
+  for (var pci = 0; pci < pcp.length; pci++) pcp[pci].onclick = function (e) { e.preventDefault(); copyTxt(this.getAttribute('data-copy')); toastL('Скопировано'); };
   $('pres').onchange = function () { pbF.res = this.value; renderPb(); };
   $('psort').onchange = function () { pbF.sort = this.value; renderPb(); };
   $('preset').onclick = function () { pbF = { q: '', ev: '', res: '', sort: 'new' }; renderPb(); };
@@ -1051,10 +1053,18 @@ function renderCard(d) {
   var fname = L.first_name || (L.username ? '@' + L.username : String(L.tg_id));
   var origin = L.link_source || (L.link_slug ? 'ссылка ' + L.link_slug : L.origin || 'miniapp-org');
   h += '<div class="lk-head"><div style="min-width:0"><h3>' + esc(fname) + '</h3>' + (L.first_name && L.username ? '<div class="mut" style="font-size:13px;margin-top:2px">@' + esc(L.username) + '</div>' : '') + '</div>' +
-    '<div class="lk-hr"><span class="pill ' + sp[1] + '">' + esc(sp[0]) + '</span>' + (L.banned_at ? '<span class="pill p-bad">заблокирован</span>' : L.access ? '<span class="pill p-ok">доступ открыт</span>' : '<span class="pill p-pur">доступ закрыт</span>') +
+    '<div class="lk-hr"><span class="pill ' + sp[1] + '">' + esc(sp[0]) + '</span>' + (L.rereg_at ? '<span class="pill p-pur">ждёт новой регистрации</span>' : '') + (L.banned_at ? '<span class="pill p-bad">заблокирован</span>' : L.access ? '<span class="pill p-ok">доступ открыт</span>' : '<span class="pill p-pur">доступ закрыт</span>') +
     '<button class="sm-x" id="cx" aria-label="Закрыть"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M2 2l10 10M12 2L2 12"/></svg></button></div></div>';
-  h += '<div class="lk-grid">' + kvc('Telegram ID', String(L.tg_id)) + kvc('Pocket ID', L.trader_id);
-  for (i = 0; i < (L.pockets || []).length; i++) h += kvc('Pocket ID ' + (i + 2), L.pockets[i]);
+  // Pocket ID: виден основной, остальные в списке под «+N ▾»; админ и тимлид делают любой основным
+  var other = []; for (i = 0; i < (L.pockets || []).length; i++) if (L.pockets[i] && L.pockets[i] !== L.trader_id) other.push(L.pockets[i]);
+  var canAct = myRole === 'admin' || myRole === 'teamlead', pk = '';
+  if (other.length) {
+    pk = '<div class="lk-pm hide" id="lkpm"><div class="mut" style="font-size:11px;padding:2px 4px 6px">' + (L.trader_id ? 'Другие Pocket ID' : 'Прежние Pocket ID') + '</div>';
+    for (i = 0; i < other.length; i++) pk += '<div class="lk-pr"><span>' + esc(other[i]) + '</span><button class="lk-cp" data-copy="' + esc(other[i]) + '" aria-label="Копировать"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg></button>' + (canAct ? '<button class="lk-mk" data-main="' + esc(other[i]) + '">Сделать основным</button>' : '') + '</div>';
+    pk += '</div>';
+  }
+  var pv = (L.trader_id ? esc(L.trader_id) + '<button class="lk-cp" data-copy="' + esc(L.trader_id) + '" aria-label="Копировать"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg></button>' : '—') + (other.length ? '<button class="lk-pb" id="lkpb">+' + other.length + ' ▾</button>' : '');
+  h += '<div class="lk-grid">' + kvc('Telegram ID', String(L.tg_id)) + '<div class="lk-kv" style="position:relative"><span>Pocket ID</span><b>' + pv + '</b>' + pk + '</div>';
   h += kv('Откуда пришёл', esc(origin)) + kv('Владелец', esc(L.owner_name || 'не закреплён')) + kv('Страна', esc(cname(d.country))) +
     (L.referrer_id ? kv('Пригласил', '<a href="#" data-card="' + esc(L.referrer_id) + '" style="color:#f1ebff;text-decoration:none">' + esc(L.referrer_id) + '</a>') : kv('Часовой пояс', esc(L.tz || ''))) +
     kvc('Промокод', d.promo) + kv('Последний визит', dt(L.last_seen_at)) + (L.referrer_id ? kv('Часовой пояс', esc(L.tz || '')) : '') + '</div>';
@@ -1097,8 +1107,20 @@ function renderCard(d) {
       (C.deposited !== null && C.deposited !== undefined ? kv('Внесено', usd2(C.deposited)) : '') + kv('Акция', C.offer ? esc(C.offer.name) + ' до ' + dmy(C.offer.until).slice(0, 5) : 'нет') + '</div></div>';
   }
   if (L.banned_at) h += '<div class="lk-ban"><b style="color:#ff6b8a">Лид заблокирован</b><div style="font-size:13px">Причина: ' + esc(L.ban_reason || '—') + '</div><div class="mut" style="font-size:12px">' + dt(L.banned_at) + (L.banned_by_name ? ' · ' + esc(L.banned_by_name) : '') + '</div></div>';
+  // Кнопки внизу, как в Office: профиль в Telegram, «Действия ▾» (админ и тимлид), виджет Pocket Option
+  var prof = L.username ? 'https://t.me/' + encodeURIComponent(L.username) : 'tg://user?id=' + L.tg_id;
+  h += '<div class="lk-act"><a class="lk-btn" href="' + prof + '" target="_blank" rel="noopener">Профиль в Telegram</a>';
+  if (canAct) {
+    h += '<span class="lk-aw"><button class="lk-btn" id="lkab">Действия ▾</button><div class="lk-am hide" id="lkam">' +
+      (L.banned_at ? '<button data-act="unban">Разблокировать</button>' : '<button data-act="ban" class="bad">Заблокировать</button>') +
+      (L.status === 'registered' && !L.access ? '<button data-act="rereg">Разрешить новую регистрацию</button>' : '') + '</div></span>';
+  }
+  h += '</div><div id="lkq"></div>';
+  h += '<div class="lk-wd"><span class="mut">Виджет Pocket Option:</span> ' + (L.widget_blocked ? '<b style="color:#ff6b8a">отключён</b>' : L.widget_used_at ? '<b style="color:#3ddc97">работает · ' + dt(L.widget_used_at) + '</b>' : '<b>' + (L.widget_has ? 'код выдан, не запускал' : 'не подключал') + '</b>') +
+    (canAct ? '<button class="lk-btn lk-sm" id="lkwd">' + (L.widget_blocked ? 'Включить' : 'Отключить') + '</button>' : '') + '</div>';
   $('smd').innerHTML = h;
   $('cov').onclick = closeCard; $('cx').onclick = closeCard;
+  lkBind(L, fname);
   var rc = $('smd').querySelectorAll('[data-card]');
   for (i = 0; i < rc.length; i++) rc[i].onclick = function (e) { e.preventDefault(); openCard(this.getAttribute('data-card')); };
   var fb = $('smd').querySelectorAll('[data-fc]');
@@ -1106,6 +1128,49 @@ function renderCard(d) {
   var cp = $('smd').querySelectorAll('[data-copy]');
   for (i = 0; i < cp.length; i++) cp[i].onclick = function (e) { e.preventDefault(); copyTxt(this.getAttribute('data-copy')); };
   smFit();
+}
+/** Вопрос внутри карточки (вместо окна браузера): текст, при необходимости поле причины, «Да» и «Отмена» */
+function lkAsk(text, yes, withReason, onYes) {
+  var q = $('lkq'); if (!q) return;
+  q.innerHTML = '<div class="lk-ask"><div>' + text + '</div>' + (withReason ? '<input id="lkr" placeholder="Причина блокировки" maxlength="300">' : '') +
+    '<div class="lk-ab"><button class="lk-btn pri" id="lky">' + yes + '</button><button class="lk-btn" id="lkn">Отмена</button></div><div class="lk-err" id="lke"></div></div>';
+  $('lkn').onclick = function () { q.innerHTML = ''; smFit(); };
+  $('lky').onclick = function () { onYes(withReason ? $('lkr').value.replace(/^\s+|\s+$/g, '') : null, function (m) { $('lke').textContent = m; }); };
+  smFit();
+}
+function lkDo(method, url, body, ok, err, id) {
+  req(method, url, body, function (st, d) { if (st >= 200 && st < 300) { toastL(ok(d)); openCard(id); } else err(d.error || ('Ошибка ' + st)); });
+}
+function lkBind(L, fname) {
+  var id = L.tg_id, A = '/api/office/leads/' + id;
+  var pb = $('lkpb'), pm = $('lkpm'); if (pb && pm) pb.onclick = function (e) { e.preventDefault(); pm.className = pm.className.indexOf('hide') >= 0 ? 'lk-pm' : 'lk-pm hide'; };
+  var mk = document.querySelectorAll('#smd [data-main]'), i;
+  for (i = 0; i < mk.length; i++) mk[i].onclick = function (e) {
+    e.preventDefault(); var x = this.getAttribute('data-main'); if (pm) pm.className = 'lk-pm hide';
+    lkAsk('Сделать <b>' + esc(x) + '</b> основным Pocket ID? ' + (L.trader_id ? 'Сейчас основной ' + esc(L.trader_id) + ', он перейдёт в список.' : 'Новая регистрация будет считаться завершённой.'), 'Сделать основным', false,
+      function (r, err) { lkDo('PATCH', A + '/main-pocket', { trader_id: x }, function () { return 'Основной Pocket ID: ' + x; }, err, id); });
+  };
+  var ab = $('lkab'), am = $('lkam'); if (ab && am) ab.onclick = function (e) { e.preventDefault(); am.className = am.className.indexOf('hide') >= 0 ? 'lk-am' : 'lk-am hide'; };
+  var ac = document.querySelectorAll('#smd [data-act]');
+  for (i = 0; i < ac.length; i++) ac[i].onclick = function (e) {
+    e.preventDefault(); var k = this.getAttribute('data-act'); if (am) am.className = 'lk-am hide';
+    if (k === 'ban') lkAsk('Заблокировать ' + esc(fname) + '? Mini App, пуши и сигналы станут ему недоступны, написать в поддержку он сможет.', 'Заблокировать', true,
+      function (r, err) { if (!r) return err('Укажите причину блокировки'); lkDo('POST', A + '/ban', { reason: r }, function () { return 'Лид заблокирован'; }, err, id); });
+    if (k === 'unban') lkAsk('Разблокировать лида? Ему снова станут доступны Mini App, пуши и сигналы.', 'Разблокировать', false,
+      function (r, err) { lkDo('DELETE', A + '/ban', null, function () { return 'Лид разблокирован'; }, err, id); });
+    if (k === 'rereg') lkAsk('Разрешить ' + esc(fname) + ' новую регистрацию? Старая регистрация останется в базе, её Pocket ID перейдёт в карточку вторым. Лид снова увидит шаг «Зарегистрироваться», бот напишет ему об этом.', 'Разрешить', false,
+      function (r, err) { lkDo('POST', A + '/rereg', {}, function (d) { return d.sent ? 'Готово: лид может зарегистрироваться заново, бот ему написал' : 'Готово, но написать лиду не удалось'; }, err, id); });
+  };
+  var wd = $('lkwd'); if (wd) wd.onclick = function (e) {
+    e.preventDefault(); var off = !L.widget_blocked;
+    var go = function (r, err) { lkDo('POST', A + '/widget', { blocked: off }, function () { return off ? 'Виджет отключён' : 'Виджет включён'; }, err || function (m) { toastL(m); }, id); };
+    if (off) lkAsk('Отключить виджет ' + esc(fname) + '? Текущий код перестанет работать, после включения клиент скопирует новый в Mini App.', 'Отключить', false, go); else go();
+  };
+}
+var toastTm = null;
+function toastL(m) {
+  var t = $('ltoast'); if (!t) { t = document.createElement('div'); t.id = 'ltoast'; t.className = 'ltoast'; document.body.appendChild(t); }
+  t.textContent = m; t.style.display = 'block'; clearTimeout(toastTm); toastTm = setTimeout(function () { t.style.display = 'none'; }, 2600);
 }
 function copyTxt(v) {
   var t = document.createElement('textarea'); t.value = v; t.style.position = 'fixed'; t.style.opacity = '0'; document.body.appendChild(t);
