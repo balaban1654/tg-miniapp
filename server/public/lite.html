@@ -832,13 +832,13 @@ function loadLeads() {
 function renderLeads() {
   var rows = leadsData || [], i, staff = function (r) { return r.lead_role && r.lead_role !== 'lead' && r.lead_role !== 'test'; };
   var list = [];
-  for (i = 0; i < rows.length; i++) { if (!leadsQ && staff(rows[i])) continue; if (leadsStatus && rows[i].status !== leadsStatus) continue; list.push(rows[i]); }
+  for (i = 0; i < rows.length; i++) { if (!leadsQ && staff(rows[i])) continue; if (leadsStatus && (rows[i].stage || rows[i].status) !== leadsStatus) continue; list.push(rows[i]); }
   var ORD = { new: 0, registered: 1, ftd: 2, active: 3, churned: 4 };
   var tms = function (r) { return Date.parse(r.status_at || r.created_at) || 0; };
   var dk = function (r) { return ymd(new Date(tms(r))); };
-  list.sort(function (a, b) { var x = dk(b), y = dk(a); if (x !== y) return x > y ? 1 : -1; var s = (ORD[a.status] || 0) - (ORD[b.status] || 0); return s || tms(b) - tms(a); });
+  list.sort(function (a, b) { var x = dk(b), y = dk(a); if (x !== y) return x > y ? 1 : -1; var s = (ORD[a.stage || a.status] || 0) - (ORD[b.stage || b.status] || 0); return s || tms(b) - tms(a); });
   var cnt = {}, k;
-  for (i = 0; i < rows.length; i++) if (!staff(rows[i])) cnt[rows[i].status] = (cnt[rows[i].status] || 0) + 1;
+  for (i = 0; i < rows.length; i++) if (!staff(rows[i])) { var sk = rows[i].stage || rows[i].status; cnt[sk] = (cnt[sk] || 0) + 1; }
   var pills = '';
   for (k in LST) if (LST.hasOwnProperty(k) && cnt[k]) pills += '<span class="st ' + LST[k][1] + '" style="margin-left:16px">' + LST[k][0] + '</span><b style="margin-left:7px">' + cnt[k] + ' шт</b>';
   var h = header('Лиды', pills);
@@ -851,9 +851,9 @@ function renderLeads() {
     h += '<div class="scroll"><table><tr><th>Пришёл</th><th class="l">Имя / ТГ</th><th>Telegram ID</th><th>Pocket ID</th><th>Статус</th><th>Владелец</th><th>Ссылка</th><th>FTD</th><th>Депозиты</th><th>Комиссия</th></tr>';
     var prev = null;
     for (i = 0; i < list.length; i++) {
-      var r = list[i], st = staff(r) ? ['Сотрудник', 'st-new'] : LST[r.status] || [r.status, 'st-new'], dd = dk(r);
+      var r = list[i], st = staff(r) ? ['Сотрудник', 'st-new'] : LST[r.stage || r.status] || [r.stage || r.status, 'st-new'], dd = dk(r);
       h += '<tr' + (prev && prev !== dd ? ' class="dayb"' : '') + '><td>' + Number(dd.slice(8)) + ' ' + MS[Number(dd.slice(5, 7)) - 1] + '</td><td class="l nm2">' + (r.first_name || !r.username ? '<div>' + esc(r.first_name || '—') + '</div>' : '') + (r.username ? '<div class="nm2-u">@' + esc(r.username) + '</div>' : '') + '</td>' +
-        '<td><a href="#" class="tgid" data-card="' + esc(r.tg_id) + '">' + esc(r.tg_id) + '</a></td><td>' + esc(r.trader_id || '—') + '</td><td>' + (r.lead_role === 'test' ? '<span class="st st-test">Тест</span> ' : '') + '<span class="st ' + st[1] + '">' + st[0] + '</span>' + (r.banned ? ' ⛔' : '') + '</td>' +
+        '<td><a href="#" class="tgid" data-card="' + esc(r.tg_id) + '">' + esc(r.tg_id) + '</a></td><td>' + esc(r.trader_id || '—') + '</td><td>' + (r.lead_role === 'test' ? '<span class="st st-test">Тест</span> ' : '') + '<span class="st ' + st[1] + '">' + st[0] + '</span>' + (r.status === 'churned' && (r.stage || r.status) !== 'churned' && !staff(r) ? ' <span class="st st-bad" title="Заблокировал бота до первого депозита: в «Отвал» не считается">бот ⛔</span>' : '') + (r.banned ? ' ⛔' : '') + '</td>' +
         '<td>' + esc(r.owner_name || 'не закреплён') + '</td><td>' + esc(r.link_slug || '—') + '</td><td>' + (r.ftd_amount != null ? usd2(r.ftd_amount) : '—') + '</td><td>' + usd2(r.deposits) + '</td><td>' + usd2(r.commission) + '</td></tr>';
       prev = dd;
     }

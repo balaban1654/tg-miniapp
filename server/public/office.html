@@ -2417,13 +2417,13 @@ async function viewLeads(){
   const holder=el('div',{});const cnt=el('span',{class:'mut'},'');const tots=el('div',{class:'pb-tots',style:'margin:0'});
   const draw=()=>{
     const qq=F.q.trim().toLowerCase().replace(/^@/,'');
-    let list=src().filter(r=>(!F.status||(r.status===F.status&&!isStaff(r)))&&(!F.link||r.link_slug===F.link)&&(!F.owner||(F.owner==='none'?!r.owner_id:String(r.owner_id)===F.owner))
+    let list=src().filter(r=>(!F.status||((r.stage||r.status)===F.status&&!isStaff(r)))&&(!F.link||r.link_slug===F.link)&&(!F.owner||(F.owner==='none'?!r.owner_id:String(r.owner_id)===F.owner))
       &&(!qq||[r.username,r.first_name,r.tg_id,r.trader_id].some(v=>v!=null&&String(v).toLowerCase().includes(qq))));
     const flat=F.q||F.status||F.link||F.owner||F.sort!=='new';
     // С фильтрами список общий: сотрудников (админ состав) показываем только при поиске — у них нет даты в периоде
     if(flat&&!F.q.trim())list=list.filter(r=>!isStaff(r));
     // По дате: внутри одного дня (по Киеву) сверху новые, ниже регистрации, FTD, активные и в самом низу «Отвал»
-    const tms=r=>new Date(r.status_at||r.created_at).getTime(),dayK=r=>Number(new Date(tms(r)).toLocaleDateString('sv-SE',{timeZone:'Europe/Kyiv'}).replaceAll('-','')),isCh=r=>({new:0,registered:1,ftd:2,active:3,churned:4})[r.status]??0;
+    const tms=r=>new Date(r.status_at||r.created_at).getTime(),dayK=r=>Number(new Date(tms(r)).toLocaleDateString('sv-SE',{timeZone:'Europe/Kyiv'}).replaceAll('-','')),isCh=r=>({new:0,registered:1,ftd:2,active:3,churned:4})[r.stage||r.status]??0;
     const by={dep:(a,b)=>b.deposits-a.deposits,depAsc:(a,b)=>a.deposits-b.deposits,comm:(a,b)=>b.commission-a.commission,old:(a,b)=>dayK(a)-dayK(b)||isCh(a)-isCh(b)||tms(a)-tms(b),new:(a,b)=>dayK(b)-dayK(a)||isCh(a)-isCh(b)||tms(b)-tms(a)}[F.sort];
     list=[...list].sort(by);
     // @r1654 (создатель компании) всегда самый первый в админ составе
@@ -2435,7 +2435,7 @@ async function viewLeads(){
     // Имя и ник в одной колонке: имя как раньше, ник Telegram мелко под ним
     const nameTd=r=>{const nm=r.first_name||(r.username?'':'—'),un=r.username?'@'+r.username:'';
       return el('td',{class:'cut nm2',title:[r.first_name,un].filter(Boolean).join(' · ')},nm?el('div',{class:'nm2-n'},nm):null,un?el('div',{class:'nm2-u'},un):null)};
-    const tbl=table(cols,sorted.map(r=>[tstCell(r,'date',td(date(r.status_at||r.created_at))),nameTd(r),el('td',{class:'n'},el('button',{type:'button',class:'own-btn',title:'Открыть карточку лида','aria-label':'Открыть карточку лида',onclick:()=>openLeadCard(r.tg_id)},String(r.tg_id))),pocketCell(r),el('td',{},isStaff(r)?el('span',{class:'pill p-pur'},({admin:'Админ',moder:'Модер',streamer:'Стример',analyst:'Аналитик',buyer:'Медиабайер',teamlead:'Тимлидер'})[r.lead_role]||r.lead_role):[r.lead_role==='test'?el('span',{class:'pill p-warn',style:'margin-right:4px',title:'Тестовый аккаунт: в статистику и зарплаты не попадает. Дату, ссылку, FTD и депозиты можно менять нажатием'},'Тест'):null,pill(r.status),r.banned?el('span',{class:'pill p-bad',style:'margin-left:4px',title:'Лид заблокирован'},'⛔'):null]),...(me.role==='admin'?[accessCell(r)]:[]),...(showOwner?[me.role==='admin'||(me.role==='teamlead'&&!isStaff(r))?ownerCell(r):td(r.owner_name||'не закреплён')]:[]),tstCell(r,'link_id',td(r.link_slug||'—')),...(me.role==='streamer'?[]:[tstCell(r,'ftd',td(r.ftd_amount!=null&&!isStaff(r)?money(r.ftd_amount):'—','n'))]),tstCell(r,'deposits',td(money(r.deposits),'n')),...(showComm?[tstCell(r,'commission',td(money(r.commission),'n'))]:[]),...(me.role==='admin'?[delLeadCell(r)]:[])]),
+    const tbl=table(cols,sorted.map(r=>[tstCell(r,'date',td(date(r.status_at||r.created_at))),nameTd(r),el('td',{class:'n'},el('button',{type:'button',class:'own-btn',title:'Открыть карточку лида','aria-label':'Открыть карточку лида',onclick:()=>openLeadCard(r.tg_id)},String(r.tg_id))),pocketCell(r),el('td',{},isStaff(r)?el('span',{class:'pill p-pur'},({admin:'Админ',moder:'Модер',streamer:'Стример',analyst:'Аналитик',buyer:'Медиабайер',teamlead:'Тимлидер'})[r.lead_role]||r.lead_role):[r.lead_role==='test'?el('span',{class:'pill p-warn',style:'margin-right:4px',title:'Тестовый аккаунт: в статистику и зарплаты не попадает. Дату, ссылку, FTD и депозиты можно менять нажатием'},'Тест'):null,pill(r.stage||r.status),r.status==='churned'&&(r.stage||r.status)!=='churned'?el('span',{class:'pill p-bad',style:'margin-left:4px',title:'Заблокировал бота до первого депозита: в «Отвал» не считается, остаётся в своём этапе'},'бот ⛔'):null,r.banned?el('span',{class:'pill p-bad',style:'margin-left:4px',title:'Лид заблокирован'},'⛔'):null]),...(me.role==='admin'?[accessCell(r)]:[]),...(showOwner?[me.role==='admin'||(me.role==='teamlead'&&!isStaff(r))?ownerCell(r):td(r.owner_name||'не закреплён')]:[]),tstCell(r,'link_id',td(r.link_slug||'—')),...(me.role==='streamer'?[]:[tstCell(r,'ftd',td(r.ftd_amount!=null&&!isStaff(r)?money(r.ftd_amount):'—','n'))]),tstCell(r,'deposits',td(money(r.deposits),'n')),...(showComm?[tstCell(r,'commission',td(money(r.commission),'n'))]:[]),...(me.role==='admin'?[delLeadCell(r)]:[])]),
       src().length?'Ничего не найдено. Измените фильтры.':'Лидов пока нет. Они появятся, когда люди перейдут по вашим ссылкам и нажмут «Старт» в боте.');
     tbl.classList.add('ctr');
     const body=tbl.querySelector('tbody');
@@ -2453,9 +2453,9 @@ async function viewLeads(){
     }
     tbl.classList.add("lt");holder.replaceChildren(tbl);cnt.textContent=(F.q.trim()&&found?'найдено '+list.length+' (поиск по всем лидам)':list.length===rows.length?rows.length+' всего':list.length+' из '+rows.length);
     // Сводка по статусам: те же фильтры, кроме самого статуса, админ состав не считаем
-    const base=src().filter(r=>!isStaff(r)&&(!F.link||r.link_slug===F.link)&&(!F.owner||(F.owner==='none'?!r.owner_id:String(r.owner_id)===F.owner))
+    const base=src().filter(r=>!isStaff(r)&&r.lead_role!=='test'&&(!F.link||r.link_slug===F.link)&&(!F.owner||(F.owner==='none'?!r.owner_id:String(r.owner_id)===F.owner))
       &&(!qq||[r.username,r.first_name,r.tg_id,r.trader_id].some(v=>v!=null&&String(v).toLowerCase().includes(qq))));
-    tots.replaceChildren(...Object.entries(STATUS).map(([k,v])=>[k,v,base.filter(r=>r.status===k).length]).filter(x=>x[2]).map(([k,v,n])=>el('span',{class:'pb-tot'},el('span',{class:'pill '+v[1]},v[0]),el('b',{},n+' шт'))));
+    tots.replaceChildren(...Object.entries(STATUS).map(([k,v])=>[k,v,base.filter(r=>(r.stage||r.status)===k).length]).filter(x=>x[2]).map(([k,v,n])=>el('span',{class:'pb-tot'},el('span',{class:'pill '+v[1]},v[0]),el('b',{},n+' шт'))));
   };
   leadsRows=rows;leadsRedraw=draw;draw();if(F.q.trim())onSearch();
   // Блок «Пользователи из старого бота» убран: перенос закончен
@@ -2744,8 +2744,8 @@ function navLblNodes(k){
   const base=k==='chats'?'Чаты':'Лиды',c=navCnt[k];
   if(!c)return[base];
   const out=[base];
-  if(c.total!==null&&c.total!==undefined)out.push(' ',el('span',{class:'nb-t',title:k==='chats'?'':'Лидов пришло за выбранный период (по умолчанию текущий месяц)'},String(c.total)));
-  if(c.reg||(k==='leads'&&c.reg===0))out.push(' (',el('span',{class:'nb-r',title:k==='chats'?'':'Регистраций за выбранный период'},String(c.reg)),')');
+  if(c.total!==null&&c.total!==undefined)out.push(' ',el('span',{class:'nb-t',title:k==='chats'?'':'Пришли в бота за выбранный период (по умолчанию текущий месяц)'},String(c.total)));
+  if(c.reg||(k==='leads'&&c.reg===0))out.push(' (',el('span',{class:'nb-r',title:k==='chats'?'':'Зарегистрировались за выбранный период, когда бы ни пришли в бота (как кольцо «Регистрации» на дашборде)'},String(c.reg)),')');
   if(c.fresh)out.push(' ',el('span',{class:'nb-n',title:k==='chats'?'Ждут ответа':'Новые лиды за сегодня (сбрасывается в 00:00 по Киеву)'},String(c.fresh)));
   return out;
 }

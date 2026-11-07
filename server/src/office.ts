@@ -13,7 +13,7 @@ const sha256 = (v: string) => createHash('sha256').update(v).digest('hex');
 import { accountingRoutes } from './accounting.js';
 import { monoRoutes } from './mono.js';
 import { mainMediaTeam } from './mediaTeams.js';
-import { leadStatusDate, leadListDate, funnelStage, funnelStageDate, churnedAfterFtd } from './leaddate.js';
+import { leadStatusDate, funnelStage, funnelStageDate, churnedAfterFtd, shownStage } from './leaddate.js';
 import { referralOfficeRoutes, accrueReferral } from './referral.js';
 import { exportTexts } from './i18nFill.js';
 import { syncRefReward } from './referral.js';
@@ -2820,7 +2820,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     } else if (D.test(String(req.query.from)) && D.test(String(req.query.to))) {
       const [a, b] = String(req.query.from) <= String(req.query.to) ? [req.query.from, req.query.to] : [req.query.to, req.query.from];
       vals.push(a, b);
-      extra += ` AND (coalesce(d.lead_role, 'lead') <> 'lead' OR (${leadListDate('d')} AT TIME ZONE 'Europe/Kyiv')::date BETWEEN $${vals.length - 1}::date AND $${vals.length}::date)`;
+      extra += ` AND (coalesce(d.lead_role, 'lead') <> 'lead' OR (${funnelStageDate('d')} AT TIME ZONE 'Europe/Kyiv')::date BETWEEN $${vals.length - 1}::date AND $${vals.length}::date)`;
     }
     const DT = depTypes(me);
     // Код кампании демо-ссылки из тренажёра (параметр ac): лид без ссылки, зарегистрированный через демо, показывается как этот код (например demo)
@@ -2831,7 +2831,8 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     const demoP = `$${vals.length}::text`;
     const r = await db.query(
       `SELECT d.tg_id, d.trader_id, d.is_tester,
-              (SELECT e.raw->>'ac' FROM events e WHERE e.tg_id = d.tg_id AND ${demoP} IS NOT NULL AND lower(e.raw->>'ac') = lower(${demoP}) LIMIT 1) AS po_ac, d.lead_role, d.origin, d.username, d.first_name, d.status, d.access, d.created_at, d.owner_id, (d.banned_at IS NOT NULL) AS banned, ${leadListDate('d')} AS status_at,
+              (SELECT e.raw->>'ac' FROM events e WHERE e.tg_id = d.tg_id AND ${demoP} IS NOT NULL AND lower(e.raw->>'ac') = lower(${demoP}) LIMIT 1) AS po_ac, d.lead_role, d.origin, d.username, d.first_name, d.status, d.access, d.created_at, d.owner_id, (d.banned_at IS NOT NULL) AS banned, ${funnelStageDate('d')} AS status_at,
+              ${shownStage('d')} AS stage,
               s.name AS owner_name, l.slug AS link_slug,
               (SELECT amount FROM events e WHERE e.tg_id = d.tg_id AND e.type = 'ftd' ORDER BY e.created_at, e.id LIMIT 1) AS ftd_amount,
               coalesce((SELECT sum(amount) FROM events e WHERE e.tg_id = d.tg_id AND e.type IN ${DT}),0) AS deposits,
@@ -2840,7 +2841,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
          LEFT JOIN staff s ON s.id = d.owner_id
          LEFT JOIN links l ON l.id = d.link_id
         WHERE d.removed_at IS NULL AND ${ownerScope(me, 'd.owner_id')}${me.role === 'admin' ? '' : " AND coalesce(d.lead_role, 'lead') = 'lead'"}${extra}
-        ORDER BY (coalesce(d.lead_role, 'lead') <> 'lead') DESC, ${leadListDate('d')} DESC LIMIT 3000`,
+        ORDER BY (coalesce(d.lead_role, 'lead') <> 'lead') DESC, ${funnelStageDate('d')} DESC LIMIT 3000`,
       vals,
     );
     // Сотрудники (админ состав) идут первыми, чтобы предел строк их никогда не отрезал; лидов за период до 3000

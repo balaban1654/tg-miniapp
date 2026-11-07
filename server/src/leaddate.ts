@@ -28,9 +28,18 @@ export const funnelStage = (a: string): string =>
   `(CASE WHEN coalesce(${a}.status_before_block, ${a}.status) = 'active' THEN 'active'
          WHEN coalesce(${a}.status_before_block, ${a}.status) = 'ftd' OR EXISTS (SELECT 1 FROM events e WHERE e.tg_id = ${a}.tg_id AND e.type = 'ftd') THEN 'ftd'
          ELSE coalesce(${a}.status_before_block, ${a}.status) END)`;
-/** Дата для этапа: FTD и активный по дате первого FTD (как в KPI), остальные по дате прихода */
+/** Дата этапа - одна для дашборда («Статусы лидов») и списка «Лиды»: FTD и активный по первому FTD (как в KPI; без события FTD -
+ *  по первому депозиту), регистрация по дате регистрации (последней, после «Разрешить новую регистрацию» - новой), новый по дате прихода.
+ *  Лид, зарегистрировавшийся в октябре и сделавший FTD в ноябре, в октябре больше не виден: он в ноябре как FTD */
 export const funnelStageDate = (a: string): string =>
-  `(CASE WHEN ${funnelStage(a)} IN ('ftd','active') THEN (SELECT min(e.created_at) FROM events e WHERE e.tg_id = ${a}.tg_id AND e.type = 'ftd') ELSE ${a}.created_at END)`;
+  `(CASE WHEN ${funnelStage(a)} IN ('ftd','active')
+         THEN coalesce((SELECT min(e.created_at) FROM events e WHERE e.tg_id = ${a}.tg_id AND e.type = 'ftd'),
+                       (SELECT min(e.created_at) FROM events e WHERE e.tg_id = ${a}.tg_id AND e.type = 'dep'), ${a}.created_at)
+         WHEN ${funnelStage(a)} = 'registered'
+         THEN coalesce((SELECT max(e.created_at) FROM events e WHERE e.tg_id = ${a}.tg_id AND e.type = 'reg'), ${a}.created_at)
+         ELSE ${a}.created_at END)`;
+/** Этап для показа (дашборд и список «Лиды»): «Отвал» только после первого депозита, ушедшие раньше остаются в своём этапе */
+export const shownStage = (a: string): string => `(CASE WHEN ${churnedAfterFtd(a)} THEN 'churned' ELSE ${funnelStage(a)} END)`;
 /** «Отвал» в статистике: заблокировал бота (статус «Отвал») после первого депозита, то есть был FTD или активным.
  *  Новые и регистрации, заблокировавшие бота, сюда не входят и остаются на своём этапе */
 export const churnedAfterFtd = (a: string): string => `(${a}.status = 'churned' AND ${funnelStage(a)} IN ('ftd','active'))`;
