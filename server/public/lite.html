@@ -34,7 +34,20 @@ input{width:100%;padding:12px;margin:6px 0 12px;font-size:17px;border-radius:10p
 .err{color:#ff6b8a;margin:6px 0}
 /* Шапка */
 .top{display:-webkit-flex;display:flex;-webkit-justify-content:space-between;justify-content:space-between;-webkit-align-items:center;align-items:center;-webkit-flex-wrap:wrap;flex-wrap:wrap;margin-bottom:16px}
-.ttl{display:-webkit-flex;display:flex;-webkit-align-items:baseline;align-items:baseline;-webkit-flex-wrap:wrap;flex-wrap:wrap}
+.ttl{display:-webkit-flex;display:flex;-webkit-align-items:center;align-items:center}.ttx{display:-webkit-flex;display:flex;-webkit-flex-direction:column;flex-direction:column}.ttx .sub{margin-top:3px}
+.rbw{display:-webkit-flex;display:flex;-webkit-align-items:center;align-items:center}.rbw .rb{margin-top:0}
+.tb{position:relative;height:42px;min-width:42px;box-sizing:border-box;margin-right:10px;border:1px solid #34255c;background:#1c1233;color:#f1ebff;border-radius:12px;font:inherit;font-weight:700;font-size:13px;padding:0 13px;-webkit-appearance:none}
+.tb.ic{padding:0;width:42px}.tb.ic svg{width:20px;height:20px;vertical-align:middle}.tb.lv{color:#ff7a99;border-color:rgba(255,59,107,.5)}
+.tb.onlb{background:rgba(61,220,151,.1);border-color:rgba(61,220,151,.3);color:#3ddc97}.tb.onlb i{display:inline-block;width:7px;height:7px;border-radius:7px;background:#3ddc97;margin-right:7px;vertical-align:1px}
+.bdg{position:absolute;top:-7px;right:-7px;min-width:20px;height:20px;line-height:20px;padding:0 6px;box-sizing:border-box;border-radius:10px;background:#ff5c7a;color:#fff;font-size:11px;font-weight:800;text-align:center}.tb.lv .bdg{background:#ff3b6b}
+@-webkit-keyframes bring{0%,46%,100%{-webkit-transform:rotate(0)}6%{-webkit-transform:rotate(15deg)}14%{-webkit-transform:rotate(-12deg)}22%{-webkit-transform:rotate(8deg)}30%{-webkit-transform:rotate(-5deg)}38%{-webkit-transform:rotate(2deg)}}@keyframes bring{0%,46%,100%{transform:rotate(0)}6%{transform:rotate(15deg)}14%{transform:rotate(-12deg)}22%{transform:rotate(8deg)}30%{transform:rotate(-5deg)}38%{transform:rotate(2deg)}}
+.tb.ring svg{-webkit-transform-origin:50% 12%;transform-origin:50% 12%;-webkit-animation:bring 1.8s ease-in-out infinite;animation:bring 1.8s ease-in-out infinite}
+.lr{display:-webkit-flex;display:flex;-webkit-align-items:center;align-items:center;padding:11px 2px;border-bottom:1px solid #34255c;color:#f1ebff;text-decoration:none}.lr:last-child{border-bottom:0}.lr .lt{-webkit-flex:1;flex:1;min-width:0;display:block}.lr .lt>*{display:block}.lr .chv{color:#a89cc8;font-size:20px;margin-left:10px}
+.lr .od{width:10px;height:10px;border-radius:10px;background:#3ddc97;margin:0 12px 0 4px;-webkit-flex:none;flex:none}.lr .rk{width:30px;height:30px;line-height:30px;border-radius:30px;text-align:center;font-weight:800;font-size:13px;background:#251847;color:#c9a6ff;margin-right:12px;-webkit-flex:none;flex:none}
+.lr .rk.m0{background:rgba(245,197,66,.2);color:#f5c542}.lr .rk.m1{background:rgba(201,210,220,.2);color:#dfe6ee}.lr .rk.m2{background:rgba(208,136,71,.2);color:#e9a46a}
+.lt1{display:-webkit-flex!important;display:flex!important;-webkit-justify-content:space-between;justify-content:space-between;margin-bottom:5px}.lt2{display:-webkit-flex!important;display:flex!important;-webkit-align-items:center;align-items:center;margin-bottom:4px;font-size:12.5px}.lt2 .bar{-webkit-flex:1;flex:1;margin:0 10px 0 0;display:block}
+.lr .liv{font-size:10px}.lr .lo{color:#ff7a99;font-weight:700;font-size:12.5px;text-decoration:none}.lon{color:#ff7a99;font-weight:700}.st-bad{background:rgba(255,92,122,.15);color:#ff7a99}
+@media (max-width:820px){.top{-webkit-align-items:flex-start;align-items:flex-start}.rbw{width:100%;margin-top:12px;-webkit-flex-wrap:wrap;flex-wrap:wrap}}
 .ttl h2{font-size:24px;margin:0 12px 0 0}
 .onl{display:inline-block;padding:3px 10px;border-radius:99px;background:rgba(61,220,151,.1);border:1px solid rgba(61,220,151,.27);color:#3ddc97;font-size:12px;font-weight:600;margin-right:12px}
 .onl i{display:inline-block;width:7px;height:7px;border-radius:7px;background:#3ddc97;margin-right:6px;vertical-align:1px;-webkit-animation:blink 1.4s ease-in-out infinite;animation:blink 1.4s ease-in-out infinite}
@@ -131,8 +144,8 @@ table.rb-g{border:0;background:none;width:auto}.rb-g th{background:none;padding:
 .rb-d{width:36px;height:34px;border:0;background:none;color:#f1ebff;border-radius:8px;font-size:14px;font-family:inherit;-webkit-appearance:none}
 .rb-d.out{color:#5b4d80}.rb-d.in{background:rgba(155,92,255,.25)}.rb-d.edge{background:#9b5cff;color:#fff;font-weight:700}.rb-d.today{box-shadow:inset 0 0 0 1px #c9a6ff}
 @media (max-width:620px){.rb-pop{left:0;right:auto;display:block}.rb-ps{width:auto;margin:0 0 10px;padding:0}.rb-ps button{display:inline-block;width:auto}}
-.burger{background:none;border:1px solid #34255c;border-radius:10px;width:40px;height:38px;padding:9px 9px;margin-right:12px;vertical-align:middle;-webkit-appearance:none}
-.burger i{display:block;height:2px;background:#f1ebff;border-radius:2px;margin:4px 0}
+.burger{background:none;border:1px solid #34255c;border-radius:12px;width:42px;height:42px;padding:0;margin-right:14px;-webkit-flex:none;flex:none;display:-webkit-flex;display:flex;-webkit-flex-direction:column;flex-direction:column;-webkit-justify-content:center;justify-content:center;-webkit-align-items:center;align-items:center;-webkit-appearance:none}
+.burger i{display:block;width:18px;height:2px;background:#f1ebff;border-radius:2px;margin:2px 0}
 .ttl{-webkit-align-items:center!important;align-items:center!important}
 .mov{position:fixed;left:0;top:0;right:0;bottom:0;background:rgba(0,0,0,.6);z-index:60}
 .menu{position:fixed;left:0;top:0;bottom:0;width:250px;background:#0a0613;border-right:1px solid #34255c;z-index:61;padding:16px 10px;display:-webkit-flex;display:flex;-webkit-flex-direction:column;flex-direction:column}
@@ -346,37 +359,22 @@ function render() {
   var d = last.d, t = d.totals || {}, g = d.goals || null, pace = Number(d.pace) || 0, h = '', i;
   var showMark = g && pace < 0.995;
 
-  // Шапка: меню, «Дашборд», онлайн, период; справа календарь и «Найти»
-  h += header(greet(), (last.onl ? '<span class="onl"><i></i>Онлайн <b>' + last.onl.total + '</b></span>' : '') + '<span class="sub">' + esc(headLabel(d.range.from, d.range.to, d.today)) + '</span>');
-
-  // Полоса стримеров: сначала в эфире, потом по FTD за месяц; админы только в эфире
-  var list = [];
-  for (i = 0; i < d.streamers.length; i++) { var s0 = d.streamers[i]; if ((s0.active || s0.live) && (s0.role !== 'admin' || s0.live)) list.push(s0); }
-  list.sort(function (a, b) {
-    var x = [a.role === 'admin' ? 1 : 0, a.live ? 0 : 1, -((a.month || {}).ftd || 0)], y = [b.role === 'admin' ? 1 : 0, b.live ? 0 : 1, -((b.month || {}).ftd || 0)];
-    for (var k = 0; k < 3; k++) if (x[k] !== y[k]) return x[k] - y[k];
-    return 0;
-  });
-  var shown = [], more = 0;
-  shownS = shown;
-  for (i = 0; i < list.length; i++) { if (liveAll || i < 4 || list[i].live) shown.push(list[i]); else more++; }
-  h += '<div class="card live">';
-  if (!list.length) h += '<span class="mut" style="margin-bottom:10px">Стримеров пока нет</span>';
-  for (i = 0; i < shown.length; i++) {
-    var s = shown[i], mo = s.month || {};
-    h += '<div class="lc"><b>' + (s.noCard ? esc(s.name) : '<a href="#" class="snm" data-sc="' + i + '">' + esc(s.name) + '</a>') + (s.role === 'streamer' ? '<span class="hp ' + lvl(mo.hoursMin, d.plan.paceMin) + '">' + hw(mo.hoursMin) + '/' + d.plan.hours + ' ч</span>' : '') + '<span class="fc">FTD ' + (mo.ftd || 0) + '</span></b>' +
-      (s.live ? '<span class="t">' + hm(s.live.elapsed) + '<span class="liv">LIVE</span></span>' : '<span class="t off">' + esc(offText(s, d.today)) + '</span>') + '</div>';
-  }
-  if (more > 0 || liveAll && list.length > 4) h += '<button class="lc more" id="liveTog">' + (liveAll ? 'Свернуть ▴' : 'Ещё ' + more + ' ▾') + '</button>';
-  h += '</div>';
+  // Шапка: приветствие и дата; справа «Онлайн», «Стримеры», колокольчик, календарь и «Найти»
+  liveL = liveList(d);
+  var nLive = 0; for (i = 0; i < liveL.length; i++) if (liveL[i].live) nLive++;
+  var tk0 = taskRows(d), sig = bellSig(tk0), seen = '';
+  try { seen = localStorage.getItem('lite_bell_' + myRole) || ''; } catch (e) {}
+  var fresh0 = tk0.length && sig !== seen;
+  var tools = (last.onl ? '<button class="tb onlb" id="onlBtn"><i></i>Онлайн <b>' + last.onl.total + '</b></button>' : '') +
+    '<button class="tb ic' + (nLive ? ' lv' : '') + '" id="liveBtn" aria-label="Стримеры">' + IC_LV + (nLive ? '<span class="bdg">' + nLive + '</span>' : '') + '</button>' +
+    '<button class="tb ic' + (fresh0 ? ' ring' : '') + '" id="bellBtn" aria-label="Требует внимания">' + IC_BELL + (fresh0 ? '<span class="bdg">' + tk0.length + '</span>' : '') + '</button>';
+  h += header(greet(), '<span class="sub">' + esc(headLabel(d.range.from, d.range.to, d.today)) + '</span>', false, tools);
 
   // План / факт: кольца 2×3 или график по дням (плитка одной высоты в обоих видах)
   var pf = pfCard(d);
   // Справа: статусы лидов и чистая прибыль (админ) или зарплата (тимлид); колонки заканчиваются на одной линии
   var right = stCard(d) + (d.leadPay ? leadPayCard(d) : netCard(d));
   h += '<div class="cols"><div class="c1">' + pf + '</div><div class="c2">' + right + '</div></div>';
-  var tk = tasks(d);
-  if (tk.indexOf('okm') < 0) h += '<div class="card" style="margin-top:16px"><div class="lbl">Требует внимания</div>' + tk + '</div>';
   h += shifts(last.fs, d);
   h += foot();
   var fresh = paint(menuHtml() + h); stamp();
@@ -540,7 +538,82 @@ function leadBonusPop(d) {
   return o + '<div class="mut" style="font-size:12px;border-top:1px solid #34255c;padding-top:6px;margin-top:4px">Бонусы за планы считаются по итогам месяца, сейчас — по текущему состоянию.</div>';
 }
 
-function tasks(d) {
+// ---------- Кнопки шапки: «Онлайн», «Стримеры», колокольчик (окна по центру, как карточка) ----------
+var IC_LV = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="2.2" fill="currentColor"/><path d="M8.5 8.5a5 5 0 0 0 0 7M15.5 8.5a5 5 0 0 1 0 7M5.6 5.6a9 9 0 0 0 0 12.8M18.4 5.6a9 9 0 0 1 0 12.8"/></svg>';
+var IC_BELL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9a6 6 0 0 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9"/><path d="M10 20a2.2 2.2 0 0 0 4 0"/></svg>';
+var liveL = [], liveSort = 'ftd';
+function liveList(d) {
+  var o = [], i; for (i = 0; i < d.streamers.length; i++) { var s = d.streamers[i]; if ((s.active || s.live) && (s.role !== 'admin' || s.live)) o.push(s); }
+  return o;
+}
+function openList(title, badge, body) {
+  fcClose();
+  $('card').innerHTML = '<div class="so" id="cov"></div><div class="sm" id="smd"><div class="hd" style="margin-bottom:12px"><b style="font-size:18px">' + title + (badge ? ' ' + badge : '') + '</b><button class="sm-x" id="cx" aria-label="Закрыть"><svg viewBox="0 0 14 14" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 3l8 8M11 3l-8 8"/></svg></button></div><div id="ldl">' + body + '</div></div>';
+  $('card').className = '';
+  $('cov').onclick = closeCard; $('cx').onclick = closeCard;
+  smFit();
+}
+function openOnline() {
+  var r = last.onl || { total: 0, list: [] }, l = r.list || [], o = '', i;
+  var RR = { admin: 'админ', moder: 'модер', streamer: 'стример', analyst: 'аналитик', buyer: 'медиабайер', test: 'тест' };
+  for (i = 0; i < l.length; i++) {
+    var x = l[i], nm = x.first_name || (x.username ? '@' + x.username : 'ID ' + x.tg_id), rl = x.lead_role && x.lead_role !== 'lead' ? (RR[x.lead_role] || x.lead_role) : '';
+    o += '<a href="#" class="lr" data-oc="' + esc(x.tg_id) + '"><span class="od"></span><span class="lt"><b>' + esc(nm) + (rl ? ' <span class="st st-new">' + esc(rl) + '</span>' : '') + '</b><span class="mut">' + esc([x.username && x.first_name ? '@' + x.username : '', 'ID ' + x.tg_id, x.owner_name ? 'владелец ' + x.owner_name : ''].filter(function (q) { return q; }).join(' · ')) + '</span></span><span class="chv">›</span></a>';
+  }
+  if (!l.length) o = '<div class="mut" style="padding:12px 0;text-align:center">Сейчас никого нет</div>';
+  if (r.hidden) o += '<div class="mut" style="padding-top:10px;font-size:13px">' + (l.length ? 'И ещё ' : '') + r.hidden + ' — клиенты других команд</div>';
+  openList('Сейчас в Mini App', '<span class="st st-ftd">' + r.total + '</span>', o);
+  var a = document.querySelectorAll('[data-oc]');
+  for (i = 0; i < a.length; i++) a[i].onclick = function (e) { e.preventDefault(); openCard(this.getAttribute('data-oc')); };
+}
+function liveRows() {
+  var d = last.d, pl = d.plan, list = liveL.slice(), o = '', i;
+  list.sort(function (a, b) {
+    var x = liveSort === 'hours' ? [-((a.month || {}).hoursMin || 0), -((a.month || {}).ftd || 0)] : [-((a.month || {}).ftd || 0), -((a.month || {}).hoursMin || 0)];
+    var y = liveSort === 'hours' ? [-((b.month || {}).hoursMin || 0), -((b.month || {}).ftd || 0)] : [-((b.month || {}).ftd || 0), -((b.month || {}).hoursMin || 0)];
+    return x[0] - y[0] || x[1] - y[1] || (a.live ? 0 : 1) - (b.live ? 0 : 1) || (a.name > b.name ? 1 : -1);
+  });
+  shownS = list;
+  o += '<div style="margin-bottom:6px"><button class="pf-tab' + (liveSort === 'ftd' ? ' on' : '') + '" data-ls="ftd">по FTD</button><button class="pf-tab' + (liveSort === 'hours' ? ' on' : '') + '" data-ls="hours">по часам</button></div>';
+  for (i = 0; i < list.length; i++) {
+    var s = list[i], mo = s.month || {}, hrs = mo.hoursMin || 0, f = mo.ftd || 0, lv = lvl(hrs, pl.paceMin), col = lv === 'pos' ? '#3ddc97' : lv === 'warn' ? '#ffb84d' : '#ff6b8a';
+    var note = s.live ? hm(s.live.elapsed) + ' в эфире' : offText(s, d.today);
+    o += '<div class="lr' + (s.noCard ? '' : ' cl') + '" data-sc="' + i + '"><span class="rk' + (i < 3 ? ' m' + i : '') + '">' + (i + 1) + '</span><span class="lt"><span class="lt1"><b>' + esc(s.name) +
+      (s.live ? ' <span class="liv">LIVE</span>' + (s.live.stream_url ? ' <a class="lo" href="' + esc(s.live.stream_url) + '" target="_blank" rel="noopener">(открыть)</a>' : '') : '') + '</b><span><b>' + f + '</b> <span class="mut">FTD</span></span></span>' +
+      (s.role === 'streamer' ? '<span class="lt2"><span class="bar"><i style="width:' + Math.min(100, hrs / (pl.planMin || 1) * 100) + '%;background:' + col + '"></i><u style="left:' + Math.min(100, pl.paceMin / (pl.planMin || 1) * 100) + '%"></u></span><span class="mut">' + hw(hrs) + ' / ' + pl.hours + ' ч</span></span>' : '') +
+      '<span class="' + (s.live ? 'lon' : 'mut') + '" style="font-size:13px">' + esc(note) + '</span></span>' + (s.noCard ? '' : '<span class="chv">›</span>') + '</div>';
+  }
+  if (!list.length) o += '<div class="mut" style="padding:12px 0;text-align:center">Стримеров пока нет</div>';
+  return o;
+}
+function openLive() {
+  var n = 0, i; for (i = 0; i < liveL.length; i++) if (liveL[i].live) n++;
+  openList('Стримеры', n ? '<span class="st st-bad">' + n + ' в эфире</span>' : '<span class="st st-new">никто не в эфире</span>', liveRows());
+  bindLive();
+}
+function bindLive() {
+  var i, a = document.querySelectorAll('#ldl [data-sc]');
+  for (i = 0; i < a.length; i++) a[i].onclick = function (e) { if (e.target && e.target.className === 'lo') return; var s = shownS[Number(this.getAttribute('data-sc'))]; if (s && !s.noCard) openStreamer(s); };
+  var b = document.querySelectorAll('[data-ls]');
+  for (i = 0; i < b.length; i++) b[i].onclick = function () { liveSort = this.getAttribute('data-ls'); $('ldl').innerHTML = liveRows(); bindLive(); smFit(); };
+}
+function bellSig(rows) { var o = []; for (var i = 0; i < rows.length; i++) o.push(rows[i][2] + '#' + rows[i][0]); return o.sort().join('|'); }
+function openBell() {
+  var rows = taskRows(last.d), o = '';
+  try { localStorage.setItem('lite_bell_' + myRole, bellSig(rows)); } catch (e) {}
+  if (!rows.length) o = '<div class="okm">Всё под контролем ✓</div>';
+  for (var i = 0; i < rows.length; i++) o += '<div class="tk"><span class="bd ' + rows[i][1] + '">' + rows[i][0] + '</span><span><span class="tt">' + esc(rows[i][2]) + '</span><span class="ts">' + esc(rows[i][3]) + '</span></span></div>';
+  openList('Требует внимания', '', o);
+  var bb = $('bellBtn'); if (bb) { bb.className = 'tb ic'; var g = bb.querySelector('.bdg'); if (g) g.parentNode.removeChild(g); }
+  lastHtml = '';
+}
+
+function tasks(d) { var rows = taskRows(d), o = '', i;
+  if (!rows.length) return '<div class="okm">Всё под контролем ✓</div>';
+  for (i = 0; i < rows.length; i++) o += '<div class="tk"><span class="bd ' + rows[i][1] + '">' + rows[i][0] + '</span><span><span class="tt">' + esc(rows[i][2]) + '</span><span class="ts">' + esc(rows[i][3]) + '</span></span></div>';
+  return o;
+}
+function taskRows(d) {
   var T = d.tasks || {}, rows = [], i;
   var names = function (a, f) { var o = []; for (var j = 0; j < a.length; j++) o.push(f(a[j])); return o.join(' · '); };
   var sum = function (a) { var n = 0; for (var j = 0; j < a.length; j++) n += a[j].n; return n; };
@@ -554,10 +627,7 @@ function tasks(d) {
   if (T.monthWaiting) rows.push([T.monthWaiting.pending || '!', T.monthWaiting.pending ? 'w' : 'r', 'Месяц ' + perLabel(T.monthWaiting.period) + ' ждёт закрытия', T.monthWaiting.hold ? 'Открыт заново: закройте его после правок' : T.monthWaiting.pending + ' отчётов не проверено']);
   if (T.tasksDone && T.tasksDone.length) rows.push([T.tasksDone.length, 'w', 'Задачи ждут принятия', names(T.tasksDone, function (x) { return x.staff_name + ': ' + x.title; })]);
   if (T.tasksOverdue && T.tasksOverdue.length) rows.push([T.tasksOverdue.length, 'r', 'Просрочены задачи', names(T.tasksOverdue, function (x) { return x.staff_name + ': ' + x.title; })]);
-  if (!rows.length) return '<div class="okm">Всё под контролем ✓</div>';
-  var o = '';
-  for (i = 0; i < rows.length; i++) o += '<div class="tk"><span class="bd ' + rows[i][1] + '">' + rows[i][0] + '</span><span><span class="tt">' + esc(rows[i][2]) + '</span><span class="ts">' + esc(rows[i][3]) + '</span></span></div>';
-  return o;
+  return rows;
 }
 function shifts(fs, d) {
   if (!fs || (!fs.fields.length && !fs.rows.length)) return '';
@@ -581,10 +651,11 @@ function shifts(fs, d) {
 
 function bind() {
   navBind();
-  if ($('liveTog')) $('liveTog').onclick = function () { liveAll = !liveAll; render(); };
+  if ($('onlBtn')) $('onlBtn').onclick = openOnline;
+  if ($('liveBtn')) $('liveBtn').onclick = openLive;
+  if ($('bellBtn')) $('bellBtn').onclick = openBell;
   if ($('lpBon')) $('lpBon').onclick = function (e) { e.preventDefault(); if ($('fcpop')) { fcClose(); return; } fcOpen(this, leadBonusPop(last.d)); var fp = $('fcpop'); if (fp) { fp.style.maxHeight = '70vh'; fp.style.width = '360px'; fp.style.fontSize = '13px'; } };
-  var sc = document.querySelectorAll('[data-sc]');
-  for (i = 0; i < sc.length; i++) sc[i].onclick = function (e) { e.preventDefault(); openStreamer(shownS[Number(this.getAttribute('data-sc'))]); };
+
 }
 
 // ---------- Период: календарь как в Office (пилюля с датами, пресеты, месяц с выбором диапазона, «Найти») ----------
@@ -643,8 +714,8 @@ function menuHtml() {
   for (i = 0; i < it.length; i++) h += '<button class="mi' + (view === it[i][0] ? ' on' : '') + '" data-v="' + it[i][0] + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' + IC[it[i][0]] + '</svg>' + it[i][1] + '</button>';
   return h + '<button class="mi out" id="logout">Выйти</button></div>';
 }
-function header(title, extra, noCal) {
-  return '<div class="top"><div class="ttl"><button class="burger" id="burger" aria-label="Меню"><i></i><i></i><i></i></button><h2>' + title + '</h2>' + (extra || '') + '</div>' + (noCal ? '' : calHtml()) + '</div>';
+function header(title, extra, noCal, tools) {
+  return '<div class="top"><div class="ttl"><button class="burger" id="burger" aria-label="Меню"><i></i><i></i><i></i></button><div class="ttx"><h2>' + title + '</h2>' + (extra || '') + '</div></div><div class="rbw">' + (tools || '') + (noCal ? '' : calHtml()) + '</div></div>';
 }
 function navBind() {
   if ($('burger')) $('burger').onclick = function () { menuOpen = true; draw(); };
