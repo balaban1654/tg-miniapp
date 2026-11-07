@@ -39,6 +39,13 @@ export async function requiredFor(tgId: number | string): Promise<Required> {
   return { required: Number(s.required), base, offer: { id: s.offer_id, name: s.offer_name, pct: s.discount_pct, until: new Date(s.expires_at).toISOString() } };
 }
 
+/** Сколько нужно было внести для доступа: цена сработавшей акции (если лид подключился по скидке), иначе как сейчас */
+export async function paidRequired(tgId: number | string): Promise<number> {
+  const c = (await db.query(`SELECT required FROM connect_sends WHERE tg_id = $1 AND connected_at IS NOT NULL AND reverted_at IS NULL ORDER BY id DESC LIMIT 1`, [tgId])).rows[0];
+  const now = (await requiredFor(tgId)).required;
+  return c ? Math.min(Number(c.required), now) : now;
+}
+
 /** Доступ лиду открыт: действующая акция сработала */
 export async function markConnected(tgId: number | string, total: number): Promise<void> {
   await db.query(

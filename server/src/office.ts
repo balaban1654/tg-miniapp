@@ -17,7 +17,7 @@ import { leadStatusDate, leadListDate, funnelStage, funnelStageDate, churnedAfte
 import { referralOfficeRoutes, accrueReferral } from './referral.js';
 import { exportTexts } from './i18nFill.js';
 import { syncRefReward } from './referral.js';
-import { connectRoutes, connectInfo, requiredFor, markConnected, TOL } from './connect.js';
+import { connectRoutes, connectInfo, requiredFor, markConnected, paidRequired, TOL } from './connect.js';
 import { toVoice, toVideoNote } from './media.js';
 import { parseReviewPhoto, cleanReviewText, cleanRating } from './reviews.js';
 import { loadDepConfig, leadTierState } from './depbonus.js';
@@ -2878,7 +2878,7 @@ export async function rollbackLeadAfterEventRemoval(tgId: number, type: string):
   if (!lead || lead.removed_at || !['registered', 'ftd', 'active'].includes(lead.status)) return;
   const e = (
     await db.query(
-      `SELECT bool_or(type = 'reg') AS reg, bool_or(type = 'ftd') AS ftd, bool_or(type = 'dep') AS dep,
+      `SELECT bool_or(type = 'reg') AS reg, bool_or(type = 'ftd') AS ftd, bool_or(type = 'dep') AS dep, bool_or(type = 'dep' AND coalesce(amount, 0) > 0) AS dep_paid,
               bool_or(type = 'comm' AND amount > 0) AS comm,
               coalesce(sum(amount) FILTER (WHERE type IN ('ftd','dep')), 0)::float AS tot
          FROM events WHERE tg_id = $1`,
@@ -2888,8 +2888,8 @@ export async function rollbackLeadAfterEventRemoval(tgId: number, type: string):
   const hasPay = Boolean(e.ftd || e.dep);
   // Комиссия по клиенту значит, что он торгует на своих депозитах (перенос из старого бота): остаётся активным
   if (!hasPay && e.comm) return;
-  const enough = hasPay && Number(e.tot) >= (await requiredFor(tgId)).required * TOL;
-  const next = enough ? (e.dep ? 'active' : 'ftd') : e.reg || hasPay || lead.trader_id ? 'registered' : 'new';
+  const enough = hasPay && Number(e.tot) >= (await paidRequired(tgId)) * TOL;
+  const next = enough ? (e.dep_paid ? 'active' : 'ftd') : e.reg || hasPay || lead.trader_id ? 'registered' : 'new';
   if (next === lead.status) return;
   const paid = next === 'ftd' || next === 'active';
   await db.query(`UPDATE leads SET ${lead.blocked ? 'status_before_block' : 'status'} = $2${paid ? '' : ', access = FALSE'} WHERE tg_id = $1`, [tgId, next]);

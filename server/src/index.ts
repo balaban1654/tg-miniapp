@@ -20,6 +20,7 @@ import { seedTemplates } from './templates.js';
 import { seedReplies } from './replies.js';
 import { applyFill } from './i18nFill.js';
 import { syncRefRewardsAll } from './referral.js';
+import { fixLeadStatusesOnce } from './postback.js';
 import { parseClick } from './clicks.js';
 import { widgetRoutes } from './widget.js';
 import { RESERVED_SLUGS, SITE_URL } from './reserved.js';
@@ -37,6 +38,17 @@ await seedTemplates();
 await seedReplies();
 await applyFill().catch((e) => console.warn('i18n-fill:', e));
 await syncRefRewardsAll().catch((e) => console.warn('ref sync:', e));
+// Разовое исправление статусов лидов (доступ за комиссию без нужной суммы, «Активный» без додепа с суммой)
+await fixLeadStatusesOnce().then(async (r) => {
+  if (!r || (!r.downgraded.length && !r.toFtd.length)) return;
+  console.log('Исправлены статусы лидов:', JSON.stringify(r));
+  const chat = process.env.ALERT_TG_CHAT_ID || process.env.BACKUP_TG_CHAT_ID;
+  if (!chat || !process.env.BOT_TOKEN) return;
+  const text = '🛠 Hunter: исправлены статусы лидов после ошибки в правилах.\n' +
+    (r.downgraded.length ? `\nДоступ закрыт, статус «Регистрация» (внесли меньше нужной суммы): ${r.downgraded.length}\n` + r.downgraded.slice(0, 40).join('\n') + '\n' : '') +
+    (r.toFtd.length ? `\n«Активный» → «FTD» (додепа с суммой не было): ${r.toFtd.length}\n` + r.toFtd.slice(0, 40).join('\n') : '');
+  await fetch(`https://api.telegram.org/bot${process.env.BOT_TOKEN}/sendMessage`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ chat_id: chat, text: text.slice(0, 4000) }) }).catch(() => {});
+}).catch((e) => console.warn('fix statuses:', e));
 await fraudBackfill().catch((e) => console.error('Проверка фрода при запуске не удалась', e));
 
 // Интерфейс Hunter Office и его API

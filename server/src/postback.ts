@@ -5,7 +5,7 @@ import { createHash, timingSafeEqual } from 'node:crypto';
 import { db, pickOrganicOwner, pickFallbackOwner } from './db.js';
 import { config } from './config.js';
 import { processLead } from './push.js';
-import { requiredFor, markConnected, TOL } from './connect.js';
+import { requiredFor, markConnected, paidRequired, TOL } from './connect.js';
 
 type Ev = 'reg' | 'ftd' | 'dep' | 'wd' | 'comm';
 const EVENTS: Ev[] = ['reg', 'ftd', 'dep', 'wd', 'comm'];
@@ -129,15 +129,18 @@ export async function postbackRoutes(app: FastifyInstance): Promise<void> {
       // Доступ открывается, когда сумма пополнений достигла минимума. Если партнёрка не прислала сумму, проверить нечем, открываем
       const tot = Number((await db.query(`SELECT coalesce(sum(amount), 0) AS s FROM events WHERE tg_id = $1 AND type IN ('ftd','dep')`, [tgId])).rows[0].s);
       // 10% запас: сумма в постбеке может быть чуть меньше из-за курса в Pocket Option
-      const enough = amount === null || tot >= (await requiredFor(tgId)).required * TOL;
+      // Без суммы доверяем только FTD (партнёрка иногда не присылает сумму первого депозита); додеп без суммы доступ не открывает
+      const enough = (amount === null && event === 'ftd') || tot >= (await requiredFor(tgId)).required * TOL;
+      // «Активный» - только после додепа с суммой: пустой постбек dep (без суммы) статус не повышает
+      const depPaid = event === 'dep' && amount !== null;
       if (enough) {
         if (event === 'ftd' || (event === 'dep' && !['ftd', 'active'].includes(cur.status))) {
           // Первый достаточный депозит: открываем анализ. Лид из старого бота приходит сразу с додепом без FTD:
           // он «активный» (его первый депозит был раньше), а не FTD
           // FTD, пришедший позже додепа (события приходят не по порядку), не должен понижать «Активного» до FTD
-          const hasDep = event === 'ftd' && (await db.query(`SELECT 1 FROM events WHERE tg_id = $1 AND type = 'dep' LIMIT 1`, [tgId])).rowCount;
-          await db.query(`UPDATE leads SET status = $2, access = (removed_at IS NULL) WHERE tg_id = $1`, [tgId, event === 'ftd' && !hasDep ? 'ftd' : 'active']);
-        } else {
+          const hasDep = event === 'ftd' && (await db.query(`SELECT 1 FROM events WHERE tg_id = $1 AND type = 'dep' AND coalesce(amount, 0) > 0 LIMIT 1`, [tgId])).rowCount;
+          await db.query(`UPDATE leads SET status = $2, access = (removed_at IS NULL) WHERE tg_id = $1`, [tgId, (event === 'ftd' && hasDep) || depPaid ? 'active' : 'ftd']);
+        } else if (depPaid) {
           await db.query(`UPDATE leads SET status = 'active' WHERE tg_id = $1 AND status = 'ftd'`, [tgId]);
         }
         await markConnected(tgId, tot).catch(() => {});
@@ -149,7 +152,9 @@ export async function postbackRoutes(app: FastifyInstance): Promise<void> {
     }
 
     // Комиссия по клиенту значит, что он торгует на своих депозитах (перенос из старого бота): статус «активный» и доступ
-    if (event === 'comm' && amount && ['new', 'registered'].includes(cur.status)) {
+    // Только если депозитов у нас нет совсем: иначе лид с FTD меньше нужной суммы получил бы доступ за комиссию
+    if (event === 'comm' && amount && ['new', 'registered'].includes(cur.status)
+        && !(await db.query(`SELECT 1 FROM events WHERE tg_id = $1 AND type IN ('ftd','dep') LIMIT 1`, [tgId])).rowCount) {
       await db.query(`UPDATE leads SET status = 'active', access = (removed_at IS NULL) WHERE tg_id = $1`, [tgId]);
     }
 
@@ -163,4 +168,36 @@ export async function postbackRoutes(app: FastifyInstance): Promise<void> {
 
   app.get('/postback/:event', handler);
   app.post('/postback/:event', handler);
+}
+
+/** Разовый пересчёт после исправления правил (ноябрь 2026): лиды, ставшие «Активными» и получившие доступ
+ *  за комиссию при FTD меньше нужной суммы, и «Активные» только с пустым (без суммы) постбеком додепа.
+ *  Сотрудников, тестовых и клиентов старого бота без депозитов не трогает. Выполняется один раз */
+export async function fixLeadStatusesOnce(): Promise<{ downgraded: string[]; toFtd: string[] } | null> {
+  const KEY = 'fix_status_2026_11';
+  if ((await db.query(`SELECT 1 FROM app_settings WHERE key = $1`, [KEY])).rowCount) return null;
+  const rows = (await db.query(
+    `SELECT d.tg_id::text AS tg_id, coalesce(d.first_name, d.username, d.tg_id::text) AS name, d.status, d.access,
+            coalesce(sum(e.amount) FILTER (WHERE e.type IN ('ftd','dep')), 0)::float AS tot,
+            bool_or(e.type = 'ftd' AND e.amount IS NULL) AS ftd_noamount,
+            bool_or(e.type = 'dep' AND coalesce(e.amount, 0) > 0) AS dep_paid, bool_or(e.type = 'ftd') AS has_ftd
+       FROM leads d JOIN events e ON e.tg_id = d.tg_id AND e.type IN ('ftd','dep')
+      WHERE d.removed_at IS NULL AND coalesce(d.lead_role, 'lead') = 'lead' AND NOT coalesce(d.is_tester, FALSE)
+        AND d.status IN ('ftd','active')
+      GROUP BY d.tg_id`,
+  )).rows as { tg_id: string; name: string; status: string; access: boolean; tot: number; ftd_noamount: boolean; dep_paid: boolean; has_ftd: boolean }[];
+  const downgraded: string[] = [], toFtd: string[] = [];
+  for (const r of rows) {
+    const enough = r.ftd_noamount || r.tot >= (await paidRequired(r.tg_id)) * TOL;
+    // Закрываем доступ только при настоящем FTD у нас: клиенты из старого бота (одни додепы) не трогаем
+    if (!enough && r.has_ftd) {
+      await db.query(`UPDATE leads SET status = 'registered', access = FALSE WHERE tg_id = $1`, [r.tg_id]);
+      downgraded.push(`${r.name} (${r.tg_id}, $${r.tot})`);
+    } else if (r.status === 'active' && !r.dep_paid) {
+      await db.query(`UPDATE leads SET status = 'ftd' WHERE tg_id = $1`, [r.tg_id]);
+      toFtd.push(`${r.name} (${r.tg_id})`);
+    }
+  }
+  await db.query(`INSERT INTO app_settings (key, value, updated_at) VALUES ($1, $2, now()) ON CONFLICT (key) DO NOTHING`, [KEY, JSON.stringify({ downgraded, toFtd })]);
+  return { downgraded, toFtd };
 }
