@@ -527,6 +527,7 @@ textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10
 .me-tools{display:flex;gap:4px;align-items:center;flex-wrap:nowrap}.me-row #meName:has(.me-sel){flex:1;min-width:0;display:block}.gear.me-tb{width:34px;height:34px;border-radius:10px;padding:0;flex:none}.gear.me-tb svg{width:18px;height:18px}.me-sel{width:100%;min-width:0;font-size:12px;padding:7px 24px 7px 9px;border-radius:10px;text-overflow:ellipsis}#actBar{position:fixed;right:16px;bottom:16px;opacity:.97;z-index:80;display:flex;align-items:center;gap:10px;flex-wrap:wrap;max-width:calc(100vw - 32px);padding:9px 10px 9px 14px;border-radius:12px;background:#ffd54d;color:#1b1530;font-weight:700;font-size:13px;box-shadow:0 10px 30px rgba(0,0,0,.45)}#actBar .btn{background:#1b1530;color:#fff;border-color:#1b1530}.me-cont{display:flex;gap:4px}.me-ci{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;flex:none;background:none;border:0;color:var(--mut);transition:background .15s,color .15s}.me-ci:hover{background:var(--card2);color:var(--fg)}
 .pw-wrap{position:relative;display:block}.pw-wrap input{padding-right:44px;width:100%}.pw-eye{position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:0;padding:6px;color:var(--mut);cursor:pointer;display:grid;place-items:center;border-radius:8px}.pw-eye:hover{color:var(--fg)}
 .lc-act{position:relative;display:inline-flex}.lc-tri{display:inline-block;margin-left:6px;font-size:12px;transition:transform .15s}.lc-act .btn.on .lc-tri{transform:rotate(180deg)}.lc-menu{position:absolute;left:0;bottom:calc(100% + 6px);z-index:20;min-width:250px;display:grid;gap:2px;padding:6px;background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 30px rgba(0,0,0,.45)}.lc-menu[hidden]{display:none}.lc-mi{border:0;background:none;color:var(--fg);font:inherit;font-weight:600;font-size:14px;text-align:left;padding:10px 12px;border-radius:8px;cursor:pointer;white-space:nowrap}.lc-mi:hover{background:var(--card2)}.lc-mi.bad{color:var(--bad)}
+.lc-pbtn{border:1px solid var(--line);background:var(--card2);color:var(--acc2);font:inherit;font-weight:700;font-size:12px;padding:2px 8px;border-radius:8px;cursor:pointer;display:inline-flex;align-items:center}.lc-pbtn .lc-tri{margin-left:4px;font-size:11px}.lc-pbtn.on .lc-tri{transform:rotate(180deg)}.lc-pmenu{top:calc(100% + 4px);bottom:auto;min-width:200px}
 </style>
 </head>
 <body>
@@ -2251,6 +2252,20 @@ async function viewHome(){
 
 const LROLES=[['lead','Лид'],['test','Тест'],['moder','Модер'],['admin','Админ'],['streamer','Стример'],['analyst','Аналитик'],['buyer','Медиабайер']];
 const lroleName=k=>(LROLES.find(x=>x[0]===k)||LROLES[0])[1];
+/** Pocket ID в карточке лида: виден основной, остальные (прежние после новой регистрации, вторые) - в списке под «▾» */
+function pocketKv(L,cpI){
+  const main=L.trader_id,other=(L.pockets||[]).filter(x=>x&&x!==main);
+  const val=el('b',{style:'display:flex;gap:6px;align-items:center'},main?String(main):'—',main?cpI(main):null);
+  if(!other.length)return el('div',{class:'lc-kv'},el('span',{class:'mut sm'},'Pocket ID'),val);
+  const menu=el('div',{class:'lc-menu lc-pmenu',hidden:'',role:'menu'},el('div',{class:'mut sm',style:'padding:4px 12px 2px'},main?'Другие Pocket ID':'Прежние Pocket ID'),
+    ...other.map(x=>el('div',{class:'lc-mi',style:'display:flex;gap:8px;align-items:center;justify-content:space-between;cursor:default'},el('span',{},x),cpI(x))));
+  const off=e=>{if(!menu.contains(e.target)&&!btn.contains(e.target))hide()};
+  const show=()=>{menu.hidden=false;btn.classList.add('on');btn.setAttribute('aria-expanded','true');setTimeout(()=>document.addEventListener('click',off),0)};
+  const hide=()=>{menu.hidden=true;btn.classList.remove('on');btn.setAttribute('aria-expanded','false');document.removeEventListener('click',off)};
+  const btn=el('button',{type:'button',class:'lc-pbtn','aria-haspopup':'menu','aria-expanded':'false',title:'Ещё Pocket ID: '+other.length,onclick:e=>{e.stopPropagation();menu.hidden?show():hide()}},'+'+other.length,el('span',{class:'lc-tri'},'▾'));
+  val.append(btn);
+  return el('div',{class:'lc-kv',style:'position:relative'},el('span',{class:'mut sm'},'Pocket ID'),val,menu);
+}
 /** «Действия ▾» в карточке лида: заблокировать / разблокировать и «Разрешить новую регистрацию» (админ и тимлид) */
 function lcActions(L,fname,close){
   const reopen=()=>{close();openLeadCard(L.tg_id)};
@@ -2962,7 +2977,7 @@ async function openLeadCard(tgId){
       el('div',{class:'lc-hr'},el('div',{class:'lc-pills'},pill(L.status),L.rereg_at?el('span',{class:'pill p-pur',title:'Новая регистрация разрешена '+fmtDT(L.rereg_at)+'. Старый Pocket ID в карточке вторым'},'ждёт новой регистрации'):null,L.banned_at?el('span',{class:'pill p-bad'},'заблокирован'):L.access?el('span',{class:'pill p-ok'},'доступ открыт'):el('span',{class:'pill p-pur'},'доступ закрыт')),
         el('button',{class:'btn o s',type:'button','aria-label':'Закрыть',onclick:close},'✕'))),
     el('div',{class:'lc-grid'},
-      kvc('Telegram ID',L.tg_id),kvc('Pocket ID',L.trader_id),...(L.pockets||[]).map((x,i)=>kvc('Pocket ID '+(i+2),x)),kv('Откуда пришёл',origin),
+      kvc('Telegram ID',L.tg_id),pocketKv(L,cpI),kv('Откуда пришёл',origin),
       // На компьютере сначала «Владелец», потом «Страна»; в мобильной версии порядок прежний
       ...(matchMedia('(min-width:521px)').matches?[kv('Владелец',L.owner_name||'не закреплён'),kv('Страна',countryName(d.country))]:[kv('Страна',countryName(d.country)),kv('Владелец',L.owner_name||'не закреплён')]),
       // Пришёл по реферальной ссылке: на месте часового пояса «Пригласил» (Telegram ID, по нажатию его карточка), пояс ниже
