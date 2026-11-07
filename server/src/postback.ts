@@ -151,12 +151,7 @@ export async function postbackRoutes(app: FastifyInstance): Promise<void> {
       }
     }
 
-    // Комиссия по клиенту значит, что он торгует на своих депозитах (перенос из старого бота): статус «активный» и доступ
-    // Только если депозитов у нас нет совсем: иначе лид с FTD меньше нужной суммы получил бы доступ за комиссию
-    if (event === 'comm' && amount && ['new', 'registered'].includes(cur.status)
-        && !(await db.query(`SELECT 1 FROM events WHERE tg_id = $1 AND type IN ('ftd','dep') LIMIT 1`, [tgId])).rowCount) {
-      await db.query(`UPDATE leads SET status = 'active', access = (removed_at IS NULL) WHERE tg_id = $1`, [tgId]);
-    }
+    // Комиссия статус и доступ не меняет: «Активный» - только после додепа с суммой после FTD
 
     if (wasBlocked) await markLeadBlocked(tgId);
 
