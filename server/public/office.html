@@ -1065,6 +1065,12 @@ function dxPlace(b,p){
     p.style.maxHeight=(innerHeight-24)+'px';const h2=Math.min(h,innerHeight-24);
     left=Math.max(12,Math.min(r.left,vw-w-12));top=Math.max(12,Math.min(r.bottom+8,innerHeight-12-h2));
   }
+  // «left»: окно открывается слева от кнопки, верх на уровне кнопки и целиком в экране; не влезает слева - под кнопкой, к её правому краю
+  if(p.classList.contains('left')&&vw>560){
+    const h2=p.classList.contains('fit')?Math.min(h,innerHeight-24):h;
+    if(r.left-8-w>=12){left=r.left-8-w;top=r.top}else{left=Math.max(12,Math.min(r.right-w,vw-w-12));top=r.bottom+8}
+    top=Math.max(12,Math.min(top,innerHeight-12-h2));
+  }
   p.style.left=(left+sx)+'px';p.style.top=(top+sy)+'px';
 }
 const dxReplace=()=>dxReg.forEach(([b,p])=>{if(!p.hidden&&p.classList.contains('dx-pop'))dxPlace(b,p)});
@@ -1192,7 +1198,7 @@ function dxBell(t){
   t.items.forEach(x=>{if(!x.dataset.done&&seen.includes(key(x)))x.classList.add('seen')});
   const list=el('div',{class:'dx-bl'},...(t.items.length?t.items:[el('div',{class:'dx-ok'},'Всё в порядке. Отличная работа')]));
   list.addEventListener('click',e=>{if(e.target.closest('.dx-tk'))setTimeout(dxCloseAll,0)});
-  const w=dxPopBtn('Требует внимания',IC_BELL,el('div',{style:'display:grid;gap:2px'},el('div',{class:'dx-lbl'},'Требует внимания'),list),'wide bell','dx-bell');
+  const w=dxPopBtn('Требует внимания',IC_BELL,el('div',{style:'display:grid;gap:2px'},el('div',{class:'dx-lbl'},'Требует внимания'),list),'wide bell left','dx-bell');
   const b=w.querySelector('button');b.classList.remove('sm2');
   const bdg=fresh.length?el('span',{class:'dx-bdg'},fresh.length>99?'99+':String(fresh.length)):null;
   if(bdg){b.classList.add('has','ring');b.append(bdg);b.title=b.ariaLabel='Требует внимания: '+fresh.length+' новых'}
@@ -1698,10 +1704,10 @@ function dxPlanFact(d){
   const title=d.range.whole&&!d.range.all?'План / факт за месяц':'План / факт';
   const icons=[];
   // Тимлиду в кольцах только общий результат компании (план команды виден на кольцах плитки)
-  if(g&&!d.company)icons.push(dxPopBtn('Кольца выполнения плана',IC_RINGS,dxRings(d),'pl'));
-  else if(d.company)icons.push(dxPopBtn('Кольца: общий результат компании',IC_RINGS,el('div',{style:'display:grid;gap:8px'},el('div',{class:'dx-lbl'},'Общий результат компании'),dxRings(d.company)),'pl'));
-  icons.push(dxPopBtn('Воронка',IC_FUNNEL,dxFunnel(d),'pl wide'));
-  icons.push(dxPopBtn(d.leadPay?'Охваты вашей команды: просмотры, подписчики, комментарии и лайки':'Просмотры, подписчики, комментарии и лайки',IC_HEART,dxSocial(d),'pl wide'));
+  if(g&&!d.company)icons.push(dxPopBtn('Кольца выполнения плана',IC_RINGS,dxRings(d),'pl left'));
+  else if(d.company)icons.push(dxPopBtn('Кольца: общий результат компании',IC_RINGS,el('div',{style:'display:grid;gap:8px'},el('div',{class:'dx-lbl'},'Общий результат компании'),dxRings(d.company)),'pl left'));
+  icons.push(dxPopBtn('Воронка',IC_FUNNEL,dxFunnel(d),'pl wide left'));
+  icons.push(dxPopBtn(d.leadPay?'Охваты вашей команды: просмотры, подписчики, комментарии и лайки':'Просмотры, подписчики, комментарии и лайки',IC_HEART,dxSocial(d),'pl wide left'));
   const days=pfDays(d.range.from,d.range.to),by=new Map((d.daily||[]).map(x=>[x.d,x])),v=k=>days.map(x=>(by.get(x)||{})[k]||0);
   const metrics=[{k:'regs',n:'Регистрации',c:'#5ab0ff',goal:g&&g.regs,f:n0,vals:v('regs')},{k:'ftd',n:'FTD',c:'#9b5cff',goal:g&&g.ftd,f:n0,vals:v('ftd')},
     {k:'ftdSum',n:'Пополнения по FTD',c:'#c084fc',goal:g&&g.ftdSum,f:usd0,vals:v('ftdSum')},{k:'deposits',n:'Все депозиты',c:'#3ddc97',goal:g&&g.deposits,f:usd0,vals:v('deposits')},
@@ -1752,7 +1758,7 @@ function dxNet(d){
   const expPop=el('div',{style:'display:grid;gap:8px'},el('div',{class:'dx-hd'},el('span',{class:'dx-lbl'},'Расходы за период'),el('a',{href:'#/acc/exp',style:'color:var(--acc2);font-weight:700;font-size:12px',onclick:e=>{e.preventDefault();dxGo('acc','exp')}},'+ Добавить')),exp);
   const diff=t.netPlanToDate===null?null:t.net-t.netPlanToDate;
   const margin=t.commission>0?Math.round(t.net/t.commission*100):null;
-  return el('div',{class:'card dx-net',style:'display:grid;gap:8px'},el('div',{class:'dx-hd'},el('div',{class:'l'},el('span',{class:'dx-lbl'},'Чистая прибыль'),dxPopBtn('Зарплаты',IC_WALLET,salPop,'pr fit sheet'),dxPopBtn('Расходы',IC_RECEIPT,expPop,'pr fit sheet'))),
+  return el('div',{class:'card dx-net',style:'display:grid;gap:8px'},el('div',{class:'dx-hd'},el('div',{class:'l'},el('span',{class:'dx-lbl'},'Чистая прибыль'),dxPopBtn('Зарплаты',IC_WALLET,salPop,'pr fit sheet left'),dxPopBtn('Расходы',IC_RECEIPT,expPop,'pr fit sheet left'))),
     el('div',{class:'big '+(t.net<0?'neg':'pos')},usd0(t.net)),
     diff!==null?el('span',{class:'dx-chip '+(diff>=0?'ok':'bad')},(diff>=0?'▲ на '+usd0(diff)+' выше':'▼ на '+usd0(-diff)+' ниже')+' плана на эту дату'):null,
     margin!==null?el('div',{class:'mut',style:'font-size:13px'},'Маржа '+(margin<0?'−'+Math.abs(margin):margin)+'% от комиссии'):null,
@@ -2120,7 +2126,7 @@ function smMetrics(d){
   const mins=v('minutes'),sm=pl.shiftH*60;let acc=0,prev=0;const shiftsDay=mins.map(x=>{acc+=x;const c=Math.floor(acc/sm);const r=c-prev;prev=c;return r});
   const metrics=[{k:'hours',n:'Часы в эфире',c:'#5ab0ff',goal:pl.planMin,f:x=>fmtH(Math.round(x))+' ч',vals:mins},{k:'shifts',n:'Закрытые смены',c:'#3ddc97',goal:m.planShifts,f:n0,vals:shiftsDay},
     {k:'regs',n:'Регистрации',c:'#f5c542',goal:0,f:n0,vals:v('regs')},{k:'ftd',n:'FTD',c:'#9b5cff',goal:pl.leads,f:n0,vals:v('ftd')},{k:'ftdSum',n:'Всего FTD $',c:'#c084fc',goal:0,f:usd0,vals:v('ftdSum')}];
-  const icons=[dxPopBtn('Общий план команды',IC_RINGS,smRings(d),'pl'),dxPopBtn('Воронка',IC_FUNNEL,smFunnel(d),'pl wide'),dxPopBtn('Просмотры, подписчики, комментарии и лайки',IC_HEART,smSocial(d),'pl')];
+  const icons=[dxPopBtn('Общий план команды',IC_RINGS,smRings(d),'pl left'),dxPopBtn('Воронка',IC_FUNNEL,smFunnel(d),'pl wide left'),dxPopBtn('Просмотры, подписчики, комментарии и лайки',IC_HEART,smSocial(d),'pl left')];
   const title='Мои показатели за '+(d.range.whole?'месяц':perLabel(m.period).toLowerCase());
   const card=el('div',{class:'card dx-pf'});
   pfMount(card,(view,show)=>[pfHead(title,mark!==null?'метка: план на сегодня':'',show,icons),view==='chart'?pfChartBlock(metrics,d.range.from,d.range.to,d.today||kyivToday(),'streamer'):el('div',{class:'pf-g'},...L),smLeadsStrip(d)]);
