@@ -171,6 +171,9 @@ table.rb-g{border:0;background:none;width:auto}.rb-g th{background:none;padding:
 tr.dayb td{border-top:2px solid #6a2fe0}
 td{white-space:nowrap}
 .tgid{color:#f1ebff;text-decoration:none;border-bottom:1px dashed #a89cc8}
+/* Таблица «Лиды» сжимается под ширину iPad: меньше отступы и шрифт, длинные имена с многоточием */
+@media (max-width:1100px){table.lt th{padding:8px 5px;font-size:10px;letter-spacing:.03em}table.lt td{padding:8px 5px;font-size:12.5px}table.lt td.nm2{max-width:120px}table.lt .st{font-size:10.5px;padding:3px 7px}}
+@media (max-width:820px){table.lt th{padding:7px 3px;font-size:9px;letter-spacing:0}table.lt td{padding:7px 3px;font-size:11.5px}table.lt td.nm2{max-width:90px}table.lt .st{font-size:9.5px;padding:2px 5px}}
 .snm{color:#f1ebff;text-decoration:none;border-bottom:1px dashed #a89cc8}
 /* Карточка стримера: как в Office (dx-md), только flex (Safari 9). Если не влезает по высоте, уменьшается целиком */
 .so{position:fixed;left:0;top:0;right:0;bottom:0;z-index:70;background:rgba(5,2,12,.6)}
@@ -870,7 +873,7 @@ function renderLeads() {
   if (leadsQ) h += '<div class="mut" style="margin:-6px 0 10px;font-size:12px">Найдено ' + list.length + ' (поиск по всем лидам, период не учитывается)</div>';
   if (!list.length) h += '<div class="card mut" style="text-align:center">' + (rows.length ? 'Ничего не найдено. Измените фильтры.' : 'Лидов за период нет') + '</div>';
   else {
-    h += '<div class="scroll"><table><tr><th>Пришёл</th><th class="l">Имя / ТГ</th><th>Telegram ID</th><th>Pocket ID</th><th>Статус</th><th>Владелец</th><th>Ссылка</th><th>FTD</th><th>Депозиты</th><th>Комиссия</th></tr>';
+    h += '<div class="scroll"><table class="lt"><tr><th>Пришёл</th><th class="l">Имя / ТГ</th><th>Telegram ID</th><th>Pocket ID</th><th>Статус</th><th>Владелец</th><th>Ссылка</th><th>FTD</th><th>Депозиты</th><th>Комиссия</th></tr>';
     var prev = null;
     for (i = 0; i < list.length; i++) {
       var r = list[i], st = staff(r) ? ['Сотрудник', 'st-new'] : LST[r.stage || r.status] || [r.stage || r.status, 'st-new'], dd = dk(r);
