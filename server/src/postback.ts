@@ -76,8 +76,9 @@ export async function postbackRoutes(app: FastifyInstance): Promise<void> {
       await db.query('UPDATE leads SET trader_id = $2 WHERE tg_id = $1 AND trader_id IS NULL', [tgId, traderId]);
     }
     // Ещё один Pocket ID того же человека (вторая регистрация, депозит с другого аккаунта): пишем в карточку списком, основной не меняем
+    let newPocket = false;
     if (traderId && lead.rows[0].trader_id && lead.rows[0].trader_id !== traderId && !oldPocket) {
-      await db.query('INSERT INTO lead_pockets (trader_id, tg_id) SELECT $1, $2 WHERE NOT EXISTS (SELECT 1 FROM leads WHERE trader_id = $1) ON CONFLICT DO NOTHING', [traderId, tgId]);
+      newPocket = !!(await db.query('INSERT INTO lead_pockets (trader_id, tg_id) SELECT $1, $2 WHERE NOT EXISTS (SELECT 1 FROM leads WHERE trader_id = $1) ON CONFLICT DO NOTHING', [traderId, tgId])).rowCount;
     }
     // Новая регистрация после «Разрешить новую регистрацию»: Pocket ID уже стал основным (выше), статус снова «Регистрация».
     // Регистрация считается в день, когда пришла (старая остаётся в своём месяце); в списке «Лиды» лид встаёт на эту дату
@@ -115,7 +116,7 @@ export async function postbackRoutes(app: FastifyInstance): Promise<void> {
       [tgId, event, amount, fingerprint, JSON.stringify(forHash)],
     );
     if (!ins.rowCount) {
-      await log(event, q, tgId, 'дубль, пропущен');
+      await log(event, q, tgId, newPocket ? 'ok: ещё один Pocket ID лида, добавлен в карточку' : 'дубль, пропущен');
       return { ok: true, duplicate: true };
     }
 

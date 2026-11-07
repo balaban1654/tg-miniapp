@@ -5285,7 +5285,7 @@ async function viewPostbacks(){
   };
   const time=v=>new Date(v).toLocaleString('ru-RU',{timeZone:'Europe/Kyiv',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit',second:'2-digit'});
   const F=pbState;
-  const kind=r=>r.result==='ok'?'ok':r.result.startsWith('дубль')?'dup':r.result.startsWith('пропущен')?'skip':'err';
+  const kind=r=>r.result==='ok'||r.result.startsWith('ok:')?'ok':r.result.startsWith('дубль')?'dup':r.result.startsWith('пропущен')?'skip':'err';
   const amt=r=>{const qq=r.query||{};return Number(qq.commission||qq.sumdep||qq.wdr_sum||qq.amount||qq.sum||0)||0};
   const sel=(opts,key,all)=>{const x=el('select',{onchange:()=>{F[key]=x.value;draw()}},...(all?[el('option',{value:''},all)]:[]),...opts.map(([v,t])=>el('option',{value:v},t)));x.value=F[key];return x};
   const qin=el('input',{type:'search',placeholder:'Поиск: Pocket ID, Telegram ID',value:F.q,oninput:()=>{F.q=qin.value;draw()}});
@@ -5326,7 +5326,7 @@ async function viewPostbacks(){
       &&(!qq||[r.tg_id,(r.query||{}).trader_id,(r.query||{}).click_id].some(v=>v!=null&&String(v).toLowerCase().includes(qq))));
     const by={new:(a,b)=>new Date(b.created_at)-new Date(a.created_at),old:(a,b)=>new Date(a.created_at)-new Date(b.created_at),sum:(a,b)=>amt(b)-amt(a),sumAsc:(a,b)=>amt(a)-amt(b)};
     list=[...list].sort(by[F.sort]||by.new);
-    holder.replaceChildren(table(['Время','Событие','Telegram ID','Pocket ID',['Сумма','n'],'Результат',''],list.map(r=>{const qq2=r.query||{};return[td(time(r.created_at)),el('td',{},el('span',{class:'pill ev-'+r.event},r.event)),tgCell(r),copyCell(qq2.trader_id),td(qq2.commission||qq2.sumdep||qq2.wdr_sum||qq2.amount||qq2.sum||'—','n'),el('td',{},el('span',{class:'pill '+(r.result==='ok'?'p-ok':(r.result.startsWith('дубль')||r.result.startsWith('пропущен'))?'p-warn':'p-bad')},r.result)),me.role==='admin'?el('td',{},el('button',{class:'del-ib',type:'button',title:'Удалить постбек','aria-label':'Удалить постбек',onclick:()=>pbDeleteDialog(r,()=>render({soft:true}))},svgIcon(TRASH,17))):td('')]}),
+    holder.replaceChildren(table(['Время','Событие','Telegram ID','Pocket ID',['Сумма','n'],'Результат',''],list.map(r=>{const qq2=r.query||{};return[td(time(r.created_at)),el('td',{},el('span',{class:'pill ev-'+r.event},r.event)),tgCell(r),copyCell(qq2.trader_id),td(qq2.commission||qq2.sumdep||qq2.wdr_sum||qq2.amount||qq2.sum||'—','n'),el('td',{},el('span',{class:'pill '+(r.result==='ok'||r.result.startsWith('ok:')?'p-ok':(r.result.startsWith('дубль')||r.result.startsWith('пропущен'))?'p-warn':'p-bad')},r.result)),me.role==='admin'?el('td',{},el('button',{class:'del-ib',type:'button',title:'Удалить постбек','aria-label':'Удалить постбек',onclick:()=>pbDeleteDialog(r,()=>render({soft:true}))},svgIcon(TRASH,17))):td('')]}),
       rows.length?'Ничего не найдено. Измените фильтры.':'Постбеков пока нет. Когда партнёрка отправит первый, он появится здесь.'));
     // Итого по показанным записям: по каждому событию отдельно, а строка «Итого» внизу таблицы, когда выбрано одно событие
     const by2={};list.forEach(r=>{const o=by2[r.event]||(by2[r.event]={n:0,s:0});o.n++;o.s+=amt(r)});

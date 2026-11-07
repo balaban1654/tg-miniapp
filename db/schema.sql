@@ -1065,3 +1065,10 @@ SELECT p.tg_id, 'reg', NULL, 'reg:' || p.tg_id || ':' || coalesce(p.query->>'tra
   FROM postback_log p
  WHERE p.result LIKE 'ok: новая регистрация (повторная, в статистику не добавлена)' AND p.tg_id IS NOT NULL
 ON CONFLICT (external_id) DO NOTHING;
+
+-- Журнал постбеков: повторная регистрация теперь в статистике; дубль регистрации с другим Pocket ID - это ещё один Pocket ID лида
+UPDATE postback_log SET result = 'ok: новая регистрация (повторная)' WHERE result = 'ok: новая регистрация (повторная, в статистику не добавлена)';
+UPDATE postback_log p SET result = 'ok: ещё один Pocket ID лида, добавлен в карточку'
+ WHERE p.result = 'дубль, пропущен' AND p.event = 'reg' AND coalesce(p.query->>'trader_id', '') <> ''
+   AND EXISTS (SELECT 1 FROM lead_pockets lp WHERE lp.trader_id = p.query->>'trader_id' AND lp.tg_id = p.tg_id)
+   AND NOT EXISTS (SELECT 1 FROM postback_log o WHERE o.id < p.id AND o.tg_id = p.tg_id AND o.query->>'trader_id' = p.query->>'trader_id');

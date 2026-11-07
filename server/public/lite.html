@@ -877,7 +877,7 @@ function loadPb() {
     pbRows = d; renderPb();
   });
 }
-function pbKind(r) { var x = String(r.result || ''); return x === 'ok' ? 'ok' : x.indexOf('дубль') === 0 ? 'dup' : x.indexOf('пропущен') === 0 ? 'skip' : 'err'; }
+function pbKind(r) { var x = String(r.result || ''); return x === 'ok' || x.indexOf('ok:') === 0 ? 'ok' : x.indexOf('дубль') === 0 ? 'dup' : x.indexOf('пропущен') === 0 ? 'skip' : 'err'; }
 function pbAmt(r) { var q = r.query || {}; return Number(q.commission || q.sumdep || q.wdr_sum || q.amount || q.sum || 0) || 0; }
 function pbTime(v) { var d = new Date(v); return d.getDate() + ' ' + MS[d.getMonth()] + ', ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds()); }
 function renderPb() {
