@@ -1748,6 +1748,14 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
             AND (${funnelStageDate('d')} AT TIME ZONE '${TZ}')::date BETWEEN $2::date AND $3::date GROUP BY 1`,
         [scopeLead ? ids : null, from, to],
       )).rows.map((r: any) => [r.status, r.n])),
+      // Из них заблокировали бота до первого депозита (остались в своём этапе); ушедшие после депозита - это «Отвал»
+      blockedBy: Object.fromEntries((await db.query(
+        `SELECT ${funnelStage('d')} AS status, count(*)::int AS n FROM leads d
+          WHERE d.removed_at IS NULL AND coalesce(d.lead_role, 'lead') = 'lead' AND ($1::int[] IS NULL OR d.owner_id = ANY($1::int[]))
+            AND d.status = 'churned' AND NOT ${churnedAfterFtd('d')} AND ${funnelStage('d')} <> 'churned'
+            AND (${funnelStageDate('d')} AT TIME ZONE '${TZ}')::date BETWEEN $2::date AND $3::date GROUP BY 1`,
+        [scopeLead ? ids : null, from, to],
+      )).rows.map((r: any) => [r.status, r.n])),
       planScope: lead && tgl!.company ? 'company' : lead ? 'team' : 'company',
       teamSalaries: teamSal,
       refPay: refPay ? { earned: refPay.earned, paid: refPay.paid, n: refPay.n } : null,
@@ -1883,6 +1891,9 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     // Период по дате этапа: у FTD по дате первого депозита. Счётчик FTD и зарплату это не меняет
     const byStatus: Record<string, number> = {};
     for (const r of (await db.query(`SELECT CASE WHEN ${churnedAfterFtd('d')} THEN 'churned' ELSE ${funnelStage('d')} END AS status, count(*)::int AS n FROM leads d WHERE d.owner_id = $1 AND d.removed_at IS NULL AND coalesce(d.lead_role, 'lead') = 'lead' AND (${funnelStageDate('d')} AT TIME ZONE '${TZ}')::date BETWEEN $2::date AND $3::date GROUP BY 1`, [me.id, from, to])).rows) byStatus[r.status] = r.n;
+    // Заблокировали бота до первого депозита, по этапу (ушедшие после депозита - это «Отвал»)
+    const blockedBy: Record<string, number> = {};
+    for (const r of (await db.query(`SELECT ${funnelStage('d')} AS status, count(*)::int AS n FROM leads d WHERE d.owner_id = $1 AND d.removed_at IS NULL AND coalesce(d.lead_role, 'lead') = 'lead' AND d.status = 'churned' AND NOT ${churnedAfterFtd('d')} AND ${funnelStage('d')} <> 'churned' AND (${funnelStageDate('d')} AT TIME ZONE '${TZ}')::date BETWEEN $2::date AND $3::date GROUP BY 1`, [me.id, from, to])).rows) blockedBy[r.status] = r.n;
     // Отвал: свои лиды, пришедшие за период, у которых сейчас статус «Отвал» (как в воронке у админа). На FTD и зарплату не влияет
     const churnedN = Number((await db.query(`SELECT count(*)::int AS n FROM leads d WHERE d.owner_id = $1 AND ${churnedAfterFtd('d')} AND d.removed_at IS NULL AND coalesce(d.lead_role, 'lead') = 'lead' AND (${funnelStageDate('d')} AT TIME ZONE '${TZ}')::date BETWEEN $2::date AND $3::date`, [me.id, from, to])).rows[0].n);
 
@@ -1954,6 +1965,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
       social: { fields: socialFs.fields, totals: socialFs.fields.map((f: string) => socialFs.rows.filter((r) => r.staff_id === me.id).reduce((a, r) => a + (r.sums[f] ?? 0), 0)) },
       clicksSince,
       byStatus,
+      blockedBy,
       colleagues,
       // Общий план команды (как кольца у админа): депозиты и FTD всей команды за месяц против целей компании
       team: { ftd: k.ftdCount + colRows.reduce((a, c) => a + (ftdBy.get(c.id) ?? 0), 0), ftdGoal: plan.goals.ftd, deposits: teamDeposits, depositsGoal: plan.goals.deposits },

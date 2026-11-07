@@ -504,12 +504,13 @@ function pfAfter(d) {
 }
 var STS = [['new', 'Новые', '#9b5cff'], ['registered', 'Регистрации', '#ffd54d'], ['ftd', 'FTD', '#3ddc97'], ['active', 'Активные', '#4da3ff'], ['churned', 'Отвал', '#ff6b8a']];
 function stCard(d) {
-  var b = d.byStatus || {}, tot = 0, i, R = 56, C = 2 * Math.PI * R, off = 0, sv = '', ks = [];
+  var b = d.byStatus || {}, tot = 0, i, R = 56, C = 2 * Math.PI * R, off = 0, sv = '', ks = [], bl = d.blockedBy || {}, blTot = b.churned || 0, bk;
+  for (bk in bl) if (bl.hasOwnProperty(bk)) blTot += bl[bk];
   for (i = 0; i < STS.length; i++) if (b[STS[i][0]]) { tot += b[STS[i][0]]; ks.push(STS[i]); }
   for (i = 0; i < ks.length; i++) { var l = C * b[ks[i][0]] / tot; sv += '<circle cx="70" cy="70" r="' + R + '" fill="none" stroke="' + ks[i][2] + '" stroke-width="18" stroke-dasharray="' + Math.max(0, l - (ks.length > 1 ? 3 : 0)).toFixed(1) + ' ' + C.toFixed(1) + '" stroke-dashoffset="' + (-off).toFixed(1) + '" transform="rotate(-90 70 70)"/>'; off += l; }
   if (!tot) sv = '<circle cx="70" cy="70" r="' + R + '" fill="none" stroke="#fff" stroke-opacity=".12" stroke-width="18"/>';
-  var o = '<div class="card stc"><svg class="st-d" viewBox="0 0 140 140">' + sv + '<text x="70" y="75" text-anchor="middle" fill="#f1ebff" font-weight="800" font-size="26">' + tot + '</text><text x="70" y="94" text-anchor="middle" fill="#a89cc8" font-size="12">всего</text></svg><div class="st-l"><div class="lbl">' + (myRole === 'teamlead' ? 'Статусы лидов команды' : 'Статусы лидов') + '</div>';
-  for (i = 0; i < STS.length; i++) { var v = b[STS[i][0]] || 0; o += '<div class="st-r"><i style="background:' + STS[i][2] + '"></i><span>' + STS[i][1] + '</span><b>' + n0(v) + ' <span class="mut">(' + (tot ? Math.round(v / tot * 100) : 0) + '%)</span></b></div>'; }
+  var o = '<div class="card stc"><svg class="st-d" viewBox="0 0 140 140">' + sv + '<text x="70" y="75" text-anchor="middle" fill="#f1ebff" font-weight="800" font-size="26">' + tot + '</text><text x="70" y="94" text-anchor="middle" fill="#a89cc8" font-size="12">всего</text></svg><div class="st-l"><div class="lbl">' + (myRole === 'teamlead' ? 'Статусы лидов команды' : 'Статусы лидов') + (tot && blTot ? '<span style="float:right;color:#ff7a99;letter-spacing:0;text-transform:none">⛔ ' + blTot + ' · ' + Math.round(blTot / tot * 100) + '%</span>' : '') + '</div>';
+  for (i = 0; i < STS.length; i++) { var v = b[STS[i][0]] || 0; o += '<div class="st-r"><i style="background:' + STS[i][2] + '"></i><span>' + STS[i][1] + '</span><b>' + n0(v) + ' <span class="mut">(' + (tot ? Math.round(v / tot * 100) : 0) + '%)</span>' + (bl[STS[i][0]] ? '<span style="color:#ff7a99;font-size:11.5px;margin-left:6px">⛔ ' + bl[STS[i][0]] + '</span>' : '') + '</b></div>'; }
   return o + '</div></div>';
 }
 // ---------- Значки в плитках как в Office: кольца плана, воронка, охваты, зарплаты и расходы (окно по центру) ----------
