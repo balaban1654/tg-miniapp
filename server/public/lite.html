@@ -302,6 +302,7 @@ function req(method, url, body, done) {
   var x = new XMLHttpRequest();
   x.open(method, url, true);
   x.withCredentials = true;
+  try { x.timeout = 25000; } catch (e) {}
   if (body) x.setRequestHeader('Content-Type', 'application/json');
   x.onreadystatechange = function () {
     if (x.readyState !== 4) return;
@@ -357,15 +358,25 @@ function navLoad() {
   var r = range();
   req('GET', '/api/office/leads/today?from=' + r.from + '&to=' + r.to, null, function (st, d) { if (st === 200) { navC = d; if (menuOpen) { lastHtml = ''; draw(); } } });
 }
+// Нет связи или сервер перезапускается (статус 0, 502/503): страницу не стираем, оставляем последние данные и тихо повторяем
+var netTm = null;
+function netFail(st) { return st === 0 || st >= 500; }
+function netRetry(have) {
+  var u = $('upd');
+  if (have && u) u.innerHTML = '<span style="color:#ffb84d">Нет связи с сервером, показаны последние данные · повторяю…</span>';
+  if (!have) { lastHtml = ''; $('body').innerHTML = '<div class="card mut" style="text-align:center;padding:28px">Подключаюсь к серверу…</div>'; }
+  clearTimeout(netTm); netTm = setTimeout(load, have ? 10000 : 4000);
+}
 function load() {
   navLoad();
   if (view === 'leads') return loadLeads();
   if (view === 'pb') return loadPb();
   var r = range(), got = 0, dash = null, onl = null, fs = null, fail = null;
-  var done = function () { if (++got < 3) return; if (fail) { lastHtml = ''; $('body').innerHTML = '<div class="card err">' + esc(fail) + '</div>'; return; } last = { d: dash, onl: onl, fs: fs }; render(); };
+  var net = false;
+  var done = function () { if (++got < 3) return; if (net) return netRetry(!!(last && last.d)); if (fail) { lastHtml = ''; $('body').innerHTML = '<div class="card err">' + esc(fail) + '</div>'; return; } last = { d: dash, onl: onl || (last && last.onl), fs: fs || (last && last.fs) }; render(); };
   req('GET', '/api/office/dashboard?from=' + r.from + '&to=' + r.to, null, function (st, d) {
     if (st === 401) { got = -9; return showLogin(); }
-    if (st !== 200) fail = d.error || ('Ошибка ' + st); else dash = d; done();
+    if (netFail(st)) net = true; else if (st !== 200) fail = d.error || ('Ошибка ' + st); else dash = d; done();
   });
   req('GET', '/api/office/online', null, function (st, d) { if (st === 200) onl = d; done(); });
   req('GET', '/api/office/shifts/fieldstats?from=' + r.from + '&to=' + r.to, null, function (st, d) { if (st === 200) fs = d; done(); });
@@ -834,6 +845,7 @@ function loadLeads() {
   var url = leadsQ ? '/api/office/leads?q=' + encodeURIComponent(leadsQ) : '/api/office/leads?from=' + rng.from + '&to=' + rng.to;
   req('GET', url, null, function (st, d) {
     if (st === 401) return showLogin();
+    if (netFail(st)) return netRetry(!!leadsData);
     if (st !== 200) { lastHtml = ''; $('body').innerHTML = header('Лиды') + '<div class="card err">' + esc(d.error || ('Ошибка ' + st)) + '</div>'; navBind(); return; }
     leadsData = d; renderLeads();
   });
@@ -884,6 +896,7 @@ var pbRows = null, pbF = { q: '', ev: '', res: '', sort: 'new' }, pbTimer = null
 function loadPb() {
   req('GET', '/api/office/postbacks?from=' + rng.from + '&to=' + rng.to, null, function (st, d) {
     if (st === 401) return showLogin();
+    if (netFail(st)) return netRetry(!!pbRows);
     if (st !== 200) { paint(menuHtml() + header('Постбеки') + '<div class="card err">' + esc(d.error || ('Ошибка ' + st)) + '</div>'); return; }
     pbRows = d; renderPb();
   });
