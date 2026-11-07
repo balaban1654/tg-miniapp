@@ -1067,8 +1067,11 @@ SELECT p.tg_id, 'reg', NULL, 'reg:' || p.tg_id || ':' || coalesce(p.query->>'tra
 ON CONFLICT (external_id) DO NOTHING;
 
 -- Журнал постбеков: повторная регистрация теперь в статистике; дубль регистрации с другим Pocket ID - это ещё один Pocket ID лида
+-- (в том числе ставший основным: до него была регистрация с другим Pocket ID)
 UPDATE postback_log SET result = 'ok: новая регистрация (повторная)' WHERE result = 'ok: новая регистрация (повторная, в статистику не добавлена)';
 UPDATE postback_log p SET result = 'ok: ещё один Pocket ID лида, добавлен в карточку'
  WHERE p.result = 'дубль, пропущен' AND p.event = 'reg' AND coalesce(p.query->>'trader_id', '') <> ''
-   AND EXISTS (SELECT 1 FROM lead_pockets lp WHERE lp.trader_id = p.query->>'trader_id' AND lp.tg_id = p.tg_id)
-   AND NOT EXISTS (SELECT 1 FROM postback_log o WHERE o.id < p.id AND o.tg_id = p.tg_id AND o.query->>'trader_id' = p.query->>'trader_id');
+   AND (EXISTS (SELECT 1 FROM lead_pockets lp WHERE lp.trader_id = p.query->>'trader_id' AND lp.tg_id = p.tg_id)
+        OR EXISTS (SELECT 1 FROM leads d WHERE d.tg_id = p.tg_id AND d.trader_id = p.query->>'trader_id'))
+   AND NOT EXISTS (SELECT 1 FROM postback_log o WHERE o.id < p.id AND o.tg_id = p.tg_id AND o.query->>'trader_id' = p.query->>'trader_id')
+   AND EXISTS (SELECT 1 FROM postback_log o WHERE o.id < p.id AND o.tg_id = p.tg_id AND o.event = 'reg' AND coalesce(o.query->>'trader_id', '') NOT IN ('', p.query->>'trader_id'));
