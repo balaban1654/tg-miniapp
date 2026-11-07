@@ -1058,3 +1058,10 @@ SELECT DISTINCT ON (p.query->>'trader_id') p.query->>'trader_id', p.tg_id FROM p
    AND NOT EXISTS (SELECT 1 FROM leads x WHERE x.trader_id = p.query->>'trader_id')
  ORDER BY p.query->>'trader_id', p.created_at
 ON CONFLICT DO NOTHING;
+
+-- Повторная регистрация, пришедшая до того, как её стали считать: событие на её время (в статистику того дня)
+INSERT INTO events (tg_id, type, amount, external_id, raw, created_at)
+SELECT p.tg_id, 'reg', NULL, 'reg:' || p.tg_id || ':' || coalesce(p.query->>'trader_id', p.id::text), p.query, p.created_at
+  FROM postback_log p
+ WHERE p.result LIKE 'ok: новая регистрация (повторная, в статистику не добавлена)' AND p.tg_id IS NOT NULL
+ON CONFLICT (external_id) DO NOTHING;

@@ -13,13 +13,13 @@ export const leadStatusDate = (a: string, strict = false): string =>
          }
          ELSE ${a}.created_at END)`;
 
-/** Дата лида в списке «Лиды»: новый по дате прихода, регистрация по дате регистрации, FTD и активный по дате первого депозита (и остаётся за ним).
+/** Дата лида в списке «Лиды»: новый по дате прихода, регистрация по дате последней регистрации (после «Разрешить новую регистрацию» - новой), FTD и активный по дате первого депозита (и остаётся за ним).
  *  Так свежая регистрация или свежий FTD всегда сверху. */
 export const leadListDate = (a: string): string =>
   `(CASE WHEN coalesce(${a}.status_before_block, ${a}.status) IN ('ftd','active')
          THEN coalesce((SELECT min(e.created_at) FROM events e WHERE e.tg_id = ${a}.tg_id AND e.type IN ('ftd','dep')), ${a}.created_at)
          WHEN coalesce(${a}.status_before_block, ${a}.status) = 'registered'
-         THEN coalesce((SELECT min(e.created_at) FROM events e WHERE e.tg_id = ${a}.tg_id AND e.type = 'reg'), ${a}.created_at)
+         THEN coalesce((SELECT max(e.created_at) FROM events e WHERE e.tg_id = ${a}.tg_id AND e.type = 'reg'), ${a}.created_at)
          ELSE ${a}.created_at END)`;
 
 /** Этап лида для полосы «Лиды по статусам»: лид с событием FTD (первым депозитом) считается FTD, даже если его статус остался

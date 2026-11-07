@@ -80,10 +80,13 @@ export async function postbackRoutes(app: FastifyInstance): Promise<void> {
       await db.query('INSERT INTO lead_pockets (trader_id, tg_id) SELECT $1, $2 WHERE NOT EXISTS (SELECT 1 FROM leads WHERE trader_id = $1) ON CONFLICT DO NOTHING', [traderId, tgId]);
     }
     // Новая регистрация после «Разрешить новую регистрацию»: Pocket ID уже стал основным (выше), статус снова «Регистрация».
-    // Событие второй регистрации не пишем: человек один, регистрация в статистике остаётся одна (первая)
+    // Регистрация считается в день, когда пришла (старая остаётся в своём месяце); в списке «Лиды» лид встаёт на эту дату
     if (event === 'reg' && lead.rows[0].rereg_at && !oldPocket) {
       await db.query(`UPDATE leads SET rereg_at = NULL, status = CASE WHEN status = 'new' THEN 'registered' ELSE status END WHERE tg_id = $1`, [tgId]);
-      await log(event, q, tgId, 'ok: новая регистрация (повторная, в статистику не добавлена)');
+      const { secret: _x, ...raw } = q;
+      const ev = await db.query(`INSERT INTO events (tg_id, type, amount, external_id, raw) VALUES ($1,'reg',NULL,$2,$3) ON CONFLICT (external_id) DO NOTHING RETURNING id`,
+        [tgId, `reg:${tgId}:${traderId || Date.now()}`, JSON.stringify(raw)]);
+      await log(event, q, tgId, 'ok: новая регистрация (повторная)', ev.rows[0]?.id ?? null);
       return { ok: true, rereg: true };
     }
     // Лид без владельца. Пришёл по ссылке стримера — у него уже есть владелец, его не трогаем (в том числе при регистрации через общую демо-ссылку).
