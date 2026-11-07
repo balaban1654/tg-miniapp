@@ -138,7 +138,13 @@ export async function teamleadPay(leadId: number, period: string, plan: KpiPlan)
   const allDone = members.length > 0 && members.every((x) => x.hoursDone && x.leadsDone);
   const allBonus = allDone ? plan.leadAll || 0 : 0;
   const bonus = members.reduce((a, x) => a + x.bonus, 0) + allBonus;
-  return { period, mode: p.mode as 'month' | 'shift', amount: p.amount as number, shifts, rate, members, bonus, allDone, allBonus, perAll: plan.leadAll || 0, perShift: plan.leadShift, perLeads: plan.leadLeads, total: r2(rate + bonus) };
+  // Ручные премии и штрафы из «Бонусов и штрафов»: показываются тимлиду в окне «За что бонусы»
+  const adjItems = (await db.query(`SELECT kind, amount::float AS amount, comment FROM staff_adjustments WHERE staff_id = $1 AND period = $2 AND visible ORDER BY id`, [leadId, period])).rows as { kind: string; amount: number; comment: string | null }[];
+  const adjBonus = r2(adjItems.filter((x) => x.kind === 'bonus').reduce((a, x) => a + x.amount, 0));
+  const adjPenalty = r2(adjItems.filter((x) => x.kind === 'penalty').reduce((a, x) => a + x.amount, 0));
+  const maxBonus = members.length * (plan.leadShift + plan.leadLeads) + (members.length ? plan.leadAll || 0 : 0);
+  return { period, mode: p.mode as 'month' | 'shift', amount: p.amount as number, shifts, rate, members, bonus, allDone, allBonus, perAll: plan.leadAll || 0, perShift: plan.leadShift, perLeads: plan.leadLeads, total: r2(rate + bonus),
+    adjItems, adjBonus, adjPenalty, maxBonus, grand: r2(rate + bonus + adjBonus - adjPenalty) };
 }
 
 /** Бонус на день рождения: в месяц рождения, начиная с самого дня (по Киеву), один раз попадает в «Бонусы и штрафы».
@@ -1728,7 +1734,20 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
         netPlanToDate: goals && !lead ? r2(goals.net * pace) : null,
       },
       // По дням для графика плитки «План / факт»; тимлиду без комиссии
-      daily: (await dailyEvents(from, to, ids)).map((x) => (lead ? { ...x, comm: 0 } : x)),
+      daily: await (async () => {
+        const ev = (await dailyEvents(from, to, ids)).map((x) => ({ ...(lead ? { ...x, comm: 0 } : x), minutes: 0 }));
+        const mins = (await db.query(`SELECT to_char(day, 'YYYY-MM-DD') AS d, coalesce(sum(approved_min), 0)::int AS m FROM shift_reports WHERE staff_id = ANY($1::int[]) AND status = 'approved' AND NOT team AND day BETWEEN $2::date AND $3::date GROUP BY 1`, [ids, from, to])).rows as { d: string; m: number }[];
+        const by = new Map(ev.map((x) => [x.d, x]));
+        for (const r of mins) { const x = by.get(r.d) ?? { d: r.d, regs: 0, ftd: 0, ftdSum: 0, deposits: 0, wd: 0, comm: 0, minutes: 0 }; x.minutes = r.m; by.set(r.d, x); }
+        return [...by.values()].sort((a, b) => a.d.localeCompare(b.d));
+      })(),
+      // Статусы лидов за период (как «Мои лиды по статусам» у стримера): админу все лиды, тимлиду - его команды
+      byStatus: Object.fromEntries((await db.query(
+        `SELECT CASE WHEN ${churnedAfterFtd('d')} THEN 'churned' ELSE ${funnelStage('d')} END AS status, count(*)::int AS n FROM leads d
+          WHERE d.removed_at IS NULL AND coalesce(d.lead_role, 'lead') = 'lead' AND ($1::int[] IS NULL OR d.owner_id = ANY($1::int[]))
+            AND (${funnelStageDate('d')} AT TIME ZONE '${TZ}')::date BETWEEN $2::date AND $3::date GROUP BY 1`,
+        [scopeLead ? ids : null, from, to],
+      )).rows.map((r: any) => [r.status, r.n])),
       planScope: lead && tgl!.company ? 'company' : lead ? 'team' : 'company',
       teamSalaries: teamSal,
       refPay: refPay ? { earned: refPay.earned, paid: refPay.paid, n: refPay.n } : null,
