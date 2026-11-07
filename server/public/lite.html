@@ -57,6 +57,21 @@ input{width:100%;padding:12px;margin:6px 0 12px;font-size:17px;border-radius:10p
 .c1{-webkit-flex:1.5 1 0;flex:1.5 1 0;min-width:0;margin-right:16px}
 .c2{-webkit-flex:1 1 0;flex:1 1 0;min-width:0;display:-webkit-flex;display:flex;-webkit-flex-direction:column;flex-direction:column}
 .c2 .card{margin-bottom:16px}.c2 .card.last{margin-bottom:0;-webkit-flex:1;flex:1}
+.c1{display:-webkit-flex;display:flex;-webkit-flex-direction:column;flex-direction:column}.c1 .card.pf{-webkit-flex:1 1 auto;flex:1 1 auto}
+.pf{display:-webkit-flex;display:flex;-webkit-flex-direction:column;flex-direction:column}.pf.pfc{overflow:hidden}
+.pf-hd{display:-webkit-flex;display:flex;-webkit-justify-content:space-between;justify-content:space-between;-webkit-align-items:center;align-items:center;margin-bottom:12px}.pf-mk{font-size:12px;margin-top:3px}
+.pf-tabs{background:#251847;border:1px solid #34255c;border-radius:10px;padding:3px;white-space:nowrap}.pf-tab{border:0;background:none;color:#a89cc8;font:inherit;font-weight:700;font-size:13px;padding:6px 13px;border-radius:8px}.pf-tab.on{background:#9b5cff;color:#fff}
+.pf-g{display:-webkit-flex;display:flex;-webkit-flex-wrap:wrap;flex-wrap:wrap;-webkit-flex:1 1 auto;flex:1 1 auto;margin:0 -5px}
+.pf-c{width:calc(50% - 10px);margin:5px;box-sizing:border-box;display:-webkit-flex;display:flex;-webkit-align-items:center;align-items:center;background:#251847;border-radius:14px;padding:14px 16px}
+.rg{width:80px;height:80px;-webkit-flex:none;flex:none;margin-right:16px}.pf-t{min-width:0}.pf-t .lbl{font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pf-v{font-weight:800;font-size:24px;white-space:nowrap}.pf-v small{font-size:13px;font-weight:600;color:#a89cc8}.pf-n{font-size:12.5px;font-weight:700;color:#a89cc8}.pf-n.ok{color:#3ddc97}.pf-n.warn{color:#ffb84d}.pf-n.bad{color:#ff6b8a}
+.pf-chips{white-space:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;margin-bottom:6px}.pf-chip{display:inline-block;border:1px solid #34255c;background:none;color:#a89cc8;font:inherit;font-weight:700;font-size:11.5px;padding:5px 8px;border-radius:20px;margin-right:4px}.pf-chip.on{color:#fff}.pf-chip i{display:inline-block;width:8px;height:8px;border-radius:8px;margin-right:6px;vertical-align:1px}
+.pf-cv{-webkit-flex:1 1 0;flex:1 1 0;min-height:160px;overflow:hidden;position:relative}.pf-cv svg{position:absolute;left:0;top:0}.pf-sts{display:-webkit-flex;display:flex;margin:6px -4px 0}.pf-st1{-webkit-flex:1;flex:1;margin:0 4px;background:#251847;border-radius:10px;padding:8px 10px}.pf-st1 b{display:block;font-size:13.5px;margin-top:2px}
+.stc{display:-webkit-flex;display:flex;-webkit-align-items:center;align-items:center}.st-d{width:150px;height:150px;-webkit-flex:none;flex:none;margin-right:20px}.st-l{-webkit-flex:1;flex:1;min-width:0}.st-r{display:-webkit-flex;display:flex;-webkit-align-items:center;align-items:center;font-size:14px;padding:3px 0}.st-r i{width:9px;height:9px;border-radius:9px;margin-right:8px;-webkit-flex:none;flex:none}.st-r span{-webkit-flex:1;flex:1}.st-r b .mut{font-weight:600}
+.lp-s{font-size:28px;font-weight:800;color:#3ddc97}.lp-l{display:-webkit-flex;display:flex;-webkit-justify-content:space-between;justify-content:space-between;font-size:13px;color:#a89cc8;margin-top:10px}.lp-l b{color:#f1ebff}.lp-l b.warn{color:#ffb84d}.lp-b{color:#c9a6ff;font-weight:700;text-decoration:none;border-bottom:1px dashed #c9a6ff}
+.lp-bar{display:-webkit-flex;display:flex;-webkit-align-items:center;align-items:center;margin-top:8px}.lp-bar .bar{-webkit-flex:1;flex:1;margin:0 10px 0 0;display:block}.lp-m{margin-top:12px;border-top:1px solid #34255c;padding-top:8px;font-size:13px}.lp-m div{display:-webkit-flex;display:flex;padding:4px 0}.lp-m div span:first-child{-webkit-flex:1;flex:1}.lp-m div span{margin-right:10px}
+.lp-r{display:-webkit-flex;display:flex;-webkit-flex-wrap:wrap;flex-wrap:wrap;-webkit-justify-content:space-between;justify-content:space-between;font-size:13px;margin-top:8px}.lp-r span:first-child{-webkit-flex:1 1 60%;flex:1 1 60%}.lp-r .mut{font-size:12px;-webkit-flex:1 1 60%;flex:1 1 60%}.lp-r span.mut[style]{-webkit-flex:0 0 auto;flex:0 0 auto}
+@media (max-width:620px){.pf-c{width:100%}.st-d{width:110px;height:110px}}
 @media (max-width:820px){.cols{display:block}.c1{margin:0 0 16px}}
 .lbl{font-weight:700;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:#a89cc8}
 .hd{display:-webkit-flex;display:flex;-webkit-justify-content:space-between;justify-content:space-between;-webkit-align-items:center;align-items:center}
@@ -252,7 +267,7 @@ tr.sum td{border-top:2px solid #9b5cff;background:rgba(155,92,255,.08);font-weig
 </div>
 <script>
 // Только ES5: var, function, XMLHttpRequest. Никаких стрелочных функций, let/const, ?., fetch и CSS Grid (Safari 9)
-var challenge = null, liveAll = false, last = null, shownS = [], myRole = '';
+var challenge = null, liveAll = false, last = null, shownS = [], myRole = '', myName = '', pfView = 'rings', pfPick = 'ftd', pfRingH = 0;
 var view = location.hash === '#leads' ? 'leads' : location.hash === '#pb' ? 'pb' : 'dash';
 var rng = (function () { var n = new Date(); return { from: ymdx(new Date(n.getFullYear(), n.getMonth(), 1)), to: ymdx(new Date(n.getFullYear(), n.getMonth() + 1, 0)) }; })();
 function ymdx(d) { return d.getFullYear() + '-' + (d.getMonth() < 9 ? '0' : '') + (d.getMonth() + 1) + '-' + (d.getDate() < 10 ? '0' : '') + d.getDate(); }
@@ -332,7 +347,7 @@ function render() {
   var showMark = g && pace < 0.995;
 
   // Шапка: меню, «Дашборд», онлайн, период; справа календарь и «Найти»
-  h += header('Дашборд', (last.onl ? '<span class="onl"><i></i>онлайн <b>' + last.onl.total + '</b></span>' : '') + '<span class="sub">' + esc(rangeLabel(d.range.from, d.range.to, d.today)) + '</span>');
+  h += header(greet(), (last.onl ? '<span class="onl"><i></i>Онлайн <b>' + last.onl.total + '</b></span>' : '') + '<span class="sub">' + esc(headLabel(d.range.from, d.range.to, d.today)) + '</span>');
 
   // Полоса стримеров: сначала в эфире, потом по FTD за месяц; админы только в эфире
   var list = [];
@@ -355,40 +370,174 @@ function render() {
   if (more > 0 || liveAll && list.length > 4) h += '<button class="lc more" id="liveTog">' + (liveAll ? 'Свернуть ▴' : 'Ещё ' + more + ' ▾') + '</button>';
   h += '</div>';
 
-  // План / факт
-  var avg = t.ftd ? t.ftdSum / t.ftd : 0, dShare = t.deposits ? t.depSum / t.deposits * 100 : 0, cShare = t.deposits ? t.commission / t.deposits * 100 : 0;
-  var rows = [['FTD — первый депозит', t.ftd, g && g.ftd, n0, showMark ? 'по графику ' + Math.round(pace * 100) + '%' : ''],
-    ['Пополнения по FTD', t.ftdSum, g && g.ftdSum, usd, 'средний FTD ' + usd(avg)],
-    ['Все депозиты (FTD + додепы)', t.deposits, g && g.deposits, usd, 'додепы ' + usd(t.depSum) + ' · ' + Math.round(dShare) + '%'],
-    ['Комиссия получена', t.commission, g && g.commission, usd, String(Math.round(cShare * 10) / 10).replace('.', ',') + '% от депозитов']];
-  var pf = '<div class="card"><div class="hd"><div><span class="lbl">' + (d.range.whole && !d.range.all ? 'План / факт за месяц' : 'План / факт') + '</span></div>' +
-    (showMark ? '<span class="mut" style="font-size:12px">метка: план на сегодня</span>' : '') + '</div>';
-  for (i = 0; i < rows.length; i++) {
-    var rw = rows[i], v = rw[1] || 0, goal = rw[2], pct = goal > 0 ? v / goal * 100 : null;
-    var cls = pct === null ? '' : pct >= pace * 100 ? 'ok' : pct >= pace * 85 ? 'warn' : 'bad';
-    pf += '<div class="m"><div class="lbl">' + rw[0] + '</div><div class="v">' + rw[3](v) + (goal > 0 ? '<small> / ' + rw[3](goal) + '</small>' : '') + '</div>' +
-      (pct !== null ? '<div class="bar"><i style="width:' + Math.min(100, pct) + '%"></i>' + (showMark ? '<u style="left:' + pace * 100 + '%"></u>' : '') + '</div>' : '') +
-      '<div class="meta"><span class="' + cls + '">' + (pct !== null ? Math.round(pct) + '% плана' : '') + '</span><span>' + rw[4] + '</span></div></div>';
-  }
-  pf += '</div>';
-
-  // Чистая прибыль
-  var diff = t.netPlanToDate === null || t.netPlanToDate === undefined ? null : t.net - t.netPlanToDate;
-  var margin = t.commission > 0 ? Math.round(t.net / t.commission * 100) : null;
-  var net = '<div class="card"><div class="hd"><div><span class="lbl">Чистая прибыль</span></div></div>' +
-    '<div class="big ' + (t.net < 0 ? 'neg' : 'pos') + '">' + usd(t.net) + '</div>' +
-    (diff !== null ? '<span class="chip ' + (diff >= 0 ? 'ok' : 'bad') + '">' + (diff >= 0 ? '▲ на ' + usd(diff) + ' выше' : '▼ на ' + usd(-diff) + ' ниже') + ' плана на эту дату</span>' : '') +
-    (margin !== null ? '<div class="mut" style="font-size:13px;margin-top:6px">Маржа ' + margin + '% от комиссии</div>' : '') +
-    '<div class="eq"><div><span>Комиссия получена</span><b>' + usd(t.commission) + '</b></div><div><span>− Зарплаты и бонусы</span><b class="neg">' + usd(-(t.salaries || 0)) + '</b></div>' +
-    '<div><span>− Расходы</span><b class="neg">' + usd(-(t.expenses || 0)) + '</b></div><div><span>= Чистая прибыль</span><b class="' + (t.net < 0 ? 'neg' : 'pos') + '">' + usd(t.net) + '</b></div></div>';
-  net += '</div>';
-
-  h += '<div class="cols"><div class="c1">' + pf + '</div><div class="c2">' + net + '<div class="card last"><div class="lbl">Требует внимания</div>' + tasks(d) + '</div></div></div>';
+  // План / факт: кольца 2×3 или график по дням (плитка одной высоты в обоих видах)
+  var pf = pfCard(d);
+  // Справа: статусы лидов и чистая прибыль (админ) или зарплата (тимлид); колонки заканчиваются на одной линии
+  var right = stCard(d) + (d.leadPay ? leadPayCard(d) : netCard(d));
+  h += '<div class="cols"><div class="c1">' + pf + '</div><div class="c2">' + right + '</div></div>';
+  var tk = tasks(d);
+  if (tk.indexOf('okm') < 0) h += '<div class="card" style="margin-top:16px"><div class="lbl">Требует внимания</div>' + tk + '</div>';
   h += shifts(last.fs, d);
   h += foot();
   var fresh = paint(menuHtml() + h); stamp();
   if (!fresh) return;
   bind();
+  pfAfter(d);
+}
+
+// ---------- Дашборд как в Office: приветствие, «План / факт» кольцами и графиком, статусы лидов ----------
+function greet() {
+  var h = Number(new Date().toLocaleString('en-GB', { timeZone: 'Europe/Kyiv', hour: '2-digit', hour12: false })) % 24;
+  if (isNaN(h)) h = new Date().getHours();
+  var g = h >= 5 && h < 12 ? 'Доброе утро' : h >= 12 && h < 18 ? 'Добрый день' : h >= 18 && h < 23 ? 'Добрый вечер' : 'Доброй ночи';
+  return esc(g + (myName ? ', ' + myName : '')) + ' 👋';
+}
+function headLabel(from, to, today) {
+  if (from.slice(8) === '01' && to === lastDay(from.slice(0, 7)) && from.slice(0, 7) === today.slice(0, 7))
+    return 'Сегодня, ' + day(today) + ' ' + today.slice(0, 4) + ' – (' + Number(today.slice(8)) + '/' + Number(to.slice(8)) + ')';
+  return rangeLabel(from, to, today);
+}
+function fmtH1(m) { var h = Math.round((Number(m) || 0) / 6) / 10; return String(h).replace('.', ','); }
+function ringSvg(r, txt, col, mark) {
+  var R = 34, C = 2 * Math.PI * R, len = C * Math.max(0, Math.min(1, r));
+  return '<svg class="rg" viewBox="0 0 84 84"><circle cx="42" cy="42" r="' + R + '" fill="none" stroke="' + col + '" stroke-opacity=".18" stroke-width="8"/>' +
+    (r === null ? '' : '<circle cx="42" cy="42" r="' + R + '" fill="none" stroke="' + col + '" stroke-width="8" stroke-linecap="round" stroke-dasharray="' + len.toFixed(1) + ' ' + C.toFixed(1) + '" transform="rotate(-90 42 42)"/>') +
+    (mark !== null && mark !== undefined ? '<line x1="42" y1="1" x2="42" y2="11" stroke="#fff" stroke-width="2" transform="rotate(' + (mark * 360).toFixed(1) + ' 42 42)"/>' : '') +
+    '<text x="42" y="47" text-anchor="middle" fill="#f1ebff" font-weight="800" font-size="15">' + txt + '</text></svg>';
+}
+function teamHours(d) {
+  var pl = d.plan, n = 0, min = 0, done = 0, i;
+  for (i = 0; i < d.streamers.length; i++) { var s = d.streamers[i]; if (!s.active || s.role !== 'streamer') continue; n++; min += (s.month || {}).hoursMin || 0; if (((s.month || {}).hoursMin || 0) >= pl.planMin && ((s.month || {}).ftd || 0) >= pl.leads) done++; }
+  return { n: n, min: min, goal: n * pl.planMin, done: done };
+}
+function pfItems(d) {
+  var t = d.totals || {}, g = d.goals || null, pace = Number(d.pace) || 0, showMark = g && pace < 0.995, pc = function (x) { return Math.round(x * 100); };
+  var avg = t.ftd ? t.ftdSum / t.ftd : 0, rtd = t.regs ? t.ftd / t.regs : 0, wd = t.withdrawals || 0, wS = t.deposits ? wd / t.deposits : 0, dS = t.deposits ? t.depSum / t.deposits : 0, cS = t.deposits ? t.commission / t.deposits : 0;
+  var L = [
+    { k: 'regs', n: 'Регистрации', v: t.regs || 0, goal: g && g.regs, f: n0, c: '#5ab0ff', note: 'в FTD: ' + n0(t.ftd) + ' (RTD ' + pc(rtd) + '%)', alt: rtd },
+    { k: 'ftd', n: 'FTD', v: t.ftd || 0, goal: g && g.ftd, f: n0, c: '#9b5cff', note: g && g.ftd && showMark ? 'к сегодня нужно ' + n0(g.ftd * pace) : 'средний ' + usd(avg) },
+    { k: 'ftdSum', n: 'Пополнения по FTD', v: t.ftdSum || 0, goal: g && g.ftdSum, f: usd, c: '#c084fc', note: 'средний FTD ' + usd(avg) },
+    { k: 'deposits', n: 'Все депозиты', v: t.deposits || 0, goal: g && g.deposits, f: usd, c: '#3ddc97', note: 'додепы ' + usd(t.depSum) + ' · ' + pc(dS) + '%' }];
+  if (d.leadPay) {
+    var th = teamHours(d);
+    L.push({ k: 'minutes', n: 'Часы команды', v: th.min, goal: th.goal, f: function (x) { return hw(x) + ' ч'; }, cf: function (x) { return fmtH1(x) + ' ч'; }, c: '#ff5ca8', note: 'по графику ' + hw(th.goal * pace) + ' ч' });
+    L.push({ k: 'done', n: 'Выполнили план', v: th.done, goal: th.n, f: n0, c: '#a3e635', noMark: true, sub: ' стримеров', note: 'часы и FTD у каждого', noChart: true });
+  } else {
+    L.push({ k: 'wd', n: 'Выводы', v: wd, goal: 0, f: usd, c: '#ff8a5c', note: pc(wS) + '% от депозитов', alt: wS });
+    L.push({ k: 'comm', n: 'Комиссия', v: t.commission || 0, goal: g && g.commission, f: usd, c: '#f5c542', note: String(Math.round(cS * 1000) / 10).replace('.', ',') + '% от депозитов' });
+  }
+  return L;
+}
+function pfCard(d) {
+  var g = d.goals || null, pace = Number(d.pace) || 0, showMark = g && pace < 0.995, L = pfItems(d), i, o = '';
+  var sub = [];
+  if (myRole === 'teamlead') sub.push(d.planScope === 'company' ? 'общий план компании' : 'план вашей команды');
+  if (showMark) sub.push('метка: план на сегодня');
+  var title = d.range.whole && !d.range.all ? 'План / факт за месяц' : 'План / факт';
+  var chart = pfView === 'chart';
+  o += '<div class="card pf' + (chart ? ' pfc' : '') + '" id="pfCard"' + (chart && pfRingH ? ' style="height:' + pfRingH + 'px"' : '') + '><div class="pf-hd"><div><span class="lbl">' + title + '</span>' + (sub.length ? '<div class="mut pf-mk">' + esc(sub.join(' · ')) + '</div>' : '') + '</div>' +
+    '<div class="pf-tabs"><button class="pf-tab' + (chart ? '' : ' on') + '" data-pfv="rings">Кольца</button><button class="pf-tab' + (chart ? ' on' : '') + '" data-pfv="chart">График</button></div></div>';
+  if (!chart) {
+    o += '<div class="pf-g">';
+    for (i = 0; i < L.length; i++) {
+      var x = L[i], has = x.goal > 0, r = has ? x.v / x.goal : (x.alt !== undefined ? x.alt : 0), cls = has ? (r >= pace ? 'ok' : r >= pace * 0.85 ? 'warn' : 'bad') : '';
+      o += '<div class="pf-c">' + ringSvg(r, has || x.alt !== undefined ? Math.round(r * 100) + '%' : '—', x.c, has && showMark && !x.noMark ? pace : null) +
+        '<div class="pf-t"><div class="lbl">' + esc(x.n) + '</div><div class="pf-v">' + x.f(x.v) + (has ? '<small> / ' + x.f(x.goal) + (x.sub || '') + '</small>' : '') + '</div><div class="pf-n ' + cls + '">' + esc(x.note) + '</div></div></div>';
+    }
+    o += '</div>';
+  } else {
+    var M = [], ok = false;
+    for (i = 0; i < L.length; i++) if (!L[i].noChart) { M.push(L[i]); if (L[i].k === pfPick) ok = true; }
+    if (!ok) pfPick = 'ftd';
+    o += '<div class="pf-chips">';
+    for (i = 0; i < M.length; i++) o += '<button class="pf-chip' + (M[i].k === pfPick ? ' on' : '') + '" style="' + (M[i].k === pfPick ? 'background:' + M[i].c + ';border-color:' + M[i].c : '') + '" data-pfk="' + M[i].k + '"><i style="background:' + (M[i].k === pfPick ? '#fff' : M[i].c) + '"></i>' + esc(M[i].n) + '</button>';
+    o += '</div><div class="pf-cv" id="pfcv"></div><div class="pf-sts" id="pfsts"></div>';
+  }
+  return o + '</div>';
+}
+function pfDays(from, to) { var o = [], x = from; while (x <= to && o.length <= 62) { o.push(x); x = addDay(x, 1); } return o; }
+function pfAfter(d) {
+  var b = document.querySelectorAll('[data-pfv]'), i;
+  for (i = 0; i < b.length; i++) b[i].onclick = function () { var v = this.getAttribute('data-pfv'); if (v === pfView) return; if (pfView === 'rings') { var c = $('pfCard'); if (c) pfRingH = c.offsetHeight; } pfView = v; render(); };
+  var k = document.querySelectorAll('[data-pfk]');
+  for (i = 0; i < k.length; i++) k[i].onclick = function () { pfPick = this.getAttribute('data-pfk'); render(); };
+  if (pfView === 'rings') { var c0 = $('pfCard'); if (c0) pfRingH = c0.offsetHeight; return; }
+  var cv = $('pfcv'); if (!cv) return;
+  var days = pfDays(d.range.from, d.range.to);
+  if (days.length > 62) { cv.innerHTML = '<div class="mut" style="padding:18px 4px">График по дням доступен для периода до двух месяцев.</div>'; return; }
+  var L = pfItems(d), m = null; for (i = 0; i < L.length; i++) if (L[i].k === pfPick) m = L[i];
+  if (!m) return;
+  var by = {}, dl = d.daily || [];
+  for (i = 0; i < dl.length; i++) by[dl[i].d] = dl[i];
+  var today = d.today || ymd(new Date()), N = days.length, ti = 0, vals = [];
+  for (i = 0; i < N; i++) { if (days[i] <= today) ti++; vals.push(((by[days[i]] || {})[m.k === 'minutes' ? 'minutes' : m.k === 'wd' ? 'wd' : m.k === 'comm' ? 'comm' : m.k]) || 0); }
+  var past = vals.slice(0, Math.max(1, ti)), f = m.cf || m.f, isMin = m.k === 'minutes', j;
+  var tot = 0, best = -1, worst = -1; for (j = 0; j < Math.min(ti, past.length); j++) { tot += past[j]; if (best < 0 || past[j] > past[best]) best = j; if (worst < 0 || past[j] < past[worst]) worst = j; }
+  var left = N - ti, need = m.goal > 0 && left > 0 ? Math.max(0, m.goal - tot) / left : null, st = '';
+  if (ti) st += '<div class="pf-st1"><div class="lbl">Лучший день</div><b class="pos">' + day(days[best]) + ' · ' + f(past[best]) + '</b></div><div class="pf-st1"><div class="lbl">Худший день</div><b class="neg">' + day(days[worst]) + ' · ' + f(past[worst]) + '</b></div>';
+  if (need !== null) st += '<div class="pf-st1"><div class="lbl">Надо в день</div><b class="warn">' + f(need) + ' до конца периода</b></div>';
+  $('pfsts').innerHTML = st;
+  var W = cv.clientWidth || 600, H = cv.clientHeight || 220; if (H < 160) H = 200;
+  var perDay = m.goal > 0 ? m.goal / N : 0, raw = Math.max.apply(null, [perDay, 1].concat(past)) * 1.1;
+  var nice = function (v) { if (isMin) { var h = Math.max(1, Math.ceil(v / 60)); return 60 * (h <= 2 ? h : h <= 5 ? 5 : h <= 10 ? 10 : Math.ceil(h / 10) * 10); } var e = Math.pow(10, Math.floor(Math.log(v) / Math.LN10)), q = v / e; return (q <= 1 ? 1 : q <= 2 ? 2 : q <= 5 ? 5 : 10) * e; };
+  var step = Math.max(1, nice(raw / 4)), mx = Math.max(step, Math.ceil(raw / step) * step), nT = Math.round(mx / step);
+  var Lm = 44, Rm = 10, T = 14, B = 24, base = H - B;
+  var X = function (j) { return Lm + (N > 1 ? j * (W - Lm - Rm) / (N - 1) : 0); }, Y = function (v) { return T + (1 - v / mx) * (H - T - B); };
+  var pts = []; for (j = 0; j < past.length; j++) pts.push([X(j), Y(past[j])]);
+  var cl = function (v) { return Math.min(base, v); }, path = 'M' + pts[0][0].toFixed(1) + ',' + pts[0][1].toFixed(1);
+  for (j = 0; j < pts.length - 1; j++) { var p0 = pts[j - 1] || pts[j], p1 = pts[j], p2 = pts[j + 1], p3 = pts[j + 2] || p2;
+    path += ' C' + (p1[0] + (p2[0] - p0[0]) / 6).toFixed(1) + ',' + cl(p1[1] + (p2[1] - p0[1]) / 6).toFixed(1) + ' ' + (p2[0] - (p3[0] - p1[0]) / 6).toFixed(1) + ',' + cl(p2[1] - (p3[1] - p1[1]) / 6).toFixed(1) + ' ' + p2[0].toFixed(1) + ',' + p2[1].toFixed(1); }
+  var last = pts[pts.length - 1], sv = '<svg width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '"><defs><linearGradient id="lg1" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="' + m.c + '" stop-opacity=".42"/><stop offset="1" stop-color="' + m.c + '" stop-opacity="0"/></linearGradient><filter id="lf1" x="-10%" y="-30%" width="120%" height="160%"><feGaussianBlur stdDeviation="4"/></filter></defs>';
+  for (j = 0; j <= nT; j++) { var yy = T + j * (H - T - B) / nT; sv += '<line x1="' + Lm + '" x2="' + (W - Rm) + '" y1="' + yy.toFixed(1) + '" y2="' + yy.toFixed(1) + '" stroke="#fff" stroke-opacity=".07"/><text x="' + (Lm - 7) + '" y="' + (yy + 4).toFixed(1) + '" text-anchor="end" fill="#a89cc8" font-size="12">' + f(mx - j * step) + '</text>'; }
+  if (perDay > 0) { var py = Y(perDay); sv += '<line x1="' + Lm + '" x2="' + (W - Rm) + '" y1="' + py.toFixed(1) + '" y2="' + py.toFixed(1) + '" stroke="#fff" stroke-opacity=".45" stroke-dasharray="4 5"/><text x="' + (W - Rm) + '" y="' + (py - 6).toFixed(1) + '" text-anchor="end" fill="#f1ebff" fill-opacity=".75" font-size="12" font-weight="700">надо ' + f(perDay) + ' в день</text>'; }
+  if (ti > 0) sv += '<path d="' + path + ' L' + last[0].toFixed(1) + ',' + base + ' L' + pts[0][0].toFixed(1) + ',' + base + ' Z" fill="url(#lg1)"/><path d="' + path + '" fill="none" stroke="' + m.c + '" stroke-width="5" opacity=".55" filter="url(#lf1)"/><path d="' + path + '" fill="none" stroke="' + m.c + '" stroke-width="2.6"/><circle cx="' + last[0].toFixed(1) + '" cy="' + last[1].toFixed(1) + '" r="5" fill="#fff" stroke="' + m.c + '" stroke-width="3"/>';
+  var tk = N > 40 ? [0, Math.round(N / 4), Math.round(N / 2), Math.round(3 * N / 4), N - 1] : [0, 7, 14, 21, N - 1];
+  for (j = 0; j < tk.length; j++) if (tk[j] < N) { var dd = days[tk[j]]; sv += '<text x="' + X(tk[j]).toFixed(1) + '" y="' + (H - 6) + '" text-anchor="' + (tk[j] === 0 ? 'start' : tk[j] === N - 1 ? 'end' : 'middle') + '" fill="#a89cc8" font-size="12">' + Number(dd.slice(8)) + ' ' + MS[Number(dd.slice(5, 7)) - 1] + '</text>'; }
+  cv.innerHTML = sv + '</svg>';
+}
+var STS = [['new', 'Новые', '#9b5cff'], ['registered', 'Регистрации', '#ffd54d'], ['ftd', 'FTD', '#3ddc97'], ['active', 'Активные', '#4da3ff'], ['churned', 'Отвал', '#ff6b8a']];
+function stCard(d) {
+  var b = d.byStatus || {}, tot = 0, i, R = 56, C = 2 * Math.PI * R, off = 0, sv = '', ks = [];
+  for (i = 0; i < STS.length; i++) if (b[STS[i][0]]) { tot += b[STS[i][0]]; ks.push(STS[i]); }
+  for (i = 0; i < ks.length; i++) { var l = C * b[ks[i][0]] / tot; sv += '<circle cx="70" cy="70" r="' + R + '" fill="none" stroke="' + ks[i][2] + '" stroke-width="18" stroke-dasharray="' + Math.max(0, l - (ks.length > 1 ? 3 : 0)).toFixed(1) + ' ' + C.toFixed(1) + '" stroke-dashoffset="' + (-off).toFixed(1) + '" transform="rotate(-90 70 70)"/>'; off += l; }
+  if (!tot) sv = '<circle cx="70" cy="70" r="' + R + '" fill="none" stroke="#fff" stroke-opacity=".12" stroke-width="18"/>';
+  var o = '<div class="card stc"><svg class="st-d" viewBox="0 0 140 140">' + sv + '<text x="70" y="75" text-anchor="middle" fill="#f1ebff" font-weight="800" font-size="26">' + tot + '</text><text x="70" y="94" text-anchor="middle" fill="#a89cc8" font-size="12">всего</text></svg><div class="st-l"><div class="lbl">' + (myRole === 'teamlead' ? 'Статусы лидов команды' : 'Статусы лидов') + '</div>';
+  for (i = 0; i < STS.length; i++) { var v = b[STS[i][0]] || 0; o += '<div class="st-r"><i style="background:' + STS[i][2] + '"></i><span>' + STS[i][1] + '</span><b>' + n0(v) + ' <span class="mut">(' + (tot ? Math.round(v / tot * 100) : 0) + '%)</span></b></div>'; }
+  return o + '</div></div>';
+}
+function netCard(d) {
+  var t = d.totals || {};
+  var diff = t.netPlanToDate === null || t.netPlanToDate === undefined ? null : t.net - t.netPlanToDate;
+  var margin = t.commission > 0 ? Math.round(t.net / t.commission * 100) : null;
+  return '<div class="card last"><div class="hd"><div><span class="lbl">Чистая прибыль</span></div></div>' +
+    '<div class="big ' + (t.net < 0 ? 'neg' : 'pos') + '">' + usd(t.net) + '</div>' +
+    (diff !== null ? '<span class="chip ' + (diff >= 0 ? 'ok' : 'bad') + '">' + (diff >= 0 ? '▲ на ' + usd(diff) + ' выше' : '▼ на ' + usd(-diff) + ' ниже') + ' плана на эту дату</span>' : '') +
+    (margin !== null ? '<div class="mut" style="font-size:13px;margin-top:6px">Маржа ' + margin + '% от комиссии</div>' : '') +
+    '<div class="eq"><div><span>Комиссия получена</span><b>' + usd(t.commission) + '</b></div><div><span>− Зарплаты и бонусы</span><b class="neg">' + usd(-(t.salaries || 0)) + '</b></div>' +
+    '<div><span>− Расходы</span><b class="neg">' + usd(-(t.expenses || 0)) + '</b></div><div><span>= Чистая прибыль</span><b class="' + (t.net < 0 ? 'neg' : 'pos') + '">' + usd(t.net) + '</b></div></div></div>';
+}
+function leadPayCard(d) {
+  var p = d.leadPay, i, nS = 0, nL = 0, N = p.members.length;
+  for (i = 0; i < N; i++) { if (p.members[i].hoursDone) nS++; if (p.members[i].leadsDone) nL++; }
+  var extra = (p.adjBonus || 0) - (p.adjPenalty || 0), bonusAll = p.bonus + extra, grand = p.grand !== undefined ? p.grand : p.total;
+  var max = p.rate + (p.maxBonus || 0) + Math.max(0, p.adjBonus || 0) - (p.adjPenalty || 0), pct = max > 0 ? Math.max(0, Math.min(1, grand / max)) : 0;
+  var per = MN[Number(p.period.slice(5, 7)) - 1].toLowerCase();
+  return '<div class="card last lp"><div class="hd"><span class="lbl">Моя зарплата · ' + per + '</span><b class="lp-s">' + usd(grand) + '</b></div>' +
+    '<div class="lp-l"><span>Ставка ' + usd(p.rate) + ' + <a href="#" class="lp-b fc-cnt" id="lpBon">бонусы ' + usd(bonusAll) + '</a></span><span>максимум <b>' + usd(max) + '</b></span></div>' +
+    '<div class="lp-bar"><span class="bar"><i style="width:' + (pct * 100).toFixed(1) + '%;background:#3ddc97"></i></span><b>' + Math.round(pct * 100) + '%</b></div>' +
+    '<div class="lp-l"><span>' + (max > grand ? 'ещё до <b class="warn">+' + usd(max - grand) + '</b> за планы стримеров и команды' : 'Все бонусы месяца получены') + '</span></div>' +
+    '<div class="lp-m">' + (function () { var o = ''; for (var k = 0; k < N; k++) { var m = p.members[k]; o += '<div><span>' + esc(m.name) + '</span><span class="' + (m.hoursDone ? 'pos' : 'neg') + '">' + (m.hoursDone ? '✓' : '✗') + ' смены</span><span class="' + (m.leadsDone ? 'pos' : 'neg') + '">' + (m.leadsDone ? '✓' : '✗') + ' лиды</span><b>+' + usd(m.bonus) + '</b></div>'; } return o; })() + '</div></div>';
+}
+function leadBonusPop(d) {
+  var p = d.leadPay, i, nS = 0, nL = 0, N = p.members.length, o = '<b style="font-size:14px">За что бонусы</b>';
+  for (i = 0; i < N; i++) { if (p.members[i].hoursDone) nS++; if (p.members[i].leadsDone) nL++; }
+  var row = function (a, b, now, sum, cls) { return '<div class="lp-r"><span>' + esc(a) + '</span><b class="' + (cls || 'pos') + '">' + b + '</b><span class="mut">' + esc(now) + '</span><span class="mut" style="text-align:right">' + sum + '</span></div>'; };
+  o += row('План смен у стримера', '+' + usd(p.perShift) + ' за каждого', 'сейчас: ' + nS + ' из ' + N, usd(nS * p.perShift));
+  o += row('План лидов (FTD) у стримера', '+' + usd(p.perLeads) + ' за каждого', 'сейчас: ' + nL + ' из ' + N, usd(nL * p.perLeads));
+  if (p.perAll) o += row('Вся команда выполнила оба плана', '+' + usd(p.perAll), 'сейчас: ' + (p.allDone ? 'да' : 'пока нет'), usd(p.allBonus));
+  var a = p.adjItems || [];
+  for (i = 0; i < a.length; i++) o += row(a[i].comment || (a[i].kind === 'bonus' ? 'Премия' : 'Штраф'), (a[i].kind === 'bonus' ? '+' : '−') + usd(a[i].amount), a[i].kind === 'bonus' ? 'начислил руководитель' : 'удержание', '', a[i].kind === 'bonus' ? 'pos' : 'neg');
+  return o + '<div class="mut" style="font-size:12px;border-top:1px solid #34255c;padding-top:6px;margin-top:4px">Бонусы за планы считаются по итогам месяца, сейчас — по текущему состоянию.</div>';
 }
 
 function tasks(d) {
@@ -433,6 +582,7 @@ function shifts(fs, d) {
 function bind() {
   navBind();
   if ($('liveTog')) $('liveTog').onclick = function () { liveAll = !liveAll; render(); };
+  if ($('lpBon')) $('lpBon').onclick = function (e) { e.preventDefault(); if ($('fcpop')) { fcClose(); return; } fcOpen(this, leadBonusPop(last.d)); var fp = $('fcpop'); if (fp) { fp.style.maxHeight = '70vh'; fp.style.width = '360px'; fp.style.fontSize = '13px'; } };
   var sc = document.querySelectorAll('[data-sc]');
   for (i = 0; i < sc.length; i++) sc[i].onclick = function (e) { e.preventDefault(); openStreamer(shownS[Number(this.getAttribute('data-sc'))]); };
 }
@@ -797,7 +947,7 @@ $('lbtn').onclick = function () {
 };
 
 // Уже вошли (cookie сессии): сразу данные, иначе форма входа. Дальше сами обновляем раз в минуту
-req('GET', '/api/office/me', null, function (st, d) { if (st === 200) { myRole = d.role || ''; showMain(); } else showLogin(); });
+req('GET', '/api/office/me', null, function (st, d) { if (st === 200) { myRole = d.role || ''; myName = String(d.name || '').split(' ')[0]; showMain(); } else showLogin(); });
 // Не обновляем, пока открыта карточка, меню, календарь, идёт свайп или печатают в поиске: иначе всё сбросится под пальцем
 setInterval(function () {
   if ($('main').className === 'hide' || document.hidden || menuOpen || calOpen || ptrY !== null || ptrBusy || $('card').className !== 'hide') return;
