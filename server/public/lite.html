@@ -152,6 +152,7 @@ table.rb-g{border:0;background:none;width:auto}.rb-g th{background:none;padding:
 .rb-d{width:36px;height:34px;border:0;background:none;color:#f1ebff;border-radius:8px;font-size:14px;font-family:inherit;-webkit-appearance:none}
 .rb-d.out{color:#5b4d80}.rb-d.in{background:rgba(155,92,255,.25)}.rb-d.edge{background:#9b5cff;color:#fff;font-weight:700}.rb-d.today{box-shadow:inset 0 0 0 1px #c9a6ff}
 @media (max-width:620px){.rb-pop{left:0;right:auto;display:block}.rb-ps{width:auto;margin:0 0 10px;padding:0}.rb-ps button{display:inline-block;width:auto}}
+.nbn{display:inline-block;min-width:20px;height:20px;line-height:20px;padding:0 5px;box-sizing:border-box;border-radius:10px;background:#9b5cff;color:#fff;font-size:11px;font-weight:800;text-align:center;margin-left:4px;vertical-align:1px}
 .burger{position:relative;display:block;background:none;border:1px solid #34255c;border-radius:12px;width:42px;height:42px;min-height:42px;box-sizing:border-box;padding:0;margin:0 14px 0 0;-webkit-flex:none;flex:none;-webkit-align-self:center;align-self:center;-webkit-appearance:none;line-height:0;font-size:0}
 .burger i{position:absolute;left:11px;width:18px;height:2px;background:#f1ebff;border-radius:2px;margin:0}.burger i:nth-child(1){top:13px}.burger i:nth-child(2){top:19px}.burger i:nth-child(3){top:25px}
 .ttl{-webkit-align-items:center!important;align-items:center!important}
@@ -350,7 +351,14 @@ function paint(h) {
   return false;
 }
 function stamp() { var u = $('upd'); if (u) u.innerHTML = 'Обновлено ' + pad(new Date().getHours()) + ':' + pad(new Date().getMinutes()) + ':' + pad(new Date().getSeconds()) + ' · обновляется само раз в 30 секунд'; }
+// Цифры у «Лиды» в меню, как в Office: пришли в бота за период (зарегистрировались за период) и новые за сегодня
+var navC = null;
+function navLoad() {
+  var r = range();
+  req('GET', '/api/office/leads/today?from=' + r.from + '&to=' + r.to, null, function (st, d) { if (st === 200) { navC = d; if (menuOpen) { lastHtml = ''; draw(); } } });
+}
 function load() {
+  navLoad();
   if (view === 'leads') return loadLeads();
   if (view === 'pb') return loadPb();
   var r = range(), got = 0, dash = null, onl = null, fs = null, fail = null;
@@ -803,7 +811,7 @@ function menuHtml() {
   if (!menuOpen) return '';
   var IC = { dash: '<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>', leads: '<path d="M3 5h18l-7 8v6l-4 2v-8z"/>', pb: '<path d="M4 12h5l2-6 3 12 2-6h4"/>' };
   var it = [['dash', 'Дашборд'], ['leads', 'Лиды']].concat(myRole === 'admin' || myRole === 'teamlead' ? [['pb', 'Постбеки']] : []), h = '<div class="mov" id="mov"></div><div class="menu"><div class="mlogo"><img src="/img/office-192.png" width="30" height="30" alt="" style="border-radius:8px;vertical-align:middle;margin-right:8px">Hunter Office</div>', i;
-  for (i = 0; i < it.length; i++) h += '<button class="mi' + (view === it[i][0] ? ' on' : '') + '" data-v="' + it[i][0] + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' + IC[it[i][0]] + '</svg>' + it[i][1] + '</button>';
+  for (i = 0; i < it.length; i++) h += '<button class="mi' + (view === it[i][0] ? ' on' : '') + '" data-v="' + it[i][0] + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' + IC[it[i][0]] + '</svg>' + it[i][1] + (it[i][0] === 'leads' && navC ? ' <b title="Пришли в бота за период">' + navC.total + '</b> (<b style="color:#ffd54d" title="Зарегистрировались за период">' + navC.reg + '</b>)' + (navC.fresh ? ' <span class="nbn" title="Новые лиды за сегодня">' + navC.fresh + '</span>' : '') : '') + '</button>';
   return h + '<button class="mi out" id="logout">Выйти</button></div>';
 }
 function header(title, extra, noCal, tools) {
@@ -842,7 +850,8 @@ function renderLeads() {
   for (i = 0; i < rows.length; i++) if (!staff(rows[i])) { var sk = rows[i].stage || rows[i].status; cnt[sk] = (cnt[sk] || 0) + 1; }
   var pills = '';
   for (k in LST) if (LST.hasOwnProperty(k) && cnt[k]) pills += '<span class="st ' + LST[k][1] + '" style="margin-left:16px">' + LST[k][0] + '</span><b style="margin-left:7px">' + cnt[k] + ' шт</b>';
-  var h = header('Лиды', pills);
+  // Счётчики статусов одной строкой под заголовком (в шапке заголовок и подпись идут столбиком)
+  var h = header('Лиды', pills ? '<div class="sub" style="margin-left:-16px;white-space:normal">' + pills + '</div>' : '');
   h += '<div class="lf"><input id="lq" placeholder="Поиск: ник, Telegram ID, Pocket ID" value="' + esc(leadsQ) + '"><select id="ls"><option value="">Все статусы</option>';
   for (k in LST) if (LST.hasOwnProperty(k)) h += '<option value="' + k + '"' + (leadsStatus === k ? ' selected' : '') + '>' + LST[k][0] + '</option>';
   h += '</select></div>';
