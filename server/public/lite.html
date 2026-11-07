@@ -836,7 +836,7 @@ function renderLeads() {
   var ORD = { new: 0, registered: 1, ftd: 2, active: 3, churned: 4 };
   var tms = function (r) { return Date.parse(r.status_at || r.created_at) || 0; };
   var dk = function (r) { return ymd(new Date(tms(r))); };
-  list.sort(function (a, b) { var x = dk(b), y = dk(a); if (x !== y) return x > y ? 1 : -1; var s = (ORD[a.stage || a.status] || 0) - (ORD[b.stage || b.status] || 0); return s || tms(b) - tms(a); });
+  list.sort(function (a, b) { var x = dk(b), y = dk(a); if (x !== y) return x > y ? 1 : -1; var bk = (a.status === 'churned' ? 1 : 0) - (b.status === 'churned' ? 1 : 0); if (bk) return bk; var s = (ORD[a.stage || a.status] || 0) - (ORD[b.stage || b.status] || 0); return s || tms(b) - tms(a); });
   var cnt = {}, k;
   for (i = 0; i < rows.length; i++) if (!staff(rows[i])) { var sk = rows[i].stage || rows[i].status; cnt[sk] = (cnt[sk] || 0) + 1; }
   var pills = '';
@@ -852,7 +852,8 @@ function renderLeads() {
     var prev = null;
     for (i = 0; i < list.length; i++) {
       var r = list[i], st = staff(r) ? ['Сотрудник', 'st-new'] : LST[r.stage || r.status] || [r.stage || r.status, 'st-new'], dd = dk(r);
-      h += '<tr' + (prev && prev !== dd ? ' class="dayb"' : '') + '><td>' + Number(dd.slice(8)) + ' ' + MS[Number(dd.slice(5, 7)) - 1] + '</td><td class="l nm2">' + (r.first_name || !r.username ? '<div>' + esc(r.first_name || '—') + '</div>' : '') + (r.username ? '<div class="nm2-u">@' + esc(r.username) + '</div>' : '') + '</td>' +
+      var tint = staff(r) ? '' : ({ new: 'rgba(155,92,255,.06)', registered: 'rgba(255,213,77,.05)', ftd: 'rgba(61,220,151,.06)', active: 'rgba(77,163,255,.06)', churned: 'rgba(255,107,138,.06)' })[r.stage || r.status] || '';
+      h += '<tr' + (prev && prev !== dd ? ' class="dayb"' : '') + (tint ? ' style="background:' + tint + '"' : '') + '><td>' + Number(dd.slice(8)) + ' ' + MS[Number(dd.slice(5, 7)) - 1] + '</td><td class="l nm2">' + (r.first_name || !r.username ? '<div>' + esc(r.first_name || '—') + '</div>' : '') + (r.username ? '<div class="nm2-u">@' + esc(r.username) + '</div>' : '') + '</td>' +
         '<td><a href="#" class="tgid" data-card="' + esc(r.tg_id) + '">' + esc(r.tg_id) + '</a></td><td>' + esc(r.trader_id || '—') + '</td><td>' + (r.lead_role === 'test' ? '<span class="st st-test">Тест</span> ' : '') + '<span class="st ' + st[1] + '">' + st[0] + '</span>' + (r.status === 'churned' && (r.stage || r.status) !== 'churned' && !staff(r) ? '<span class="st st-bad" style="display:table;margin:3px auto 0" title="Заблокировал бота до первого депозита: в «Отвал» не считается">бот ⛔</span>' : '') + (r.banned ? ' ⛔' : '') + '</td>' +
         '<td>' + esc(r.owner_name || 'не закреплён') + '</td><td>' + esc(r.link_slug || '—') + '</td><td>' + (r.ftd_amount != null ? usd2(r.ftd_amount) : '—') + '</td><td>' + usd2(r.deposits) + '</td><td>' + usd2(r.commission) + '</td></tr>';
       prev = dd;

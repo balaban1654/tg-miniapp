@@ -611,6 +611,7 @@ function el(tag,props={},...kids){
 const money=v=>'$'+Number(v||0).toLocaleString('ru-RU',{maximumFractionDigits:2});
 const date=v=>new Date(v).toLocaleDateString('ru-RU',{timeZone:'Europe/Kyiv',day:'numeric',month:'short'});
 const pill=(st)=>{const[t,c]=STATUS[st]||[st,'p-pur'];return el('span',{class:'pill '+c},t)};
+const LTINT={new:'rgba(155,92,255,.06)',registered:'rgba(255,213,77,.05)',ftd:'rgba(61,220,151,.06)',active:'rgba(77,163,255,.06)',churned:'rgba(255,107,138,.06)'};
 function table(cols,rows,empty){
   if(!rows.length)return el('div',{class:'card empty'},empty);
   const names=cols.map(c=>Array.isArray(c)?c[0]:c);
@@ -2423,8 +2424,8 @@ async function viewLeads(){
     // С фильтрами список общий: сотрудников (админ состав) показываем только при поиске — у них нет даты в периоде
     if(flat&&!F.q.trim())list=list.filter(r=>!isStaff(r));
     // По дате: внутри одного дня (по Киеву) сверху новые, ниже регистрации, FTD, активные и в самом низу «Отвал»
-    const tms=r=>new Date(r.status_at||r.created_at).getTime(),dayK=r=>Number(new Date(tms(r)).toLocaleDateString('sv-SE',{timeZone:'Europe/Kyiv'}).replaceAll('-','')),isCh=r=>({new:0,registered:1,ftd:2,active:3,churned:4})[r.stage||r.status]??0;
-    const by={dep:(a,b)=>b.deposits-a.deposits,depAsc:(a,b)=>a.deposits-b.deposits,comm:(a,b)=>b.commission-a.commission,old:(a,b)=>dayK(a)-dayK(b)||isCh(a)-isCh(b)||tms(a)-tms(b),new:(a,b)=>dayK(b)-dayK(a)||isCh(a)-isCh(b)||tms(b)-tms(a)}[F.sort];
+    const tms=r=>new Date(r.status_at||r.created_at).getTime(),dayK=r=>Number(new Date(tms(r)).toLocaleDateString('sv-SE',{timeZone:'Europe/Kyiv'}).replaceAll('-','')),isCh=r=>({new:0,registered:1,ftd:2,active:3,churned:4})[r.stage||r.status]??0,blk=r=>r.status==='churned'?1:0;
+    const by={dep:(a,b)=>b.deposits-a.deposits,depAsc:(a,b)=>a.deposits-b.deposits,comm:(a,b)=>b.commission-a.commission,old:(a,b)=>dayK(a)-dayK(b)||blk(a)-blk(b)||isCh(a)-isCh(b)||tms(a)-tms(b),new:(a,b)=>dayK(b)-dayK(a)||blk(a)-blk(b)||isCh(a)-isCh(b)||tms(b)-tms(a)}[F.sort];
     list=[...list].sort(by);
     // @r1654 (создатель компании) всегда самый первый в админ составе
     const isOwner=r=>String(r.username||'').toLowerCase()==='r1654';
@@ -2439,6 +2440,8 @@ async function viewLeads(){
       src().length?'Ничего не найдено. Измените фильтры.':'Лидов пока нет. Они появятся, когда люди перейдут по вашим ссылкам и нажмут «Старт» в боте.');
     tbl.classList.add('ctr');
     const body=tbl.querySelector('tbody');
+    // Строка еле заметно в цвет этапа лида (заблокировавшие бота до депозита - в цвет своего этапа)
+    if(body)[...body.children].forEach((tr,i)=>{const r=sorted[i];if(r&&!isStaff(r)){const c=LTINT[r.stage||r.status];if(c)tr.style.background=c}});
     // Граница между днями: первая строка нового дня отделена более заметной линией, когда список идёт по дате
     if(body&&(F.sort==='new'||F.sort==='old')){
       const dk=r=>new Date(r.status_at||r.created_at).toLocaleDateString('sv-SE',{timeZone:'Europe/Kyiv'});
