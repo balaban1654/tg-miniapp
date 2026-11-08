@@ -1005,8 +1005,15 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
   // Закрыть чат может админ, тимлидер и стример (в пределах своих чатов): он уходит из списка, переписка сохраняется
   // Шаблоны ответов: /команда -> текст. Видят все, кто отвечает в чатах; создают и меняют админ и тимлиды
   const tplShort = (v: unknown) => String(v ?? '').trim().replace(/^\/+/, '').toLowerCase().replace(/\s+/g, '_').slice(0, 32);
-  app.get('/chat-templates', { preHandler: auth }, async () =>
-    (await db.query(`SELECT t.id, t.shortcut, t.body, s.name AS author FROM chat_templates t LEFT JOIN staff s ON s.id = t.created_by ORDER BY t.shortcut`)).rows);
+  // ?fill=1 (поле ответа в чате): метка {менеджер} заменяется на Telegram-ник того, кто отвечает (нет ника - на имя)
+  app.get<{ Querystring: { fill?: string } }>('/chat-templates', { preHandler: auth }, async (req) => {
+    const rows = (await db.query(`SELECT t.id, t.shortcut, t.body, s.name AS author FROM chat_templates t LEFT JOIN staff s ON s.id = t.created_by ORDER BY t.shortcut`)).rows;
+    if (req.query.fill !== '1') return rows;
+    const st = (await db.query('SELECT name, tg_username FROM staff WHERE id = $1', [req.staff!.id])).rows[0] ?? {};
+    const u = String(st.tg_username ?? '').trim().replace(/^@+/, '');
+    const who = u ? '@' + u : String(st.name ?? req.staff!.name ?? '');
+    return rows.map((r: any) => ({ ...r, body: String(r.body).replace(/\{\s*менеджер\s*\}/giu, who) }));
+  });
   const tplSave = async (req: FastifyRequest, reply: FastifyReply, id: number | null) => {
     const b = (req.body ?? {}) as Record<string, unknown>;
     const shortcut = tplShort(b.shortcut);

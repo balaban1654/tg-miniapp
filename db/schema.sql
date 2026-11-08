@@ -1098,3 +1098,13 @@ SELECT 'аккаунт', 'У вас уже есть аккаунт Pocket Option
  WHERE NOT EXISTS (SELECT 1 FROM app_settings WHERE key = 'tpl_seed_akkaunt')
 ON CONFLICT (shortcut) DO NOTHING;
 INSERT INTO app_settings (key, value) VALUES ('tpl_seed_akkaunt', '1') ON CONFLICT (key) DO NOTHING;
+
+-- Шаблон /закрытие: добавляется один раз; {менеджер} при вставке заменяется на ник отвечающего
+INSERT INTO chat_templates (shortcut, body)
+SELECT 'закрытие', 'Спасибо за обращение! 🙌
+Если появятся вопросы, пишите сюда в чат или мне напрямую: {менеджер}
+
+Удачной торговли!'
+ WHERE NOT EXISTS (SELECT 1 FROM app_settings WHERE key = 'tpl_seed_zakrytie')
+ON CONFLICT (shortcut) DO NOTHING;
+INSERT INTO app_settings (key, value) VALUES ('tpl_seed_zakrytie', '1') ON CONFLICT (key) DO NOTHING;

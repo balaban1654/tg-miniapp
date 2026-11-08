@@ -647,7 +647,7 @@ function tplManager(onChange){
     showAdd();
     box.replaceChildren(
       el('div',{class:'lc-hr',style:'display:flex;align-items:center;gap:10px'},el('h3',{style:'font-size:18px;flex:1'},'Шаблоны ответов'),el('button',{class:'btn o s',type:'button','aria-label':'Закрыть',onclick:close},'✕')),
-      el('div',{class:'mut sm'},'В чате наберите «/» в начале поля: появится список шаблонов. Выберите стрелками и Enter или нажмите на шаблон, текст вставится в поле, его можно поправить перед отправкой. Шаблоны видят все, кто отвечает в чатах.'),
+      el('div',{class:'mut sm'},'В чате наберите «/» в начале поля: появится список шаблонов. Выберите стрелками и Enter или нажмите на шаблон, текст вставится в поле, его можно поправить перед отправкой. Шаблоны видят все, кто отвечает в чатах. Метка {менеджер} в тексте заменится на Telegram-ник того, кто вставляет шаблон (если ника нет — на имя).'),
       add,
       ...(list.length?list.map(t=>{
         const row=el('div',{class:'tpm-row'});
@@ -4192,7 +4192,7 @@ async function viewChats(){
   // Шаблоны ответов: «/» в начале поля показывает список, Enter или нажатие вставляет текст
   let tpls=[],tplSel=0,tplShown=[];
   const tplBox=el('div',{class:'tpl-sug',hidden:''});
-  const tplLoad=()=>api('/chat-templates').then(r=>{tpls=r}).catch(()=>{});tplLoad();
+  const tplLoad=()=>api('/chat-templates?fill=1').then(r=>{tpls=r}).catch(()=>{});tplLoad();
   const sendBtn=el('button',{class:'btn',type:'button'},'Отправить');
   const IC=h=>svgIcon(h,22);
   const CLIP='<path d="M21 11.5l-8.6 8.6a5 5 0 01-7.1-7.1l8.6-8.6a3.3 3.3 0 014.7 4.7l-8.6 8.6a1.7 1.7 0 01-2.4-2.4l7.9-7.9"/>';
