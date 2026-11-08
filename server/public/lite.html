@@ -746,6 +746,8 @@ function shifts(fs, d) {
   var label = fs.from ? (fs.from.slice(0, 7) === fs.to.slice(0, 7) && fs.from.slice(8) === '01' && fs.to === lastDay(fs.from.slice(0, 7)) ? perLabel(fs.from.slice(0, 7)) : dmy(fs.from) + ' — ' + dmy(fs.to)) : perLabel(fs.period);
   var o = '<h3>Эфиры за ' + esc(label) + '</h3>';
   if (!fs.rows.length) return o + '<div class="card mut" style="text-align:center">Зачтённых отчётов за период пока нет.</div>';
+  // Сверху лучший: больше всего времени в эфире, при равенстве больше отчётов
+  fs.rows.sort(function (a, b) { return b.minutes - a.minutes || b.reports - a.reports; });
   var i, j, tot = {}, rep = 0, min = 0;
   o += '<div class="scroll"><table><tr><th class="l">Сотрудник</th><th>Отчётов</th><th>Время</th>';
   for (j = 0; j < fs.fields.length; j++) o += '<th>' + esc(fs.fields[j]) + '</th>';

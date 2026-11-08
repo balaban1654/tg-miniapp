@@ -3413,6 +3413,8 @@ const efTd=(v,full)=>el('td',{title:full!==undefined?String(full):null},v);
 async function fieldStatsBlock(qs=''){
   const d=await api('/shifts/fieldstats'+qs);
   if(!d.fields.length&&!d.rows.length)return null;
+  // Сверху лучший: больше всего времени в эфире, при равенстве больше отчётов и первого показателя (просмотров)
+  d.rows.sort((a,b)=>b.minutes-a.minutes||b.reports-a.reports||((b.sums[d.fields[0]]||0)-(a.sums[d.fields[0]]||0)));
   const cols=['Сотрудник','Отчётов','Время',...d.fields];
   const tot={};d.rows.forEach(r=>d.fields.forEach(f=>{tot[f]=(tot[f]||0)+(r.sums[f]||0)}));
   const rows=d.rows.map(r=>[td(r.name),td(r.reports,'n'),td(hmin(r.minutes)),...d.fields.map(f=>td((r.sums[f]||0).toLocaleString('ru-RU'),'n'))]);
