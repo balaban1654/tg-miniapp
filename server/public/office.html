@@ -258,6 +258,7 @@ textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10
 .msg-menu{position:fixed;z-index:90;display:grid;min-width:180px;background:var(--card2);border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:0 18px 44px rgba(0,0,0,.55)}.msg-menu button{background:none;border:0;border-bottom:1px solid var(--line);color:var(--fg);text-align:left;padding:13px 16px;font:inherit;font-size:15px}.msg-menu button:last-child{border-bottom:0;color:#ffffffa0}.msg-menu button.bad{color:var(--bad)}
 .bub img{max-width:240px;border-radius:8px;display:block;margin-bottom:4px}
 .reply{display:flex;gap:8px;padding:10px;border-top:1px solid var(--line);align-items:flex-end}
+.tpl-wrap{position:relative}.tpl-sug{position:absolute;left:10px;right:10px;bottom:calc(100% + 6px);z-index:30;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:6px;display:grid;gap:2px;box-shadow:0 14px 40px rgba(0,0,0,.5);max-height:320px;overflow-y:auto}.tpl-sug[hidden]{display:none}.tpl-it{display:flex;gap:12px;align-items:baseline;text-align:left;border:0;background:none;color:var(--fg);font:inherit;padding:8px 10px;border-radius:8px;cursor:pointer;min-width:0}.tpl-it b{color:var(--acc2);flex:none}.tpl-it span{color:var(--mut);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}.tpl-it.on,.tpl-it:hover{background:var(--card2)}.tpl-none{padding:8px 10px}.tpl-btn{margin-left:auto;margin-right:12px}.tpm{width:min(640px,100%);max-height:calc(100vh - 32px);overflow-y:auto;display:grid;gap:12px}.tpm-row{display:grid;gap:6px;border:1px solid var(--line);border-radius:12px;padding:10px 12px}.tpm-h{display:flex;gap:8px;align-items:center}.tpm-h b{color:var(--acc2)}.tpm-h .sp{flex:1}.tpm-b{white-space:pre-wrap;font-size:13.5px;color:var(--fg)}.tpm-f{display:grid;gap:8px}.tpm-f textarea{min-height:110px;resize:vertical;width:100%;box-sizing:border-box;background:var(--bg2);color:var(--fg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;font:inherit;font-size:14px;line-height:1.45}.tpm-f textarea:focus{outline:none;border-color:var(--acc)}
 .rbtn{width:46px;height:46px;flex:none;padding:0;display:grid;place-items:center}.rbtn.rec{background:#ff3b4e;border-color:#ff3b4e;color:#fff}
 .qprev{display:flex;gap:8px;flex-wrap:wrap;padding:8px 12px 0}.qi.ask{max-width:360px}.qask{flex:1 1 100%;display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:12px}.qask span{flex:1 1 auto}.qi{flex-wrap:wrap;position:relative;display:flex;gap:8px;align-items:center;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:6px 30px 6px 6px;max-width:290px;font-size:12px}
 .qi img,.qi video{height:48px;width:48px;object-fit:cover;border-radius:8px;flex:none}.qi video.rd{border-radius:50%}.qi audio{height:34px;width:210px}.qi .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:170px}.qi .x{position:absolute;top:3px;right:3px;width:22px;height:22px;padding:0;border-radius:50%;line-height:1;font-size:12px}
@@ -623,6 +624,42 @@ function table(cols,rows,empty){
 }
 const td=(v,cls)=>el('td',{class:cls||''},v);
 
+/** «Шаблоны» в «Чатах поддержки» (админ и тимлид): список, добавить, изменить, удалить. Команда /привет, текст вставляется в поле ответа */
+function tplManager(onChange){
+  setMtop&&setMtop();
+  const box=el('div',{class:'lc tpm'});
+  const ov=el('div',{class:'lc-overlay full-m',role:'dialog','aria-modal':'true',onclick:e=>{if(e.target===ov)close()}},box);
+  const close=()=>{ov.remove();document.removeEventListener('keydown',kd)};
+  const kd=e=>{if(e.key==='Escape'&&!document.querySelector('.ask-ov'))close()};
+  document.addEventListener('keydown',kd);
+  const form=(t,done)=>{
+    const sc=el('input',{placeholder:'команда, например привет',value:t?t.shortcut:'',maxlength:'33'});
+    const tx=el('textarea',{placeholder:'Текст, который вставится в ответ клиенту',maxlength:'4000'});tx.value=t?t.body:'';
+    const er=el('div',{class:'err sm'});
+    const save=el('button',{class:'btn s',type:'button',onclick:async()=>{er.textContent='';save.disabled=true;
+      try{await api('/chat-templates'+(t?'/'+t.id:''),{method:t?'PUT':'POST',body:{shortcut:sc.value,body:tx.value}});toast(t?'Шаблон сохранён':'Шаблон добавлен');onChange&&onChange();draw()}catch(x){er.textContent=x.message;save.disabled=false}}},t?'Сохранить':'Добавить');
+    return el('div',{class:'tpm-f'},el('div',{style:'display:flex;gap:6px;align-items:center'},el('b',{style:'color:var(--acc2);font-size:18px'},'/'),sc),tx,er,el('div',{style:'display:flex;gap:8px'},save,el('button',{class:'btn o s',type:'button',onclick:done},'Отмена')));
+  };
+  async function draw(){
+    let list=[];try{list=await api('/chat-templates')}catch(x){toast(x.message)}
+    const add=el('div',{});
+    const showAdd=()=>add.replaceChildren(el('button',{class:'btn',type:'button',onclick:()=>add.replaceChildren(form(null,showAdd))},'+ Новый шаблон'));
+    showAdd();
+    box.replaceChildren(
+      el('div',{class:'lc-hr',style:'display:flex;align-items:center;gap:10px'},el('h3',{style:'font-size:18px;flex:1'},'Шаблоны ответов'),el('button',{class:'btn o s',type:'button','aria-label':'Закрыть',onclick:close},'✕')),
+      el('div',{class:'mut sm'},'В чате наберите «/» в начале поля: появится список шаблонов. Выберите стрелками и Enter или нажмите на шаблон, текст вставится в поле, его можно поправить перед отправкой. Шаблоны видят все, кто отвечает в чатах.'),
+      add,
+      ...(list.length?list.map(t=>{
+        const row=el('div',{class:'tpm-row'});
+        const show=()=>row.replaceChildren(el('div',{class:'tpm-h'},el('b',{},'/'+t.shortcut),el('span',{class:'sp mut sm'},t.author?'добавил(а) '+t.author:''),
+          el('button',{class:'btn o s',type:'button',onclick:()=>row.replaceChildren(form(t,show))},'Изменить'),
+          el('button',{class:'btn o s',type:'button',style:'color:var(--bad);border-color:var(--bad)',onclick:async()=>{if(!await askC('Удалить шаблон /'+t.shortcut+'?'))return;try{await api('/chat-templates/'+t.id,{method:'DELETE'});toast('Шаблон удалён');onChange&&onChange();draw()}catch(x){toast(x.message)}}},'Удалить')),
+          el('div',{class:'tpm-b'},t.body));
+        show();return row;
+      }):[el('div',{class:'mut',style:'text-align:center;padding:14px'},'Шаблонов пока нет')]));
+  }
+  document.body.append(ov);draw();
+}
 function askC(text,extra){return new Promise(res=>{const prev=document.activeElement;const done=v=>{ov.remove();document.removeEventListener('keydown',kd,true);try{prev&&prev.focus&&prev.focus()}catch{}res(v)};
   const kd=e=>{if(e.key==='Escape'){e.preventDefault();e.stopPropagation();done(false)}};
   const ok=el('button',{type:'button',class:'btn',onclick:()=>done(true)},'Да'),no=el('button',{type:'button',class:'btn o',onclick:()=>done(false)},'Отмена');
@@ -4151,7 +4188,11 @@ async function viewChats(){
   const list=el('div',{class:'chat-list'});
   const head=el('div',{class:'thread-head'});
   const msgs=el('div',{class:'msgs'});
-  const ta=el('textarea',{id:'replyText',rows:'1',placeholder:'Ответ клиенту. Enter — отправить',maxlength:'4000'});
+  const ta=el('textarea',{id:'replyText',rows:'1',placeholder:'Ответ клиенту. Enter — отправить, / — шаблоны',maxlength:'4000'});
+  // Шаблоны ответов: «/» в начале поля показывает список, Enter или нажатие вставляет текст
+  let tpls=[],tplSel=0,tplShown=[];
+  const tplBox=el('div',{class:'tpl-sug',hidden:''});
+  const tplLoad=()=>api('/chat-templates').then(r=>{tpls=r}).catch(()=>{});tplLoad();
   const sendBtn=el('button',{class:'btn',type:'button'},'Отправить');
   const IC=h=>svgIcon(h,22);
   const CLIP='<path d="M21 11.5l-8.6 8.6a5 5 0 01-7.1-7.1l8.6-8.6a3.3 3.3 0 014.7 4.7l-8.6 8.6a1.7 1.7 0 01-2.4-2.4l7.9-7.9"/>';
@@ -4220,7 +4261,7 @@ async function viewChats(){
   micBtn.addEventListener('click',startVoice);
   const err=el('div',{class:'err',role:'alert',style:'padding:0 12px'});
   const backBtn=el('button',{class:'chat-back',type:'button',onclick:()=>{active=null;wrap.classList.remove('open');loadList().catch(()=>{});window.scrollTo(0,0)}},'‹ Все чаты');
-  const thread=el('div',{class:'chat-thread'},head,msgs,el('div',{},err,prev,el('div',{class:'reply'},attachBtn,micBtn,fileIn,ta,recBar,sendBtn)));
+  const thread=el('div',{class:'chat-thread'},head,msgs,el('div',{class:'tpl-wrap'},err,prev,tplBox,el('div',{class:'reply'},attachBtn,micBtn,fileIn,ta,recBar,sendBtn)));
   // Перетаскивание файлов в окно переписки
   ['dragenter','dragover'].forEach(ev=>thread.addEventListener(ev,e=>{if(e.dataTransfer&&[...e.dataTransfer.types].includes('Files')){e.preventDefault();thread.classList.add('drag')}}));
   ['dragleave','drop'].forEach(ev=>thread.addEventListener(ev,e=>{if(ev==='dragleave'&&thread.contains(e.relatedTarget))return;thread.classList.remove('drag')}));
@@ -4352,6 +4393,28 @@ async function viewChats(){
     finally{sendBtn.disabled=false;sendBtn.textContent='Отправить';ta.focus()}
   }
   sendBtn.addEventListener('click',send);
+  const tplHide=()=>{tplBox.hidden=true;tplShown=[]};
+  const tplPut=t=>{ta.value=t.body;tplHide();ta.focus();ta.dispatchEvent(new Event('input'));try{ta.setSelectionRange(ta.value.length,ta.value.length)}catch{}};
+  const tplDraw=()=>{
+    const m=/^\/([^\s]*)$/.exec(ta.value);
+    if(!m||!tpls.length){tplHide();return}
+    const q=m[1].toLowerCase();
+    tplShown=tpls.filter(t=>t.shortcut.startsWith(q)).concat(tpls.filter(t=>!t.shortcut.startsWith(q)&&t.shortcut.includes(q)));
+    if(!tplShown.length){tplBox.hidden=false;tplBox.replaceChildren(el('div',{class:'tpl-none mut sm'},'Нет шаблона /'+q));return}
+    tplSel=Math.min(tplSel,tplShown.length-1);
+    tplBox.hidden=false;
+    tplBox.replaceChildren(...tplShown.slice(0,8).map((t,i)=>el('button',{type:'button',class:'tpl-it'+(i===tplSel?' on':''),onmousedown:e=>{e.preventDefault();tplPut(t)}},el('b',{},'/'+t.shortcut),el('span',{},t.body.replace(/\s+/g,' ')))));
+  };
+  ta.addEventListener('input',()=>{tplSel=0;tplDraw()});
+  ta.addEventListener('blur',()=>setTimeout(tplHide,150));
+  ta.addEventListener('keydown',e=>{
+    if(tplBox.hidden||!tplShown.length)return;
+    const n=Math.min(8,tplShown.length);
+    if(e.key==='ArrowDown'){e.preventDefault();tplSel=(tplSel+1)%n;tplDraw()}
+    else if(e.key==='ArrowUp'){e.preventDefault();tplSel=(tplSel-1+n)%n;tplDraw()}
+    else if((e.key==='Enter'&&!e.shiftKey)||e.key==='Tab'){e.preventDefault();e.stopImmediatePropagation();tplPut(tplShown[tplSel])}
+    else if(e.key==='Escape'){e.preventDefault();tplHide()}
+  });
   ta.addEventListener('paste',e=>{const fs=[...(e.clipboardData?.files||[])];if(fs.length){e.preventDefault();addFiles(fs)}});
   ta.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send()}});
   const wrap=el('div',{class:'chat-wrap'},list,thread);
@@ -4359,7 +4422,7 @@ async function viewChats(){
   head.replaceChildren(el('span',{class:'mut'},'Выберите чат слева'));
   if(pendingChat){const id=pendingChat;pendingChat=null;await openChat(id)}
   poll=setInterval(()=>{loadList().catch(()=>{});loadThread().catch(()=>{})},6000);
-  return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Чаты поддержки'),el('span',{class:'mut sm'},me.role==='admin'?'Вы видите все чаты':'Новый клиент другого стримера открывается всем, если тот не ответил: через 15 минут после конца эфира или через 5 минут, если он не в эфире. Кто ответит первым, тому клиент и переходит')),wrap];
+  return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},'Чаты поддержки'),me.role==='admin'||me.role==='teamlead'?el('button',{type:'button',class:'btn o s tpl-btn',onclick:()=>tplManager(tplLoad)},'Шаблоны'):null,el('span',{class:'mut sm'},me.role==='admin'?'Вы видите все чаты':'Новый клиент другого стримера открывается всем, если тот не ответил: через 15 минут после конца эфира или через 5 минут, если он не в эфире. Кто ответит первым, тому клиент и переходит')),wrap];
 }
 
 const TRIG={start:'Нажал /start',no_reg:'Нет регистрации',no_deposit:'Регистрация без депозита',ftd:'Депозит получен',inactive:'Давно не заходил',withdrawal:'Успешный вывод средств'};

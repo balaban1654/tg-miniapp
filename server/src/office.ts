@@ -1003,6 +1003,30 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
 
   // Закрытый чат скрывается, пока клиент не напишет снова. Очистить переписку совсем может только админ
   // Закрыть чат может админ, тимлидер и стример (в пределах своих чатов): он уходит из списка, переписка сохраняется
+  // Шаблоны ответов: /команда -> текст. Видят все, кто отвечает в чатах; создают и меняют админ и тимлиды
+  const tplShort = (v: unknown) => String(v ?? '').trim().replace(/^\/+/, '').toLowerCase().replace(/\s+/g, '_').slice(0, 32);
+  app.get('/chat-templates', { preHandler: auth }, async () =>
+    (await db.query(`SELECT t.id, t.shortcut, t.body, s.name AS author FROM chat_templates t LEFT JOIN staff s ON s.id = t.created_by ORDER BY t.shortcut`)).rows);
+  const tplSave = async (req: FastifyRequest, reply: FastifyReply, id: number | null) => {
+    const b = (req.body ?? {}) as Record<string, unknown>;
+    const shortcut = tplShort(b.shortcut);
+    const body = String(b.body ?? '').trim().slice(0, 4000);
+    if (!/^[\p{L}\p{N}_-]{1,32}$/u.test(shortcut)) return reply.code(400).send({ error: 'Команда: буквы, цифры, _ или -, до 32 символов, без пробелов' });
+    if (!body) return reply.code(400).send({ error: 'Напишите текст шаблона' });
+    const dup = (await db.query('SELECT id FROM chat_templates WHERE shortcut = $1 AND ($2::int IS NULL OR id <> $2)', [shortcut, id])).rows[0];
+    if (dup) return reply.code(409).send({ error: 'Шаблон /' + shortcut + ' уже есть' });
+    const r = id
+      ? await db.query('UPDATE chat_templates SET shortcut = $2, body = $3, updated_at = now() WHERE id = $1 RETURNING id', [id, shortcut, body])
+      : await db.query('INSERT INTO chat_templates (shortcut, body, created_by) VALUES ($1,$2,$3) RETURNING id', [shortcut, body, req.staff!.id]);
+    if (!r.rowCount) return reply.code(404).send({ error: 'Шаблон не найден' });
+    return { ok: true, id: r.rows[0].id };
+  };
+  app.post('/chat-templates', { preHandler: need('admin', 'teamlead') }, async (req, reply) => tplSave(req, reply, null));
+  app.put<{ Params: { id: string } }>('/chat-templates/:id', { preHandler: need('admin', 'teamlead') }, async (req, reply) => tplSave(req, reply, Number(req.params.id)));
+  app.delete<{ Params: { id: string } }>('/chat-templates/:id', { preHandler: need('admin', 'teamlead') }, async (req) => {
+    await db.query('DELETE FROM chat_templates WHERE id = $1', [Number(req.params.id)]);
+    return { ok: true };
+  });
   app.post<{ Params: { tgId: string } }>('/chats/:tgId/close', { preHandler: need('admin', 'teamlead', 'streamer') }, async (req, reply) => {
     const me = req.staff!;
     const r = await db.query(`UPDATE leads d SET chat_closed_at = now() WHERE d.tg_id = $1 AND ${chatScope(me, 'd.owner_id')}`, [Number(req.params.tgId)]);

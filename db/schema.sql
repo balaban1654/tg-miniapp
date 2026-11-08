@@ -1075,3 +1075,13 @@ UPDATE postback_log p SET result = 'ok: ещё один Pocket ID лида, до
         OR EXISTS (SELECT 1 FROM leads d WHERE d.tg_id = p.tg_id AND d.trader_id = p.query->>'trader_id'))
    AND NOT EXISTS (SELECT 1 FROM postback_log o WHERE o.id < p.id AND o.tg_id = p.tg_id AND o.query->>'trader_id' = p.query->>'trader_id')
    AND EXISTS (SELECT 1 FROM postback_log o WHERE o.id < p.id AND o.tg_id = p.tg_id AND o.event = 'reg' AND coalesce(o.query->>'trader_id', '') NOT IN ('', p.query->>'trader_id'));
+
+-- Шаблоны ответов в «Чатах поддержки» (как быстрые ответы в Telegram для бизнеса): /команда -> текст.
+-- Создают админ и тимлиды, пользуются все, кто отвечает в чатах
+CREATE TABLE IF NOT EXISTS chat_templates (
+  id         SERIAL PRIMARY KEY,
+  shortcut   TEXT NOT NULL UNIQUE,
+  body       TEXT NOT NULL,
+  created_by INT REFERENCES staff(id) ON DELETE SET NULL,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
