@@ -1111,3 +1111,6 @@ INSERT INTO app_settings (key, value) VALUES ('tpl_seed_zakrytie', '1') ON CONFL
 
 -- Закрытый чат: когда лид снова пишет, бот спрашивает «Нужна поддержка?» (не чаще раза в 10 минут)
 ALTER TABLE leads ADD COLUMN IF NOT EXISTS support_ask_at TIMESTAMPTZ;
+
+-- Вопрос в закрытом чате без слова «поддержки» (если текст не меняли в Office)
+UPDATE bot_replies SET text = 'Вам нужна помощь?' WHERE key = 'support_ask' AND text = 'Вам нужна помощь поддержки?';
