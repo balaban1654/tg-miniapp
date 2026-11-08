@@ -1203,7 +1203,7 @@ function mineBell(list){const m=myTaskItemsFrom(list);return{items:m,n:m.filter(
 function teamBell(d,list){const tk=dxTasks(d),m=myTaskItemsFrom(list);return{items:[...tk.items,...m],n:tk.n+m.filter(x=>!x.dataset.done).length}}
 async function loadBellSrc(){
   const r=me.role;
-  if(r==='admin'||r==='teamlead'){const d=await api('/dashboard'+dxQuery());d.chatsWaiting=await waitingChats();liveSrc={d,skew:Date.parse(d.now)-Date.now()};const ml=r==='teamlead'?await api('/tasks/mine').catch(()=>[]):[];bellSrc=r==='admin'?()=>dxTasks(d):()=>teamBell(d,ml)}
+  if(r==='admin'||r==='teamlead'){const d=await api('/dashboard'+dxQuery());d.chatsWaiting=await waitingChats();d.pbNew=await newPostbacks();liveSrc={d,skew:Date.parse(d.now)-Date.now()};const ml=r==='teamlead'?await api('/tasks/mine').catch(()=>[]):[];bellSrc=r==='admin'?()=>dxTasks(d):()=>teamBell(d,ml)}
   else if(r==='streamer'){const c=dxCur();const d=await api('/my/dashboard?from='+c.from+'&to='+c.to);liveSrc=liveFromColleagues(d,Date.parse(d.now)-Date.now());d.alerts.chats=await waitingChats();bellSrc=()=>smTasks(d)}
   else{const ml=await api('/tasks/mine').catch(()=>[]);bellSrc=()=>mineBell(ml)}
   bellAt=Date.now();
@@ -1244,7 +1244,8 @@ function dxBell(t){
   const bdg=fresh.length?el('span',{class:'dx-bdg'},fresh.length>99?'99+':String(fresh.length)):null;
   if(bdg){b.classList.add('has','ring');b.append(bdg);b.title=b.ariaLabel='Требует внимания: '+fresh.length+' новых'}
   b.addEventListener('click',()=>{setMtop();document.querySelectorAll('.onl-ov').forEach(x=>x.remove());b.classList.remove('ring','has');bdg&&bdg.remove();bellScrollY=scrollY;
-    try{localStorage.setItem(KEY,JSON.stringify(live.map(key)))}catch{}});
+    try{localStorage.setItem(KEY,JSON.stringify(live.map(key)))}catch{}
+    try{if(t.items.some(x=>x.dataset.lag))localStorage.setItem('lag_seen_'+(me&&me.id),lagSlot());const pm=Math.max(0,...t.items.map(x=>Number(x.dataset.pb)||0));if(pm)localStorage.setItem(pbSeenKey(),String(pm))}catch{}});
   return w;
 }
 /* Плашка «онлайн»: сколько людей прямо сейчас с открытым Mini App (обновляется раз в 15 с) */
@@ -1821,24 +1822,43 @@ function chatBellItems(list){
 }
 // В колокольчике чат висит, пока клиенту не ответили: последнее сообщение от клиента (открыть чат мало). Закрытый чат сюда не попадает
 const waitingChats=()=>api('/chats').then(r=>r.filter(x=>x.last_dir==='in')).catch(()=>[]);
+// Отставание стримеров: «день» начинается в 12:00 по Киеву; открыли колокольчик - до следующих 12:00 пункта нет
+const lagSlot=()=>{const h=Number(new Date().toLocaleString('en-GB',{timeZone:'Europe/Kyiv',hour:'2-digit',hour12:false}))%24,t=kyivToday();return h>=12?t:addDay(t,-1)};
+const lagSeenNow=()=>{try{return localStorage.getItem('lag_seen_'+(me&&me.id))===lagSlot()}catch{return false}};
+// Постбеки в колокольчике: новые с прошлого открытия колокольчика (за сегодня и вчера), по нажатию - раздел «Постбеки»
+const pbSeenKey=()=>'pb_seen_'+(me&&me.id);
+const newPostbacks=()=>{if(!me||(me.role!=='admin'&&me.role!=='teamlead'))return Promise.resolve([]);const t=kyivToday();
+  return api('/postbacks?from='+addDay(t,-1)+'&to='+t).then(r=>{let seen=0;try{seen=Number(localStorage.getItem(pbSeenKey()))||0}catch{}return r.filter(x=>Number(x.id)>seen)}).catch(()=>[])};
+function pbBellItems(list){
+  if(!list||!list.length)return[];
+  const by={},ORD=['reg','ftd','dep','wd','comm'];let bad=0;
+  list.forEach(x=>{const o=by[x.event]||(by[x.event]={n:0,s:0});o.n++;const q=x.query||{};o.s+=Number(q.commission||q.sumdep||q.wdr_sum||q.amount||q.sum||0)||0;if(!/^(ok|дубль)/.test(String(x.result||'')))bad++});
+  const parts=ORD.filter(k=>by[k]).map(k=>k+' '+by[k].n+(k!=='reg'&&by[k].s?' ('+usd0(by[k].s)+')':''));
+  const b=el('button',{type:'button',class:'dx-tk',title:'Открыть постбеки',onclick:()=>{dxCloseAll();tab='pb';showApp();render()}},el('b',{class:'dx-bd '+(bad?'r':'w')},String(list.length)),
+    el('span',{class:'dx-tx'},el('span',{class:'tt'},'Новые постбеки'),el('span',{class:'ts'},parts.join(' · ')+(bad?' · без лида или с ошибкой: '+bad:''))),svgIcon(IC_CHEV,16));
+  b.dataset.pb=String(Math.max(...list.map(x=>Number(x.id)||0)));
+  return[b];
+}
 function dxTasks(d){
   const T=d.tasks,rows=[];
   const names=(a,f)=>a.map(f).join(' · ');
   const hlag=T.lagging.map(x=>x.name+' '+hw(x.hoursMin)+'/'+d.plan.hours+' ч').join(' · ');
   if(T.pending.length)rows.push([T.pending.reduce((a,x)=>a+x.n,0),'w','Отчёты ждут проверки',names(T.pending,x=>x.name+' '+x.n),'acc','review']);
   if(T.advances.length)rows.push([T.advances.length,'w','Заявка на аванс',names(T.advances,x=>x.staff_name+' · '+usd0(x.amount)),'acc','pay']);
-  if(T.lagging.length)rows.push([T.lagging.length,T.lagging.some(x=>x.level==='bad')?'r':'w','Стримеры отстают от плана',hlag,'acc','sum']);
+  // «Стримеры отстают от плана» приходит раз в день в 12:00 по Киеву и пропадает, когда колокольчик открыли
+  if(T.lagging.length&&!lagSeenNow())rows.push([T.lagging.length,T.lagging.some(x=>x.level==='bad')?'r':'w','Стримеры отстают от плана',hlag,'acc','sum']);
   if(T.shortfalls.length)rows.push([T.shortfalls.reduce((a,x)=>a+x.n,0),'w','Недобор часов без причины',names(T.shortfalls,x=>x.name+' '+x.n),'acc','why']);
   if(T.monthWaiting)rows.push([T.monthWaiting.pending||'!',T.monthWaiting.pending?'w':'r','Месяц '+perLabel(T.monthWaiting.period)+' ждёт закрытия',T.monthWaiting.hold?'Открыт заново: закройте его после правок':T.monthWaiting.pending+' отчётов не проверено. После проверки закроется сам','acc','review',T.monthWaiting.period]);
   if((T.tasksDone||[]).length)rows.push([T.tasksDone.length,'w','Задачи ждут принятия',names(T.tasksDone,x=>x.staff_name+': '+x.title),'plans','tasks']);
   if((T.tasksOverdue||[]).length)rows.push([T.tasksOverdue.length,'r','Просрочены задачи',names(T.tasksOverdue,x=>x.staff_name+': '+x.title),'plans','tasks']);
   const list=el('div',{class:'dx-tl'},...(rows.length?rows.map(([n,c,t,s,tb,sub,per])=>el('button',{type:'button',class:'dx-tk',onclick:()=>{dxCloseAll();dxGo(tb,sub,per)}},el('b',{class:'dx-bd '+c},String(n)),el('span',{class:'dx-tx'},el('span',{class:'tt'},t),el('span',{class:'ts'},s)),svgIcon(IC_CHEV,16))):[el('div',{class:'dx-ok'},'Всё в порядке: задач нет')]));
-  const ch=chatBellItems(d.chatsWaiting);
-  return{items:[...ch,...(rows.length?[...list.children]:[])],n:rows.length+ch.length};
+  if(rows.length)[...list.children].forEach((x,i)=>{if(rows[i][2]==='Стримеры отстают от плана')x.dataset.lag='1'});
+  const ch=chatBellItems(d.chatsWaiting),pb=pbBellItems(d.pbNew);
+  return{items:[...ch,...pb,...(rows.length?[...list.children]:[])],n:rows.length+ch.length+pb.length};
 }
 async function adminDash(){
   dxReg.length=0;dxCloseModal();
-  const d=await api('/dashboard'+dxQuery());d.chatsWaiting=await waitingChats();
+  const d=await api('/dashboard'+dxQuery());d.chatsWaiting=await waitingChats();d.pbNew=await newPostbacks();
   const skew=Date.parse(d.now)-Date.now();
   const fs=await fieldStatsBlock('?from='+d.range.from+'&to='+d.range.to).catch(()=>null);
   stopPoll();
@@ -1852,7 +1872,7 @@ async function adminDash(){
 /* ---------- Дашборд тимлида: его команда онлайн, общие показатели команды и его зарплата ---------- */
 async function leadDash(){
   dxReg.length=0;dxCloseModal();
-  const d=await api('/dashboard'+dxQuery());d.chatsWaiting=await waitingChats();
+  const d=await api('/dashboard'+dxQuery());d.chatsWaiting=await waitingChats();d.pbNew=await newPostbacks();
   const skew=Date.parse(d.now)-Date.now();
   const fs=await fieldStatsBlock('?from='+d.range.from+'&to='+d.range.to).catch(()=>null);
   stopPoll();
