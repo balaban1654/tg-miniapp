@@ -1085,3 +1085,16 @@ CREATE TABLE IF NOT EXISTS chat_templates (
   created_by INT REFERENCES staff(id) ON DELETE SET NULL,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Шаблон /аккаунт: добавляется один раз (если его потом удалят или изменят, не возвращается)
+INSERT INTO chat_templates (shortcut, body)
+SELECT 'аккаунт', 'У вас уже есть аккаунт Pocket Option? Тогда сделайте так:
+
+1. Зайдите в «Профиль» на платформе, в самом низу нажмите «Удалить аккаунт», причина — «Хочу сменить партнёра».
+2. Зарегистрируйте новый аккаунт по ссылке из нашего бота, на новую почту.
+3. Пополните счёт, и бот подключит вас автоматически.
+
+Мы официально сотрудничаем с платформой. Поэтому вы получите промокод на бонус к первому депозиту и бесплатный доступ к сигналам: сможете торговать вместе со мной, когда я в эфире 🙌'
+ WHERE NOT EXISTS (SELECT 1 FROM app_settings WHERE key = 'tpl_seed_akkaunt')
+ON CONFLICT (shortcut) DO NOTHING;
+INSERT INTO app_settings (key, value) VALUES ('tpl_seed_akkaunt', '1') ON CONFLICT (key) DO NOTHING;
