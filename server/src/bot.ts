@@ -77,7 +77,7 @@ bot.command('start', async (ctx) => {
   // Кнопка «Поддержка» в Mini App ведёт сюда
   if (payload === 'support') {
     // Клиент сам нажал «Поддержка»: закрытый чат открываем, его следующее сообщение сразу попадёт в Office
-    await db.query('UPDATE leads SET chat_closed_at = NULL, support_ask_at = NULL WHERE tg_id = $1', [from.id]);
+    await db.query('UPDATE leads SET chat_closed_at = NULL, support_ask_at = NULL, chat_notified_at = CASE WHEN chat_closed_at IS NOT NULL THEN NULL ELSE chat_notified_at END WHERE tg_id = $1', [from.id]);
     await sendReply(from.id, 'support');
     return;
   }
@@ -135,8 +135,9 @@ bot.callbackQuery(/^support_(yes|no)$/, async (ctx) => {
     await sendReply(id, 'support_no');
     return;
   }
-  await db.query('UPDATE leads SET chat_closed_at = NULL, support_ask_at = NULL WHERE tg_id = $1', [id]);
-  await sendReply(id, 'support');
+  // Чат открыт заново: отметку «группу уже уведомили» сбрасываем, иначе уведомление с его сообщением не уйдёт
+  await db.query('UPDATE leads SET chat_closed_at = NULL, support_ask_at = NULL, chat_notified_at = NULL WHERE tg_id = $1', [id]);
+  await sendReply(id, 'support_wait');
   const last = (await db.query(`SELECT kind, text FROM messages WHERE tg_id = $1 AND direction = 'in' ORDER BY id DESC LIMIT 1`, [id])).rows[0];
   await notifySupport({ tgId: id, kind: last?.kind ?? 'text', text: last?.text ?? null, fileId: null, tgMessageId: null }).catch(() => {});
 });
@@ -221,5 +222,6 @@ bot.on('message', async (ctx) => {
     return;
   }
   const first = await recordIncoming(inc);
-  if (first) await ctx.reply((await leadLang(from.id)) === 'en' ? 'Got it. We will reply right here in this chat.' : 'Принято. Ответим прямо здесь, в этом чате.');
+  // Первое сообщение за 10 минут: «Ожидайте, менеджер ответит…» (текст в Office: Пуши → Ответы бота)
+  if (first) await sendReply(from.id, 'support_wait');
 });

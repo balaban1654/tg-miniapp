@@ -3,7 +3,7 @@ import { config } from './config.js';
 import { buildKeyboard, deliver, loadTarget, pickText, renderText, type Button } from './push.js';
 
 /** Ответы бота на кнопки и /start. Текст, картинку и кнопки админ правит в Office: Пуши → Ответы бота */
-export const REPLY_KEYS = ['acc_ready', 'acc_no', 'acc_yes', 'access_open', 'support', 'support_ask', 'support_no'] as const;
+export const REPLY_KEYS = ['acc_ready', 'acc_no', 'acc_yes', 'access_open', 'support', 'support_ask', 'support_no', 'support_wait'] as const;
 export type ReplyKey = (typeof REPLY_KEYS)[number];
 
 const SUPPORT: Button = { label: 'Написать в поддержку', type: 'support' };
@@ -41,6 +41,10 @@ export const REPLY_DEFAULTS: Record<ReplyKey, { text: string; buttons: Button[] 
     text: 'Хорошо! Если понадобится помощь, просто напишите сюда.',
     buttons: [],
   },
+  support_wait: {
+    text: 'Ожидайте, менеджер ответит вам в ближайшее время. Если есть что дополнить — напишите, пока ждём менеджера.',
+    buttons: [],
+  },
 };
 
 /** Английские тексты стандартных ответов. Используются, пока админ не задал свой английский текст и русский не менялся */
@@ -52,6 +56,7 @@ export const REPLY_DEFAULTS_EN: Record<ReplyKey, string> = {
   support: 'Describe what happened in one message. You can add a screenshot. We will reply right here in this chat.',
   support_ask: 'Do you need help from support?',
   support_no: 'Okay! If you need help, just write here.',
+  support_wait: 'Please wait, a manager will reply shortly. If you want to add anything, write it here while you wait.',
 };
 
 export async function seedReplies(): Promise<void> {
