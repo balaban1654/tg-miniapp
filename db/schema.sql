@@ -1114,3 +1114,7 @@ ALTER TABLE leads ADD COLUMN IF NOT EXISTS support_ask_at TIMESTAMPTZ;
 
 -- Вопрос в закрытом чате без слова «поддержки» (если текст не меняли в Office)
 UPDATE bot_replies SET text = 'Вам нужна помощь?' WHERE key = 'support_ask' AND text = 'Вам нужна помощь поддержки?';
+
+-- Вопрос в закрытом чате: «Вам нужна помощь менеджера?» и кнопки «Да, нужна / Нет, спасибо» (если в Office не меняли)
+UPDATE bot_replies SET text = 'Вам нужна помощь менеджера?', buttons = '[{"label": "Да, нужна", "label_en": "Yes, please", "type": "callback", "data": "support_yes", "style": "success", "inline": true}, {"label": "Нет, спасибо", "label_en": "No, thanks", "type": "callback", "data": "support_no"}]'::jsonb
+ WHERE key = 'support_ask' AND text IN ('Вам нужна помощь?', 'Вам нужна помощь поддержки?');

@@ -31,9 +31,9 @@ export const REPLY_DEFAULTS: Record<ReplyKey, { text: string; buttons: Button[] 
     buttons: [],
   },
   support_ask: {
-    text: 'Вам нужна помощь?',
+    text: 'Вам нужна помощь менеджера?',
     buttons: [
-      { label: 'Да, нужна поддержка', label_en: 'Yes, I need support', type: 'callback', data: 'support_yes', style: 'success', inline: true },
+      { label: 'Да, нужна', label_en: 'Yes, please', type: 'callback', data: 'support_yes', style: 'success', inline: true },
       { label: 'Нет, спасибо', label_en: 'No, thanks', type: 'callback', data: 'support_no' },
     ],
   },
@@ -54,7 +54,7 @@ export const REPLY_DEFAULTS_EN: Record<ReplyKey, string> = {
   acc_yes: 'Great! For us to see your account and unlock access, it must be registered via our link. If you registered without it, write to support and we will help.',
   access_open: 'Access is open. Open the app: trades, the trainer and team materials are there.',
   support: 'Describe what happened in one message. You can add a screenshot. We will reply right here in this chat.',
-  support_ask: 'Do you need help?',
+  support_ask: "Do you need a manager's help?",
   support_no: 'Okay! If you need help, just write here.',
   support_wait: 'Please wait, a manager will reply shortly. If you want to add anything, write it here while you wait.',
 };
