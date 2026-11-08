@@ -1811,12 +1811,13 @@ function dxNet(d){
 }
 /** Колокольчик: сообщения от лидов, которые ждут ответа. Пункт пропадает, когда клиенту ответили или чат закрыли.
  *  До трёх чатов - по пункту на каждый (нажатие открывает чат), больше - один пункт со списком имён */
+const IC_MAIL='<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3.5 6.5l8.5 6.5 8.5-6.5"/>';
 function chatBellItems(list){
   const nm=x=>x.first_name||(x.username?'@'+x.username:String(x.tg_id));
   const go=id=>{dxCloseAll();if(id)pendingChat=id;tab='chats';showApp()};
   if(!list||!list.length)return[];
   if(list.length>3)return[el('button',{type:'button',class:'dx-tk',title:'Открыть чаты',onclick:()=>go(null)},el('b',{class:'dx-bd w'},String(list.length)),el('span',{class:'dx-tx'},el('span',{class:'tt'},'Новые сообщения в чатах'),el('span',{class:'ts'},list.map(nm).join(' · '))),svgIcon(IC_CHEV,16))];
-  return list.map(x=>el('button',{type:'button',class:'dx-tk',title:'Открыть чат',onclick:()=>go(x.tg_id)},el('span',{class:'dx-ic a'},svgIcon(IC_ALERT,18)),el('span',{class:'dx-tx'},el('span',{class:'tt'},'Новое сообщение: '+nm(x)),el('span',{class:'ts'},(x.last_text?String(x.last_text).slice(0,80):'Откройте чат и ответьте')+(x.owner_name?' · ведёт '+x.owner_name:''))),svgIcon(IC_CHEV,16)));
+  return list.map(x=>el('button',{type:'button',class:'dx-tk',title:'Открыть чат',onclick:()=>go(x.tg_id)},el('span',{class:'dx-ic a'},svgIcon(IC_MAIL,18)),el('span',{class:'dx-tx'},el('span',{class:'tt'},'Новое сообщение: '+nm(x)),el('span',{class:'ts'},(x.last_text?String(x.last_text).slice(0,80):'Откройте чат и ответьте')+(x.owner_name?' · ведёт '+x.owner_name:''))),svgIcon(IC_CHEV,16)));
 }
 // В колокольчике чат висит, пока клиенту не ответили: последнее сообщение от клиента (открыть чат мало). Закрытый чат сюда не попадает
 const waitingChats=()=>api('/chats').then(r=>r.filter(x=>x.last_dir==='in')).catch(()=>[]);
