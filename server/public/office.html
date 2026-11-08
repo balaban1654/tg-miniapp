@@ -278,6 +278,7 @@ textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10
 }
 
 .dx-ib.only-m{display:none}
+.ef-mw{display:none;gap:6px}@media(max-width:760px){.ef-mw{display:grid}}.ef-m table{width:100%;min-width:0!important;table-layout:auto}.ef-m th{font-size:14px;padding:8px 2px;text-align:center}.ef-m td{font-size:12px;padding:9px 2px;text-align:center;white-space:nowrap}.ef-m th:first-child,.ef-m td:first-child{text-align:left;padding-left:10px}.ef-m td:last-child,.ef-m th:last-child{padding-right:8px}
 @media(max-width:760px){.only-d,.dx-hd .mark{display:none!important}.dx-ib.only-m{display:grid}.dx-ext{display:none}.dx-hd{flex-wrap:nowrap}.dx-hd .l{flex:1 1 auto;min-width:0;flex-wrap:wrap;gap:6px 8px}.dx-hd .l .dx-lbl{flex:1 1 auto;min-width:0}.dx-hd .l .dx-pw,.dx-hd .l>.dx-ib{flex:none}}
 @media(max-width:560px){.dx-pop,.dx-pop.wide{width:min(340px,calc(100vw - 24px));padding:10px;gap:8px}.dx-pop .dx-rg{width:min(100%,220px)}.dx-seg2{min-height:24px}.dx-seg2 span{height:24px;padding:0 5px;font-size:10.5px}.dx-fsh b{font-size:14px}.dx-pop .dx-lbl{font-size:11px}}
 .burger{display:none}.side-menu{display:contents}.m-bell{display:none}
@@ -2191,7 +2192,15 @@ function smTasks(d){
 function smLast(d){
   const cols=['Дата','Время','Статус',...d.fields];
   const rows=d.last.map(r=>[td(dxDay(r.day)),td(r.minutes?hm(r.minutes):'—'),el('td',{},el('span',{class:'pill '+(REPSTATUS[r.status]||['',''])[1]},(REPSTATUS[r.status]||[r.status])[0])),...d.fields.map(f=>td(r.values[f]===undefined||r.values[f]===null?'—':Number(r.values[f]).toLocaleString('ru-RU'),'n'))]);
-  return el('div',{style:'display:grid;gap:8px'},el('div',{class:'dx-hd'},el('h3',{style:'font-size:15px'},'Мои последние эфиры'),el('a',{href:'#/shifts',style:'color:var(--acc2);font-weight:700;font-size:12px;text-decoration:none',onclick:e=>{e.preventDefault();dxGo('shifts')}},'Смены и отчёты →')),ctrT(table(cols,rows,'За выбранный период отчётов нет.')));
+  const full=ctrT(table(cols,rows,'За выбранный период отчётов нет.'));
+  // Телефон: дата коротко, время 1:16, статус значком (✓ зачтён, ⏳ на проверке или ждёт отчёта, ✕ отклонён), показатели значками и сокращённо
+  const SI={approved:['✓','var(--ok)'],pending:['⏳','var(--warn)'],await:['⏳','var(--warn)'],rejected:['✕','var(--bad)']};
+  const mob=d.last.length?efTable([['Дата'],['⏱','Время'],['✓','Статус'],...d.fields.map(f=>[EF_IC(f),f])],
+    d.last.map(r=>{const si=SI[r.status]||['·',''];return[efTd(dxDay(r.day)),efTd(r.minutes?efHM(r.minutes):'—'),el('td',{title:(REPSTATUS[r.status]||[r.status])[0],style:'color:'+si[1]+';font-weight:800'},si[0]),
+      ...d.fields.map(f=>{const v=r.values[f];return v===undefined||v===null?efTd('—'):efTd(efK(v),Number(v).toLocaleString('ru-RU'))})]}),
+    '⏱ время · ✓ зачтён · ⏳ на проверке · ✕ отклонён'+d.fields.map(f=>' · '+EF_IC(f)+' '+String(f).toLowerCase()).join(''),false):null;
+  if(mob)full.classList.add('only-d');
+  return el('div',{style:'display:grid;gap:8px'},el('div',{class:'dx-hd'},el('h3',{style:'font-size:15px'},'Мои последние эфиры'),el('a',{href:'#/shifts',style:'color:var(--acc2);font-weight:700;font-size:12px;text-decoration:none',onclick:e=>{e.preventDefault();dxGo('shifts')}},'Смены и отчёты →')),full,mob);
 }
 async function streamerDash(){
   dxReg.length=0;dxCloseModal();
@@ -3391,6 +3400,15 @@ async function kpiCardBlock(){
     advNode);
 }
 
+/* Эфиры на телефоне - сжатая таблица: в заголовках значки, большие числа сокращены (1,5к, 394к), точное число в подсказке */
+const EF_IC=f=>{const x=String(f).toLowerCase();return /просм/.test(x)?'👁':/подпис/.test(x)?'👥':/ком+ент/.test(x)?'💬':/лайк/.test(x)?'❤️':String(f).slice(0,4)};
+const efK=n=>{n=Number(n)||0;return n>=100000?Math.round(n/1000)+'к':n>=1000?String(Math.round(n/100)/10).replace('.',',')+'к':String(n)};
+const efHM=m=>{m=Number(m)||0;return Math.floor(m/60)+':'+String(m%60).padStart(2,'0')};
+function efTable(head,rows,legend,sumLast){
+  const t=el('table',{},el('thead',{},el('tr',{},...head.map(h=>el('th',{title:h[1]||''},h[0])))),el('tbody',{},...rows.map((r,i)=>el('tr',{class:sumLast&&i===rows.length-1?'sum-row':''},...r))));
+  return el('div',{class:'ef-mw'},el('div',{class:'tbl ef-m'},t),el('div',{class:'mut',style:'font-size:11px;line-height:1.6'},legend));
+}
+const efTd=(v,full)=>el('td',{title:full!==undefined?String(full):null},v);
 /** Для админа и тимлида (только его команда) на дашборде: суммы полей отчётов за период (qs: ?from=&to=, без него текущий месяц) */
 async function fieldStatsBlock(qs=''){
   const d=await api('/shifts/fieldstats'+qs);
@@ -3400,7 +3418,13 @@ async function fieldStatsBlock(qs=''){
   const rows=d.rows.map(r=>[td(r.name),td(r.reports,'n'),td(hmin(r.minutes)),...d.fields.map(f=>td((r.sums[f]||0).toLocaleString('ru-RU'),'n'))]);
   if(d.rows.length)rows.push([el('td',{},el('b',{},'Всего')),td(d.rows.reduce((a,r)=>a+r.reports,0),'n'),td(hmin(d.rows.reduce((a,r)=>a+r.minutes,0))),...d.fields.map(f=>el('td',{class:'n'},el('b',{},(tot[f]||0).toLocaleString('ru-RU'))))]);
   const label=d.from?(d.from.slice(0,7)===d.to.slice(0,7)&&d.from.endsWith('-01')&&d.to===lastDayOf(d.from.slice(0,7))?perLabel(d.from.slice(0,7)):dmy(d.from)+' — '+dmy(d.to)):perLabel(d.period);
-  return el('div',{style:'display:grid;gap:8px'},el('h3',{style:'font-size:15px'},'Эфиры за '+label),ctrT(totalRow(table(cols,rows,'Зачтённых отчётов за период пока нет.'),d.rows.length>0)));
+  const full=ctrT(totalRow(table(cols,rows,'Зачтённых отчётов за период пока нет.'),d.rows.length>0));
+  if(!d.rows.length)return el('div',{style:'display:grid;gap:8px'},el('h3',{style:'font-size:15px'},'Эфиры за '+label),full);
+  const mRows=[...d.rows.map(r=>[efTd(r.name),efTd(r.reports),efTd(efHM(r.minutes),hmin(r.minutes)),...d.fields.map(f=>efTd(efK(r.sums[f]||0),(r.sums[f]||0).toLocaleString('ru-RU')))]),
+    [el('td',{},el('b',{},'Всего')),efTd(d.rows.reduce((a,r)=>a+r.reports,0)),efTd(efHM(d.rows.reduce((a,r)=>a+r.minutes,0))),...d.fields.map(f=>efTd(efK(tot[f]||0),(tot[f]||0).toLocaleString('ru-RU')))]];
+  const mob=efTable([['Кто'],['📝','Отчётов'],['⏱','Время'],...d.fields.map(f=>[EF_IC(f),f])],mRows,'📝 отчётов · ⏱ часы'+d.fields.map(f=>' · '+EF_IC(f)+' '+String(f).toLowerCase()).join(''),true);
+  full.classList.add('only-d');
+  return el('div',{style:'display:grid;gap:8px'},el('h3',{style:'font-size:15px'},'Эфиры за '+label),full,mob);
 }
 const totalRow=(t,on)=>{if(on){const tr=t.querySelector('tbody tr:last-child');if(tr)tr.classList.add('sum-row')}return t};
 const lastDayOf=m=>{const[y,mo]=m.split('-').map(Number);return m+'-'+String(new Date(Date.UTC(y,mo,0)).getUTCDate()).padStart(2,'0')};
