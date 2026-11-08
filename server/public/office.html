@@ -1204,7 +1204,7 @@ function teamBell(d,list){const tk=dxTasks(d),m=myTaskItemsFrom(list);return{ite
 async function loadBellSrc(){
   const r=me.role;
   if(r==='admin'||r==='teamlead'){const d=await api('/dashboard'+dxQuery());d.chatsWaiting=await waitingChats();liveSrc={d,skew:Date.parse(d.now)-Date.now()};const ml=r==='teamlead'?await api('/tasks/mine').catch(()=>[]):[];bellSrc=r==='admin'?()=>dxTasks(d):()=>teamBell(d,ml)}
-  else if(r==='streamer'){const c=dxCur();const d=await api('/my/dashboard?from='+c.from+'&to='+c.to);liveSrc=liveFromColleagues(d,Date.parse(d.now)-Date.now());d.alerts.chats=(await api('/chats').catch(()=>[])).filter(x=>x.waiting);bellSrc=()=>smTasks(d)}
+  else if(r==='streamer'){const c=dxCur();const d=await api('/my/dashboard?from='+c.from+'&to='+c.to);liveSrc=liveFromColleagues(d,Date.parse(d.now)-Date.now());d.alerts.chats=await waitingChats();bellSrc=()=>smTasks(d)}
   else{const ml=await api('/tasks/mine').catch(()=>[]);bellSrc=()=>mineBell(ml)}
   bellAt=Date.now();
 }
@@ -2228,7 +2228,7 @@ function smTasks(d){
   // Новые события клиентов (без сумм): открыли карточку клиента, уведомление исчезло
   const NK={reg:['Регистрация клиента','a'],ftd:['Первый депозит клиента','ok'],dep:['Додеп клиента','ok'],wd:['Вывод клиента','w']};
   (d.alerts.notices||[]).forEach(x=>{const k=NK[x.kind]||[x.kind,'a'];items.push(el('button',{type:'button',class:'dx-tk',title:'Открыть карточку клиента',onclick:()=>openLeadCard(x.tg_id)},el('span',{class:'dx-ic '+k[1]},svgIcon(IC_ALERT,18)),el('span',{class:'dx-tx'},el('span',{class:'tt'},k[0]+' '+x.name+(x.kind==='ftd'&&x.amount?' · '+usd2(x.amount):'')),el('span',{class:'ts'},(x.n>1?x.n+' новых · ':'')+'Откройте карточку клиента')),svgIcon(IC_CHEV,16)))});
-  (d.alerts.chats||[]).forEach(x=>items.push(el('button',{type:'button',class:'dx-tk',title:'Открыть чат',onclick:()=>{pendingChat=x.tg_id;tab='chats';showApp()}},el('span',{class:'dx-ic a'},svgIcon(IC_ALERT,18)),el('span',{class:'dx-tx'},el('span',{class:'tt'},'Новое сообщение в поддержке: '+(x.username?'@'+x.username:x.first_name||x.tg_id)),el('span',{class:'ts'},x.last_text?String(x.last_text).slice(0,80):'Откройте чат и ответьте')),svgIcon(IC_CHEV,16))));
+  chatBellItems(d.alerts.chats).forEach(x=>items.push(x));
   d.alerts.rejected.forEach(x=>items.push(alertRow('r','Отчёт за '+dxDay(x.day)+' отклонён',x.reject_reason||'Исправьте и отправьте снова')));
   d.alerts.shortfalls.forEach(x=>items.push(alertRow('w','Недобор часов '+dxDay(x.day),'Напишите причину, её прочтёт руководитель')));
   d.tasks.forEach(t=>{
@@ -2258,7 +2258,7 @@ async function streamerDash(){
   const r=dxCur();
   const d=await api('/my/dashboard?from='+r.from+'&to='+r.to);
   // Клиенты, которые написали в поддержку и ждут ответа
-  d.alerts.chats=(await api('/chats').catch(()=>[])).filter(x=>x.waiting);
+  d.alerts.chats=await waitingChats();
   const skew=Date.parse(d.now)-Date.now();
   stopPoll();
   poll=setInterval(()=>{
@@ -4539,6 +4539,8 @@ const REPLY_INFO={
   acc_no:{title:'После кнопки «Нет, создать»',when:'У клиента нет аккаунта Pocket Option. {условия} превращается в ссылку на условия использования.'},
   acc_yes:{title:'После кнопки «Да, уже есть»',when:'У клиента уже есть аккаунт Pocket Option.'},
   access_open:{title:'/start, когда доступ уже открыт',when:'Клиент с открытым доступом снова нажал /start.'},
+  support_ask:{title:'Чат закрыт, клиент снова написал',when:'Чат поддержки закрыт в Office, а клиент прислал сообщение. Бот спрашивает, нужна ли поддержка (не чаще раза в 10 минут). Кнопка «Да» открывает чат в Office с тем, что клиент уже написал, и отправляет ответ «Кнопка «Поддержка» в Mini App»; «Нет» оставляет чат закрытым.'},
+  support_no:{title:'Кнопка «Нет, спасибо»',when:'Клиент ответил, что поддержка не нужна. Чат остаётся закрытым.'},
   support:{title:'Кнопка «Поддержка» в Mini App',when:'Клиент открыл чат поддержки из Mini App. После этого любое его сообщение попадает в «Чаты поддержки».'}
 };
 function replyCard(t){

@@ -1108,3 +1108,6 @@ SELECT 'закрытие', 'Спасибо за обращение! 🙌
  WHERE NOT EXISTS (SELECT 1 FROM app_settings WHERE key = 'tpl_seed_zakrytie')
 ON CONFLICT (shortcut) DO NOTHING;
 INSERT INTO app_settings (key, value) VALUES ('tpl_seed_zakrytie', '1') ON CONFLICT (key) DO NOTHING;
+
+-- Закрытый чат: когда лид снова пишет, бот спрашивает «Нужна поддержка?» (не чаще раза в 10 минут)
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS support_ask_at TIMESTAMPTZ;

@@ -12,13 +12,13 @@ export interface Incoming {
 }
 
 /** Сохраняет сообщение клиента. Возвращает true, если это первое сообщение за последние 10 минут. */
-export async function recordIncoming(m: Incoming): Promise<boolean> {
+export async function recordIncoming(m: Incoming, silent = false): Promise<boolean> {
   const recent = await db.query(`SELECT 1 FROM messages WHERE tg_id = $1 AND created_at > now() - interval '10 minutes' LIMIT 1`, [m.tgId]);
   await db.query(
     `INSERT INTO messages (tg_id, direction, kind, text, file_id, tg_message_id, file_name) VALUES ($1,'in',$2,$3,$4,$5,$6)`,
     [m.tgId, m.kind, m.text, m.fileId, m.tgMessageId, m.fileName ?? null],
   );
-  await notifySupport(m).catch((e) => console.error('Уведомление о сообщении в поддержку: сбой', e));
+  if (!silent) await notifySupport(m).catch((e) => console.error('Уведомление о сообщении в поддержку: сбой', e));
   return !recent.rowCount;
 }
 
@@ -27,7 +27,7 @@ const KIND: Record<string, string> = { photo: '📷 фото', video: '🎬 ви
 
 /** Новое сообщение в поддержку (от любого: клиента, теста или сотрудника): одно уведомление в ветку команды с @ трейдера. Следующее от того же клиента
  *  только после того, как чат закрыли кнопкой «Закрыть» в Office, чтобы не было уведомления на каждое сообщение */
-async function notifySupport(m: Incoming): Promise<void> {
+export async function notifySupport(m: Incoming): Promise<void> {
   // Куда слать: группа и ветка, назначенные командой /notify; иначе из настроек сервера
   const st = Object.fromEntries((await db.query(`SELECT key, value FROM app_settings WHERE key IN ('support_notify_chat','support_notify_thread')`)).rows.map((r) => [r.key, r.value]));
   const chat = st.support_notify_chat || config.supportNotifyChat;

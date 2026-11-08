@@ -3,7 +3,7 @@ import { config } from './config.js';
 import { buildKeyboard, deliver, loadTarget, pickText, renderText, type Button } from './push.js';
 
 /** Ответы бота на кнопки и /start. Текст, картинку и кнопки админ правит в Office: Пуши → Ответы бота */
-export const REPLY_KEYS = ['acc_ready', 'acc_no', 'acc_yes', 'access_open', 'support'] as const;
+export const REPLY_KEYS = ['acc_ready', 'acc_no', 'acc_yes', 'access_open', 'support', 'support_ask', 'support_no'] as const;
 export type ReplyKey = (typeof REPLY_KEYS)[number];
 
 const SUPPORT: Button = { label: 'Написать в поддержку', type: 'support' };
@@ -30,6 +30,17 @@ export const REPLY_DEFAULTS: Record<ReplyKey, { text: string; buttons: Button[] 
     text: 'Опиши, что случилось, одним сообщением. Можно со скриншотом. Ответим прямо здесь, в этом чате.',
     buttons: [],
   },
+  support_ask: {
+    text: 'Вам нужна помощь поддержки?',
+    buttons: [
+      { label: 'Да, нужна поддержка', label_en: 'Yes, I need support', type: 'callback', data: 'support_yes', style: 'success', inline: true },
+      { label: 'Нет, спасибо', label_en: 'No, thanks', type: 'callback', data: 'support_no' },
+    ],
+  },
+  support_no: {
+    text: 'Хорошо! Если понадобится помощь, просто напишите сюда.',
+    buttons: [],
+  },
 };
 
 /** Английские тексты стандартных ответов. Используются, пока админ не задал свой английский текст и русский не менялся */
@@ -39,6 +50,8 @@ export const REPLY_DEFAULTS_EN: Record<ReplyKey, string> = {
   acc_yes: 'Great! For us to see your account and unlock access, it must be registered via our link. If you registered without it, write to support and we will help.',
   access_open: 'Access is open. Open the app: trades, the trainer and team materials are there.',
   support: 'Describe what happened in one message. You can add a screenshot. We will reply right here in this chat.',
+  support_ask: 'Do you need help from support?',
+  support_no: 'Okay! If you need help, just write here.',
 };
 
 export async function seedReplies(): Promise<void> {

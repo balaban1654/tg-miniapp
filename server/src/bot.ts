@@ -4,7 +4,7 @@ import { config } from './config.js';
 import { attachLead, db } from './db.js';
 import { parseRefPayload } from './referral.js';
 import { processLead } from './push.js';
-import { recordIncoming } from './chat.js';
+import { recordIncoming, notifySupport } from './chat.js';
 import { sendReply } from './replies.js';
 
 import { bot } from './tg.js';
@@ -76,6 +76,8 @@ bot.command('start', async (ctx) => {
   }
   // Кнопка «Поддержка» в Mini App ведёт сюда
   if (payload === 'support') {
+    // Клиент сам нажал «Поддержка»: закрытый чат открываем, его следующее сообщение сразу попадёт в Office
+    await db.query('UPDATE leads SET chat_closed_at = NULL, support_ask_at = NULL WHERE tg_id = $1', [from.id]);
     await sendReply(from.id, 'support');
     return;
   }
@@ -119,6 +121,24 @@ bot.callbackQuery(/^lang:(ru|en)$/, async (ctx) => {
     return;
   }
   await continueStart(ctx.from.id);
+});
+
+// Закрытый чат, лид снова написал: «Да, нужна поддержка» - чат открывается в Office (с тем, что он уже написал) и бот просит описать ситуацию;
+// «Нет, спасибо» - чат остаётся закрытым
+bot.callbackQuery(/^support_(yes|no)$/, async (ctx) => {
+  const yes = ctx.match[1] === 'yes';
+  await ctx.answerCallbackQuery();
+  await ctx.editMessageReplyMarkup({ reply_markup: undefined }).catch(() => {});
+  const id = ctx.from.id;
+  if (!yes) {
+    await db.query('UPDATE leads SET support_ask_at = NULL WHERE tg_id = $1', [id]);
+    await sendReply(id, 'support_no');
+    return;
+  }
+  await db.query('UPDATE leads SET chat_closed_at = NULL, support_ask_at = NULL WHERE tg_id = $1', [id]);
+  await sendReply(id, 'support');
+  const last = (await db.query(`SELECT kind, text FROM messages WHERE tg_id = $1 AND direction = 'in' ORDER BY id DESC LIMIT 1`, [id])).rows[0];
+  await notifySupport({ tgId: id, kind: last?.kind ?? 'text', text: last?.text ?? null, fileId: null, tgMessageId: null }).catch(() => {});
 });
 
 // Ответы на кнопки воронки: тексты и кнопки настраиваются в Office (Пуши → Ответы бота)
@@ -184,13 +204,22 @@ bot.on('message', async (ctx) => {
   else if (m.video_note) [kind, fileId] = ['video_note', m.video_note.file_id];
   else if (m.sticker) kind = 'sticker';
 
-  const first = await recordIncoming({
-    tgId: from.id,
-    kind,
-    text: m.text ?? m.caption ?? null,
-    fileId,
-    fileName: m.document?.file_name ?? m.audio?.file_name ?? null,
-    tgMessageId: m.message_id,
-  });
+  // Чат закрыт в Office (после закрытия от клиента ничего не было): сообщение сохраняем, но чат не открываем,
+  // а спрашиваем, нужна ли поддержка (не чаще раза в 10 минут). Откроет чат кнопка «Да, нужна поддержка»
+  const st = (await db.query(
+    `SELECT d.chat_closed_at IS NOT NULL AND coalesce((SELECT max(created_at) FROM messages WHERE tg_id = d.tg_id), '-infinity') <= d.chat_closed_at AS closed,
+            (d.support_ask_at IS NULL OR d.support_ask_at < now() - interval '10 minutes') AS can_ask
+       FROM leads d WHERE d.tg_id = $1`, [from.id])).rows[0];
+  const inc = { tgId: from.id, kind, text: m.text ?? m.caption ?? null, fileId, fileName: m.document?.file_name ?? m.audio?.file_name ?? null, tgMessageId: m.message_id };
+  if (st?.closed) {
+    await recordIncoming(inc, true);
+    await db.query('UPDATE leads SET chat_closed_at = now() WHERE tg_id = $1', [from.id]);
+    if (st.can_ask) {
+      await db.query('UPDATE leads SET support_ask_at = now() WHERE tg_id = $1', [from.id]);
+      await sendReply(from.id, 'support_ask');
+    }
+    return;
+  }
+  const first = await recordIncoming(inc);
   if (first) await ctx.reply((await leadLang(from.id)) === 'en' ? 'Got it. We will reply right here in this chat.' : 'Принято. Ответим прямо здесь, в этом чате.');
 });
