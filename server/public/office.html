@@ -1809,7 +1809,7 @@ function dxNet(d){
     margin!==null?el('div',{class:'mut',style:'font-size:13px'},'Маржа '+(margin<0?'−'+Math.abs(margin):margin)+'% от комиссии'):null,
     el('div',{class:'dx-eq'},el('div',{},el('span',{},'Комиссия получена'),el('b',{},usd0(t.commission))),el('div',{},el('span',{},'− Зарплаты и бонусы'),el('b',{class:'dx-neg'},'−'+usd0(t.salaries))),el('div',{},el('span',{},'− Расходы'),el('b',{class:'dx-neg'},'−'+usd0(t.expenses))),el('div',{},el('span',{},'= Чистая прибыль'),el('b',{style:'color:'+(t.net<0?'var(--bad)':'var(--ok)')},usd0(t.net)))));
 }
-/** Колокольчик: сообщения от лидов, которые ждут ответа (никто ещё не открыл чат). Открыли или закрыли чат - пункт пропадает.
+/** Колокольчик: сообщения от лидов, которые ждут ответа. Пункт пропадает, когда клиенту ответили или чат закрыли.
  *  До трёх чатов - по пункту на каждый (нажатие открывает чат), больше - один пункт со списком имён */
 function chatBellItems(list){
   const nm=x=>x.first_name||(x.username?'@'+x.username:String(x.tg_id));
@@ -1818,10 +1818,8 @@ function chatBellItems(list){
   if(list.length>3)return[el('button',{type:'button',class:'dx-tk',title:'Открыть чаты',onclick:()=>go(null)},el('b',{class:'dx-bd w'},String(list.length)),el('span',{class:'dx-tx'},el('span',{class:'tt'},'Новые сообщения в чатах'),el('span',{class:'ts'},list.map(nm).join(' · '))),svgIcon(IC_CHEV,16))];
   return list.map(x=>el('button',{type:'button',class:'dx-tk',title:'Открыть чат',onclick:()=>go(x.tg_id)},el('span',{class:'dx-ic a'},svgIcon(IC_ALERT,18)),el('span',{class:'dx-tx'},el('span',{class:'tt'},'Новое сообщение: '+nm(x)),el('span',{class:'ts'},(x.last_text?String(x.last_text).slice(0,80):'Откройте чат и ответьте')+(x.owner_name?' · ведёт '+x.owner_name:''))),svgIcon(IC_CHEV,16)));
 }
-// Открытый мной чат в колокольчике больше не показываем, пока клиент не напишет снова (отметка в браузере: админ, открывая чат стримера, не гасит её у стримера)
-const chatSeenKey=()=>'chat_seen_me_'+(me&&me.id);
-function chatSeenMine(id){try{const m=JSON.parse(localStorage.getItem(chatSeenKey())||'{}');m[id]=Date.now();const k=Object.keys(m);if(k.length>300)k.sort((a,b)=>m[a]-m[b]).slice(0,k.length-300).forEach(x=>delete m[x]);localStorage.setItem(chatSeenKey(),JSON.stringify(m))}catch{}}
-const waitingChats=()=>api('/chats').then(r=>{let m={};try{m=JSON.parse(localStorage.getItem(chatSeenKey())||'{}')}catch{}return r.filter(x=>x.waiting&&!(m[x.tg_id]&&m[x.tg_id]>=Date.parse(x.last_at)))}).catch(()=>[]);
+// В колокольчике чат висит, пока клиенту не ответили: последнее сообщение от клиента (открыть чат мало). Закрытый чат сюда не попадает
+const waitingChats=()=>api('/chats').then(r=>r.filter(x=>x.last_dir==='in')).catch(()=>[]);
 function dxTasks(d){
   const T=d.tasks,rows=[];
   const names=(a,f)=>a.map(f).join(' · ');
@@ -4327,7 +4325,15 @@ async function viewChats(){
       if(canEdit(m)||canDel(m))holdMenu(bub,()=>[canEdit(m)?['Изменить',()=>startEdit(m,bub,tx)]:null,canDel(m)?['Удалить',()=>delMsg(m),true]:null].filter(Boolean));
       return bub;
     }));
-    if(near||!msgs.dataset.init){msgs.scrollTop=msgs.scrollHeight;msgs.dataset.init='1'}
+    if(!msgs.dataset.init){
+      // Открыли чат (из колокольчика, из списка): сразу к последнему сообщению. Картинки, видео и голосовые догружаются
+      // и сдвигают переписку, поэтому ещё 4 секунды держим низ, пока человек сам не начал листать
+      msgs.dataset.init='1';const until=Date.now()+4000;let user=false;
+      const bottom=()=>{if(!user&&Date.now()<until)msgs.scrollTop=msgs.scrollHeight};
+      const stop=()=>{user=true};msgs.addEventListener('wheel',stop,{once:true,passive:true});msgs.addEventListener('touchstart',stop,{once:true,passive:true});
+      msgs.addEventListener('load',bottom,true);msgs.addEventListener('loadedmetadata',bottom,true);
+      msgs.scrollTop=msgs.scrollHeight;requestAnimationFrame(bottom);[150,400,900,1800,3000].forEach(t=>setTimeout(bottom,t));
+    }else if(near)msgs.scrollTop=msgs.scrollHeight;
   }
   // Исправление своего сообщения: правка уходит и клиенту в Telegram. Пока идёт правка, чат не перерисовывается
   // Свои сообщения; тимлид ещё и сообщения своей команды; админ любые
@@ -4373,13 +4379,13 @@ async function viewChats(){
   async function chatDone(id,how){
     if(how==='clear'&&!await askC('Удалить всю переписку с этим клиентом? Это нельзя отменить.'))return;
     try{
-      if(how==='clear')await api('/chats/'+id,{method:'DELETE'});else await api('/chats/'+id+'/close',{method:'POST'});
+      if(how==='clear')await api('/chats/'+id,{method:'DELETE'});else await api('/chats/'+id+'/close',{method:'POST'});refreshHeaderBell(true);
       toast(how==='clear'?'Переписка удалена':'Чат закрыт');
       active=null;wrap.classList.remove('open');msgs.replaceChildren();head.replaceChildren(el('span',{class:'mut'},'Выберите чат слева'));
       await loadList();window.scrollTo(0,0);
     }catch(e){toast(e.message)}
   }
-  async function openChat(id){active=id;tplLoad();chatSeenMine(id);setTimeout(()=>refreshHeaderBell(true),1500);setMtop();wrap.classList.add('open');window.scrollTo(0,0);msgs.dataset.init='';err.textContent='';try{await loadThread();await loadList()}catch(e){err.textContent=e.message}}
+  async function openChat(id){active=id;tplLoad();setMtop();wrap.classList.add('open');window.scrollTo(0,0);msgs.dataset.init='';err.textContent='';try{await loadThread();await loadList()}catch(e){err.textContent=e.message}}
   async function send(){
     const text=ta.value.trim();if((!text&&!queue.length)||!active)return;
     if(rec)return;
@@ -4403,7 +4409,7 @@ async function viewChats(){
         }
         if(sepText)await api('/chats/'+id+'/reply',{method:'POST',body:{text:sepText}});
       }
-      ta.value='';ta.style.height='';clearQueue();await loadThread();await loadList()}
+      ta.value='';ta.style.height='';clearQueue();await loadThread();await loadList();refreshHeaderBell(true)}
     catch(e){err.textContent=e.message;if(/уже взял/.test(e.message)){await loadList();await loadThread().catch(()=>{})}}
     finally{sendBtn.disabled=false;sendBtn.textContent='Отправить';ta.focus()}
   }
