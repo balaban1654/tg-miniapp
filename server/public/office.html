@@ -4398,7 +4398,7 @@ async function viewChats(){
   const tplPut=t=>{ta.value=t.body;tplHide();ta.focus();ta.dispatchEvent(new Event('input'));try{ta.setSelectionRange(ta.value.length,ta.value.length)}catch{}};
   const tplDraw=()=>{
     const m=/^\/([^\s]*)$/.exec(ta.value);
-    if(!m||!tpls.length||document.activeElement!==ta){tplHide();return}
+    if(!m||!tpls.length){tplHide();return}
     const q=m[1].toLowerCase();
     tplShown=tpls.filter(t=>t.shortcut.startsWith(q)).concat(tpls.filter(t=>!t.shortcut.startsWith(q)&&t.shortcut.includes(q)));
     if(!tplShown.length){tplBox.hidden=false;tplBox.replaceChildren(el('div',{class:'tpl-none mut sm'},'Нет шаблона /'+q));return}
@@ -4407,17 +4407,12 @@ async function viewChats(){
     tplBox.replaceChildren(...tplShown.slice(0,8).map((t,i)=>el('button',{type:'button',class:'tpl-it'+(i===tplSel?' on':''),onpointerdown:e=>{e.preventDefault();tplPut(t)}},el('b',{},'/'+t.shortcut),el('span',{},t.body.replace(/\s+/g,' ')))));
   };
   ta.addEventListener('input',()=>{tplSel=0;tplDraw()});
-  // Подсказки только пока поле в фокусе: закрыли клавиатуру или нажали мимо - список прячется, снова нажали в поле - появляется вместе с курсором
+  // Список шаблонов виден, пока поле начинается с «/», даже если клавиатуру закрыли; прячется, когда «/» стёрли или шаблон выбран
   ta.addEventListener('focus',()=>tplDraw());
-  document.addEventListener('pointerdown',e=>{if(!tplBox.hidden&&e.target!==ta&&!tplBox.contains(e.target))tplHide()},true);
-  if(window.visualViewport){let vh0=visualViewport.height;visualViewport.addEventListener('resize',()=>{const h=visualViewport.height;
-    // Клавиатура телефона закрылась (видимая область заметно выросла): прячем список и снимаем фокус, чтобы следующее касание поля вернуло курсор
-    if(h>vh0+120&&document.activeElement===ta){tplHide();ta.blur()}vh0=h})}
   // Поле растёт под текст до своей наибольшей высоты; на телефоне подсказка короче
   const taFit=()=>{ta.style.height='auto';ta.style.height=Math.min(ta.scrollHeight+2,parseInt(getComputedStyle(ta).maxHeight)||220)+'px'};
   ta.addEventListener('input',taFit);
   if(matchMedia('(max-width:760px)').matches)ta.placeholder='Ответ клиенту · / — шаблоны';
-  ta.addEventListener('blur',()=>setTimeout(tplHide,150));
   ta.addEventListener('keydown',e=>{
     if(tplBox.hidden||!tplShown.length)return;
     const n=Math.min(8,tplShown.length);
