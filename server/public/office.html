@@ -4398,15 +4398,21 @@ async function viewChats(){
   const tplPut=t=>{ta.value=t.body;tplHide();ta.focus();ta.dispatchEvent(new Event('input'));try{ta.setSelectionRange(ta.value.length,ta.value.length)}catch{}};
   const tplDraw=()=>{
     const m=/^\/([^\s]*)$/.exec(ta.value);
-    if(!m||!tpls.length){tplHide();return}
+    if(!m||!tpls.length||document.activeElement!==ta){tplHide();return}
     const q=m[1].toLowerCase();
     tplShown=tpls.filter(t=>t.shortcut.startsWith(q)).concat(tpls.filter(t=>!t.shortcut.startsWith(q)&&t.shortcut.includes(q)));
     if(!tplShown.length){tplBox.hidden=false;tplBox.replaceChildren(el('div',{class:'tpl-none mut sm'},'Нет шаблона /'+q));return}
     tplSel=Math.min(tplSel,tplShown.length-1);
     tplBox.hidden=false;
-    tplBox.replaceChildren(...tplShown.slice(0,8).map((t,i)=>el('button',{type:'button',class:'tpl-it'+(i===tplSel?' on':''),onmousedown:e=>{e.preventDefault();tplPut(t)}},el('b',{},'/'+t.shortcut),el('span',{},t.body.replace(/\s+/g,' ')))));
+    tplBox.replaceChildren(...tplShown.slice(0,8).map((t,i)=>el('button',{type:'button',class:'tpl-it'+(i===tplSel?' on':''),onpointerdown:e=>{e.preventDefault();tplPut(t)}},el('b',{},'/'+t.shortcut),el('span',{},t.body.replace(/\s+/g,' ')))));
   };
   ta.addEventListener('input',()=>{tplSel=0;tplDraw()});
+  // Подсказки только пока поле в фокусе: закрыли клавиатуру или нажали мимо - список прячется, снова нажали в поле - появляется вместе с курсором
+  ta.addEventListener('focus',()=>tplDraw());
+  document.addEventListener('pointerdown',e=>{if(!tplBox.hidden&&e.target!==ta&&!tplBox.contains(e.target))tplHide()},true);
+  if(window.visualViewport){let vh0=visualViewport.height;visualViewport.addEventListener('resize',()=>{const h=visualViewport.height;
+    // Клавиатура телефона закрылась (видимая область заметно выросла): прячем список и снимаем фокус, чтобы следующее касание поля вернуло курсор
+    if(h>vh0+120&&document.activeElement===ta){tplHide();ta.blur()}vh0=h})}
   // Поле растёт под текст до своей наибольшей высоты; на телефоне подсказка короче
   const taFit=()=>{ta.style.height='auto';ta.style.height=Math.min(ta.scrollHeight+2,parseInt(getComputedStyle(ta).maxHeight)||220)+'px'};
   ta.addEventListener('input',taFit);
