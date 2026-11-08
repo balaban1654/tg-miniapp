@@ -1045,12 +1045,31 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     if (!r.rowCount) return reply.code(404).send({ error: 'Чат не найден' });
     return { ok: true };
   });
-  app.delete<{ Params: { tgId: string } }>('/chats/:tgId', { preHandler: need('admin') }, async (req, reply) => {
+  // Очистить переписку: ?everywhere=1 - ещё и удалить эти сообщения у клиента в Telegram (и его, и наши).
+  // Telegram даёт боту удалять сообщения только моложе 48 часов: более старые останутся у клиента, их число вернём
+  app.delete<{ Params: { tgId: string }; Querystring: { everywhere?: string } }>('/chats/:tgId', { preHandler: need('admin') }, async (req, reply) => {
     const tgId = Number(req.params.tgId);
     if (!Number.isSafeInteger(tgId)) return reply.code(400).send({ error: 'Неверный ID' });
+    let tgDeleted = 0;
+    let tgLeft = 0;
+    if (req.query.everywhere === '1') {
+      const ids = ((await db.query('SELECT DISTINCT tg_message_id AS id FROM messages WHERE tg_id = $1 AND tg_message_id IS NOT NULL', [tgId])).rows as { id: string }[]).map((x) => Number(x.id)).filter((x) => x > 0);
+      for (let i = 0; i < ids.length; i += 100) {
+        const part = ids.slice(i, i + 100);
+        try {
+          await bot.api.deleteMessages(tgId, part);
+          tgDeleted += part.length;
+        } catch {
+          // Пачкой не вышло (часть старше 48 часов или уже удалена): по одному
+          for (const m of part) {
+            try { await bot.api.deleteMessage(tgId, m); tgDeleted++; } catch { tgLeft++; }
+          }
+        }
+      }
+    }
     const r = await db.query('DELETE FROM messages WHERE tg_id = $1', [tgId]);
     await db.query('UPDATE leads SET chat_closed_at = NULL WHERE tg_id = $1', [tgId]);
-    return { ok: true, deleted: r.rowCount };
+    return { ok: true, deleted: r.rowCount, tgDeleted, tgLeft };
   });
 
   // Кэш файлов чатов в памяти: плеер просит видео кусками (Range), без кэша каждый кусок заново качался из Telegram

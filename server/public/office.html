@@ -660,6 +660,18 @@ function tplManager(onChange){
   }
   document.body.append(ov);draw();
 }
+/** «Очистить переписку»: только в Office или у всех (и у клиента в Telegram). Возвращает 'office', 'all' или null */
+function askClear(){return new Promise(res=>{const done=v=>{ov.remove();document.removeEventListener('keydown',kd,true);res(v)};
+  const kd=e=>{if(e.key==='Escape'){e.preventDefault();e.stopPropagation();done(null)}};
+  const b=(t,v,cls,st)=>el('button',{type:'button',class:cls,style:st||'',onclick:()=>done(v)},t);
+  const ov=el('div',{class:'lc-overlay ask-ov',role:'alertdialog','aria-modal':'true',style:'z-index:120',onclick:e=>{if(e.target===ov)done(null)}},
+    el('div',{class:'card',style:'max-width:440px;width:100%;display:grid;gap:12px;text-align:center'},
+      el('b',{style:'font-size:17px'},'Очистить переписку?'),
+      el('div',{class:'mut sm',style:'line-height:1.45'},'«Только в Office» — переписка пропадёт здесь, у клиента в Telegram всё останется. «У всех» — сообщения удалятся и у клиента в Telegram (Telegram даёт удалить только сообщения за последние 48 часов). Это нельзя отменить.'),
+      b('Только в Office','office','btn o'),
+      b('У всех, и у клиента в Telegram','all','btn o','color:var(--bad);border-color:var(--bad)'),
+      b('Отмена',null,'btn o')));
+  document.body.append(ov);document.addEventListener('keydown',kd,true)})}
 function askC(text,extra){return new Promise(res=>{const prev=document.activeElement;const done=v=>{ov.remove();document.removeEventListener('keydown',kd,true);try{prev&&prev.focus&&prev.focus()}catch{}res(v)};
   const kd=e=>{if(e.key==='Escape'){e.preventDefault();e.stopPropagation();done(false)}};
   const ok=el('button',{type:'button',class:'btn',onclick:()=>done(true)},'Да'),no=el('button',{type:'button',class:'btn o',onclick:()=>done(false)},'Отмена');
@@ -4398,10 +4410,12 @@ async function viewChats(){
   }
   // Закрыть чат (уходит из списка до нового сообщения клиента, история остаётся); очистить переписку может только админ
   async function chatDone(id,how){
-    if(how==='clear'&&!await askC('Удалить всю переписку с этим клиентом? Это нельзя отменить.'))return;
+    let where=null;
+    if(how==='clear'){where=await askClear();if(!where)return}
     try{
-      if(how==='clear')await api('/chats/'+id,{method:'DELETE'});else await api('/chats/'+id+'/close',{method:'POST'});refreshHeaderBell(true);
-      toast(how==='clear'?'Переписка удалена':'Чат закрыт');
+      let r=null;
+      if(how==='clear')r=await api('/chats/'+id+(where==='all'?'?everywhere=1':''),{method:'DELETE'});else await api('/chats/'+id+'/close',{method:'POST'});refreshHeaderBell(true);
+      toast(how!=='clear'?'Чат закрыт':where!=='all'?'Переписка удалена в Office':'Переписка удалена в Office и у клиента'+(r&&r.tgLeft?'. '+r.tgLeft+' сообщ. старше 48 часов Telegram удалить не дал':''));
       active=null;wrap.classList.remove('open');msgs.replaceChildren();head.replaceChildren(el('span',{class:'mut'},'Выберите чат слева'));
       await loadList();window.scrollTo(0,0);
     }catch(e){toast(e.message)}
