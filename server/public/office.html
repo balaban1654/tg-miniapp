@@ -1203,7 +1203,7 @@ function mineBell(list){const m=myTaskItemsFrom(list);return{items:m,n:m.filter(
 function teamBell(d,list){const tk=dxTasks(d),m=myTaskItemsFrom(list);return{items:[...tk.items,...m],n:tk.n+m.filter(x=>!x.dataset.done).length}}
 async function loadBellSrc(){
   const r=me.role;
-  if(r==='admin'||r==='teamlead'){const d=await api('/dashboard'+dxQuery());liveSrc={d,skew:Date.parse(d.now)-Date.now()};const ml=r==='teamlead'?await api('/tasks/mine').catch(()=>[]):[];bellSrc=r==='admin'?()=>dxTasks(d):()=>teamBell(d,ml)}
+  if(r==='admin'||r==='teamlead'){const d=await api('/dashboard'+dxQuery());d.chatsWaiting=await waitingChats();liveSrc={d,skew:Date.parse(d.now)-Date.now()};const ml=r==='teamlead'?await api('/tasks/mine').catch(()=>[]):[];bellSrc=r==='admin'?()=>dxTasks(d):()=>teamBell(d,ml)}
   else if(r==='streamer'){const c=dxCur();const d=await api('/my/dashboard?from='+c.from+'&to='+c.to);liveSrc=liveFromColleagues(d,Date.parse(d.now)-Date.now());d.alerts.chats=(await api('/chats').catch(()=>[])).filter(x=>x.waiting);bellSrc=()=>smTasks(d)}
   else{const ml=await api('/tasks/mine').catch(()=>[]);bellSrc=()=>mineBell(ml)}
   bellAt=Date.now();
@@ -1809,6 +1809,19 @@ function dxNet(d){
     margin!==null?el('div',{class:'mut',style:'font-size:13px'},'Маржа '+(margin<0?'−'+Math.abs(margin):margin)+'% от комиссии'):null,
     el('div',{class:'dx-eq'},el('div',{},el('span',{},'Комиссия получена'),el('b',{},usd0(t.commission))),el('div',{},el('span',{},'− Зарплаты и бонусы'),el('b',{class:'dx-neg'},'−'+usd0(t.salaries))),el('div',{},el('span',{},'− Расходы'),el('b',{class:'dx-neg'},'−'+usd0(t.expenses))),el('div',{},el('span',{},'= Чистая прибыль'),el('b',{style:'color:'+(t.net<0?'var(--bad)':'var(--ok)')},usd0(t.net)))));
 }
+/** Колокольчик: сообщения от лидов, которые ждут ответа (никто ещё не открыл чат). Открыли или закрыли чат - пункт пропадает.
+ *  До трёх чатов - по пункту на каждый (нажатие открывает чат), больше - один пункт со списком имён */
+function chatBellItems(list){
+  const nm=x=>x.first_name||(x.username?'@'+x.username:String(x.tg_id));
+  const go=id=>{dxCloseAll();if(id)pendingChat=id;tab='chats';showApp()};
+  if(!list||!list.length)return[];
+  if(list.length>3)return[el('button',{type:'button',class:'dx-tk',title:'Открыть чаты',onclick:()=>go(null)},el('b',{class:'dx-bd w'},String(list.length)),el('span',{class:'dx-tx'},el('span',{class:'tt'},'Новые сообщения в чатах'),el('span',{class:'ts'},list.map(nm).join(' · '))),svgIcon(IC_CHEV,16))];
+  return list.map(x=>el('button',{type:'button',class:'dx-tk',title:'Открыть чат',onclick:()=>go(x.tg_id)},el('span',{class:'dx-ic a'},svgIcon(IC_ALERT,18)),el('span',{class:'dx-tx'},el('span',{class:'tt'},'Новое сообщение: '+nm(x)),el('span',{class:'ts'},(x.last_text?String(x.last_text).slice(0,80):'Откройте чат и ответьте')+(x.owner_name?' · ведёт '+x.owner_name:''))),svgIcon(IC_CHEV,16)));
+}
+// Открытый мной чат в колокольчике больше не показываем, пока клиент не напишет снова (отметка в браузере: админ, открывая чат стримера, не гасит её у стримера)
+const chatSeenKey=()=>'chat_seen_me_'+(me&&me.id);
+function chatSeenMine(id){try{const m=JSON.parse(localStorage.getItem(chatSeenKey())||'{}');m[id]=Date.now();const k=Object.keys(m);if(k.length>300)k.sort((a,b)=>m[a]-m[b]).slice(0,k.length-300).forEach(x=>delete m[x]);localStorage.setItem(chatSeenKey(),JSON.stringify(m))}catch{}}
+const waitingChats=()=>api('/chats').then(r=>{let m={};try{m=JSON.parse(localStorage.getItem(chatSeenKey())||'{}')}catch{}return r.filter(x=>x.waiting&&!(m[x.tg_id]&&m[x.tg_id]>=Date.parse(x.last_at)))}).catch(()=>[]);
 function dxTasks(d){
   const T=d.tasks,rows=[];
   const names=(a,f)=>a.map(f).join(' · ');
@@ -1821,11 +1834,12 @@ function dxTasks(d){
   if((T.tasksDone||[]).length)rows.push([T.tasksDone.length,'w','Задачи ждут принятия',names(T.tasksDone,x=>x.staff_name+': '+x.title),'plans','tasks']);
   if((T.tasksOverdue||[]).length)rows.push([T.tasksOverdue.length,'r','Просрочены задачи',names(T.tasksOverdue,x=>x.staff_name+': '+x.title),'plans','tasks']);
   const list=el('div',{class:'dx-tl'},...(rows.length?rows.map(([n,c,t,s,tb,sub,per])=>el('button',{type:'button',class:'dx-tk',onclick:()=>{dxCloseAll();dxGo(tb,sub,per)}},el('b',{class:'dx-bd '+c},String(n)),el('span',{class:'dx-tx'},el('span',{class:'tt'},t),el('span',{class:'ts'},s)),svgIcon(IC_CHEV,16))):[el('div',{class:'dx-ok'},'Всё в порядке: задач нет')]));
-  return{items:rows.length?[...list.children]:[],n:rows.length};
+  const ch=chatBellItems(d.chatsWaiting);
+  return{items:[...ch,...(rows.length?[...list.children]:[])],n:rows.length+ch.length};
 }
 async function adminDash(){
   dxReg.length=0;dxCloseModal();
-  const d=await api('/dashboard'+dxQuery());
+  const d=await api('/dashboard'+dxQuery());d.chatsWaiting=await waitingChats();
   const skew=Date.parse(d.now)-Date.now();
   const fs=await fieldStatsBlock('?from='+d.range.from+'&to='+d.range.to).catch(()=>null);
   stopPoll();
@@ -1839,7 +1853,7 @@ async function adminDash(){
 /* ---------- Дашборд тимлида: его команда онлайн, общие показатели команды и его зарплата ---------- */
 async function leadDash(){
   dxReg.length=0;dxCloseModal();
-  const d=await api('/dashboard'+dxQuery());
+  const d=await api('/dashboard'+dxQuery());d.chatsWaiting=await waitingChats();
   const skew=Date.parse(d.now)-Date.now();
   const fs=await fieldStatsBlock('?from='+d.range.from+'&to='+d.range.to).catch(()=>null);
   stopPoll();
@@ -4365,7 +4379,7 @@ async function viewChats(){
       await loadList();window.scrollTo(0,0);
     }catch(e){toast(e.message)}
   }
-  async function openChat(id){active=id;tplLoad();setMtop();wrap.classList.add('open');window.scrollTo(0,0);msgs.dataset.init='';err.textContent='';try{await loadThread();await loadList()}catch(e){err.textContent=e.message}}
+  async function openChat(id){active=id;tplLoad();chatSeenMine(id);setTimeout(()=>refreshHeaderBell(true),1500);setMtop();wrap.classList.add('open');window.scrollTo(0,0);msgs.dataset.init='';err.textContent='';try{await loadThread();await loadList()}catch(e){err.textContent=e.message}}
   async function send(){
     const text=ta.value.trim();if((!text&&!queue.length)||!active)return;
     if(rec)return;
