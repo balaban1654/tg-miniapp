@@ -147,8 +147,10 @@ async function goLink(req: FastifyRequest, reply: FastifyReply, slug: string, to
   const ci = parseClick(req.headers);
   void db.query('INSERT INTO link_clicks (link_id, country, city, device, os, browser, referrer, ip_hash) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)', [row.id, ci.country, ci.city, ci.device, ci.os, ci.browser, ci.referrer, ci.device === 'Бот' ? null : ipHash(req.ip)]).catch(() => {});
   const kind = row.owner_role === 'buyer' ? 'b' : 's';
+  // Пробный режим ?app=1: ссылка сразу открывает Mini App (основное приложение бота), метка ссылки приходит в приложение
+  const toApp = String((req.query as Record<string, unknown>)?.app ?? '') === '1';
   // В параметре старта у случайной ссылки её код: слэш Telegram не допускает
-  return reply.redirect(302, `https://t.me/${config.botUsername}?start=${kind}_${encodeURIComponent(row.token ?? slug)}`);
+  return reply.redirect(302, `https://t.me/${config.botUsername}?${toApp ? 'startapp' : 'start'}=${kind}_${encodeURIComponent(row.token ?? slug)}`);
 }
 const SEG = '^[a-z0-9][a-z0-9_-]{1,39}$';
 const TOK = '^[a-z0-9_-]{2,40}$';

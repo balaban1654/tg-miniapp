@@ -477,6 +477,8 @@ html[data-theme=light] .card.hero{background:linear-gradient(180deg,#ece3ff,var(
 const tg=window.Telegram&&window.Telegram.WebApp;
 if(window.__splash)window.__splash(30,'Запускаем Hunter AI');
 try{tg&&tg.ready();tg&&tg.expand()}catch{}
+// Пришёл по ссылке прямо в приложение, «Старт» в боте не нажимал: просим разрешить боту писать ему (иначе бот не сможет присылать сообщения)
+try{const u=tg&&tg.initDataUnsafe;if(u&&u.start_param&&u.user&&!u.user.allows_write_to_pm&&tg.requestWriteAccess)setTimeout(()=>{try{tg.requestWriteAccess()}catch{}},1200)}catch{}
 /** Применить тему: атрибут у <html>, цвет шапки и фона Telegram, theme-color */
 function applyTheme(t){
   const light=t==='light',c=light?'#f6f4fb':'#0d0817';

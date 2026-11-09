@@ -28,7 +28,7 @@ export async function attachLead(
   slug: string | null,
   origin: 'site' | 'ref' | null = null,
   refId: number | null = null,
-  via: 'start' | 'app' | 'msg' = 'start',
+  via: 'start' | 'app' | 'msg' | 'applink' = 'start',
   ip: string | null = null,
 ): Promise<{ lead: Lead; isNew: boolean }> {
   // Открыл Mini App без «Старта» (кнопкой «Открыть» в профиле бота): параметр ссылки Telegram в этом случае не передаёт.
@@ -104,7 +104,7 @@ export async function attachLead(
      RETURNING *`,
     [tgId, username ?? null, firstName ?? null, linkId, ownerId, linkId ? null : origin, referrer],
   );
-  const VIA = { start: 'нажал «Старт» в боте', app: 'открыл Mini App без «Старта»', msg: 'написал боту без «Старта»' };
+  const VIA = { start: 'нажал «Старт» в боте', app: 'открыл Mini App без «Старта»', msg: 'написал боту без «Старта»', applink: 'ссылка сразу открыла Mini App (метка ссылки пришла в приложение)' };
   const ipNote = byIp ? ` (определено по переходу по ссылке с того же IP${byIp.min ? ' за ' + byIp.min + ' мин до этого' : ''}: «Старт» он не нажимал)` : '';
   const src = linkSlug ? 'по ссылке ' + linkSlug + ipNote : referrer ? 'по реферальной ссылке' : origin === 'site' ? 'с сайта' : 'без ссылки (органика)';
   if (ins.rows[0]) {

@@ -3,7 +3,7 @@ import { referralAppRoutes } from './referral.js';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { createHash, createHmac, timingSafeEqual, randomBytes } from 'node:crypto';
 import { db, attachLead } from './db.js';
-import { bot } from './bot.js';
+import { bot, giveMenu } from './bot.js';
 import { InputFile } from 'grammy';
 import { config } from './config.js';
 import { loadDepConfig, leadTierState } from './depbonus.js';
@@ -182,8 +182,17 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
     const user = initData ? verifyInitData(initData, config.botToken) : null;
     if (!user) return reply.code(401).send({ error: 'Откройте приложение из Telegram' });
     req.tg = user;
-    // Если человек открыл приложение, не нажимая /start, всё равно заводим лида
-    await attachLead(user.id, user.username, user.first_name, null, null, null, 'app', req.ip);
+    // Если человек открыл приложение, не нажимая /start, всё равно заводим лида.
+    // Ссылка вида t.me/<бот>?startapp=s_<ссылка> открывает приложение сразу, метка ссылки приходит в start_param:
+    // по ней закрепляем лида за ссылкой (только пока ссылки у него нет, чтобы не трогать базу на каждом запросе)
+    const sp = /^[sb]_([a-zA-Z0-9_-]{1,64})$/.exec(new URLSearchParams(initData).get('start_param') ?? '')?.[1] ?? null;
+    let appSlug: string | null = null;
+    if (sp) {
+      const cur = (await db.query('SELECT link_id FROM leads WHERE tg_id = $1', [user.id])).rows[0];
+      if (!cur || cur.link_id == null) appSlug = sp;
+    }
+    await attachLead(user.id, user.username, user.first_name, appSlug, null, null, appSlug ? 'applink' : 'app', req.ip);
+    if (appSlug) void giveMenu(user.id);
     // Заблокированный админом лид в Mini App не попадает: показываем причину и поддержку
     const ban = (await db.query('SELECT ban_reason FROM leads WHERE tg_id = $1 AND banned_at IS NOT NULL', [user.id])).rows[0];
     if (ban) return reply.code(403).send({ error: 'Доступ заблокирован', banned: true, reason: ban.ban_reason ?? null, botUsername: config.botUsername });
