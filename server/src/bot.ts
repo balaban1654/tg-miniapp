@@ -74,6 +74,8 @@ bot.command('start', async (ctx) => {
     await ctx.reply(await banned(from.id));
     return;
   }
+  // Нажал «Старт»: теперь у него есть кнопка меню с Mini App
+  void giveMenu(from.id);
   // Кнопка «Поддержка» в Mini App ведёт сюда
   if (payload === 'support') {
     // Клиент сам нажал «Поддержка»: закрытый чат открываем, его следующее сообщение сразу попадёт в Office
@@ -166,12 +168,48 @@ export async function setupBotProfile(): Promise<void> {
       'The assistant gives ready-made trading signals: pair, direction, entry points. All you need to do is follow them.\n\nTap “Start” and in 1 minute I will show you how it works.',
       { language_code: 'en' },
     );
-    if (config.miniAppUrl) {
-      await bot.api.setChatMenuButton({ menu_button: { type: 'web_app', text: 'Hunter AI', web_app: { url: config.miniAppUrl } } });
-    }
+    await setupMenuButton();
   } catch (e) {
     console.error('Не удалось обновить описание бота:', e);
   }
+}
+
+/** Кнопка меню «Hunter AI» (Mini App) появляется у человека только после «Старта»: так он не откроет приложение,
+ *  минуя «Старт», и ссылка стримера, по которой он пришёл, не потеряется */
+export async function giveMenu(chatId: number): Promise<void> {
+  if (!config.miniAppUrl) return;
+  const set = () => bot.api.setChatMenuButton({ chat_id: chatId, menu_button: { type: 'web_app', text: 'Hunter AI', web_app: { url: config.miniAppUrl } } });
+  try {
+    await set();
+  } catch (e) {
+    // Слишком часто: Telegram говорит, сколько подождать
+    const wait = Number((e as { parameters?: { retry_after?: number } })?.parameters?.retry_after);
+    if (wait > 0) {
+      await new Promise((res) => setTimeout(res, (wait + 1) * 1000));
+      await set().catch(() => {});
+    }
+  }
+}
+
+/** Общая кнопка меню для всех — обычная (без Mini App). Один раз при переходе на эту схему сначала выдаём кнопку
+ *  каждому, кто уже нажимал «Старт», чтобы у старых лидов она не пропала */
+async function setupMenuButton(): Promise<void> {
+  if (!config.miniAppUrl) return;
+  const done = (await db.query(`SELECT 1 FROM app_settings WHERE key = 'menu_after_start'`)).rowCount;
+  if (done) {
+    await bot.api.setChatMenuButton({ menu_button: { type: 'default' } });
+    return;
+  }
+  void (async () => {
+    const ids = (await db.query(`SELECT tg_id FROM leads WHERE bot_started AND NOT coalesce(bot_blocked, FALSE) ORDER BY last_seen_at DESC NULLS LAST`)).rows.map((x) => Number(x.tg_id));
+    for (const id of ids) {
+      await giveMenu(id);
+      await new Promise((res) => setTimeout(res, 40));
+    }
+    await bot.api.setChatMenuButton({ menu_button: { type: 'default' } });
+    await db.query(`INSERT INTO app_settings (key, value) VALUES ('menu_after_start', $1) ON CONFLICT (key) DO NOTHING`, [String(ids.length)]);
+    console.log('Кнопка меню после «Старта»: выдана', ids.length, 'лидам, общая кнопка теперь обычная');
+  })().catch((e) => console.error('Кнопка меню:', e));
 }
 
 // Клиент заблокировал бота или разблокировал его: Telegram сообщает об этом сразу
