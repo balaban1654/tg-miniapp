@@ -1130,3 +1130,7 @@ CREATE TABLE IF NOT EXISTS lead_log (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS lead_log_tg ON lead_log (tg_id, created_at);
+
+-- Хеш IP клика по ссылке: если лид открыл Mini App кнопкой «Открыть» без «Старта», по нему находим ссылку, с которой он пришёл
+ALTER TABLE link_clicks ADD COLUMN IF NOT EXISTS ip_hash TEXT;
+CREATE INDEX IF NOT EXISTS link_clicks_ip ON link_clicks (ip_hash, at) WHERE ip_hash IS NOT NULL;

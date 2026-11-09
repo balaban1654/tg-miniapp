@@ -5,7 +5,7 @@ import { fraudBackfill } from './fraud.js';
 import Fastify from 'fastify';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { config } from './config.js';
-import { db } from './db.js';
+import { db, ipHash } from './db.js';
 import { bot, setupBotProfile } from './bot.js';
 import cookie from '@fastify/cookie';
 import { readFileSync, readdirSync } from 'node:fs';
@@ -145,7 +145,7 @@ async function goLink(req: FastifyRequest, reply: FastifyReply, slug: string, to
   const row = r.rows[0];
   // Журнал кликов для дашборда по периодам. Ошибка журнала не должна ломать переход
   const ci = parseClick(req.headers);
-  void db.query('INSERT INTO link_clicks (link_id, country, city, device, os, browser, referrer) VALUES ($1,$2,$3,$4,$5,$6,$7)', [row.id, ci.country, ci.city, ci.device, ci.os, ci.browser, ci.referrer]).catch(() => {});
+  void db.query('INSERT INTO link_clicks (link_id, country, city, device, os, browser, referrer, ip_hash) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)', [row.id, ci.country, ci.city, ci.device, ci.os, ci.browser, ci.referrer, ci.device === 'Бот' ? null : ipHash(req.ip)]).catch(() => {});
   const kind = row.owner_role === 'buyer' ? 'b' : 's';
   // В параметре старта у случайной ссылки её код: слэш Telegram не допускает
   return reply.redirect(302, `https://t.me/${config.botUsername}?start=${kind}_${encodeURIComponent(row.token ?? slug)}`);

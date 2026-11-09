@@ -2,6 +2,10 @@ import pg from 'pg';
 import { referrerOf } from './referral.js';
 import { config } from './config.js';
 import { leadLog, staffName } from './leadlog.js';
+import { createHash } from 'node:crypto';
+
+/** Хеш IP для сопоставления клика по ссылке и первого входа в Mini App (сам IP не храним) */
+export const ipHash = (ip: string | null | undefined): string | null => (ip ? createHash('sha256').update(ip + '|' + config.botToken).digest('hex').slice(0, 32) : null);
 
 export const db = new pg.Pool({ connectionString: config.databaseUrl });
 
@@ -25,7 +29,21 @@ export async function attachLead(
   origin: 'site' | 'ref' | null = null,
   refId: number | null = null,
   via: 'start' | 'app' | 'msg' = 'start',
+  ip: string | null = null,
 ): Promise<{ lead: Lead; isNew: boolean }> {
+  // Открыл Mini App без «Старта» (кнопкой «Открыть» в профиле бота): параметр ссылки Telegram в этом случае не передаёт.
+  // Ищем переход по ссылке с этого же IP за 30 минут до первого захода — значит, пришёл по ней
+  let byIp: { min: number } | null = null;
+  if (!slug && !refId && ip) {
+    const L0 = (await db.query('SELECT link_id, created_at FROM leads WHERE tg_id = $1', [tgId])).rows[0];
+    if (!L0 || (L0.link_id == null && +new Date(L0.created_at) > Date.now() - 86400000)) {
+      const c = (await db.query(
+        `SELECT l.slug, round(extract(epoch FROM ($2::timestamptz - c.at)) / 60)::int AS min FROM link_clicks c JOIN links l ON l.id = c.link_id
+          WHERE c.ip_hash = $1 AND c.at BETWEEN $2::timestamptz - interval '30 minutes' AND $2::timestamptz + interval '2 minutes' ORDER BY c.at DESC LIMIT 1`,
+        [ipHash(ip), L0 ? L0.created_at : new Date()])).rows[0];
+      if (c) { slug = c.slug; byIp = { min: Math.max(0, c.min) }; }
+    }
+  }
   // Для журнала лида: откуда пришёл и почему достался этому владельцу
   let how = '';
   let linkSlug: string | null = null;
@@ -67,7 +85,7 @@ export async function attachLead(
                 EXISTS (SELECT 1 FROM messages m WHERE m.tg_id = d.tg_id AND m.direction = 'out' AND m.staff_id IS NOT NULL) AS replied,
                 EXISTS (SELECT 1 FROM lead_log g WHERE g.tg_id = d.tg_id AND g.kind = 'owner') AS touched
            FROM leads d WHERE d.tg_id = $1`, [tgId])).rows[0];
-      move = !!cur && cur.link_id == null && cur.owner_id != null && cur.organic && cur.recent && cur.status === 'new' && !cur.replied && !cur.touched;
+      move = !!cur && cur.link_id == null && cur.owner_id != null && cur.organic && cur.recent && !cur.replied && !cur.touched;
       // «Случайно»: владельца выбираем по очереди, только для нового лида, лида без владельца или переводимого из органики
       if (r.rows[0].rotate) {
         if (!cur || cur.owner_id == null || move) { const p = await pickRotationOwner(r.rows[0].root, tgId); if (p) { ownerId = p; how = 'по очереди из списка «Случайно» этой ссылки'; } }
@@ -87,7 +105,8 @@ export async function attachLead(
     [tgId, username ?? null, firstName ?? null, linkId, ownerId, linkId ? null : origin, referrer],
   );
   const VIA = { start: 'нажал «Старт» в боте', app: 'открыл Mini App без «Старта»', msg: 'написал боту без «Старта»' };
-  const src = linkSlug ? 'по ссылке ' + linkSlug : referrer ? 'по реферальной ссылке' : origin === 'site' ? 'с сайта' : 'без ссылки (органика)';
+  const ipNote = byIp ? ` (определено по переходу по ссылке с того же IP${byIp.min ? ' за ' + byIp.min + ' мин до этого' : ''}: «Старт» он не нажимал)` : '';
+  const src = linkSlug ? 'по ссылке ' + linkSlug + ipNote : referrer ? 'по реферальной ссылке' : origin === 'site' ? 'с сайта' : 'без ссылки (органика)';
   if (ins.rows[0]) {
     await db.query(`INSERT INTO events (tg_id, type) VALUES ($1,'start')`, [tgId]);
     await leadLog(tgId, 'came', `Пришёл ${src}: ${VIA[via]}. ` + (ownerId ? `Закреплён за ${await staffName(ownerId)} (${how || 'владелец ссылки'})` : 'Не закреплён: заберёт тот, кто ответит первым'));
@@ -101,10 +120,10 @@ export async function attachLead(
   const was = (await db.query('SELECT link_id, owner_id FROM leads WHERE tg_id = $1', [tgId])).rows[0];
   if (was && move && ownerId && ownerId !== was.owner_id) {
     await db.query('UPDATE leads SET owner_id = $2, link_id = $3, taken_from = NULL WHERE tg_id = $1', [tgId, ownerId, linkId]);
-    await leadLog(tgId, 'owner', `Нажал «Старт» по ссылке ${linkSlug} вскоре после того, как его раздали как органику: ` +
+    await leadLog(tgId, 'owner', (byIp ? `Найден переход по ссылке ${linkSlug} с того же IP перед первым заходом` : `Нажал «Старт» по ссылке ${linkSlug}`) + ' вскоре после того, как его раздали как органику: ' +
       `переведён от ${await staffName(was.owner_id)} к ${await staffName(ownerId)} (${how})`);
   } else if (was && linkId && was.link_id !== linkId) {
-    await leadLog(tgId, 'restart', `Снова нажал «Старт» по ссылке ${linkSlug}. ` +
+    await leadLog(tgId, 'restart', (byIp ? `Найден переход по ссылке ${linkSlug} с того же IP перед первым заходом. ` : `Снова нажал «Старт» по ссылке ${linkSlug}. `) +
       (was.link_id == null ? 'Ссылки у него не было — записана эта. ' : 'Ссылка остаётся первой, по которой он пришёл. ') +
       (was.owner_id == null ? (ownerId ? `Владелец: ${await staffName(ownerId)} (${how})` : 'Владельца по-прежнему нет') : `Владелец не меняется: ${await staffName(was.owner_id)}`));
   }
