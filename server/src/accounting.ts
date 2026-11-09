@@ -21,7 +21,8 @@ export interface KpiPlan {
   ftd: { over: number; bonus: number }[]; // бонус за FTD по сумме первого депозита
   day: { count: number; min: number; bonus: number; cutoffH: number }; // дневной бонус
   tol: number; // запас на курс брокера
-  shiftTol: number; // допуск по дневной смене: недобор в пределах этой доли нормы не считается невыполненным днём
+  shiftTol: number; // прежний допуск долей нормы (до перехода на минуты)
+  shiftTolMin?: number; // допуск по дневной смене в минутах: недобор в пределах не считается невыполненным днём
   advance: number; // максимальный аванс
   birthday: number; // бонус на день рождения сотрудника, $ (0 — не начислять)
   leadShift: number; // тимлиду за каждого члена команды, выполнившего план смен за месяц, $
@@ -79,6 +80,8 @@ const r2 = (n: number) => Math.round(n * 100) / 100;
 const PERIOD = /^\d{4}-(0[1-9]|1[0-2])$/;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
+/** Допуск по смене в минутах; в старом плане он был долей нормы (15% от 3 ч = 27 мин) */
+export const shiftTolMin = (p: KpiPlan): number => p.shiftTolMin ?? Math.round(p.shiftH * 60 * (p.shiftTol ?? 0.15));
 export async function getPlan(): Promise<KpiPlan> {
   const row = (await db.query('SELECT data FROM kpi_settings WHERE id = 1')).rows[0];
   const d = (row?.data ?? {}) as Partial<KpiPlan>;
@@ -430,6 +433,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
       day: { count: n(b.day?.count, cur.day.count, 1, 100), min: n(b.day?.min, cur.day.min), bonus: n(b.day?.bonus, cur.day.bonus), cutoffH: n(b.day?.cutoffH, cur.day.cutoffH, 0, 12) },
       tol: n(b.tol, cur.tol, 0, 0.5),
       shiftTol: n(b.shiftTol, cur.shiftTol, 0, 0.5),
+      shiftTolMin: n(b.shiftTolMin, shiftTolMin(cur), 0, 720),
       advance: n(b.advance, cur.advance),
       birthday: n(b.birthday, cur.birthday),
       leadShift: n(b.leadShift, cur.leadShift),
@@ -1197,8 +1201,8 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
   app.post('/shortfalls/sync', { preHandler: stream }, async (req) => {
     const me = req.staff!;
     const plan = await getPlan();
-    // Норма смены с допуском: например, 3 ч и допуск 15% значит, что 2 ч 33 мин и больше считается выполненным днём
-    const need = Math.round(plan.shiftH * 60 * (1 - plan.shiftTol));
+    // Норма смены с допуском в минутах: например, 3 ч и допуск 30 мин значит, что 2 ч 30 мин и больше считается выполненным днём
+    const need = Math.max(0, Math.round(plan.shiftH * 60 - shiftTolMin(plan)));
     // Прежние дни без причины, которые теперь укладываются в допуск, убираем
     await db.query(
       `DELETE FROM shift_shortfalls f WHERE f.staff_id = $1 AND f.reason IS NULL
