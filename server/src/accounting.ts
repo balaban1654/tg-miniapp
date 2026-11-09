@@ -15,6 +15,7 @@ export interface KpiPlan {
   base: number; // ставка за смены при выполнении
   baseLow: number; // ставка, если смены не выполнены
   baseMinFtd: number; // полная ставка за часы только при стольких FTD за месяц и больше; иначе минимальная (0 — без условия)
+  baseLowMinFtd?: number; // минимальная ставка за часы только при стольких FTD за месяц и больше; меньше - часы не оплачиваются (0 — без условия)
   price: number; // цена за лида
   priceLow: number; // цена за лида, если план по лидам не выполнен
   tiers: { from: number; price: number }[]; // повышенные цены за всех лидов месяца
@@ -102,6 +103,7 @@ export interface KpiResult {
   payCount: number; // из них оплачиваются как лиды (без рефералов)
   shiftsDone: boolean;
   hoursDone?: boolean; // часы по плану набраны (полная ставка ещё требует FTD не меньше plan.baseMinFtd)
+  lowOk?: boolean; // FTD хватает на минимальную ставку (plan.baseLowMinFtd)
   leadsDone: boolean;
   overtimeMin: number;
   act: { base: number; baseRate: number; price: number; leadsPay: number };
@@ -201,8 +203,11 @@ async function kpiCompute(staffId: number, period: string, plan: KpiPlan): Promi
   const shiftsDone = hoursDone && n >= (plan.baseMinFtd || 0);
   const leadsDone = n >= plan.leads;
   const tierPrice = () => plan.tiers.slice().sort((a, b) => b.from - a.from).find((t) => n >= t.from)?.price ?? plan.price;
+  // Минимальная ставка тоже с условием: FTD меньше baseLowMinFtd - часы не оплачиваются (и в «по минимальным», и по факту)
+  const lowOk = n >= (plan.baseLowMinFtd || 0);
+  const low = lowOk ? plan.baseLow : 0;
   const mode = (m: 'full' | 'min' | 'actual') => {
-    const baseRate = m === 'full' ? plan.base : m === 'min' ? plan.baseLow : shiftsDone ? plan.base : plan.baseLow;
+    const baseRate = m === 'full' ? plan.base : m === 'min' ? low : shiftsDone ? plan.base : low;
     const price = m === 'full' ? tierPrice() : m === 'min' ? plan.priceLow : leadsDone ? tierPrice() : plan.priceLow;
     return { base: r2((baseRate * Math.min(hoursMin, planMin)) / planMin), baseRate, price, leadsPay: r2(nPay * price) };
   };
@@ -252,6 +257,7 @@ async function kpiCompute(staffId: number, period: string, plan: KpiPlan): Promi
     payCount: nPay,
     shiftsDone,
     hoursDone,
+    lowOk,
     leadsDone,
     overtimeMin: Math.max(0, hoursMin - planMin),
     act,
@@ -426,6 +432,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
       base: n(b.base, cur.base),
       baseLow: n(b.baseLow, cur.baseLow),
       baseMinFtd: n(b.baseMinFtd, cur.baseMinFtd, 0, 10000),
+      baseLowMinFtd: n(b.baseLowMinFtd, cur.baseLowMinFtd ?? 0, 0, 10000),
       price: n(b.price, cur.price),
       priceLow: n(b.priceLow, cur.priceLow),
       tiers: Array.isArray(b.tiers) ? b.tiers.map((t: any) => ({ from: n(t.from, 0), price: n(t.price, 0) })).filter((t: any) => t.from > 0) : cur.tiers,
