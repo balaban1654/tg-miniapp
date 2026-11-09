@@ -4,6 +4,7 @@ import { newSecret, otpUri, verifyTotp, newRecoveryCodes } from './totp.js';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { GrammyError, InputFile } from 'grammy';
 import { db, pickFallbackOwner } from './db.js';
+import { leadLog, staffName } from './leadlog.js';
 import { bot } from './bot.js';
 import { markLeadBlocked, BLOCKED_RE } from './leadblock.js';
 import { config } from './config.js';
@@ -1043,6 +1044,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     const me = req.staff!;
     const r = await db.query(`UPDATE leads d SET chat_closed_at = now() WHERE d.tg_id = $1 AND ${chatScope(me, 'd.owner_id')}`, [Number(req.params.tgId)]);
     if (!r.rowCount) return reply.code(404).send({ error: 'Чат не найден' });
+    await leadLog(req.params.tgId, 'chat', `${me.name} закрыл чат`, me.id);
     return { ok: true };
   });
   // Очистить переписку: ?everywhere=1 - ещё и удалить эти сообщения у клиента в Telegram (и его, и наши).
@@ -1143,14 +1145,16 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     if (ownerId === null && (me.role === 'streamer' || me.role === 'teamlead')) {
       const claim = await db.query('UPDATE leads SET owner_id = $2 WHERE tg_id = $1 AND owner_id IS NULL RETURNING tg_id', [tgId, me.id]);
       if (claim.rowCount) await syncRefReward(tgId).catch(() => {});
+      if (claim.rowCount) await leadLog(tgId, 'owner', `${me.name} взял лида: ответил первым, владельца не было`, me.id);
       if (!claim.rowCount) {
         const o = await db.query('SELECT o.id, o.name FROM leads d JOIN staff o ON o.id = d.owner_id WHERE d.tg_id = $1', [tgId]);
         if (o.rows[0]?.id !== me.id) return `Этого клиента уже взял ${o.rows[0]?.name ?? 'другой стример'}`;
       }
     } else if (ownerId !== null && ownerId !== me.id && me.role === 'streamer') {
       // Чужой новый клиент, открытый всем (владелец не ответил вовремя, см. takeOpen): кто ответил, тот его и забирает (ссылка, по которой он пришёл, остаётся)
-      await db.query(`UPDATE leads d SET owner_id = $2, taken_from = d.owner_id WHERE d.tg_id = $1 AND d.owner_id = $3 AND ${takeOpen('d', 'd.owner_id')}`, [tgId, me.id, ownerId]);
+      const tk = await db.query(`UPDATE leads d SET owner_id = $2, taken_from = d.owner_id WHERE d.tg_id = $1 AND d.owner_id = $3 AND ${takeOpen('d', 'd.owner_id')}`, [tgId, me.id, ownerId]);
       await syncRefReward(tgId).catch(() => {});
+      if (tk.rowCount) await leadLog(tgId, 'owner', `${me.name} забрал лида у ${await staffName(ownerId)}: владелец не ответил вовремя, чат был открыт всем`, me.id);
     }
     return null;
   }
@@ -1680,8 +1684,10 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
       if (!cur || cur.lr !== 'lead' || !(await mine(cur.owner_id))) return reply.code(403).send({ error: 'Это лид не вашей команды' });
       if (!(await mine(owner))) return reply.code(403).send({ error: 'Закрепить можно только за стримером своей команды' });
     }
+    const prev = (await db.query('SELECT owner_id FROM leads WHERE tg_id = $1', [Number(req.params.tgId)])).rows[0];
     const r = await db.query('UPDATE leads SET owner_id = $2, taken_from = NULL WHERE tg_id = $1 RETURNING tg_id', [Number(req.params.tgId), owner]);
     if (r.rowCount) await syncRefReward(Number(req.params.tgId)).catch(() => {});
+    if (r.rowCount && prev && prev.owner_id !== owner) await leadLog(req.params.tgId, 'owner', `${me.name} сменил владельца вручную: ${await staffName(prev.owner_id)} → ${await staffName(owner)}`, me.id);
     if (!r.rowCount) return reply.code(404).send({ error: 'Лид не найден' });
     return { ok: true };
   });
@@ -2554,6 +2560,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     if (on && !['lead', 'test', 'moder', 'admin', 'streamer', 'analyst', 'buyer'].includes(role)) return reply.code(400).send({ error: 'Неизвестная роль' });
     const r = await db.query('UPDATE leads SET is_tester = $2, lead_role = $3 WHERE tg_id = $1 RETURNING tg_id', [Number(req.params.tgId), on, on ? role : 'lead']);
     if (!r.rowCount) return reply.code(404).send({ error: 'Лид не найден' });
+    await leadLog(req.params.tgId, 'access', on ? `${req.staff!.name} выдал доступ с ролью «${role}»` : `${req.staff!.name} снял выданный доступ`, req.staff!.id);
     // Тест ведёт себя как обычный лид: доступ открывается депозитом, а не ролью. Снятие роли тест возвращает аккаунт к обычному лиду без доступа
     if (role === 'test' || !on) await db.query(`UPDATE leads SET access = FALSE WHERE tg_id = $1 AND NOT EXISTS (SELECT 1 FROM events e WHERE e.tg_id = leads.tg_id AND e.type IN ('ftd','dep'))`, [Number(req.params.tgId)]);
     return { ok: true };
@@ -2640,8 +2647,10 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
   app.patch<{ Params: { tgId: string } }>('/leads/:tgId/trader', { preHandler: need('admin') }, async (req, reply) => {
     const v = str((req.body as any)?.trader_id, 40);
     if (v && !/^[A-Za-z0-9_-]+$/.test(v)) return reply.code(400).send({ error: 'Pocket ID: только буквы, цифры, - и _' });
+    const was = (await db.query('SELECT trader_id FROM leads WHERE tg_id = $1', [Number(req.params.tgId)])).rows[0];
     const r = await db.query('UPDATE leads SET trader_id = $2 WHERE tg_id = $1 RETURNING tg_id', [Number(req.params.tgId), v || null]);
     if (!r.rowCount) return reply.code(404).send({ error: 'Лид не найден' });
+    if ((was?.trader_id ?? null) !== (v || null)) await leadLog(req.params.tgId, 'pocket', `${req.staff!.name} вручную поменял Pocket ID: ${was?.trader_id || 'нет'} → ${v || 'нет'}`, req.staff!.id);
     return { ok: true };
   });
 
@@ -2665,6 +2674,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
       if (!owner) return reply.code(409).send({ error: done ? `Раздано ${done}, дальше некому: нет активных стримеров` : 'Нет активных стримеров, раздавать некому' });
       const n1 = (await db.query(`UPDATE leads SET owner_id = $2 WHERE tg_id = $1 AND owner_id IS NULL`, [id, owner])).rowCount ?? 0;
       if (n1) await syncRefReward(id).catch(() => {});
+      if (n1) await leadLog(id, 'owner', `${_req.staff!.name} раздал незакреплённых: лид ушёл ${await staffName(owner)} по общей очереди`, _req.staff!.id);
       done += n1;
     }
     return { ok: true, assigned: done };
@@ -2700,6 +2710,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     if (!(await banAllowed(req.staff!, Number(req.params.tgId)))) return reply.code(403).send({ error: 'Это лид не вашей команды' });
     const r = await db.query('UPDATE leads SET banned_at = now(), ban_reason = $2, banned_by = $3 WHERE tg_id = $1 RETURNING tg_id', [Number(req.params.tgId), reason, req.staff!.id]);
     if (!r.rowCount) return reply.code(404).send({ error: 'Лид не найден' });
+    await leadLog(req.params.tgId, 'ban', `${req.staff!.name} заблокировал лида. Причина: ${reason}`, req.staff!.id);
     return { ok: true };
   });
   // Лид забыл доступ к аккаунту Pocket Option: старая регистрация остаётся в базе (Pocket ID в lead_pockets, события на месте),
@@ -2712,6 +2723,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     if (L.status !== 'registered' || L.access) return reply.code(409).send({ error: 'Новую регистрацию можно разрешить только лиду в статусе «Регистрация» без доступа' });
     if (L.trader_id) await db.query('INSERT INTO lead_pockets (trader_id, tg_id) VALUES ($1,$2) ON CONFLICT DO NOTHING', [L.trader_id, tgId]);
     await db.query(`UPDATE leads SET trader_id = NULL, status = 'new', rereg_at = now() WHERE tg_id = $1`, [tgId]);
+    await leadLog(tgId, 'pocket', `${req.staff!.name} разрешил новую регистрацию` + (L.trader_id ? ` (старый Pocket ID ${L.trader_id} сохранён в карточке)` : ''), req.staff!.id);
     const text = L.lang === 'en'
       ? 'You can register a new Pocket Option account. Open the app and tap «Register»: access opens after the first deposit.'
       : 'Можно зарегистрировать новый аккаунт Pocket Option. Откройте приложение и нажмите «Зарегистрироваться»: доступ откроется после первого пополнения.';
@@ -2731,11 +2743,13 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     if (L.trader_id) await db.query('INSERT INTO lead_pockets (trader_id, tg_id) VALUES ($1,$2) ON CONFLICT DO NOTHING', [L.trader_id, tgId]);
     // Ждал новую регистрацию: выбор основного её завершает, лид снова в «Регистрации»
     await db.query(`UPDATE leads SET trader_id = $2, rereg_at = NULL, status = CASE WHEN rereg_at IS NOT NULL AND status = 'new' THEN 'registered' ELSE status END WHERE tg_id = $1`, [tgId, trader]);
+    await leadLog(tgId, 'pocket', `${req.staff!.name} сделал основным Pocket ID ${trader}` + (L.trader_id ? ` (был ${L.trader_id})` : ''), req.staff!.id);
     return { ok: true };
   });
   app.delete<{ Params: { tgId: string } }>('/leads/:tgId/ban', { preHandler: need('admin', 'teamlead') }, async (req, reply) => {
     if (!(await banAllowed(req.staff!, Number(req.params.tgId)))) return reply.code(403).send({ error: 'Это лид не вашей команды' });
-    await db.query('UPDATE leads SET banned_at = NULL, ban_reason = NULL, banned_by = NULL WHERE tg_id = $1', [Number(req.params.tgId)]);
+    const ub = await db.query('UPDATE leads SET banned_at = NULL, ban_reason = NULL, banned_by = NULL WHERE tg_id = $1 AND banned_at IS NOT NULL', [Number(req.params.tgId)]);
+    if (ub.rowCount) await leadLog(req.params.tgId, 'ban', `${req.staff!.name} разблокировал лида`, req.staff!.id);
     return { ok: true };
   });
 
@@ -2754,6 +2768,65 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     if (!r.rowCount) return reply.code(404).send({ error: 'Лид не найден' });
     return { ok: true };
   });
+  // Журнал лида для админа: текущая ссылка и владелец + вся история по времени. Записи журнала (lead_log) дополняются тем, что
+  // уже есть в базе: события постбеков, раздачи «Случайно» и органики, сообщения, блокировки. Так история видна и у старых лидов
+  app.get<{ Params: { tgId: string } }>('/leads/:tgId/history', { preHandler: need('admin') }, async (req, reply) => {
+    const tgId = Number(req.params.tgId);
+    if (!Number.isSafeInteger(tgId)) return reply.code(400).send({ error: 'Неверный ID' });
+    const L = (await db.query(
+      `SELECT d.*, l.slug AS link_slug, l.source AS link_source, lo.name AS link_owner, o.name AS owner_name, tf.name AS taken_from_name,
+              bb.name AS banned_by_name, coalesce(p.rotate, l.rotate) AS link_rotate
+         FROM leads d LEFT JOIN links l ON l.id = d.link_id LEFT JOIN links p ON p.id = l.parent_id LEFT JOIN staff lo ON lo.id = l.owner_id
+         LEFT JOIN staff o ON o.id = d.owner_id LEFT JOIN staff tf ON tf.id = d.taken_from LEFT JOIN staff bb ON bb.id = d.banned_by
+        WHERE d.tg_id = $1`, [tgId])).rows[0];
+    if (!L) return reply.code(404).send({ error: 'Лид не найден' });
+    type Item = { at: string | null; kind: string; text: string; who?: string | null; src: 'log' | 'db' };
+    const items: Item[] = [];
+    const logs = (await db.query(`SELECT g.created_at, g.kind, g.text, s.name FROM lead_log g LEFT JOIN staff s ON s.id = g.staff_id WHERE g.tg_id = $1 ORDER BY g.id`, [tgId])).rows;
+    for (const g of logs) items.push({ at: g.created_at, kind: g.kind, text: g.text, who: g.name, src: 'log' });
+    const has = (k: string, re?: RegExp) => logs.some((g) => g.kind === k && (!re || re.test(g.text)));
+    // Как пришёл: если журнала ещё не было, собираем из того, что есть
+    if (!has('came')) {
+      const st = (await db.query(`SELECT min(created_at) AS at FROM events WHERE tg_id = $1 AND type = 'start'`, [tgId])).rows[0]?.at ?? L.created_at;
+      const src = L.link_slug ? 'по ссылке ' + L.link_slug + (L.link_owner ? ' (ссылка ' + L.link_owner + ')' : '') : L.referrer_id ? 'по приглашению друга (Telegram ID ' + L.referrer_id + ')' : L.origin === 'site' ? 'с сайта' : 'без ссылки (органика)';
+      const ra = (await db.query(`SELECT a.at, s.name, l.slug FROM link_assign a JOIN staff s ON s.id = a.staff_id JOIN links l ON l.id = a.link_id WHERE a.tg_id = $1 ORDER BY a.at`, [tgId])).rows;
+      const oa = (await db.query(`SELECT a.at, a.kind, s.name FROM organic_assign a JOIN staff s ON s.id = a.staff_id WHERE a.tg_id = $1 ORDER BY a.at`, [tgId])).rows;
+      const first = Math.min(...[st, L.created_at, ...ra.map((x) => x.at), ...oa.map((x) => x.at)].filter(Boolean).map((x) => +new Date(x)));
+      items.push({ at: new Date(first - 1).toISOString(), kind: 'came', text: 'Появился в базе, ' + src + (oa.length && L.link_slug ? '. Первый заход был без ссылки (его раздали как органику), ссылка записалась позже' : ''), src: 'db' });
+      for (const a of ra) items.push({ at: a.at, kind: 'owner', text: `Раздача «Случайно» со ссылки ${a.slug}: выпал ${a.name}`, src: 'db' });
+      for (const a of oa) items.push({ at: a.at, kind: 'owner', text: a.kind === 'any' ? `Владельца не было: по общей очереди достался ${a.name}` : `Органика (${a.kind === 'site' ? 'сайт' : 'нашёл бота сам'}): по настройке «Органика» достался ${a.name}`, src: 'db' });
+    }
+    if (L.taken_from_name && !has('owner', /забрал/)) items.push({ at: null, kind: 'owner', text: `${L.owner_name ?? 'Сотрудник'} забрал лида у ${L.taken_from_name} в чате (до появления журнала, время неизвестно)`, src: 'db' });
+    // Постбеки: регистрации, депозиты, выводы, комиссия
+    const EV: Record<string, string> = { reg: 'Регистрация в Pocket Option', ftd: 'Первый депозит', dep: 'Повторный депозит', wd: 'Вывод', comm: 'Комиссия' };
+    const ev = (await db.query(`SELECT type, amount, external_id, created_at FROM events WHERE tg_id = $1 AND type <> 'start' ORDER BY created_at`, [tgId])).rows;
+    for (const e of ev) {
+      const pid = e.type === 'reg' ? String(e.external_id ?? '').split(':')[2] : '';
+      items.push({ at: e.created_at, kind: 'pb', text: (EV[e.type] ?? e.type) + (e.amount != null ? ' $' + Number(e.amount).toLocaleString('ru-RU') : '') + (pid && /^\w+$/.test(pid) ? ' · Pocket ID ' + pid : ''), src: 'db' });
+    }
+    // Чат: первое сообщение лида и первый ответ каждого сотрудника
+    const m1 = (await db.query(`SELECT min(created_at) AS at, count(*)::int AS n FROM messages WHERE tg_id = $1 AND direction = 'in'`, [tgId])).rows[0];
+    if (m1?.at) items.push({ at: m1.at, kind: 'chat', text: `Первое сообщение от лида (всего от него ${m1.n})`, src: 'db' });
+    const mo = (await db.query(`SELECT s.name, min(m.created_at) AS at, count(*)::int AS n FROM messages m JOIN staff s ON s.id = m.staff_id WHERE m.tg_id = $1 AND m.direction = 'out' GROUP BY s.name ORDER BY 2`, [tgId])).rows;
+    for (const x of mo) items.push({ at: x.at, kind: 'chat', text: `${x.name} впервые ответил в чате (всего ответов ${x.n})`, who: x.name, src: 'db' });
+    if (L.demo_clicked_at) items.push({ at: L.demo_clicked_at, kind: 'other', text: 'Нажал ссылку на демо-счёт', src: 'db' });
+    if (L.support_ask_at) items.push({ at: L.support_ask_at, kind: 'chat', text: 'Написал в закрытый чат: бот спросил, нужна ли помощь менеджера', src: 'db' });
+    if (L.chat_closed_at && !has('chat', /закрыл/)) items.push({ at: L.chat_closed_at, kind: 'chat', text: 'Чат закрыт', src: 'db' });
+    if (L.banned_at && !has('ban')) items.push({ at: L.banned_at, kind: 'ban', text: `Заблокирован${L.banned_by_name ? ' (' + L.banned_by_name + ')' : ''}. Причина: ${L.ban_reason ?? '—'}`, src: 'db' });
+    if (L.rereg_at && !has('pocket', /новую регистрацию/)) items.push({ at: L.rereg_at, kind: 'pocket', text: 'Разрешена новая регистрация, ждём новый Pocket ID', src: 'db' });
+    if (L.removed_at && !has('removed')) items.push({ at: L.removed_at, kind: 'removed', text: 'Убран из списка лидов', src: 'db' });
+    if (L.bot_blocked) items.push({ at: null, kind: 'other', text: 'Сейчас бот у лида заблокирован (сообщения не доходят)', src: 'db' });
+    items.sort((a, b) => (a.at ? +new Date(a.at) : 0) - (b.at ? +new Date(b.at) : 0));
+    return {
+      now: {
+        link: L.link_slug ?? null, link_source: L.link_source ?? null, link_owner: L.link_owner ?? null, link_rotate: !!L.link_rotate,
+        origin: L.link_slug ? null : L.referrer_id ? 'ref' : L.origin ?? 'org', owner: L.owner_name ?? null, taken_from: L.taken_from_name ?? null,
+        created_at: L.created_at,
+      },
+      items,
+    };
+  });
+
   app.get<{ Params: { tgId: string } }>('/leads/:tgId', { preHandler: auth }, async (req, reply) => {
     const me = req.staff!;
     const tgId = Number(req.params.tgId);
@@ -2923,6 +2996,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     if (lead.lead_role && lead.lead_role !== 'lead') return reply.code(400).send({ error: 'Сотрудника из админ состава удалить нельзя: сначала снимите ему доступ' });
     if (req.query.mode === 'revoke') {
       await db.query(`UPDATE leads SET access = FALSE, is_tester = FALSE, removed_at = now() WHERE tg_id = $1`, [tgId]);
+      await leadLog(tgId, 'removed', `${req.staff!.name} отозвал доступ и убрал лида из списка (постбеки сохранены)`, req.staff!.id);
       await db.query(`UPDATE legacy_ids SET claimed_by = NULL, claimed_at = NULL WHERE claimed_by = $1`, [tgId]);
       return { ok: true, mode: 'revoke' };
     }
@@ -2930,7 +3004,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     const c = await db.connect();
     try {
       await c.query('BEGIN');
-      for (const t of ['events', 'deals', 'lesson_progress', 'messages', 'push_log', 'broadcast_jobs', 'signal_steps', 'postback_log']) {
+      for (const t of ['events', 'deals', 'lesson_progress', 'messages', 'push_log', 'broadcast_jobs', 'signal_steps', 'postback_log', 'lead_log']) {
         await c.query(`DELETE FROM ${t} WHERE tg_id = $1`, [tgId]);
       }
       await c.query(`UPDATE legacy_ids SET claimed_by = NULL, claimed_at = NULL WHERE claimed_by = $1`, [tgId]);

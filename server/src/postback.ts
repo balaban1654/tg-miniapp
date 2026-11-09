@@ -4,6 +4,7 @@ import { markLeadBlocked } from './leadblock.js';
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { db, pickOrganicOwner, pickFallbackOwner } from './db.js';
 import { config } from './config.js';
+import { leadLog, staffName } from './leadlog.js';
 import { processLead } from './push.js';
 import { requiredFor, markConnected, paidRequired, TOL } from './connect.js';
 
@@ -97,7 +98,9 @@ export async function postbackRoutes(app: FastifyInstance): Promise<void> {
       const org = meta && !meta.link_id ? await pickOrganicOwner(meta.origin === 'site' ? 'site' : 'org', tgId) : null;
       const byAc = !org && q.ac ? (await db.query('SELECT id FROM staff WHERE lower(po_campaign) = lower($1) AND active', [q.ac])).rows[0]?.id : null;
       const owner = org ?? byAc ?? (await pickFallbackOwner(tgId));
-      if (owner) await db.query('UPDATE leads SET owner_id = $2 WHERE tg_id = $1 AND owner_id IS NULL', [tgId, owner]);
+      const set = owner ? await db.query('UPDATE leads SET owner_id = $2 WHERE tg_id = $1 AND owner_id IS NULL', [tgId, owner]) : null;
+      if (set?.rowCount) await leadLog(tgId, 'owner', `Владельца не было, назначен по постбеку «${event}»: ${await staffName(owner)} (` +
+        (org ? 'по настройке «Органика»' : byAc ? 'по коду кампании ' + q.ac : 'по общей очереди') + ')');
     }
     const amount = Math.abs(Number(pick(q, AMOUNT_KEYS))) || null;
 

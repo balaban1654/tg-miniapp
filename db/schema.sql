@@ -1118,3 +1118,15 @@ UPDATE bot_replies SET text = 'Вам нужна помощь?' WHERE key = 'sup
 -- Вопрос в закрытом чате: «Вам нужна помощь менеджера?» и кнопки «Да, нужна / Нет, спасибо» (если в Office не меняли)
 UPDATE bot_replies SET text = 'Вам нужна помощь менеджера?', buttons = '[{"label": "Да, нужна", "label_en": "Yes, please", "type": "callback", "data": "support_yes", "style": "success", "inline": true}, {"label": "Нет, спасибо", "label_en": "No, thanks", "type": "callback", "data": "support_no"}]'::jsonb
  WHERE key = 'support_ask' AND text IN ('Вам нужна помощь?', 'Вам нужна помощь поддержки?');
+
+-- Журнал лида: как пришёл (ссылка, кому и почему достался), кто взял, забрал или сменил владельца, блокировки, Pocket ID, доступ.
+-- Показывается админу в карточке лида (значок «i»). Для старых лидов история дополняется из событий, раздач и сообщений
+CREATE TABLE IF NOT EXISTS lead_log (
+  id         BIGSERIAL PRIMARY KEY,
+  tg_id      BIGINT NOT NULL,
+  kind       TEXT NOT NULL,
+  text       TEXT NOT NULL,
+  staff_id   INT REFERENCES staff(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS lead_log_tg ON lead_log (tg_id, created_at);

@@ -180,6 +180,17 @@ th.n{text-align:right}
 .an-tbl{overflow-x:auto}.an-tbl table{min-width:0;font-size:12.5px}.an-tbl th,.an-tbl td{padding:7px 10px}
 @media(max-width:560px){.an{padding:14px 12px}.an-ov{padding:8px}}
 .lc-hr{display:flex;gap:8px;align-items:center;flex:none}.lc-pills{display:flex;gap:8px;align-items:center}
+.lc-hb{display:flex;gap:8px;align-items:center}.lc-hb .btn{display:inline-flex;align-items:center;justify-content:center}
+.lh-now{display:grid;gap:4px;padding:12px 14px;border-radius:12px;background:var(--bg2,rgba(255,255,255,.04));border:1px solid var(--line,rgba(255,255,255,.1))}
+.lh-warn{color:var(--warn,#ffd54d)}
+.lh-list{display:grid;gap:0;max-height:min(calc(100dvh - 340px),560px);min-height:120px;overflow:auto;padding-right:4px}
+.lh-it{display:grid;grid-template-columns:12px 1fr;gap:10px;padding:9px 0;border-top:1px solid var(--line,rgba(255,255,255,.08))}.lh-it:first-child{border-top:0}
+.lh-dot{width:10px;height:10px;border-radius:50%;margin-top:5px;background:var(--mut,#8a7fae)}
+.lh-it[data-k=came] .lh-dot,.lh-it[data-k=restart] .lh-dot,.lh-it[data-k=back] .lh-dot{background:#3ddc97}
+.lh-it[data-k=owner] .lh-dot{background:#9b5cff}.lh-it[data-k=pb] .lh-dot{background:#5cb8ff}
+.lh-it[data-k=ban] .lh-dot,.lh-it[data-k=removed] .lh-dot{background:#ff6b8a}.lh-it[data-k=pocket] .lh-dot,.lh-it[data-k=access] .lh-dot{background:#ffd54d}
+.lh-t{font-size:14px;line-height:1.4}.lh-m{font-size:12px;margin-top:2px}
+@media(max-width:560px){.lc.wide .lc-hb{flex-direction:column}}
 @media(max-width:560px){.lc.wide .lc-head{flex-wrap:nowrap;align-items:flex-start}.lc.wide .lc-hr{align-items:flex-start}.lc.wide .lc-pills{flex-direction:column;align-items:flex-end;gap:5px}.lc.wide .lc-head h3{font-size:19px!important}}
 .lc.wide{width:min(560px,100%);padding:14px 16px;gap:9px}.lc.wide .lc-grid{gap:7px 14px;grid-template-columns:repeat(3,minmax(0,1fr))}.lc.wide .lc-kv b{overflow-wrap:anywhere}@media(max-width:520px){.lc.wide .lc-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}.lc.wide .lc-kv .sm{font-size:11px}.lc.wide .lc-kv b{font-size:13px}.lc.wide .lc-h{margin:2px 0 6px}.lc.wide .lc-step{padding:2px 0}.lc.wide .lc-steps{gap:6px}
 .lc-two2{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start}
@@ -2985,6 +2996,30 @@ const fmtDT=v=>v?new Date(v).toLocaleString('ru-RU',{timeZone:'Europe/Kyiv',day:
 const countryName=c=>{if(!c)return '—';try{return (new Intl.DisplayNames(['ru'],{type:'region'}).of(String(c).toUpperCase().slice(0,2))||c)+' ('+String(c).toUpperCase()+')'}catch{return c}};
 const REGION_NAME={ru:'RU, СНГ',ww:'EU, Мир'};
 /** Карточка лида: откуда пришёл, путь, депозиты, кнопка «Открыть чат» */
+const INFOI='<circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 7.5h.01"/>';
+/** История лида (админ): ссылка и владелец сейчас + всё, что с ним происходило, по времени */
+async function leadHistory(L,fname){
+  const ov=el('div',{class:'lc-overlay',role:'dialog','aria-modal':'true','aria-label':'История лида'});
+  const close=()=>{ov.remove();document.removeEventListener('keydown',onKey,true)};
+  const onKey=e=>{if(e.key==='Escape'){e.stopPropagation();close()}};document.addEventListener('keydown',onKey,true);
+  ov.addEventListener('mousedown',e=>{if(e.target===ov)close()});
+  const body=el('div',{class:'mut'},'Загрузка…');
+  ov.append(el('div',{class:'lc',style:'width:min(620px,100%);display:grid;gap:12px'},
+    el('div',{class:'lc-head'},el('h3',{style:'font-size:18px'},'История: '+fname),el('button',{class:'btn o s',type:'button','aria-label':'Закрыть',onclick:close},'✕')),body));
+  document.body.append(ov);
+  let d;try{d=await api('/leads/'+L.tg_id+'/history')}catch(x){body.textContent=x.message;return}
+  const n=d.now;
+  const ORG={ref:'по приглашению друга',site:'с сайта',org:'без ссылки (органика)'};
+  const diff=n.link&&n.link_owner&&n.owner&&n.link_owner!==n.owner;
+  const now=el('div',{class:'lh-now'},
+    el('div',{},el('span',{class:'mut'},'Ссылка: '),el('b',{},n.link?n.link:ORG[n.origin]||'без ссылки'),n.link?el('span',{class:'mut'},' · ссылка '+(n.link_rotate?'«Случайно»':(n.link_owner||'—'))+(n.link_source?' · '+n.link_source:'')):null),
+    el('div',{},el('span',{class:'mut'},'Владелец лида: '),el('b',{},n.owner||'не закреплён'),n.taken_from?el('span',{class:'mut'},' · забрал у '+n.taken_from):null),
+    el('div',{class:'mut sm'},'В базе с '+fmtDT(n.created_at)),
+    diff?el('div',{class:'sm lh-warn'},'Владелец не совпадает со ссылкой. Причина — в истории ниже (раздача, смена владельца или первый заход без ссылки).'):null);
+  const list=el('div',{class:'lh-list'},...(d.items.length?d.items.map(it=>el('div',{class:'lh-it','data-k':it.kind},el('span',{class:'lh-dot'}),
+    el('div',{},el('div',{class:'lh-t'},it.text),el('div',{class:'mut lh-m'},(it.at?fmtDT(it.at):'время неизвестно')+(it.src==='db'?' · из данных базы':''))))):[el('div',{class:'mut'},'Пока ничего нет')]));
+  body.replaceWith(el('div',{style:'display:grid;gap:12px'},now,list,el('div',{class:'mut sm'},'Журнал ведётся с 10 ноября 2026. Что было раньше, собрано из постбеков, раздач и чата; ручные смены владельца до этой даты не сохранились.')));
+}
 async function openLeadCard(tgId){
   document.querySelectorAll('.lc-overlay').forEach(x=>x.remove());
   if(me.role==='streamer')setTimeout(updateBadge,1500); // уведомление по этому клиенту погасло, обновляем цифру у «Дашборда»
@@ -3079,7 +3114,8 @@ async function openLeadCard(tgId){
   box.replaceChildren(...[
     el('div',{class:'lc-head'},el('div',{style:'min-width:0'},el('h3',{style:'font-size:21px;line-height:1.2;overflow:hidden;text-overflow:ellipsis'},fname),L.first_name&&L.username?el('div',{class:'mut',style:'font-size:13px;margin-top:2px'},'@'+L.username):null),
       el('div',{class:'lc-hr'},el('div',{class:'lc-pills'},pill(L.status),L.rereg_at?el('span',{class:'pill p-pur',title:'Новая регистрация разрешена '+fmtDT(L.rereg_at)+'. Старый Pocket ID в карточке вторым'},'ждёт новой регистрации'):null,L.banned_at?el('span',{class:'pill p-bad'},'заблокирован'):L.access?el('span',{class:'pill p-ok'},'доступ открыт'):el('span',{class:'pill p-pur'},'доступ закрыт')),
-        el('button',{class:'btn o s',type:'button','aria-label':'Закрыть',onclick:close},'✕'))),
+        el('span',{class:'lc-hb'},el('button',{class:'btn o s',type:'button','aria-label':'Закрыть',onclick:close},'✕'),
+          me.role==='admin'?el('button',{class:'btn o s',type:'button','aria-label':'История лида',title:'История лида: откуда пришёл, кто и почему владелец',onclick:()=>leadHistory(L,fname)},svgIcon(INFOI,16)):null))),
     el('div',{class:'lc-grid'},
       kvc('Telegram ID',L.tg_id),pocketKv(L,cpI,close),kv('Откуда пришёл',origin),
       // На компьютере сначала «Владелец», потом «Страна»; в мобильной версии порядок прежний

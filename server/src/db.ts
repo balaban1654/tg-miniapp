@@ -1,6 +1,7 @@
 import pg from 'pg';
 import { referrerOf } from './referral.js';
 import { config } from './config.js';
+import { leadLog, staffName } from './leadlog.js';
 
 export const db = new pg.Pool({ connectionString: config.databaseUrl });
 
@@ -23,7 +24,11 @@ export async function attachLead(
   slug: string | null,
   origin: 'site' | 'ref' | null = null,
   refId: number | null = null,
+  via: 'start' | 'app' | 'msg' = 'start',
 ): Promise<{ lead: Lead; isNew: boolean }> {
+  // Для журнала лида: откуда пришёл и почему достался этому владельцу
+  let how = '';
+  let linkSlug: string | null = null;
   let linkId: number | null = null;
   let ownerId: number | null = null;
   // Реферальная ссылка: новый лид закрепляется за трейдером пригласившего
@@ -31,38 +36,40 @@ export async function attachLead(
   if (refId && !slug && !(await db.query('SELECT 1 FROM leads WHERE tg_id = $1', [tgId])).rowCount) {
     const r = await referrerOf(refId, tgId);
     if (r) {
-      referrer = refId; ownerId = r.owner_id; origin = 'ref';
+      referrer = refId; ownerId = r.owner_id; origin = 'ref'; how = 'по приглашению друга (Telegram ID ' + refId + '), владелец как у пригласившего';
       // Пригласивший пришёл по ссылке «Случайно»: его друга тоже раздаём по очереди из пула этой ссылки.
       // Если пригласил сам стример со своего аккаунта, друг остаётся за ним
       if (!r.staff) {
         const l = (await db.query(
           `SELECT coalesce(l.parent_id, l.id) AS root, coalesce(p.rotate, l.rotate) AS rotate
              FROM leads d JOIN links l ON l.id = d.link_id LEFT JOIN links p ON p.id = l.parent_id WHERE d.tg_id = $1`, [refId])).rows[0];
-        if (l?.rotate) ownerId = (await pickRotationOwner(l.root, tgId)) ?? ownerId;
+        if (l?.rotate) { const p = await pickRotationOwner(l.root, tgId); if (p) { ownerId = p; how = 'по приглашению друга, по очереди из списка «Случайно» ссылки пригласившего'; } }
       }
     }
   }
   if (slug) {
     const r = await db.query(
-      `SELECT l.id, l.owner_id, coalesce(p.rotate, l.rotate) AS rotate, coalesce(l.parent_id, l.id) AS root
+      `SELECT l.id, l.slug, l.owner_id, coalesce(p.rotate, l.rotate) AS rotate, coalesce(l.parent_id, l.id) AS root
          FROM links l LEFT JOIN links p ON p.id = l.parent_id WHERE l.slug = $1 OR l.token = $1`,
       [slug],
     );
     if (r.rows[0]) {
       linkId = r.rows[0].id;
       ownerId = r.rows[0].owner_id;
+      linkSlug = r.rows[0].slug;
+      how = 'владелец ссылки';
       // «Случайно»: владельца выбираем по очереди, только для нового лида или лида без владельца
       if (r.rows[0].rotate) {
         const cur = (await db.query('SELECT owner_id FROM leads WHERE tg_id = $1', [tgId])).rows[0];
-        if (!cur || cur.owner_id == null) ownerId = (await pickRotationOwner(r.rows[0].root, tgId)) ?? ownerId;
+        if (!cur || cur.owner_id == null) { const p = await pickRotationOwner(r.rows[0].root, tgId); if (p) { ownerId = p; how = 'по очереди из списка «Случайно» этой ссылки'; } }
       }
     }
   }
   // Органика: новый лид без ссылки (сам нашёл бота или пришёл с сайта) — владелец по настройкам «Органика» в Office
   const fresh = !(await db.query('SELECT 1 FROM leads WHERE tg_id = $1', [tgId])).rowCount;
-  if (!linkId && !referrer && fresh) ownerId = await pickOrganicOwner(origin === 'site' ? 'site' : 'org', tgId);
+  if (!linkId && !referrer && fresh) { ownerId = await pickOrganicOwner(origin === 'site' ? 'site' : 'org', tgId); if (ownerId) how = 'органика: по настройке «Органика» в Office'; }
   // Никто не нашёлся (органика «Не закреплять», пустой пул, пригласивший без трейдера): по очереди всем активным стримерам
-  if (fresh && !ownerId) ownerId = await pickFallbackOwner(tgId);
+  if (fresh && !ownerId) { ownerId = await pickFallbackOwner(tgId); if (ownerId) how = 'никто не был назначен, по общей очереди всем активным стримерам'; }
   const ins = await db.query(
     `INSERT INTO leads (tg_id, username, first_name, link_id, owner_id, origin, referrer_id)
      VALUES ($1,$2,$3,$4,$5,$6,$7)
@@ -70,13 +77,24 @@ export async function attachLead(
      RETURNING *`,
     [tgId, username ?? null, firstName ?? null, linkId, ownerId, linkId ? null : origin, referrer],
   );
+  const VIA = { start: 'нажал «Старт» в боте', app: 'открыл Mini App без «Старта»', msg: 'написал боту без «Старта»' };
+  const src = linkSlug ? 'по ссылке ' + linkSlug : referrer ? 'по реферальной ссылке' : origin === 'site' ? 'с сайта' : 'без ссылки (органика)';
   if (ins.rows[0]) {
     await db.query(`INSERT INTO events (tg_id, type) VALUES ($1,'start')`, [tgId]);
+    await leadLog(tgId, 'came', `Пришёл ${src}: ${VIA[via]}. ` + (ownerId ? `Закреплён за ${await staffName(ownerId)} (${how || 'владелец ссылки'})` : 'Не закреплён: заберёт тот, кто ответит первым'));
     return { lead: ins.rows[0], isNew: true };
   }
   // Лид, которого удалили из списка (снят с Mini App), вернулся сам (/start, сообщение, открыл Mini App): снова показываем его в «Лидах»
   // как пришедшего сейчас. Доступ при этом не открывается сам: он закрыт, пока не придёт депозит или его не выдадут вручную
-  await db.query('UPDATE leads SET removed_at = NULL, created_at = now() WHERE tg_id = $1 AND removed_at IS NOT NULL', [tgId]);
+  const back = await db.query('UPDATE leads SET removed_at = NULL, created_at = now() WHERE tg_id = $1 AND removed_at IS NOT NULL', [tgId]);
+  if (back.rowCount) await leadLog(tgId, 'back', `Вернулся после удаления из списка: ${VIA[via]}` + (linkSlug ? ' по ссылке ' + linkSlug : ''));
+  // Уже есть в базе и пришёл снова по ссылке: пишем, по какой, и что вышло со ссылкой и владельцем
+  const was = (await db.query('SELECT link_id, owner_id FROM leads WHERE tg_id = $1', [tgId])).rows[0];
+  if (was && linkId && was.link_id !== linkId) {
+    await leadLog(tgId, 'restart', `Снова нажал «Старт» по ссылке ${linkSlug}. ` +
+      (was.link_id == null ? 'Ссылки у него не было — записана эта. ' : 'Ссылка остаётся первой, по которой он пришёл. ') +
+      (was.owner_id == null ? (ownerId ? `Владелец: ${await staffName(ownerId)} (${how})` : 'Владельца по-прежнему нет') : `Владелец не меняется: ${await staffName(was.owner_id)}`));
+  }
   // Лид мог быть заведён вручную из постбеков (только Telegram ID и Pocket ID): дописываем юзернейм, имя, ссылку и владельца
   await db.query(
     `UPDATE leads SET username = coalesce($2, username), first_name = coalesce($3, first_name), link_id = coalesce(link_id, $4), owner_id = coalesce(owner_id, $5) WHERE tg_id = $1`,

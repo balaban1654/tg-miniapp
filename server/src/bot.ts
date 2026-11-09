@@ -190,7 +190,7 @@ bot.on('message', async (ctx) => {
   if (!from || ctx.chat.type !== 'private') return;
   const m = ctx.message;
   if (m.text?.startsWith('/')) return;
-  await attachLead(from.id, from.username, from.first_name, null);
+  await attachLead(from.id, from.username, from.first_name, null, null, null, 'msg');
   await markLeadAlive(from.id);
 
   let kind = 'other';
