@@ -266,7 +266,13 @@ export async function referralOfficeRoutes(app: FastifyInstance, h: { need: Need
     if (!(lead >= 0 && lead <= 1000 && staff >= 0 && staff <= 1000)) return reply.code(400).send({ error: 'Суммы от $0 до $1000' });
     if (!(min >= 0 && min <= 10000)) return reply.code(400).send({ error: 'Минимальный вывод от $0 до $10 000' });
     await db.query('UPDATE connect_settings SET ref_lead = $1, ref_staff = $2, ref_min_payout = $3 WHERE id = 1', [lead, staff, min]);
-    return { ok: true };
+    // Уже начисленное за друзей в незакрытых месяцах - по новым ставкам (клиенту на баланс и трейдеру в зарплату); закрытые месяцы как были
+    const openW = `NOT EXISTS (SELECT 1 FROM month_closes c WHERE c.period = to_char(w.created_at AT TIME ZONE 'Europe/Kyiv', 'YYYY-MM'))`;
+    const rl = await db.query(`UPDATE referral_rewards w SET lead_amount = $1 WHERE w.lead_amount > 0 AND w.lead_amount <> $1 AND ${openW}`, [lead]);
+    const rs = await db.query(`UPDATE referral_rewards w SET staff_amount = $1 WHERE w.staff_amount > 0 AND w.staff_amount <> $1 AND ${openW} RETURNING adjustment_id`, [staff]);
+    const adj = rs.rows.map((x: any) => x.adjustment_id).filter(Boolean);
+    if (adj.length) await db.query('UPDATE staff_adjustments SET amount = $1 WHERE id = ANY($2::int[])', [staff, adj]);
+    return { ok: true, recalc: { lead: rl.rowCount, staff: rs.rowCount } };
   });
 
   app.get('/referral/pending', { preHandler: admin }, async () => {

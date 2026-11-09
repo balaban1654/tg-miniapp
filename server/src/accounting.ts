@@ -81,6 +81,26 @@ const r2 = (n: number) => Math.round(n * 100) / 100;
 const PERIOD = /^\d{4}-(0[1-9]|1[0-2])$/;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
+/** Изменили KPI-план: в незакрытых месяцах уже начисленное пересчитывается по новым ставкам (закрытые месяцы не трогаем).
+ *  Ставки, часы, цены за FTD, бонусы за FTD и дневные и так считаются по текущему плану; здесь то, что записано суммой:
+ *  бонусы за додепы (запросы на проверке и одобренные) и бонус на день рождения */
+export async function recalcOpenMonths(plan: KpiPlan): Promise<{ dep: number; birthday: number }> {
+  const open = `NOT EXISTS (SELECT 1 FROM month_closes c WHERE c.period = x.period)`;
+  let dep = 0;
+  for (let i = 0; i < plan.depTiers.length; i++) {
+    const r = await db.query(`UPDATE dep_bonus_requests x SET amount = $2 WHERE x.tier = $1 AND x.status IN ('pending','approved') AND x.amount <> $2 AND ${open}`, [i + 1, plan.depTiers[i].bonus]);
+    dep += r.rowCount ?? 0;
+  }
+  let birthday = 0;
+  if (plan.birthday > 0) {
+    birthday = (await db.query(`UPDATE staff_adjustments x SET amount = $1 WHERE x.kind = 'bonus' AND x.comment = '🎂 Бонус на день рождения' AND x.amount <> $1 AND ${open}`, [plan.birthday])).rowCount ?? 0;
+  } else {
+    // Бонус отключили: убираем начисленный в открытых месяцах, чтобы при включении он начислился заново
+    birthday = (await db.query(`DELETE FROM staff_adjustments x WHERE x.kind = 'bonus' AND x.comment = '🎂 Бонус на день рождения' AND ${open}`)).rowCount ?? 0;
+    await db.query(`DELETE FROM birthday_bonuses x WHERE ${open}`);
+  }
+  return { dep, birthday };
+}
 /** Допуск по смене в минутах; в старом плане он был долей нормы (15% от 3 ч = 27 мин) */
 export const shiftTolMin = (p: KpiPlan): number => p.shiftTolMin ?? Math.round(p.shiftH * 60 * (p.shiftTol ?? 0.15));
 export async function getPlan(): Promise<KpiPlan> {
@@ -465,7 +485,8 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
       if (!next.depStart && tiers.some((t) => t.bonus > 0)) next.depStart = new Date().toISOString();
     }
     await db.query('UPDATE kpi_settings SET data = $1::jsonb WHERE id = 1', [JSON.stringify(next)]);
-    return { ok: true, plan: next };
+    const recalc = await recalcOpenMonths(next);
+    return { ok: true, plan: next, recalc };
   });
 
   // ----- Поля формы отчёта -----
