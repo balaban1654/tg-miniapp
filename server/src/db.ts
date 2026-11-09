@@ -29,6 +29,9 @@ export async function attachLead(
   // Для журнала лида: откуда пришёл и почему достался этому владельцу
   let how = '';
   let linkSlug: string | null = null;
+  // Лид сначала открыл Mini App или написал без «Старта» (его раздали как органику), а потом пришёл по ссылке стримера:
+  // переводим его владельцу ссылки, пока он ещё ничей по сути — в течение суток, до регистрации, без ответов команды и ручных смен
+  let move = false;
   let linkId: number | null = null;
   let ownerId: number | null = null;
   // Реферальная ссылка: новый лид закрепляется за трейдером пригласившего
@@ -58,10 +61,16 @@ export async function attachLead(
       ownerId = r.rows[0].owner_id;
       linkSlug = r.rows[0].slug;
       how = 'владелец ссылки';
-      // «Случайно»: владельца выбираем по очереди, только для нового лида или лида без владельца
+      const cur = (await db.query(
+        `SELECT d.owner_id, d.link_id, d.status, d.created_at > now() - interval '24 hours' AS recent,
+                EXISTS (SELECT 1 FROM organic_assign a WHERE a.tg_id = d.tg_id) AS organic,
+                EXISTS (SELECT 1 FROM messages m WHERE m.tg_id = d.tg_id AND m.direction = 'out' AND m.staff_id IS NOT NULL) AS replied,
+                EXISTS (SELECT 1 FROM lead_log g WHERE g.tg_id = d.tg_id AND g.kind = 'owner') AS touched
+           FROM leads d WHERE d.tg_id = $1`, [tgId])).rows[0];
+      move = !!cur && cur.link_id == null && cur.owner_id != null && cur.organic && cur.recent && cur.status === 'new' && !cur.replied && !cur.touched;
+      // «Случайно»: владельца выбираем по очереди, только для нового лида, лида без владельца или переводимого из органики
       if (r.rows[0].rotate) {
-        const cur = (await db.query('SELECT owner_id FROM leads WHERE tg_id = $1', [tgId])).rows[0];
-        if (!cur || cur.owner_id == null) { const p = await pickRotationOwner(r.rows[0].root, tgId); if (p) { ownerId = p; how = 'по очереди из списка «Случайно» этой ссылки'; } }
+        if (!cur || cur.owner_id == null || move) { const p = await pickRotationOwner(r.rows[0].root, tgId); if (p) { ownerId = p; how = 'по очереди из списка «Случайно» этой ссылки'; } }
       }
     }
   }
@@ -90,7 +99,11 @@ export async function attachLead(
   if (back.rowCount) await leadLog(tgId, 'back', `Вернулся после удаления из списка: ${VIA[via]}` + (linkSlug ? ' по ссылке ' + linkSlug : ''));
   // Уже есть в базе и пришёл снова по ссылке: пишем, по какой, и что вышло со ссылкой и владельцем
   const was = (await db.query('SELECT link_id, owner_id FROM leads WHERE tg_id = $1', [tgId])).rows[0];
-  if (was && linkId && was.link_id !== linkId) {
+  if (was && move && ownerId && ownerId !== was.owner_id) {
+    await db.query('UPDATE leads SET owner_id = $2, link_id = $3, taken_from = NULL WHERE tg_id = $1', [tgId, ownerId, linkId]);
+    await leadLog(tgId, 'owner', `Нажал «Старт» по ссылке ${linkSlug} вскоре после того, как его раздали как органику: ` +
+      `переведён от ${await staffName(was.owner_id)} к ${await staffName(ownerId)} (${how})`);
+  } else if (was && linkId && was.link_id !== linkId) {
     await leadLog(tgId, 'restart', `Снова нажал «Старт» по ссылке ${linkSlug}. ` +
       (was.link_id == null ? 'Ссылки у него не было — записана эта. ' : 'Ссылка остаётся первой, по которой он пришёл. ') +
       (was.owner_id == null ? (ownerId ? `Владелец: ${await staffName(ownerId)} (${how})` : 'Владельца по-прежнему нет') : `Владелец не меняется: ${await staffName(was.owner_id)}`));
