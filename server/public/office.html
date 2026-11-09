@@ -2240,7 +2240,7 @@ function smSalary(d){
   let adv;
   const a=s.advance;
   if(a&&a.request)adv=el('div',{class:'sm-adv'},el('div',{class:'tx'},el('b',{},a.request.status==='paid'?'Аванс '+usd0(a.request.amount)+' выплачен.':'Аванс '+usd0(a.request.amount)+' запрошен.'),a.request.status==='paid'?' Получить можно один раз в месяц.':' Ждёт выплаты.'),el('button',{class:'btn',type:'button',disabled:''},'Запросить аванс'));
-  else if(a)adv=el('div',{class:'sm-adv'+(a.can?'':' off')},el('div',{class:'tx'},a.can?el('b',{},'Аванс '+usd0(a.amount)+' доступен. '):null,a.can?'По минимальным ставкам уже накопилось '+usd0(s.totalMin)+'. Получить можно один раз в месяц.':'До аванса осталось '+usd0(a.amount-s.totalMin)+' по минимальным ставкам. Получить можно один раз в месяц.'),
+  else if(a)adv=el('div',{class:'sm-adv'+(a.can?'':' off')},el('div',{class:'tx'},a.can?el('b',{},'Аванс '+usd0(a.amount)+' доступен. '):null,a.can?(a.byRules?'Условия выполнены: '+a.needH+' ч и '+a.needF+' FTD. ':'По минимальным ставкам уже накопилось '+usd0(s.totalMin)+'. ')+'Получить можно один раз в месяц.':advLeftText(a,s.totalMin)+' Получить можно один раз в месяц.'),
     el('button',{class:'btn',type:'button',disabled:a.can?null:'',onclick:async e=>{const bt=e.currentTarget;bt.disabled=true;try{await api('/advance/request',{method:'POST'});toast('Аванс запрошен');render({soft:true})}catch(x){toast(x.message);bt.disabled=false}}},'Запросить аванс'));
   return el('div',{class:'card sm-pay'},el('div',{class:'dx-lbl'},'Моя зарплата за месяц'),
     el('div',{style:'margin-top:8px'},el('div',{class:'big2'},pr(pay[0],pay[1])),el('div',{class:'cap'},'К выплате: план не выполнен / выполнен')),
@@ -2271,6 +2271,8 @@ function smTasks(d){
   // Выполненные задачи (ждут проверки) в списке остаются, но в число на колокольчике не входят
   return{items,n:items.filter(x=>!x.dataset.done).length};
 }
+/** Подпись под кнопкой аванса: чего не хватает (часы и FTD) или сколько осталось по минимальным ставкам */
+function advLeftText(a,totalMin){if(!a.byRules)return 'До аванса осталось '+usd0(Math.max(0,a.amount-totalMin))+' по минимальным ставкам.';const p=[];if(a.leftMin>0)p.push(fmtH(a.leftMin)+' ч в эфире');if(a.leftFtd>0)p.push(a.leftFtd+' FTD');return 'Аванс '+usd0(a.amount)+' — от '+a.needH+' ч и '+a.needF+' FTD за месяц. Осталось: '+(p.join(' и ')||'—')+'.'}
 function smLast(d){
   const cols=['Дата','Время','Статус',...d.fields];
   const rows=d.last.map(r=>[td(dxDay(r.day)),td(r.minutes?hm(r.minutes):'—'),el('td',{},el('span',{class:'pill '+(REPSTATUS[r.status]||['',''])[1]},(REPSTATUS[r.status]||[r.status])[0])),...d.fields.map(f=>td(r.values[f]===undefined||r.values[f]===null?'—':Number(r.values[f]).toLocaleString('ru-RU'),'n'))]);
@@ -3469,7 +3471,7 @@ async function kpiCardBlock(){
   let advNode;
   if(adv.request)advNode=el('div',{class:'inl'},el('button',{class:'btn',type:'button',disabled:''},'Аванс '+usd2(adv.request.amount)),el('span',{class:'mut sm'},adv.request.status==='paid'?'Аванс выплачен':'Аванс запрошен, ждёт выплаты'));
   else advNode=el('div',{class:'inl'},el('button',{class:'btn',type:'button',disabled:adv.can?null:'',onclick:async e=>{const bt=e.currentTarget;bt.disabled=true;try{await api('/advance/request',{method:'POST'});toast('Аванс запрошен');render({soft:true})}catch(x){toast(x.message);bt.disabled=false}}},'Запросить аванс '+usd2(adv.amount)),
-    el('span',{class:'mut sm'},adv.can?'Доступно: по минимальным ставкам набралось '+usd2(k.minTotal):'До аванса осталось '+usd2(adv.amount-k.minTotal)+' по минимальным ставкам'));
+    el('span',{class:'mut sm'},adv.can?(adv.byRules?'Доступно: '+adv.needH+' ч и '+adv.needF+' FTD набраны':'Доступно: по минимальным ставкам набралось '+usd2(k.minTotal)):adv.byRules?advLeftText(adv,k.minTotal):'До аванса осталось '+usd2(adv.amount-k.minTotal)+' по минимальным ставкам'));
   return el('div',{class:'card kpi-card'},
     el('div',{class:'head'},el('h3',{style:'font-size:15px'},'Мой KPI · '+perLabel(k.period)),el('span',{class:'mut sm'},'считается только зачтённое время')),
     pbRow('План по сменам',k.shifts+'/'+planShifts+' дн. · '+hmin(k.hoursMin)+' из '+plan.hours+' ч',k.hoursMin/k.planMin*100,k.shiftsDone,k.overtimeMin?'Переработал на '+hmin(k.overtimeMin)+': эти часы не оплачиваются, доплата на усмотрение руководителя':''),
@@ -4186,14 +4188,14 @@ async function accPlan(){
   const p=await api('/kpi/settings');
   const num=(v,min)=>el('input',{type:'number',min:min??'0',step:'any',value:String(v)});
   const f={base:num(p.base),baseLow:num(p.baseLow),bmf:num(p.baseMinFtd??15),blmf:num(p.baseLowMinFtd??0),price:num(p.price),priceLow:num(p.priceLow),
-    dc:num(p.day.count,1),dm:num(p.day.min),db:num(p.day.bonus),dh:num(p.day.cutoffH),tol:num(Math.round(p.tol*100)),stol:num(p.shiftTolMin??Math.round((p.shiftH||0)*60*(p.shiftTol??.15))),adv:num(p.advance),bday:num(p.birthday||0),ls:num(p.leadShift??50),ll:num(p.leadLeads??50),la:num(p.leadAll??200)};
+    dc:num(p.day.count,1),dm:num(p.day.min),db:num(p.day.bonus),dh:num(p.day.cutoffH),tol:num(Math.round(p.tol*100)),stol:num(p.shiftTolMin??Math.round((p.shiftH||0)*60*(p.shiftTol??.15))),adv:num(p.advance),advh:num(p.advMinHours||0),advf:num(p.advMinFtd||0),bday:num(p.birthday||0),ls:num(p.leadShift??50),ll:num(p.leadLeads??50),la:num(p.leadAll??200)};
   const tiers=p.tiers.map(t=>({from:num(t.from),price:num(t.price)}));
   const ftd=p.ftd.map(t=>({over:num(t.over),bonus:num(t.bonus)}));
   const dep=(p.depTiers||[]).map(t=>({name:t.name,from:num(t.from),bonus:num(t.bonus)}));
   const err=el('div',{class:'err',role:'alert'});
   const lab=(t,i)=>el('label',{},t,i);
   const save=async()=>{err.textContent='';try{await api('/kpi/settings',{method:'PUT',body:{base:+f.base.value,baseLow:+f.baseLow.value,baseMinFtd:+f.bmf.value,baseLowMinFtd:+f.blmf.value,price:+f.price.value,priceLow:+f.priceLow.value,
-    tiers:tiers.map(t=>({from:+t.from.value,price:+t.price.value})),ftd:ftd.map(t=>({over:+t.over.value,bonus:+t.bonus.value})),depTiers:dep.map(t=>({from:+t.from.value,bonus:+t.bonus.value})),day:{count:+f.dc.value,min:+f.dm.value,bonus:+f.db.value,cutoffH:+f.dh.value},tol:+f.tol.value/100,shiftTolMin:+f.stol.value,advance:+f.adv.value,birthday:+f.bday.value,leadShift:+f.ls.value,leadLeads:+f.ll.value,leadAll:+f.la.value}}).then(r=>{const c=r&&r.recalc;toast('План сохранён'+(c&&(c.dep||c.birthday)?'. Пересчитано в открытом месяце: бонусов за додепы '+c.dep+', дней рождения '+c.birthday:''))});accRefresh()}catch(x){err.textContent=x.message}};
+    tiers:tiers.map(t=>({from:+t.from.value,price:+t.price.value})),ftd:ftd.map(t=>({over:+t.over.value,bonus:+t.bonus.value})),depTiers:dep.map(t=>({from:+t.from.value,bonus:+t.bonus.value})),day:{count:+f.dc.value,min:+f.dm.value,bonus:+f.db.value,cutoffH:+f.dh.value},tol:+f.tol.value/100,shiftTolMin:+f.stol.value,advance:+f.adv.value,advMinHours:+f.advh.value,advMinFtd:+f.advf.value,birthday:+f.bday.value,leadShift:+f.ls.value,leadLeads:+f.ll.value,leadAll:+f.la.value}}).then(r=>{const c=r&&r.recalc;toast('План сохранён'+(c&&(c.dep||c.birthday)?'. Пересчитано в открытом месяце: бонусов за додепы '+c.dep+', дней рождения '+c.birthday:''))});accRefresh()}catch(x){err.textContent=x.message}};
   return[el('div',{class:'head'},el('h3',{style:'font-size:15px'},'KPI-план стримера: ставки и бонусы')),
     el('div',{class:'card',style:'display:grid;gap:14px'},
       el('h4',{},'Смены'),el('div',{class:'lc-two'},lab('Ставка за смены, $',f.base),lab('Ставка, если смены не выполнены, $',f.baseLow),lab('Полная ставка только при FTD за месяц от (0 — без условия)',f.bmf),lab('Минимальная ставка только при FTD за месяц от (меньше — часы не оплачиваются; 0 — без условия)',f.blmf)),
@@ -4202,7 +4204,7 @@ async function accPlan(){
       el('h4',{},'Бонус за FTD (по сумме первого депозита)'),el('div',{class:'lc-two'},...ftd.map(t=>el('div',{class:'inl'},el('span',{class:'mut sm'},'больше $'),t.over,el('span',{class:'mut sm'},'бонус $'),t.bonus))),
       el('h4',{},'Бонус за додепы (по сумме всех депозитов лида за всё время)'),el('div',{class:'mut sm'},'Лид получает градацию по сумме FTD и додепов. Бонус платится за градации выше той, которую лид взял первым депозитом, и только за одну: высшую из достигнутых. Стример запрашивает бонус со скрином, вы принимаете его во вкладке «Бонусы за додепы». Пока бонус 0, градация ничего не начисляет. Запросить можно и по старым лидам: по каждому платится одна, высшая градация, один раз. Отклонённый запрос закрывает градацию: стример ждёт следующую.'),el('div',{class:'lc-two'},...dep.map(t=>el('div',{class:'inl'},el('b',{style:'min-width:70px'},t.name),el('span',{class:'mut sm'},'от $'),t.from,el('span',{class:'mut sm'},'бонус $'),t.bonus))),
       el('h4',{},'Дневной бонус'),el('div',{class:'lc-two'},lab('FTD в день',f.dc),lab('Минимальный депозит, $',f.dm),lab('Бонус, $',f.db),lab('День закрывается в (Киев), час',f.dh)),
-      el('h4',{},'Прочее'),el('div',{class:'lc-two'},lab('Запас на курс брокера, %',f.tol),lab('Допуск по смене, мин (недобор в пределах не считается невыполненным днём)',f.stol),lab('Максимальный аванс, $',f.adv)),
+      el('h4',{},'Прочее'),el('div',{class:'lc-two'},lab('Запас на курс брокера, %',f.tol),lab('Допуск по смене, мин (недобор в пределах не считается невыполненным днём)',f.stol),lab('Аванс, $ (фиксированный, раз в месяц)',f.adv),lab('Аванс только от часов в эфире за месяц (0 — без условия)',f.advh),lab('Аванс только от FTD за месяц (0 — без условия)',f.advf)),
       el('h4',{},'Тимлидеру за команду'),el('div',{class:'lc-two'},lab('За каждого, кто выполнил план смен за месяц, $',f.ls),lab('За каждого, кто выполнил план лидов за месяц, $',f.ll),lab('Если вся команда выполнила и часы, и FTD, $',f.la)),
       el('h4',{},'День рождения'),el('div',{class:'lc-two'},lab('Бонус на день рождения, $ (0 — не начислять)',f.bday),el('div',{class:'mut sm',style:'align-self:end'},'Начисляется сам в день рождения сотрудника (дата из его настроек) и попадает в «Бонусы и штрафы» за этот месяц. Один раз в год; если удалить его там, повторно он не появится.')),
       err,el('div',{},el('button',{class:'btn',type:'button',onclick:save},'Сохранить'))),

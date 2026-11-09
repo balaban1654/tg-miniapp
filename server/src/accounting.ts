@@ -24,7 +24,9 @@ export interface KpiPlan {
   tol: number; // запас на курс брокера
   shiftTol: number; // прежний допуск долей нормы (до перехода на минуты)
   shiftTolMin?: number; // допуск по дневной смене в минутах: недобор в пределах не считается невыполненным днём
-  advance: number; // максимальный аванс
+  advance: number; // сумма аванса
+  advMinHours?: number; // аванс только от стольких часов в эфире за месяц (вместе с advMinFtd; 0 и 0 — как раньше: когда по минимальным накопилась сумма аванса)
+  advMinFtd?: number; // аванс только от стольких FTD за месяц
   birthday: number; // бонус на день рождения сотрудника, $ (0 — не начислять)
   leadShift: number; // тимлиду за каждого члена команды, выполнившего план смен за месяц, $
   leadLeads: number; // тимлиду за каждого члена команды, выполнившего план лидов за месяц, $
@@ -462,6 +464,8 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
       shiftTol: n(b.shiftTol, cur.shiftTol, 0, 0.5),
       shiftTolMin: n(b.shiftTolMin, shiftTolMin(cur), 0, 720),
       advance: n(b.advance, cur.advance),
+      advMinHours: n(b.advMinHours, cur.advMinHours ?? 0, 0, 744),
+      advMinFtd: n(b.advMinFtd, cur.advMinFtd ?? 0, 0, 10000),
       birthday: n(b.birthday, cur.birthday),
       leadShift: n(b.leadShift, cur.leadShift),
       leadLeads: n(b.leadLeads, cur.leadLeads),
@@ -851,9 +855,14 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
   });
 
   // ----- KPI: свой (стример) и сводка (админ) -----
-  const advState = async (staffId: number, period: string, minTotal: number, plan: KpiPlan) => {
+  // Аванс: фиксированная сумма раз в месяц. Если заданы пороги часов и FTD — доступен, когда оба набраны;
+  // иначе (оба 0) — как раньше, когда по минимальным ставкам накопилась сумма аванса
+  const advState = async (staffId: number, period: string, k: { minTotal: number; hoursMin: number; ftdCount: number }, plan: KpiPlan) => {
     const rq = (await db.query(`SELECT id, status, amount FROM advance_requests WHERE staff_id = $1 AND period = $2 AND status <> 'rejected'`, [staffId, period])).rows[0] ?? null;
-    return { request: rq, can: !rq && minTotal >= plan.advance, amount: plan.advance };
+    const needH = plan.advMinHours || 0, needF = plan.advMinFtd || 0, byRules = needH > 0 || needF > 0;
+    const leftMin = Math.max(0, Math.round(needH * 60 - k.hoursMin)), leftFtd = Math.max(0, needF - k.ftdCount);
+    const ok = byRules ? leftMin === 0 && leftFtd === 0 : k.minTotal >= plan.advance;
+    return { request: rq, can: !rq && ok, amount: plan.advance, byRules, needH, needF, leftMin, leftFtd };
   };
 
   app.get('/kpi/me', { preHandler: stream }, async (req) => {
@@ -866,7 +875,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     const unpaidShort = (await db.query(`SELECT to_char(day, 'YYYY-MM-DD') AS day, minutes FROM shift_shortfalls WHERE staff_id = $1 AND reason IS NULL AND dismissed_at IS NULL ORDER BY day`, [me.id])).rows;
     // Стримеру показываем суммы бонусов и штрафов без комментариев
     const awaiting = (await db.query(`SELECT id, started_at, ended_at, to_char(day, 'YYYY-MM-DD') AS day FROM shift_reports WHERE staff_id = $1 AND status = 'await' ORDER BY id`, [me.id])).rows;
-    return { plan, kpi: k, ...t, live, awaiting, now: new Date().toISOString(), advance: await advState(me.id, period, k.minTotal, plan), shortfalls: unpaidShort };
+    return { plan, kpi: k, ...t, live, awaiting, now: new Date().toISOString(), advance: await advState(me.id, period, k, plan), shortfalls: unpaidShort };
   });
 
   app.post('/advance/request', { preHandler: stream }, async (req, reply) => {
@@ -874,9 +883,9 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     const plan = await getPlan();
     const period = await currentPeriod();
     const k = await kpiFor(me.id, period, plan);
-    const st = await advState(me.id, period, k.minTotal, plan);
+    const st = await advState(me.id, period, k, plan);
     if (st.request) return reply.code(409).send({ error: 'Аванс в этом месяце уже запрошен' });
-    if (!st.can) return reply.code(400).send({ error: `Аванс откроется, когда по минимальным ставкам накопится $${plan.advance}` });
+    if (!st.can) return reply.code(400).send({ error: st.byRules ? `Аванс откроется от ${st.needH} ч в эфире и ${st.needF} FTD за месяц` : `Аванс откроется, когда по минимальным ставкам накопится $${plan.advance}` });
     await db.query('INSERT INTO advance_requests (staff_id, period, amount) VALUES ($1,$2,$3)', [me.id, period, plan.advance]);
     return { ok: true };
   });
@@ -1958,7 +1967,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
       })
       .sort((a, b) => (b.live ? Date.now() - Date.parse(b.live.started_at) + 1e12 : 0) - (a.live ? Date.now() - Date.parse(a.live.started_at) + 1e12 : 0) || (Date.parse(b.lastEnd ?? '0') || 0) - (Date.parse(a.lastEnd ?? '0') || 0));
 
-    const adv = await advState(me.id, curMonth, (await kpiFor(me.id, curMonth, plan)).minTotal, plan);
+    const adv = await advState(me.id, curMonth, await kpiFor(me.id, curMonth, plan), plan);
 
     // Задачи: от админа и то, что требует внимания по смене
     const tasks = (await db.query(`SELECT ${TASK_COLS} FROM staff_tasks t JOIN staff s ON s.id = t.staff_id WHERE t.staff_id = $1 AND t.status <> 'accepted' ORDER BY (t.status = 'open') DESC, t.due NULLS LAST, t.id DESC`, [me.id])).rows.map(taskRow);
