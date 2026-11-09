@@ -3,7 +3,7 @@ import QRCode from 'qrcode';
 import { newSecret, otpUri, verifyTotp, newRecoveryCodes } from './totp.js';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { GrammyError, InputFile } from 'grammy';
-import { db, pickFallbackOwner } from './db.js';
+import { db, pickFallbackOwner, pickRotationOwner } from './db.js';
 import { leadLog, staffName } from './leadlog.js';
 import { bot } from './bot.js';
 import { markLeadBlocked, BLOCKED_RE } from './leadblock.js';
@@ -2768,6 +2768,45 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     if (!r.rowCount) return reply.code(404).send({ error: 'Лид не найден' });
     return { ok: true };
   });
+  // Лиды, которых раздали как органику (первый заход без ссылки), хотя ссылка стримера у них записана и владелец другой.
+  // Так бывало, когда человек по ссылке открыл бота кнопкой «Открыть» или написал без «Старта». Админ смотрит и переводит
+  const MISMATCH = `
+    SELECT d.tg_id::text AS tg_id, d.first_name, d.username, d.created_at, d.status, d.trader_id,
+           l.slug AS link_slug, lo.id AS link_owner_id, lo.name AS link_owner, coalesce(p.rotate, l.rotate) AS rotate,
+           o.id AS owner_id, o.name AS owner_name,
+           (SELECT min(a.at) FROM organic_assign a WHERE a.tg_id = d.tg_id) AS organic_at,
+           (SELECT coalesce(sum(e.amount), 0) FROM events e WHERE e.tg_id = d.tg_id AND e.type IN ('ftd','dep')) AS deposits,
+           (SELECT count(*)::int FROM messages m WHERE m.tg_id = d.tg_id AND m.direction = 'out' AND m.staff_id = d.owner_id) AS owner_msgs,
+           EXISTS (SELECT 1 FROM link_pool lp WHERE lp.link_id = coalesce(l.parent_id, l.id) AND lp.staff_id = d.owner_id) AS in_pool
+      FROM leads d JOIN links l ON l.id = d.link_id LEFT JOIN links p ON p.id = l.parent_id
+      JOIN staff lo ON lo.id = l.owner_id LEFT JOIN staff o ON o.id = d.owner_id
+     WHERE d.removed_at IS NULL AND coalesce(d.lead_role, 'lead') = 'lead'
+       AND EXISTS (SELECT 1 FROM organic_assign a WHERE a.tg_id = d.tg_id)
+       AND d.owner_id IS DISTINCT FROM l.owner_id`;
+  app.get('/leads/mismatch', { preHandler: need('admin') }, async () => {
+    const rows = (await db.query(MISMATCH + ' ORDER BY d.created_at DESC LIMIT 500')).rows.filter((r) => !(r.rotate && r.in_pool));
+    return { rows };
+  });
+  // Перевести выбранных владельцам их ссылок (у ссылки «Случайно» — первому из её списка по очереди)
+  app.post('/leads/mismatch/fix', { preHandler: need('admin') }, async (req, reply) => {
+    const me = req.staff!;
+    const ids = Array.isArray((req.body as any)?.tg_ids) ? ((req.body as any).tg_ids as unknown[]).map(Number).filter(Number.isSafeInteger).slice(0, 500) : [];
+    if (!ids.length) return reply.code(400).send({ error: 'Не выбраны лиды' });
+    const rows = (await db.query(MISMATCH + ' AND d.tg_id = ANY($1::bigint[])', [ids])).rows.filter((r) => !(r.rotate && r.in_pool));
+    let done = 0;
+    for (const r of rows) {
+      let to: number | null = r.link_owner_id;
+      if (r.rotate) to = await pickRotationOwner((await db.query('SELECT coalesce(parent_id, id) AS root FROM links WHERE slug = $1', [r.link_slug])).rows[0].root, Number(r.tg_id));
+      if (!to || to === r.owner_id) continue;
+      const u = await db.query('UPDATE leads SET owner_id = $2, taken_from = NULL WHERE tg_id = $1 AND owner_id IS NOT DISTINCT FROM $3', [r.tg_id, to, r.owner_id]);
+      if (!u.rowCount) continue;
+      await syncRefReward(Number(r.tg_id)).catch(() => {});
+      await leadLog(r.tg_id, 'owner', `${me.name} исправил владельца: лид пришёл по ссылке ${r.link_slug}, но был роздан как органика. ${r.owner_name ?? 'никто'} → ${await staffName(to)}`, me.id);
+      done++;
+    }
+    return { ok: true, moved: done };
+  });
+
   // Журнал лида для админа: текущая ссылка и владелец + вся история по времени. Записи журнала (lead_log) дополняются тем, что
   // уже есть в базе: события постбеков, раздачи «Случайно» и органики, сообщения, блокировки. Так история видна и у старых лидов
   app.get<{ Params: { tgId: string } }>('/leads/:tgId/history', { preHandler: need('admin') }, async (req, reply) => {

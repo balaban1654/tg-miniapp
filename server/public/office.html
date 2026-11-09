@@ -189,7 +189,8 @@ th.n{text-align:right}
 .lh-it[data-k=came] .lh-dot,.lh-it[data-k=restart] .lh-dot,.lh-it[data-k=back] .lh-dot{background:#3ddc97}
 .lh-it[data-k=owner] .lh-dot{background:#9b5cff}.lh-it[data-k=pb] .lh-dot{background:#5cb8ff}
 .lh-it[data-k=ban] .lh-dot,.lh-it[data-k=removed] .lh-dot{background:#ff6b8a}.lh-it[data-k=pocket] .lh-dot,.lh-it[data-k=access] .lh-dot{background:#ffd54d}
-.lh-t{font-size:14px;line-height:1.4}.lh-m{font-size:12px;margin-top:2px}
+.lh-t{font-size:14px;line-height:1.4}
+.mis-l{display:grid;overflow:auto;max-height:min(calc(100dvh - 360px),520px)}.mis-r{display:grid;grid-template-columns:22px 1fr;gap:10px;align-items:start;padding:10px 0;border-top:1px solid var(--line,rgba(255,255,255,.08));cursor:pointer}.mis-r:first-child{border-top:0}.mis-r input{margin-top:4px;width:18px;height:18px}.mis-r .pill{vertical-align:middle}.lh-m{font-size:12px;margin-top:2px}
 @media(max-width:560px){.lc.wide .lc-hb{flex-direction:column}}
 @media(max-width:560px){.lc.wide .lc-head{flex-wrap:nowrap;align-items:flex-start}.lc.wide .lc-hr{align-items:flex-start}.lc.wide .lc-pills{flex-direction:column;align-items:flex-end;gap:5px}.lc.wide .lc-head h3{font-size:19px!important}}
 .lc.wide{width:min(560px,100%);padding:14px 16px;gap:9px}.lc.wide .lc-grid{gap:7px 14px;grid-template-columns:repeat(3,minmax(0,1fr))}.lc.wide .lc-kv b{overflow-wrap:anywhere}@media(max-width:520px){.lc.wide .lc-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}.lc.wide .lc-kv .sm{font-size:11px}.lc.wide .lc-kv b{font-size:13px}.lc.wide .lc-h{margin:2px 0 6px}.lc.wide .lc-step{padding:2px 0}.lc.wide .lc-steps{gap:6px}
@@ -2518,12 +2519,14 @@ async function viewLeads(){
   const owners=[...new Map(rows.filter(r=>r.owner_id).map(r=>[String(r.owner_id),r.owner_name])).entries()];
   // Админ: раздать всех незакреплённых по очереди активным стримерам (новые закрепляются сами)
   const unownedBtn=me.role==='admin'?el('button',{class:'btn s',type:'button',hidden:''}):null;
+  const misBtn=me.role==='admin'?el('button',{class:'btn s o',type:'button',hidden:'',title:'Пришли по ссылке стримера, но были розданы как органика',onclick:()=>mismatchDialog(()=>render({soft:true}))}):null;
+  if(misBtn)api('/leads/mismatch').then(m=>{if(!m.rows.length)return;misBtn.hidden=false;misBtn.textContent='Ссылка ≠ владелец ('+m.rows.length+')'}).catch(()=>{});
   if(unownedBtn)api('/leads/unowned').then(u=>{if(!u.n)return;unownedBtn.hidden=false;unownedBtn.textContent='Раздать незакреплённых ('+u.n+')';
     unownedBtn.onclick=async()=>{if(!await askC('Раздать '+u.n+' незакреплённых лидов по очереди активным стримерам?\nОчередь та же, что для новых: кто меньше получил сегодня, у кого больше часов и FTD за месяц. В начале месяца, пока у всех ноль, первым идёт лучший по FTD за прошлый месяц.'))return;
       unownedBtn.disabled=true;try{const r=await api('/leads/unowned/assign',{method:'POST'});toast('Раздано лидов: '+r.assigned);render({soft:true})}catch(x){toast(x.message);unownedBtn.disabled=false}}}).catch(()=>{});
   const bar=el('div',{class:'lf'},q,sel(Object.entries(STATUS).map(([k,v])=>[k,v[0]]),'status','Все статусы'),
     sel(links.map(x=>[x,x]),'link','Все ссылки'),showOwner?sel([['none','Не закреплён'],...owners],'owner','Все владельцы'):null,sel(SORTS,'sort'),
-    el('button',{class:'btn o s',type:'button',onclick:()=>{Object.assign(F,{q:'',status:'',link:'',owner:'',sort:'new'});render()}},'Сбросить'),unownedBtn);
+    el('button',{class:'btn o s',type:'button',onclick:()=>{Object.assign(F,{q:'',status:'',link:'',owner:'',sort:'new'});render()}},'Сбросить'),unownedBtn,misBtn);
   const holder=el('div',{});const cnt=el('span',{class:'mut'},'');const tots=el('div',{class:'pb-tots',style:'margin:0'});
   const draw=()=>{
     const qq=F.q.trim().toLowerCase().replace(/^@/,'');
@@ -2997,6 +3000,34 @@ const countryName=c=>{if(!c)return '—';try{return (new Intl.DisplayNames(['ru'
 const REGION_NAME={ru:'RU, СНГ',ww:'EU, Мир'};
 /** Карточка лида: откуда пришёл, путь, депозиты, кнопка «Открыть чат» */
 const INFOI='<circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 7.5h.01"/>';
+/** Лиды, розданные как органика, хотя пришли по ссылке стримера: список и перевод владельцам ссылок */
+async function mismatchDialog(done){
+  const ov=el('div',{class:'lc-overlay',role:'dialog','aria-modal':'true','aria-label':'Ссылка не совпадает с владельцем'});
+  const close=()=>{ov.remove();document.removeEventListener('keydown',onKey,true)};
+  const onKey=e=>{if(e.key==='Escape'){e.stopPropagation();close()}};document.addEventListener('keydown',onKey,true);
+  ov.addEventListener('mousedown',e=>{if(e.target===ov)close()});
+  const body=el('div',{class:'mut'},'Загрузка…');
+  ov.append(el('div',{class:'lc',style:'width:min(860px,100%);display:grid;gap:12px'},
+    el('div',{class:'lc-head'},el('h3',{style:'font-size:18px'},'Ссылка ≠ владелец'),el('button',{class:'btn o s',type:'button','aria-label':'Закрыть',onclick:close},'✕')),
+    el('div',{class:'mut sm'},'Эти лиды пришли по ссылке стримера, но первый заход был без «Старта» (кнопка «Открыть» или сообщение), поэтому их раздали как органику. Отметьте, кого перевести владельцу ссылки. Смена владельца попадёт в журнал лида; FTD и депозиты пойдут новому владельцу в открытых месяцах, закрытые месяцы не меняются.'),body));
+  document.body.append(ov);
+  let d;try{d=await api('/leads/mismatch')}catch(x){body.textContent=x.message;return}
+  if(!d.rows.length){body.textContent='Таких лидов нет';return}
+  const sel=new Set(d.rows.filter(r=>!r.owner_msgs).map(r=>r.tg_id));
+  const btn=el('button',{class:'btn',type:'button'});
+  const upd=()=>{btn.textContent='Перевести выбранных ('+sel.size+')';btn.disabled=!sel.size};
+  const usd=v=>'$'+Number(v||0).toLocaleString('ru-RU',{maximumFractionDigits:0});
+  const rows=d.rows.map(r=>{const cb=el('input',{type:'checkbox','aria-label':'Перевести'});cb.checked=sel.has(r.tg_id);cb.onchange=()=>{cb.checked?sel.add(r.tg_id):sel.delete(r.tg_id);upd()};
+    return el('label',{class:'mis-r'},cb,
+      el('div',{style:'min-width:0'},el('div',{},el('button',{type:'button',class:'own-btn',onclick:e=>{e.preventDefault();openLeadCard(Number(r.tg_id))}},cname(r)),' ',pill(r.status),Number(r.deposits)?el('span',{class:'mut sm'},' '+usd(r.deposits)):null),
+        el('div',{class:'sm'},el('span',{class:'mut'},'Ссылка '),el('b',{},r.link_slug),el('span',{class:'mut'},' ('+(r.rotate?'«Случайно»':r.link_owner)+') · ведёт '),el('b',{},r.owner_name||'—')),
+        el('div',{class:'mut sm'},fmtDT(r.created_at)),r.owner_msgs?el('div',{class:'sm lh-warn'},r.owner_name+' уже переписывался с ним ('+r.owner_msgs+')'):null))});
+  const tbl=el('div',{class:'mis-l'},...rows);
+  btn.onclick=async()=>{if(!await askC('Перевести '+sel.size+' лидов владельцам их ссылок?'))return;btn.disabled=true;
+    try{const r=await api('/leads/mismatch/fix',{method:'POST',body:{tg_ids:[...sel]}});toast('Переведено лидов: '+r.moved);close();done&&done()}catch(x){toast(x.message);btn.disabled=false}};
+  upd();
+  body.replaceWith(el('div',{style:'display:grid;gap:12px'},el('div',{class:'mut sm'},'Найдено: '+d.rows.length+'. Те, с кем текущий владелец уже переписывался, по умолчанию не отмечены.'),tbl,el('div',{},btn)));
+}
 /** История лида (админ): ссылка и владелец сейчас + всё, что с ним происходило, по времени */
 async function leadHistory(L,fname){
   const ov=el('div',{class:'lc-overlay',role:'dialog','aria-modal':'true','aria-label':'История лида'});
