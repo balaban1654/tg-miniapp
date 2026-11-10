@@ -2848,6 +2848,22 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     if (m1?.at) items.push({ at: m1.at, kind: 'chat', text: `Первое сообщение от лида (всего от него ${m1.n})`, src: 'db' });
     const mo = (await db.query(`SELECT s.name, min(m.created_at) AS at, count(*)::int AS n FROM messages m JOIN staff s ON s.id = m.staff_id WHERE m.tg_id = $1 AND m.direction = 'out' GROUP BY s.name ORDER BY 2`, [tgId])).rows;
     for (const x of mo) items.push({ at: x.at, kind: 'chat', text: `${x.name} впервые ответил в чате (всего ответов ${x.n})`, who: x.name, src: 'db' });
+    // Скидки на подключение: кто отправил или активировал, какая, сработала ли
+    const cs = (await db.query(
+      `SELECT c.offer_name, c.discount_pct, c.required::float AS required, c.sent_at, c.expires_at, c.delivery, c.error, c.connected_at, c.connected_amount::float AS connected_amount, c.reverted_at, s.name
+         FROM connect_sends c LEFT JOIN staff s ON s.id = c.sent_by WHERE c.tg_id = $1 ORDER BY c.sent_at`, [tgId])).rows;
+    const usdS = (n: number) => '$' + Number(n).toLocaleString('ru-RU', { maximumFractionDigits: 2 });
+    const dS = (v: string) => new Date(v).toLocaleString('ru-RU', { timeZone: 'Europe/Kyiv', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+    for (const c of cs) {
+      const who = c.name ?? 'Автоматически';
+      const what = `скидку «${c.offer_name}» −${c.discount_pct}% (подключение от ${usdS(c.required)})`;
+      if (c.delivery === 'manual') items.push({ at: c.sent_at, kind: 'access', text: `${who} активировал ${what} вручную: внесено ${usdS(c.connected_amount ?? 0)}, доступ открыт`, who: c.name, src: 'db' });
+      else {
+        items.push({ at: c.sent_at, kind: 'access', text: `${who} отправил ${what}, действует до ${dS(c.expires_at)}` + (c.delivery === 'failed' || c.error ? ' — не доставлено' + (c.error ? ': ' + String(c.error).slice(0, 80) : '') : ''), who: c.name, src: 'db' });
+        if (c.connected_at) items.push({ at: c.connected_at, kind: 'access', text: `Подключился по скидке «${c.offer_name}»: внесено ${usdS(c.connected_amount ?? 0)}`, src: 'db' });
+      }
+      if (c.reverted_at) items.push({ at: c.reverted_at, kind: 'access', text: `Подключение по скидке «${c.offer_name}» отменено`, src: 'db' });
+    }
     if (L.demo_clicked_at) items.push({ at: L.demo_clicked_at, kind: 'other', text: 'Нажал ссылку на демо-счёт', src: 'db' });
     if (L.support_ask_at) items.push({ at: L.support_ask_at, kind: 'chat', text: 'Написал в закрытый чат: бот спросил, нужна ли помощь менеджера', src: 'db' });
     if (L.chat_closed_at && !has('chat', /закрыл/)) items.push({ at: L.chat_closed_at, kind: 'chat', text: 'Чат закрыт', src: 'db' });
@@ -2855,7 +2871,8 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     if (L.rereg_at && !has('pocket', /новую регистрацию/)) items.push({ at: L.rereg_at, kind: 'pocket', text: 'Разрешена новая регистрация, ждём новый Pocket ID', src: 'db' });
     if (L.removed_at && !has('removed')) items.push({ at: L.removed_at, kind: 'removed', text: 'Убран из списка лидов', src: 'db' });
     if (L.bot_blocked) items.push({ at: null, kind: 'other', text: 'Сейчас бот у лида заблокирован (сообщения не доходят)', src: 'db' });
-    items.sort((a, b) => (a.at ? +new Date(a.at) : 0) - (b.at ? +new Date(b.at) : 0));
+    // Сверху самое свежее; записи без времени — в самом низу
+    items.sort((a, b) => (b.at ? +new Date(b.at) : -Infinity) - (a.at ? +new Date(a.at) : -Infinity) || 0);
     return {
       now: {
         link: L.link_slug ?? null, link_source: L.link_source ?? null, link_owner: L.link_owner ?? null, link_rotate: !!L.link_rotate,
