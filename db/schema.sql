@@ -1134,3 +1134,21 @@ CREATE INDEX IF NOT EXISTS lead_log_tg ON lead_log (tg_id, created_at);
 -- Хеш IP клика по ссылке: если лид открыл Mini App кнопкой «Открыть» без «Старта», по нему находим ссылку, с которой он пришёл
 ALTER TABLE link_clicks ADD COLUMN IF NOT EXISTS ip_hash TEXT;
 CREATE INDEX IF NOT EXISTS link_clicks_ip ON link_clicks (ip_hash, at) WHERE ip_hash IS NOT NULL;
+
+-- Один раз: ноябрь 2026 — стримерам за друзей по реферальной системе $5 вместо $3 (и в зарплате, и в начислениях).
+-- Ставка на будущее тоже $5. Закрытые месяцы не трогаются
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM app_settings WHERE key = 'ref_staff5_2026_11') THEN
+    UPDATE connect_settings SET ref_staff = 5 WHERE id = 1 AND ref_staff = 3;
+    IF NOT EXISTS (SELECT 1 FROM month_closes WHERE period = '2026-11') THEN
+      UPDATE staff_adjustments a SET amount = 5
+        FROM referral_rewards w
+       WHERE a.id = w.adjustment_id AND w.staff_amount = 3
+         AND to_char(w.created_at AT TIME ZONE 'Europe/Kyiv', 'YYYY-MM') = '2026-11';
+      UPDATE referral_rewards w SET staff_amount = 5
+       WHERE w.staff_amount = 3 AND to_char(w.created_at AT TIME ZONE 'Europe/Kyiv', 'YYYY-MM') = '2026-11';
+    END IF;
+    INSERT INTO app_settings (key, value) VALUES ('ref_staff5_2026_11', '1') ON CONFLICT (key) DO NOTHING;
+  END IF;
+END $$;
