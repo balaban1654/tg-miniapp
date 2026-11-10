@@ -310,6 +310,10 @@
     .pott-quick:hover { color: #fff; }
     .pott-quick svg { width: 17px; height: 17px; display: block; }
     .pott-quick-split { padding: 0; overflow: hidden; cursor: default; }
+    /* Плашка «Не является финансовой рекомендацией» слева от размытия: только надпись, клики проходят сквозь неё */
+    .pott-quick.pott-disc { cursor: default; pointer-events: none; gap: 8px; padding: 0 12px; white-space: nowrap; color: #fff; line-height: 1.12; font-weight: 800; font-family: 'Montserrat', 'Segoe UI', system-ui, -apple-system, sans-serif; text-align: left; justify-content: flex-start; }
+    .pott-disc .pott-disc-i { font-size: 1.45em; line-height: 1; flex: none; }
+    .pott-disc .pott-disc-t { display: block; }
 
     /* --- Список пар (клик по названию пары) --- */
     #pott-pairs {
@@ -2848,12 +2852,34 @@
     '<button class="pott-q-part" id="pott-q-count" title="Сбросить всё размытие и увеличение">0</button>';
   document.documentElement.appendChild(quickBlur);
   const quickBlurIcon = quickBlur.querySelector('#pott-q-blur');
+  const quickDisc = document.createElement('div');
+  quickDisc.id = 'pott-q-disc';
+  quickDisc.className = 'pott-quick pott-disc';
+  quickDisc.setAttribute('aria-hidden', 'true');
+  quickDisc.innerHTML = '<span class="pott-disc-i">⚠️</span><span class="pott-disc-t">Не является<br>финансовой рекомендацией</span>';
+  document.documentElement.appendChild(quickDisc);
   const quickCount = quickBlur.querySelector('#pott-q-count');
   const quickGear = makeQuick('pott-q-gear', 'Настройки: цвет и прозрачность виджета',
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>');
   const quickMag = makeQuick('pott-q-mag', 'Лупа: выделите область - она увеличится. Если лупа включена - выключает её',
     '<svg viewBox="0 0 20 20"><circle cx="8.5" cy="8.5" r="5.5" fill="none" stroke="currentColor" stroke-width="1.8"></circle><line x1="12.6" y1="12.6" x2="17" y2="17" stroke="currentColor" stroke-width="2" stroke-linecap="round"></line></svg>');
-  if (CLIENT) { quickBlur.remove(); quickMag.remove(); }
+  if (CLIENT) { quickBlur.remove(); quickMag.remove(); quickDisc.remove(); }
+  // Надпись ставим вплотную слева от кнопки размытия, той же высоты; если места нет (узкое окно) — прячем
+  function placeDisc(blurLeft, size, topPx, radius, bg, borderW, borderC) {
+    if (CLIENT) return;
+    quickDisc.style.display = 'flex';
+    Object.assign(quickDisc.style, {
+      height: size + 'px', top: topPx, borderRadius: radius || '6px',
+      fontSize: Math.max(11, Math.min(16, Math.round(size * 0.33))) + 'px',
+    });
+    if (bg) quickDisc.style.background = bg;
+    if (borderW) quickDisc.style.borderWidth = borderW;
+    if (borderC) quickDisc.style.setProperty('--pott-q-border', borderC);
+    const w = quickDisc.offsetWidth;
+    const left = blurLeft - 8 - w;
+    if (left < 160) { quickDisc.style.display = 'none'; return; }
+    quickDisc.style.left = left + 'px';
+  }
   function syncQuick() {
     quickBlurIcon.classList.toggle('pott-on', blurEls.select.classList.contains('pott-on'));
     const n = parseInt(blurEls.count.textContent, 10) || 0;
@@ -2975,6 +3001,9 @@
         if (bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent') b.style.background = bg;
         if (parseFloat(cs.borderTopWidth) > 0) b.style.setProperty('--pott-q-border', cs.borderTopColor);
       });
+      placeDisc(magLeft - 8 - blurW, size, topPx, mini.style.borderRadius,
+        bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent' ? bg : '', cs.borderTopWidth,
+        parseFloat(cs.borderTopWidth) > 0 ? cs.borderTopColor : '');
       // Подпись - точь-в-точь как «QT Real USD» у баланса: тот же шрифт, размер, цвет,
       // та же высота (на линии рамки) и тот же фон, который перекрывает линию.
       // Сумма - того же размера и на той же высоте, что сумма баланса.
@@ -3021,6 +3050,7 @@
       Object.assign(quickMag.style, { width: '44px', height: '44px', left: (x - 52) + 'px', top: y + 'px' });
       Object.assign(quickGear.style, { width: '44px', height: '44px', left: (x + 108) + 'px', top: y + 'px' });
       Object.assign(quickBlur.style, { width: '81px', height: '44px', left: (x - 52 - 89) + 'px', top: y + 'px' });
+      placeDisc(x - 52 - 89, 44, y + 'px');
     }
   }
   function applyMinimized() {
@@ -3626,7 +3656,7 @@
       placeMini();
       if (!state.minimized && state.pos) clampPosition();
       preloadStyle.remove();
-      [box, mini, quickBlur, quickMag, quickGear].forEach((el) => {
+      [box, mini, quickBlur, quickMag, quickGear, quickDisc].forEach((el) => {
         if (el.isConnected && !el.hidden && el.animate) {
           el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 250, easing: 'ease-out' });
         }
