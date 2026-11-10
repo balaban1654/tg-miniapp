@@ -180,7 +180,7 @@ th.n{text-align:right}
 .an-tbl{overflow-x:auto}.an-tbl table{min-width:0;font-size:12.5px}.an-tbl th,.an-tbl td{padding:7px 10px}
 @media(max-width:560px){.an{padding:14px 12px}.an-ov{padding:8px}}
 .lc-hr{display:flex;gap:8px;align-items:center;flex:none}.lc-pills{display:flex;gap:8px;align-items:center}
-.lc-hb{display:flex;gap:8px;align-items:center}.lc-hb .btn{display:inline-flex;align-items:center;justify-content:center}
+.lh-ib{display:inline-flex;align-items:center;justify-content:center;padding:2px;margin:-2px 0;border:0;background:none;color:var(--acc2,#c9a6ff);cursor:pointer;border-radius:6px;line-height:0}.lh-ib:hover{color:#fff;background:rgba(155,92,255,.18)}.lh-ib:focus-visible{outline:2px solid var(--acc,#9b5cff);outline-offset:1px}
 .lh-now{display:grid;gap:4px;padding:12px 14px;border-radius:12px;background:var(--bg2,rgba(255,255,255,.04));border:1px solid var(--line,rgba(255,255,255,.1))}
 .lh-warn{color:var(--warn,#ffd54d)}
 .lh-list{display:grid;gap:0;max-height:min(calc(100dvh - 340px),560px);min-height:120px;overflow:auto;padding-right:4px}
@@ -191,7 +191,6 @@ th.n{text-align:right}
 .lh-it[data-k=ban] .lh-dot,.lh-it[data-k=removed] .lh-dot{background:#ff6b8a}.lh-it[data-k=pocket] .lh-dot,.lh-it[data-k=access] .lh-dot{background:#ffd54d}
 .lh-t{font-size:14px;line-height:1.4}
 .mis-l{display:grid;overflow:auto;max-height:min(calc(100dvh - 360px),520px)}.mis-r{display:grid;grid-template-columns:22px 1fr;gap:10px;align-items:start;padding:10px 0;border-top:1px solid var(--line,rgba(255,255,255,.08));cursor:pointer}.mis-r:first-child{border-top:0}.mis-r input{margin-top:4px;width:18px;height:18px}.mis-r .pill{vertical-align:middle}.lh-m{font-size:12px;margin-top:2px}
-@media(max-width:560px){.lc.wide .lc-hb{flex-direction:column}}
 @media(max-width:560px){.lc.wide .lc-head{flex-wrap:nowrap;align-items:flex-start}.lc.wide .lc-hr{align-items:flex-start}.lc.wide .lc-pills{flex-direction:column;align-items:flex-end;gap:5px}.lc.wide .lc-head h3{font-size:19px!important}}
 .lc.wide{width:min(560px,100%);padding:14px 16px;gap:9px}.lc.wide .lc-grid{gap:7px 14px;grid-template-columns:repeat(3,minmax(0,1fr))}.lc.wide .lc-kv b{overflow-wrap:anywhere}@media(max-width:520px){.lc.wide .lc-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}.lc.wide .lc-kv .sm{font-size:11px}.lc.wide .lc-kv b{font-size:13px}.lc.wide .lc-h{margin:2px 0 6px}.lc.wide .lc-step{padding:2px 0}.lc.wide .lc-steps{gap:6px}
 .lc-two2{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start}
@@ -3145,10 +3144,10 @@ async function openLeadCard(tgId){
   box.replaceChildren(...[
     el('div',{class:'lc-head'},el('div',{style:'min-width:0'},el('h3',{style:'font-size:21px;line-height:1.2;overflow:hidden;text-overflow:ellipsis'},fname),L.first_name&&L.username?el('div',{class:'mut',style:'font-size:13px;margin-top:2px'},'@'+L.username):null),
       el('div',{class:'lc-hr'},el('div',{class:'lc-pills'},pill(L.status),L.rereg_at?el('span',{class:'pill p-pur',title:'Новая регистрация разрешена '+fmtDT(L.rereg_at)+'. Старый Pocket ID в карточке вторым'},'ждёт новой регистрации'):null,L.banned_at?el('span',{class:'pill p-bad'},'заблокирован'):L.access?el('span',{class:'pill p-ok'},'доступ открыт'):el('span',{class:'pill p-pur'},'доступ закрыт')),
-        el('span',{class:'lc-hb'},el('button',{class:'btn o s',type:'button','aria-label':'Закрыть',onclick:close},'✕'),
-          me.role==='admin'?el('button',{class:'btn o s',type:'button','aria-label':'История лида',title:'История лида: откуда пришёл, кто и почему владелец',onclick:()=>leadHistory(L,fname)},svgIcon(INFOI,16)):null))),
+        el('button',{class:'btn o s',type:'button','aria-label':'Закрыть',onclick:close},'✕'))),
     el('div',{class:'lc-grid'},
-      kvc('Telegram ID',L.tg_id),pocketKv(L,cpI,close),kv('Откуда пришёл',origin),
+      kvc('Telegram ID',L.tg_id),pocketKv(L,cpI,close),me.role==='admin'?el('div',{class:'lc-kv'},el('span',{class:'mut sm'},'Откуда пришёл'),el('b',{style:'display:flex;gap:6px;align-items:center'},origin||'—',
+        el('button',{type:'button',class:'lh-ib','aria-label':'История лида',title:'История лида: откуда пришёл, кто и почему владелец',onclick:()=>leadHistory(L,fname)},svgIcon(INFOI,17)))):kv('Откуда пришёл',origin),
       // На компьютере сначала «Владелец», потом «Страна»; в мобильной версии порядок прежний
       ...(matchMedia('(min-width:521px)').matches?[kv('Владелец',L.owner_name||'не закреплён'),kv('Страна',countryName(d.country))]:[kv('Страна',countryName(d.country)),kv('Владелец',L.owner_name||'не закреплён')]),
       // Пришёл по реферальной ссылке: на месте часового пояса «Пригласил» (Telegram ID, по нажатию его карточка), пояс ниже
