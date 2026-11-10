@@ -310,10 +310,20 @@
     .pott-quick:hover { color: #fff; }
     .pott-quick svg { width: 17px; height: 17px; display: block; }
     .pott-quick-split { padding: 0; overflow: hidden; cursor: default; }
-    /* Плашка «Не является финансовой рекомендацией» слева от размытия: только надпись, клики проходят сквозь неё */
-    .pott-quick.pott-disc { cursor: default; pointer-events: none; gap: 8px; padding: 0 12px; white-space: nowrap; color: #fff; line-height: 1.12; font-weight: 800; font-family: 'Montserrat', 'Segoe UI', system-ui, -apple-system, sans-serif; text-align: left; justify-content: flex-start; }
-    .pott-disc .pott-disc-i { font-size: 1.45em; line-height: 1; flex: none; }
-    .pott-disc .pott-disc-t { display: block; }
+    /* Кнопка ⚠️ слева от размытия: показывает и прячет табличку «Не является финансовой рекомендацией» */
+    .pott-quick.pott-disc { font-size: 18px; line-height: 1; }
+    .pott-quick.pott-disc.pott-on { --pott-q-border: #ffcc4d; }
+    #pott-disc-panel {
+      position: fixed; z-index: 2147483646; box-sizing: border-box;
+      display: flex; align-items: center; justify-content: center; text-align: center;
+      min-width: 160px; min-height: 56px; padding: 10px 16px;
+      background: rgba(22,24,36,0.94); border: 1.5px solid rgba(255,204,77,0.55); border-radius: 12px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.45);
+      color: #fff; font-family: 'Montserrat', 'Segoe UI', system-ui, -apple-system, sans-serif; font-weight: 800; line-height: 1.15;
+      resize: both; overflow: hidden; cursor: move; user-select: none; -webkit-user-select: none; touch-action: none;
+    }
+    #pott-disc-panel[hidden] { display: none; }
+    #pott-disc-text { display: block; pointer-events: none; white-space: nowrap; }
 
     /* --- Список пар (клик по названию пары) --- */
     #pott-pairs {
@@ -2852,33 +2862,84 @@
     '<button class="pott-q-part" id="pott-q-count" title="Сбросить всё размытие и увеличение">0</button>';
   document.documentElement.appendChild(quickBlur);
   const quickBlurIcon = quickBlur.querySelector('#pott-q-blur');
-  const quickDisc = document.createElement('div');
+  const quickDisc = document.createElement('button');
   quickDisc.id = 'pott-q-disc';
   quickDisc.className = 'pott-quick pott-disc';
-  quickDisc.setAttribute('aria-hidden', 'true');
-  quickDisc.innerHTML = '<span class="pott-disc-i">⚠️</span><span class="pott-disc-t">Не является<br>финансовой рекомендацией</span>';
+  quickDisc.title = 'Табличка «Не является финансовой рекомендацией»: показать или спрятать. Её можно двигать и растягивать за угол';
+  quickDisc.textContent = '⚠️';
   document.documentElement.appendChild(quickDisc);
+  // Табличка: двигается мышью, растягивается за правый нижний угол, текст подстраивается под размер. Место и размер запоминаются
+  const discPanel = document.createElement('div');
+  discPanel.id = 'pott-disc-panel';
+  discPanel.hidden = true;
+  discPanel.innerHTML = '<span id="pott-disc-text">Не является<br>финансовой рекомендацией</span>';
+  document.documentElement.appendChild(discPanel);
+  const discText = discPanel.querySelector('#pott-disc-text');
+  const DISC_KEY = 'pott_disc_v1';
+  let discState = {};
+  try { discState = JSON.parse(localStorage.getItem(DISC_KEY) || '{}') || {}; } catch (e) { discState = {}; }
+  const saveDisc = () => { try { localStorage.setItem(DISC_KEY, JSON.stringify(discState)); } catch (e) {} };
+  function fitDisc() {
+    const w = discPanel.clientWidth - 32, h = discPanel.clientHeight - 20;
+    if (w <= 0 || h <= 0) return;
+    let fs = Math.max(10, Math.min(120, Math.floor(h / 2.5)));
+    discText.style.fontSize = fs + 'px';
+    while (fs > 10 && (discText.scrollWidth > w || discText.scrollHeight > h)) { fs -= 1; discText.style.fontSize = fs + 'px'; }
+  }
+  function placeDiscPanel() {
+    const w = Math.min(discState.w || 420, window.innerWidth - 16), h = Math.min(discState.h || 110, window.innerHeight - 16);
+    const left = Math.max(8, Math.min(discState.left != null ? discState.left : (window.innerWidth - w) / 2, window.innerWidth - w - 8));
+    const top = Math.max(8, Math.min(discState.top != null ? discState.top : 90, window.innerHeight - h - 8));
+    Object.assign(discPanel.style, { width: w + 'px', height: h + 'px', left: left + 'px', top: top + 'px' });
+    fitDisc();
+  }
+  function showDisc(on) {
+    discPanel.hidden = !on;
+    quickDisc.classList.toggle('pott-on', on);
+    discState.open = on; saveDisc();
+    if (on) placeDiscPanel();
+  }
+  quickDisc.addEventListener('click', () => showDisc(discPanel.hidden));
+  if (typeof ResizeObserver !== 'undefined') {
+    new ResizeObserver(() => {
+      if (discPanel.hidden) return;
+      fitDisc();
+      discState.w = discPanel.offsetWidth; discState.h = discPanel.offsetHeight; saveDisc();
+    }).observe(discPanel);
+  }
+  // Перетаскивание: за любое место таблички, кроме уголка растягивания
+  discPanel.addEventListener('pointerdown', (e) => {
+    e.stopPropagation();
+    const r0 = discPanel.getBoundingClientRect();
+    if (e.clientX > r0.right - 20 && e.clientY > r0.bottom - 20) return;
+    e.preventDefault();
+    const dx = e.clientX - r0.left, dy = e.clientY - r0.top;
+    const move = (ev) => {
+      const left = Math.max(0, Math.min(ev.clientX - dx, window.innerWidth - r0.width));
+      const top = Math.max(0, Math.min(ev.clientY - dy, window.innerHeight - r0.height));
+      discPanel.style.left = left + 'px'; discPanel.style.top = top + 'px';
+      discState.left = left; discState.top = top;
+    };
+    const up = () => { document.removeEventListener('pointermove', move, true); document.removeEventListener('pointerup', up, true); saveDisc(); };
+    document.addEventListener('pointermove', move, true);
+    document.addEventListener('pointerup', up, true);
+  });
+  ['mousedown', 'click', 'touchstart'].forEach((type) => discPanel.addEventListener(type, (e) => e.stopPropagation()));
+  window.addEventListener('resize', () => { if (!discPanel.hidden) placeDiscPanel(); });
+  if (!CLIENT && discState.open) showDisc(true);
   const quickCount = quickBlur.querySelector('#pott-q-count');
   const quickGear = makeQuick('pott-q-gear', 'Настройки: цвет и прозрачность виджета',
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>');
   const quickMag = makeQuick('pott-q-mag', 'Лупа: выделите область - она увеличится. Если лупа включена - выключает её',
     '<svg viewBox="0 0 20 20"><circle cx="8.5" cy="8.5" r="5.5" fill="none" stroke="currentColor" stroke-width="1.8"></circle><line x1="12.6" y1="12.6" x2="17" y2="17" stroke="currentColor" stroke-width="2" stroke-linecap="round"></line></svg>');
-  if (CLIENT) { quickBlur.remove(); quickMag.remove(); quickDisc.remove(); }
-  // Надпись ставим вплотную слева от кнопки размытия, той же высоты; если места нет (узкое окно) — прячем
+  if (CLIENT) { quickBlur.remove(); quickMag.remove(); quickDisc.remove(); discPanel.remove(); }
+  // Кнопка ⚠️ — вплотную слева от кнопки размытия, такая же квадратная, как лупа
   function placeDisc(blurLeft, size, topPx, radius, bg, borderW, borderC) {
     if (CLIENT) return;
-    quickDisc.style.display = 'flex';
-    Object.assign(quickDisc.style, {
-      height: size + 'px', top: topPx, borderRadius: radius || '6px',
-      fontSize: Math.max(11, Math.min(16, Math.round(size * 0.33))) + 'px',
-    });
+    Object.assign(quickDisc.style, { width: size + 'px', height: size + 'px', top: topPx, left: (blurLeft - 8 - size) + 'px', borderRadius: radius || '6px' });
     if (bg) quickDisc.style.background = bg;
     if (borderW) quickDisc.style.borderWidth = borderW;
-    if (borderC) quickDisc.style.setProperty('--pott-q-border', borderC);
-    const w = quickDisc.offsetWidth;
-    const left = blurLeft - 8 - w;
-    if (left < 160) { quickDisc.style.display = 'none'; return; }
-    quickDisc.style.left = left + 'px';
+    if (borderC && !quickDisc.classList.contains('pott-on')) quickDisc.style.setProperty('--pott-q-border', borderC);
   }
   function syncQuick() {
     quickBlurIcon.classList.toggle('pott-on', blurEls.select.classList.contains('pott-on'));
@@ -2888,7 +2949,7 @@
     quickMag.classList.toggle('pott-on', blurEls.draw.classList.contains('pott-on'));
     quickGear.classList.toggle('pott-on', settingsOpen());
   }
-  [mini, quickBlur, quickMag, quickGear].forEach((el) => {
+  [mini, quickBlur, quickMag, quickGear, quickDisc].forEach((el) => {
     ['mousedown', 'click', 'pointerdown', 'touchstart'].forEach((type) => {
       el.addEventListener(type, (e) => e.stopPropagation());
     });
