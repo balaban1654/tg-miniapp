@@ -527,6 +527,20 @@ textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10
 .dx-seg2 .dx-seg2{height:auto}
 .sm-pay{display:flex;flex-direction:column;gap:14px}.sm-pay .big2{font:700 34px var(--fm);letter-spacing:-.03em;line-height:1}.sm-pay .big2 .dx-dm{font-size:24px}.sm-pay .big2 span:last-child{color:var(--ok)}
 .sm-pay .cap{font-size:12px;color:var(--mut);margin-top:4px}
+.sm-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px 14px;flex-wrap:wrap}.sm-top>div:first-child{min-width:0;flex:1 1 200px}
+.shw{display:grid;gap:6px;justify-items:end;flex:none}
+.shw-go{display:inline-flex;align-items:center;gap:8px;padding:11px 18px;font-weight:800;border-radius:12px}
+.shw-go svg{flex:none}
+.shw-pill{display:inline-flex;align-items:center;gap:10px;background:linear-gradient(135deg,#2d1b5a,#1f1440);border:1.5px solid var(--acc);border-radius:99px;padding:6px 6px 6px 14px;white-space:nowrap}
+.shw-pill .t{font:700 17px var(--fm);letter-spacing:.01em;font-variant-numeric:tabular-nums}
+.shw-dot{width:8px;height:8px;border-radius:50%;background:var(--bad);box-shadow:0 0 0 4px rgba(255,107,138,.18);flex:none;animation:shwp 1.6s ease-in-out infinite}
+@keyframes shwp{50%{box-shadow:0 0 0 7px rgba(255,107,138,.05)}}
+.shw-stop{background:none;border:1.5px solid var(--bad);color:var(--bad);border-radius:99px;padding:5px 12px;font:700 12px var(--fm);cursor:pointer}
+.shw-stop:hover{background:rgba(255,107,138,.12)}
+#shbar{position:fixed;left:10px;right:10px;bottom:calc(10px + env(safe-area-inset-bottom,0px));z-index:60;display:none;align-items:center;gap:10px;background:linear-gradient(135deg,#2d1b5a,#1f1440);border:1.5px solid var(--acc);border-radius:16px;padding:10px 12px;box-shadow:0 10px 30px rgba(0,0,0,.55)}
+#shbar .t{font:700 18px var(--fm);font-variant-numeric:tabular-nums}#shbar .tx{flex:1;min-width:0}
+#shbar.idle{background:var(--card);border-color:var(--line);padding:8px}#shbar.idle .btn{flex:1;justify-content:center}
+@media(max-width:760px){body.has-shbar #shbar{display:flex}body.has-shbar #main{padding-bottom:86px}.sm-top .shw{display:none}}
 .sm-pay .cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:6px 20px}.sm-pay .col2{display:flex;flex-direction:column;gap:6px}
 .sm-pay .h{font-size:12px;color:var(--mut);text-transform:uppercase;letter-spacing:.06em;margin-top:6px}.sm-pay .col2 .h:first-child{margin-top:0}.sm-pay .col2 .h.push{margin-top:auto}
 .sm-pay .dx-row{white-space:nowrap;border-bottom:1px solid var(--line);padding-bottom:6px}
@@ -1091,6 +1105,7 @@ async function render(opt){
     else if(tab==='mytasks')m.replaceChildren(...await viewMyTasks());
   }catch(x){if(x.message!=='auth')m.replaceChildren(el('div',{class:'err'},x.message))}
   if(tab!=='home')refreshHeaderBell();else if(bellSrc)mountHeaderBell();
+  refreshShiftBar();
   if(soft){
     window.scrollTo(0,y);m.scrollTop=mt;
     // Картинки и таблицы дорисовываются позже и укорачивают страницу: возвращаем прежнее место ещё несколько раз, пока человек сам не прокрутил
@@ -2253,8 +2268,10 @@ function smSalary(d){
   if(a&&a.request)adv=el('div',{class:'sm-adv'},el('div',{class:'tx'},el('b',{},a.request.status==='paid'?'Аванс '+usd0(a.request.amount)+' выплачен.':'Аванс '+usd0(a.request.amount)+' запрошен.'),a.request.status==='paid'?' Получить можно один раз в месяц.':' Ждёт выплаты.'),el('button',{class:'btn',type:'button',disabled:''},'Запросить аванс'));
   else if(a)adv=el('div',{class:'sm-adv'+(a.can?'':' off')},el('div',{class:'tx'},a.can?el('b',{},'Аванс '+usd0(a.amount)+' доступен. '):null,a.can?(a.byRules?'Условия выполнены: '+a.needH+' ч и '+a.needF+' FTD. ':'По минимальным ставкам уже накопилось '+usd0(s.totalMin)+'. ')+'Получить можно один раз в месяц.':advLeftText(a,s.totalMin)+' Получить можно один раз в месяц.'),
     el('button',{class:'btn',type:'button',disabled:a.can?null:'',onclick:async e=>{const bt=e.currentTarget;bt.disabled=true;try{await api('/advance/request',{method:'POST'});toast('Аванс запрошен');render({soft:true})}catch(x){toast(x.message);bt.disabled=false}}},'Запросить аванс'));
-  return el('div',{class:'card sm-pay'},el('div',{class:'dx-lbl'},'Моя зарплата за месяц'),
-    el('div',{style:'margin-top:8px'},el('div',{class:'big2'},pr(pay[0],pay[1])),el('div',{class:'cap'},'К выплате: план не выполнен / выполнен')),
+  // Справа сверху — смена: «Начать смену» или идущая смена с таймером (на телефоне вместо неё плашка внизу экрана)
+  const shSlot=el('div',{class:'shw'});shiftData().then(k=>{if(k)shSlot.replaceChildren(...shiftWidget(k,'card'))});
+  return el('div',{class:'card sm-pay'},el('div',{class:'sm-top'},el('div',{},el('div',{class:'dx-lbl'},'Моя зарплата за месяц'),
+    el('div',{style:'margin-top:8px'},el('div',{class:'big2'},pr(pay[0],pay[1])),el('div',{class:'cap'},'К выплате: план не выполнен / выполнен'))),shSlot),
     el('div',{class:'cols'},
       el('div',{class:'col2'},el('div',{class:'h'},'База'),row('Ставка ('+s.shifts+' смен)',el('b',{},pr(s.base[0],s.base[1]))),row('Лиды ('+s.leadsN+')',el('b',{},pr(s.leads[0],s.leads[1]))),el('div',{class:'h'},'Бонусы'),row('FTD (суммы больше)',el('b',{},sg(s.ftdBonus))),row('Дневной ('+d.plan.dayCount+' FTD)',el('b',{},sg(s.dayBonus))),row('Додепы (градации)',el('b',{},sg(s.depBonus||0))),row('Премии',el('b',{},sg(s.bonus-(s.refBonus||0)))),row('Рефералы'+(s.refN?' ('+s.refN+')':''),el('b',{},sg(s.refBonus||0)))),
       el('div',{class:'col2'},el('div',{class:'h'},'Итого начислено'),row('По минимальным',el('b',{},usd0(tot(0)))),row('По полным',el('b',{},usd0(tot(1)))),el('div',{class:'h push'},'Удержания'),row('Штрафы',el('b',{class:s.penalty?'dx-neg':''},s.penalty?sgn0(-s.penalty):'$0')),row('Выплачено (аванс)',el('b',{},s.paid?sgn0(-s.paid):'$0')))),
@@ -3604,6 +3621,54 @@ async function finesTab(){
     el('div',{class:'mut sm'},'Штраф вычитается из зарплаты за месяц. Если он выписан по ошибке, напишите руководителю.')];
 }
 
+/* ---------- Смена в один клик: на дашборде (карточка зарплаты) и плашкой внизу экрана на телефоне ---------- */
+const isStreamer=()=>me&&(me.role==='streamer'||me.streams);
+const shiftData=()=>isStreamer()?api('/kpi/me').catch(()=>null):Promise.resolve(null);
+const PLAYI='<path d="M7 5l12 7-12 7z" fill="currentColor"/>';
+function shiftStartDialog(){
+  const ov=el('div',{class:'lc-overlay',role:'dialog','aria-modal':'true','aria-label':'Начать смену'});
+  const close=()=>{ov.remove();document.removeEventListener('keydown',onKey,true)};
+  const onKey=e=>{if(e.key==='Escape'){e.stopPropagation();close()}};document.addEventListener('keydown',onKey,true);
+  ov.addEventListener('mousedown',e=>{if(e.target===ov)close()});
+  const url=el('input',{type:'text',inputmode:'url',autocapitalize:'off',autocomplete:'off',placeholder:'https://tiktok.com/@name/live',maxlength:'500'});
+  const err=el('div',{class:'err',role:'alert'});
+  const go=el('button',{class:'btn',type:'button',onclick:async()=>{err.textContent='';go.disabled=true;
+    try{await api('/shifts/start',{method:'POST',body:{stream_url:url.value}});toast('Смена началась');close();render({soft:true})}catch(x){err.textContent=x.message;go.disabled=false}}},'Начать смену');
+  url.addEventListener('keydown',e=>{if(e.key==='Enter')go.click()});
+  ov.append(el('div',{class:'lc',style:'width:min(440px,100%);display:grid;gap:12px'},
+    el('div',{class:'lc-head'},el('h3',{style:'font-size:18px'},'Начать смену'),el('button',{class:'btn o s',type:'button','aria-label':'Закрыть',onclick:close},'✕')),
+    el('label',{},'Ссылка на эфир (обязательно)',url),err,el('div',{},go),el('div',{class:'mut sm'},'Без ссылки на эфир смену начать нельзя.')));
+  document.body.append(ov);setTimeout(()=>url.focus(),50);
+}
+/** Узлы смены. kind: 'card' — в карточке зарплаты, 'bar' — плашка внизу экрана */
+function shiftWidget(k,kind){
+  const {plan}=k,skew=Date.parse(k.now)-Date.now(),counted=(k.approvedToday||0)+(k.pendingToday||0),shiftMin=plan.shiftH*60;
+  if(!k.live){
+    const b=el('button',{class:'btn shw-go',type:'button',onclick:shiftStartDialog},svgIcon(PLAYI,14),'Начать смену');
+    const note=el('span',{class:'mut sm'},'сегодня '+hmin(counted)+' из '+plan.shiftH+' ч');
+    return kind==='bar'?[b]:[b,note];
+  }
+  const live=k.live,t=el('span',{class:'t'}),left=el('span',{class:'mut sm'});
+  const stop=el('button',{class:'shw-stop',type:'button',onclick:()=>openFinishModal(live,skew,{later:true})},kind==='bar'?'Закончить':'Стоп');
+  const tick=()=>{if(!t.isConnected&&started){clearInterval(iv);return}
+    const sec=Math.max(0,Math.floor((Date.now()+skew-Date.parse(live.started_at))/1000));
+    t.textContent=[Math.floor(sec/3600),Math.floor(sec%3600/60),sec%60].map(x=>String(x).padStart(2,'0')).join(':');
+    const lm=Math.max(0,shiftMin-counted-Math.floor(sec/60));left.textContent=lm?'ещё '+hmin(lm)+(kind==='bar'?' до '+plan.shiftH+' ч':''):'смена закрыта ✓'};
+  let started=false;tick();const iv=setInterval(tick,1000);setTimeout(()=>{started=true},1500);
+  if(kind==='bar')return[el('span',{class:'shw-dot'}),el('div',{class:'tx'},t,el('div',{},left)),stop];
+  return[el('span',{class:'shw-pill',title:'Смена идёт с '+new Date(live.started_at).toLocaleTimeString('ru-RU',{timeZone:'Europe/Kyiv',hour:'2-digit',minute:'2-digit'})},el('span',{class:'shw-dot'}),t,stop),left];
+}
+/** Плашка смены внизу экрана на телефоне: на всех страницах, кроме «Смены» (там свой блок) и чатов (там поле ответа) */
+let shBarSeq=0;
+async function refreshShiftBar(){
+  const seq=++shBarSeq;
+  let bar=document.getElementById('shbar');
+  if(!isStreamer()||tab==='shifts'||tab==='chats'){document.body.classList.remove('has-shbar');return}
+  const k=await shiftData();if(seq!==shBarSeq)return;
+  if(!k){document.body.classList.remove('has-shbar');return}
+  if(!bar){bar=el('div',{id:'shbar',role:'region','aria-label':'Смена'});document.body.append(bar)}
+  bar.className=k.live?'':'idle';bar.replaceChildren(...shiftWidget(k,'bar'));document.body.classList.add('has-shbar');
+}
 async function shiftTab(){
   const d=await api('/kpi/me');
   const {plan}=d,skew=Date.parse(d.now)-Date.now(),shiftMin=plan.shiftH*60;
