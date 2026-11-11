@@ -531,12 +531,19 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
 
   app.get('/shifts/current', { preHandler: stream }, async (req) => {
     const me = req.staff!;
-    const live = (await db.query(`SELECT id, stream_url, started_at FROM shift_reports WHERE staff_id = $1 AND status = 'live' AND NOT team ORDER BY id DESC LIMIT 1`, [me.id])).rows[0] ?? null;
+    const live = (await db.query(`SELECT id, stream_url, stream_url2, started_at FROM shift_reports WHERE staff_id = $1 AND status = 'live' AND NOT team ORDER BY id DESC LIMIT 1`, [me.id])).rows[0] ?? null;
     const awaiting = (await db.query(`SELECT id, started_at, ended_at, to_char(day, 'YYYY-MM-DD') AS day FROM shift_reports WHERE staff_id = $1 AND status = 'await' ORDER BY id`, [me.id])).rows;
     return { live, awaiting, now: new Date().toISOString(), ...(await todayInfo(me.id)), fields: await fieldsDef(true) };
   });
 
   // Админ открывает смену за стримера (например, когда тот забыл): та же ссылка на эфир, дальше стример заканчивает смену сам
+  // Вторая ссылка на эфир — по желанию: пусто → null, не ссылка → false (ошибка)
+  const url2Of = (v: unknown): string | null | false => {
+    const raw = str(v, 500);
+    if (!raw.trim()) return null;
+    const u = raw.match(/https?:\/\/[^\s]+/i)?.[0] ?? '';
+    return /^https?:\/\/[^\s]+\.[^\s]+$/i.test(u) ? u : false;
+  };
   app.post('/shifts/start-for', { preHandler: admin }, async (req, reply) => {
     const b = (req.body ?? {}) as Record<string, unknown>;
     const sid = Number(b.staff_id);
@@ -545,8 +552,10 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     const st = (await db.query(`SELECT id FROM staff WHERE id = $1 AND (role = 'streamer' OR streams) AND active`, [sid])).rows[0];
     if (!st) return reply.code(404).send({ error: 'Стример не найден' });
     if ((await db.query(`SELECT 1 FROM shift_reports WHERE staff_id = $1 AND status = 'live' AND NOT team`, [sid])).rowCount) return reply.code(409).send({ error: 'У этого стримера смена уже идёт' });
-    const r = await db.query(`INSERT INTO shift_reports (staff_id, stream_url, day) VALUES ($1,$2,(now() AT TIME ZONE '${TZ}')::date) RETURNING id`, [sid, url]);
-    void announceLive(sid, url);
+    const u2 = url2Of(b.stream_url2);
+    if (u2 === false) return reply.code(400).send({ error: 'Вторая ссылка не похожа на ссылку, например https://youtube.com/live/…' });
+    const r = await db.query(`INSERT INTO shift_reports (staff_id, stream_url, stream_url2, day) VALUES ($1,$2,$3,(now() AT TIME ZONE '${TZ}')::date) RETURNING id`, [sid, url, u2]);
+    void announceLive(sid, url, u2);
     return { ok: true, id: r.rows[0].id };
   });
 
@@ -556,8 +565,10 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     const url = str((req.body as any)?.stream_url, 500).match(/https?:\/\/[^\s]+/i)?.[0] ?? '';
     if (!/^https?:\/\/[^\s]+\.[^\s]+$/i.test(url)) return reply.code(400).send({ error: 'Вставьте ссылку на эфир, например https://tiktok.com/@name/live' });
     if ((await db.query(`SELECT 1 FROM shift_reports WHERE staff_id = $1 AND status = 'live'`, [me.id])).rowCount) return reply.code(409).send({ error: 'Смена уже идёт' });
-    const r = await db.query(`INSERT INTO shift_reports (staff_id, stream_url, day) VALUES ($1,$2,(now() AT TIME ZONE '${TZ}')::date) RETURNING id`, [me.id, url]);
-    void announceLive(me.id, url);
+    const u2 = url2Of((req.body as any)?.stream_url2);
+    if (u2 === false) return reply.code(400).send({ error: 'Вторая ссылка не похожа на ссылку, например https://youtube.com/live/…' });
+    const r = await db.query(`INSERT INTO shift_reports (staff_id, stream_url, stream_url2, day) VALUES ($1,$2,$3,(now() AT TIME ZONE '${TZ}')::date) RETURNING id`, [me.id, url, u2]);
+    void announceLive(me.id, url, u2);
     return { ok: true, id: r.rows[0].id };
   });
 
@@ -871,7 +882,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     const period = await currentPeriod();
     const k = await kpiFor(me.id, period, plan);
     const t = await todayInfo(me.id);
-    const live = (await db.query(`SELECT id, stream_url, started_at FROM shift_reports WHERE staff_id = $1 AND status = 'live' AND NOT team LIMIT 1`, [me.id])).rows[0] ?? null;
+    const live = (await db.query(`SELECT id, stream_url, stream_url2, started_at FROM shift_reports WHERE staff_id = $1 AND status = 'live' AND NOT team LIMIT 1`, [me.id])).rows[0] ?? null;
     const unpaidShort = (await db.query(`SELECT to_char(day, 'YYYY-MM-DD') AS day, minutes FROM shift_shortfalls WHERE staff_id = $1 AND reason IS NULL AND dismissed_at IS NULL ORDER BY day`, [me.id])).rows;
     // Стримеру показываем суммы бонусов и штрафов без комментариев
     const awaiting = (await db.query(`SELECT id, started_at, ended_at, to_char(day, 'YYYY-MM-DD') AS day FROM shift_reports WHERE staff_id = $1 AND status = 'await' ORDER BY id`, [me.id])).rows;
@@ -1938,7 +1949,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     // Отвал: свои лиды, пришедшие за период, у которых сейчас статус «Отвал» (как в воронке у админа). На FTD и зарплату не влияет
     const churnedN = Number((await db.query(`SELECT count(*)::int AS n FROM leads d WHERE d.owner_id = $1 AND ${churnedAfterFtd('d')} AND d.removed_at IS NULL AND coalesce(d.lead_role, 'lead') = 'lead' AND (${funnelStageDate('d')} AT TIME ZONE '${TZ}')::date BETWEEN $2::date AND $3::date`, [me.id, from, to])).rows[0].n);
 
-    const live = (await db.query(`SELECT id, stream_url, started_at FROM shift_reports WHERE staff_id = $1 AND status = 'live' AND NOT team ORDER BY id DESC LIMIT 1`, [me.id])).rows[0] ?? null;
+    const live = (await db.query(`SELECT id, stream_url, stream_url2, started_at FROM shift_reports WHERE staff_id = $1 AND status = 'live' AND NOT team ORDER BY id DESC LIMIT 1`, [me.id])).rows[0] ?? null;
     const t = await todayInfo(me.id);
     const elapsed = live ? Math.max(0, Math.floor((Date.now() - Date.parse(live.started_at)) / 60000)) : 0;
     const todayMin = t.approvedToday + t.pendingToday + elapsed;

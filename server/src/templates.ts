@@ -111,6 +111,8 @@ export interface Dispatch {
   varsEn?: Record<string, string>;
   /** Ссылка на эфир для кнопки «Смотреть эфир» */
   streamUrl?: string;
+  /** Вторая ссылка на эфир: тогда вместо «Смотреть эфир» две кнопки LIVE 1 | LIVE 2 */
+  streamUrl2?: string | null;
   /** Канал самого стримера (из карточки сотрудника) */
   staffChannel?: string | null;
   /** Чьим лидам слать, если в шаблоне выбрано «Лиды этого стримера» */
@@ -143,7 +145,10 @@ export async function dispatchTemplate(key: TemplateKey, d: Dispatch): Promise<{
   const buttons: Button[] = [];
   for (const b of t.buttons) {
     if (b.type === 'stream') {
-      if (d.streamUrl) buttons.push({ ...b, type: 'url', url: d.streamUrl });
+      if (d.streamUrl && d.streamUrl2) {
+        buttons.push({ ...b, type: 'url', url: d.streamUrl, label: 'LIVE 1', label_en: 'LIVE 1', inline: true });
+        buttons.push({ ...b, type: 'url', url: d.streamUrl2, label: 'LIVE 2', label_en: 'LIVE 2' });
+      } else if (d.streamUrl) buttons.push({ ...b, type: 'url', url: d.streamUrl });
     } else buttons.push(b);
   }
   let users = 0;
@@ -179,13 +184,13 @@ const lastLive = new Map<number, number>();
 
 /** Стример открыл смену: шлём «Стример в прямом эфире». Повтор от одного стримера не чаще раза в 5 минут
  *  (бывает, что выкидывает с эфира и стример открывает смену заново с новой ссылкой) */
-export async function announceLive(staffId: number, streamUrl: string): Promise<void> {
+export async function announceLive(staffId: number, streamUrl: string, streamUrl2: string | null = null): Promise<void> {
   try {
     const prev = lastLive.get(staffId) ?? 0;
     if (Date.now() - prev < 5 * 60_000) return;
     const st = (await db.query('SELECT name, live_channel FROM staff WHERE id = $1', [staffId])).rows[0];
     if (!st) return;
-    const r = await dispatchTemplate('live', { vars: { 'стример': st.name }, streamUrl, ownerId: staffId, staffChannel: st.live_channel, createdBy: staffId });
+    const r = await dispatchTemplate('live', { vars: { 'стример': st.name }, streamUrl, streamUrl2, ownerId: staffId, staffChannel: st.live_channel, createdBy: staffId });
     if (!r.skipped) lastLive.set(staffId, Date.now());
   } catch (e) {
     console.error('Не удалось отправить «Стример в эфире»:', e);

@@ -1152,3 +1152,6 @@ BEGIN
     INSERT INTO app_settings (key, value) VALUES ('ref_staff5_2026_11', '1') ON CONFLICT (key) DO NOTHING;
   END IF;
 END $$;
+
+-- Вторая ссылка на эфир (по желанию: ещё TikTok или YouTube). В уведомлении «в эфире» тогда две кнопки: LIVE 1 | LIVE 2
+ALTER TABLE shift_reports ADD COLUMN IF NOT EXISTS stream_url2 TEXT;

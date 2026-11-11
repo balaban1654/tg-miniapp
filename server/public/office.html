@@ -1460,10 +1460,11 @@ function dxModal(btn,s,d,skew,mode){
   const x=el('button',{type:'button',class:'dx-x','aria-label':'Закрыть',onclick:dxCloseModal},'×');
   // Открыть смену за стримера: ссылка на эфир и «Начать смену», как у самого стримера
   const ofUrl=el('input',{type:'text',inputmode:'url',autocapitalize:'off',autocomplete:'off',placeholder:'Ссылка на эфир TikTok, например https://tiktok.com/@name/live'});
+  const ofUrl2=el('input',{type:'text',inputmode:'url',autocapitalize:'off',autocomplete:'off',placeholder:'Вторая ссылка по желанию: ещё TikTok или YouTube'});
   const ofErr=el('div',{class:'er',role:'alert'});
-  const ofGo=el('button',{class:'btn s',type:'button',onclick:async()=>{ofErr.textContent='';ofGo.disabled=true;try{await api('/shifts/start-for',{method:'POST',body:{staff_id:s.id,stream_url:ofUrl.value}});toast('Смена открыта: '+s.name);dxCloseModal();render({soft:true})}catch(e){ofErr.textContent=e.message;ofGo.disabled=false}}},'Начать смену');
+  const ofGo=el('button',{class:'btn s',type:'button',onclick:async()=>{ofErr.textContent='';ofGo.disabled=true;try{await api('/shifts/start-for',{method:'POST',body:{staff_id:s.id,stream_url:ofUrl.value,stream_url2:ofUrl2.value}});toast('Смена открыта: '+s.name);dxCloseModal();render({soft:true})}catch(e){ofErr.textContent=e.message;ofGo.disabled=false}}},'Начать смену');
   ofUrl.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();ofGo.click()}});
-  const openForm=el('div',{class:'dx-of',hidden:''},ofUrl,ofGo,ofErr);
+  const openForm=el('div',{class:'dx-of',hidden:''},ofUrl,ofUrl2,ofGo,ofErr);
   // Закрыть смену за стримера: внести данные самому или пропустить, тогда отчёт появится у стримера в задачах
   const clSkip=el('button',{class:'btn o s',type:'button',onclick:async()=>{clSkip.disabled=true;try{await api('/shifts/'+(s.live&&s.live.id)+'/close',{method:'POST'});toast('Смена закрыта: отчёт заполнит '+s.name);dxCloseModal();render({soft:true})}catch(e){clErr.textContent=e.message;clSkip.disabled=false}}},'Пропустить');
   const clFill=el('button',{class:'btn s',type:'button',onclick:()=>{const lv=s.live;dxCloseModal();openFinishModal({id:lv.id,started_at:lv.started_at},skew)}},'Указать данные');
@@ -3628,13 +3629,15 @@ function shiftStartDialog(){
   const onKey=e=>{if(e.key==='Escape'){e.stopPropagation();close()}};document.addEventListener('keydown',onKey,true);
   ov.addEventListener('mousedown',e=>{if(e.target===ov)close()});
   const url=el('input',{type:'text',inputmode:'url',autocapitalize:'off',autocomplete:'off',placeholder:'https://tiktok.com/@name/live',maxlength:'500'});
+  const url2=el('input',{type:'text',inputmode:'url',autocapitalize:'off',autocomplete:'off',placeholder:'ещё TikTok или YouTube',maxlength:'500'});
   const err=el('div',{class:'err',role:'alert'});
   const go=el('button',{class:'btn',type:'button',onclick:async()=>{err.textContent='';go.disabled=true;
-    try{await api('/shifts/start',{method:'POST',body:{stream_url:url.value}});toast('Смена началась');close();render({soft:true})}catch(x){err.textContent=x.message;go.disabled=false}}},'Начать смену');
+    try{await api('/shifts/start',{method:'POST',body:{stream_url:url.value,stream_url2:url2.value}});toast('Смена началась');close();render({soft:true})}catch(x){err.textContent=x.message;go.disabled=false}}},'Начать смену');
   url.addEventListener('keydown',e=>{if(e.key==='Enter')go.click()});
   ov.append(el('div',{class:'lc',style:'width:min(440px,100%);display:grid;gap:12px'},
     el('div',{class:'lc-head'},el('h3',{style:'font-size:18px'},'Начать смену'),el('button',{class:'btn o s',type:'button','aria-label':'Закрыть',onclick:close},'✕')),
-    el('label',{},'Ссылка на эфир (обязательно)',url),err,el('div',{},go),el('div',{class:'mut sm'},'Без ссылки на эфир смену начать нельзя.')));
+    el('label',{},'Ссылка на эфир (обязательно)',url),el('label',{},'Вторая ссылка (по желанию)',url2),err,el('div',{},go),
+    el('div',{class:'mut sm'},'Без первой ссылки смену начать нельзя. Если есть вторая, в уведомлении у зрителей будут две кнопки: LIVE 1 и LIVE 2, иначе одна «Смотреть эфир».')));
   document.body.append(ov);setTimeout(()=>url.focus(),50);
 }
 /** Блок «Моя смена» в окне «Стримеры»: «Начать смену» или идущая смена с таймером и «Закончить» */
@@ -3672,12 +3675,13 @@ async function shiftTab(){
   const counted=d.approvedToday+d.pendingToday;
   if(!d.live){
     const url=el('input',{type:'text',inputmode:'url',autocapitalize:'off',autocomplete:'off',placeholder:'https://tiktok.com/@name/live',maxlength:'500'});
+    const url2=el('input',{type:'text',inputmode:'url',autocapitalize:'off',autocomplete:'off',placeholder:'ещё TikTok или YouTube',maxlength:'500'});
     const err=el('div',{class:'err',role:'alert'});
     out.push(el('div',{class:'card',style:'display:grid;gap:10px;max-width:560px'},
       el('div',{class:'head'},el('h3',{style:'font-size:15px'},'Смена не начата'),el('span',{class:'pill p-pur'},'сегодня зачтено '+hmin(counted)+' из '+plan.shiftH+' ч')),
-      el('label',{},'Ссылка на эфир (обязательно)',url),err,
-      el('div',{},el('button',{class:'btn',type:'button',onclick:async e=>{const b=e.currentTarget;err.textContent='';b.disabled=true;try{await api('/shifts/start',{method:'POST',body:{stream_url:url.value}});toast('Смена началась');render({soft:true})}catch(x){err.textContent=x.message;b.disabled=false}}},'Начать смену')),
-      el('div',{class:'mut sm'},'Без ссылки на эфир смену начать нельзя.')));
+      el('label',{},'Ссылка на эфир (обязательно)',url),el('label',{},'Вторая ссылка (по желанию)',url2),err,
+      el('div',{},el('button',{class:'btn',type:'button',onclick:async e=>{const b=e.currentTarget;err.textContent='';b.disabled=true;try{await api('/shifts/start',{method:'POST',body:{stream_url:url.value,stream_url2:url2.value}});toast('Смена началась');render({soft:true})}catch(x){err.textContent=x.message;b.disabled=false}}},'Начать смену')),
+      el('div',{class:'mut sm'},'Без первой ссылки смену начать нельзя. Вторая — если идёте в эфир ещё на одной площадке: у зрителей будут кнопки LIVE 1 и LIVE 2.')));
     return out;
   }
   const live=d.live;
@@ -3692,7 +3696,7 @@ async function shiftTab(){
     el('div',{class:'head'},el('h3',{style:'font-size:15px'},'Смена идёт'),el('span',{class:'live-dot sm'},el('i'),'эфир')),
     timer,
     el('div',{class:'lab2'},el('span',{},'До целой смены ('+plan.shiftH+' ч)'),left),barEl,
-    el('div',{class:'mut sm'},'Начало '+new Date(live.started_at).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'})+' · '+live.stream_url),
+    el('div',{class:'mut sm'},'Начало '+new Date(live.started_at).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'})+' · '+live.stream_url+(live.stream_url2?' · '+live.stream_url2:'')),
     el('div',{},el('button',{class:'btn',type:'button',onclick:()=>openFinishModal(live,skew,{later:true})},'Закончить смену'))));
   return out;
 }
