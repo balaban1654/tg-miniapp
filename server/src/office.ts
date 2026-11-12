@@ -2809,9 +2809,11 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
 
   // Журнал лида для админа: текущая ссылка и владелец + вся история по времени. Записи журнала (lead_log) дополняются тем, что
   // уже есть в базе: события постбеков, раздачи «Случайно» и органики, сообщения, блокировки. Так история видна и у старых лидов
-  app.get<{ Params: { tgId: string } }>('/leads/:tgId/history', { preHandler: need('admin') }, async (req, reply) => {
+  app.get<{ Params: { tgId: string } }>('/leads/:tgId/history', { preHandler: need('admin', 'teamlead') }, async (req, reply) => {
     const tgId = Number(req.params.tgId);
     if (!Number.isSafeInteger(tgId)) return reply.code(400).send({ error: 'Неверный ID' });
+    // Тимлидер видит историю только лидов своей команды
+    if (!(await banAllowed(req.staff!, tgId))) return reply.code(403).send({ error: 'Это лид не вашей команды' });
     const L = (await db.query(
       `SELECT d.*, l.slug AS link_slug, l.source AS link_source, lo.name AS link_owner, o.name AS owner_name, tf.name AS taken_from_name,
               bb.name AS banned_by_name, coalesce(p.rotate, l.rotate) AS link_rotate

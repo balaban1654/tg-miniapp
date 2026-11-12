@@ -3161,7 +3161,7 @@ async function openLeadCard(tgId){
       el('div',{class:'lc-hr'},el('div',{class:'lc-pills'},pill(L.status),L.rereg_at?el('span',{class:'pill p-pur',title:'Новая регистрация разрешена '+fmtDT(L.rereg_at)+'. Старый Pocket ID в карточке вторым'},'ждёт новой регистрации'):null,L.banned_at?el('span',{class:'pill p-bad'},'заблокирован'):L.access?el('span',{class:'pill p-ok'},'доступ открыт'):el('span',{class:'pill p-pur'},'доступ закрыт')),
         el('button',{class:'btn o s',type:'button','aria-label':'Закрыть',onclick:close},'✕'))),
     el('div',{class:'lc-grid'},
-      kvc('Telegram ID',L.tg_id),pocketKv(L,cpI,close),me.role==='admin'?el('div',{class:'lc-kv'},el('span',{class:'mut sm'},'Откуда пришёл'),el('b',{style:'display:flex;gap:6px;align-items:center'},origin||'—',
+      kvc('Telegram ID',L.tg_id),pocketKv(L,cpI,close),(me.role==='admin'||me.role==='teamlead')?el('div',{class:'lc-kv'},el('span',{class:'mut sm'},'Откуда пришёл'),el('b',{style:'display:flex;gap:6px;align-items:center'},origin||'—',
         el('button',{type:'button',class:'lh-ib','aria-label':'История лида',title:'История лида: откуда пришёл, кто и почему владелец',onclick:()=>leadHistory(L,fname)},svgIcon(INFOI,17)))):kv('Откуда пришёл',origin),
       // На компьютере сначала «Владелец», потом «Страна»; в мобильной версии порядок прежний
       ...(matchMedia('(min-width:521px)').matches?[kv('Владелец',L.owner_name||'не закреплён'),kv('Страна',countryName(d.country))]:[kv('Страна',countryName(d.country)),kv('Владелец',L.owner_name||'не закреплён')]),
