@@ -220,7 +220,7 @@ th.n{text-align:right}
 .lc-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:4px}
 .lc-widget{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px;padding-top:10px;border-top:1px solid var(--line)}.lc-widget .btn{padding:4px 10px;font-size:12px}
 
-.ctr tr.band td{text-align:left;font:600 11px var(--fm);letter-spacing:.06em;text-transform:uppercase;color:var(--acc2);background:var(--bg2);border-bottom:1px solid var(--line);padding:8px 14px}
+.ctr tr.blk-band td{color:var(--live)!important;font-size:12px!important;padding:12px 14px!important;border-top:2px solid var(--line)}tr.band td{text-align:left;font:600 11px var(--fm);letter-spacing:.06em;text-transform:uppercase;color:var(--acc2);background:var(--bg2);border-bottom:1px solid var(--line);padding:8px 14px}
 .cp-btn{background:none;border:0;padding:2px;color:var(--mut);cursor:pointer;display:grid;place-items:center;border-radius:6px}.cp-btn:hover{color:var(--fg);background:var(--card2)}
 .cp{display:inline-flex;align-items:center;gap:8px}.cp button{background:none;border:0;padding:2px;color:var(--mut);cursor:pointer;display:grid;place-items:center;border-radius:6px}.cp button:hover{color:var(--fg);background:var(--card2)}
 .pill{display:inline-block;border-radius:99px;padding:2px 10px;font:600 11px var(--fm)}
@@ -2556,8 +2556,12 @@ async function viewLeads(){
     // @r1654 (создатель компании) всегда самый первый в админ составе
     const isOwner=r=>String(r.username||'').toLowerCase()==='r1654';
     const staffRows=flat?[]:list.filter(isStaff).sort((a,b)=>(isOwner(b)-isOwner(a))||(ORDER[a.lead_role]??9)-(ORDER[b.lead_role]??9));
-    const leadRows=flat?list:list.filter(r=>!isStaff(r));
-    const sorted=[...(F.staffOpen?staffRows:[]),...leadRows];
+    const leadRows0=flat?list:list.filter(r=>!isStaff(r));
+    // Заблокировавшие бота — отдельным списком внизу, так же по датам (когда список идёт по дате)
+    const byDate=F.sort==='new'||F.sort==='old';
+    const blockedRows=byDate?leadRows0.filter(r=>!isStaff(r)&&r.status==='churned'):[];
+    const leadRows=blockedRows.length?leadRows0.filter(r=>!blockedRows.includes(r)):leadRows0;
+    const sorted=[...(F.staffOpen?staffRows:[]),...leadRows,...blockedRows];
     const cutTd=v=>el('td',{class:'cut',title:v},v);
     // Имя и ник в одной колонке: имя как раньше, ник Telegram мелко под ним
     const nameTd=r=>{const nm=r.first_name||(r.username?'':'—'),un=r.username?'@'+r.username:'';
@@ -2572,6 +2576,11 @@ async function viewLeads(){
     if(body&&(F.sort==='new'||F.sort==='old')){
       const dk=r=>new Date(r.status_at||r.created_at).toLocaleDateString('sv-SE',{timeZone:'Europe/Kyiv'});
       const shown=sorted;[...body.children].forEach((tr,i)=>{if(i>0&&shown[i]&&shown[i-1]&&!isStaff(shown[i])&&!isStaff(shown[i-1])&&dk(shown[i])!==dk(shown[i-1]))tr.classList.add('day-sep')});
+    }
+    if(body&&blockedRows.length){
+      const trs0=[...body.children],at=(F.staffOpen?staffRows.length:0)+leadRows.length;
+      trs0[at]&&trs0[at].classList.remove('day-sep');
+      body.insertBefore(el('tr',{class:'band blk-band'},el('td',{colspan:String(cols.length)},'⛔ Заблокировали бота ('+blockedRows.length+')')),trs0[at]||null);
     }
     if(body&&staffRows.length){
       const band=(t,fn)=>el('tr',{class:'band',style:fn?'cursor:pointer':'',...(fn?{onclick:fn}:{})},el('td',{colspan:String(cols.length)},t));
