@@ -1155,3 +1155,6 @@ END $$;
 
 -- Вторая ссылка на эфир (по желанию: ещё TikTok или YouTube). В уведомлении «в эфире» тогда две кнопки: LIVE 1 | LIVE 2
 ALTER TABLE shift_reports ADD COLUMN IF NOT EXISTS stream_url2 TEXT;
+
+-- Клик из встроенного браузера TikTok (показали подсказку «Откройте в браузере»): по нему не считаем повторный клик из Safari / Chrome
+ALTER TABLE link_clicks ADD COLUMN IF NOT EXISTS inapp TEXT;

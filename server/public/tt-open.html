@@ -1,0 +1,58 @@
+<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Hunter AI</title>
+<link rel="icon" href="/img/favicon.png">
+<style>
+@font-face{font-family:'Montserrat';font-weight:500;font-display:swap;src:url('/fonts/Montserrat-Medium.woff2') format('woff2')}
+@font-face{font-family:'Montserrat';font-weight:600;font-display:swap;src:url('/fonts/Montserrat-SemiBold.woff2') format('woff2')}
+@font-face{font-family:'Montserrat';font-weight:800;font-display:swap;src:url('/fonts/Montserrat-ExtraBold.woff2') format('woff2')}
+:root{--bg:#0d0817;--card:#1c1233;--line:#34255c;--fg:#f1ebff;--mut:#a89cc8;--acc:#9b5cff;--acc2:#c9a6ff}
+*{box-sizing:border-box}html,body{margin:0;min-height:100%}
+body{background:radial-gradient(520px 320px at 100% 0,rgba(155,92,255,.35),transparent 60%),var(--bg);font-family:Montserrat,system-ui,-apple-system,sans-serif;color:var(--fg);
+  padding:calc(18px + env(safe-area-inset-top,0px)) 18px calc(18px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:12px;min-height:100vh;min-height:100dvh;max-width:520px;margin:0 auto}
+.lg{display:flex;justify-content:space-between;align-items:center}
+.logo{display:flex;align-items:center;gap:10px;font-weight:800;font-size:16px}
+.logo img{width:36px;height:36px;border-radius:10px;object-fit:cover;display:block;box-shadow:0 0 0 1.5px rgba(155,92,255,.6),0 6px 20px rgba(155,92,255,.45)}
+.sw{display:flex;border:1px solid var(--line);border-radius:99px;overflow:hidden;font-size:12px;font-weight:800}
+.sw button{-webkit-appearance:none;appearance:none;border:0;background:none;font:inherit;cursor:pointer;padding:7px 13px;color:var(--mut)}.sw button.on{background:var(--acc);color:#fff}
+h1{font-size:22px;line-height:1.25;margin:6px 0 0;font-weight:800}.p{font-size:14px;color:var(--mut);line-height:1.45;margin:0;font-weight:500}
+.st{display:flex;gap:10px;align-items:center;font-size:15px;font-weight:600}.st b{flex:none;width:27px;height:27px;border-radius:50%;background:var(--acc);display:grid;place-items:center;font-size:13px}
+.demo{flex:1;min-height:260px;max-height:380px;background:var(--card);border:1px solid var(--line);border-radius:18px;position:relative;overflow:hidden}
+.bar{position:absolute;top:16px;left:14px;right:14px;height:44px;background:#2a2140;border-radius:12px;display:flex;align-items:center;padding:0 12px;gap:10px;font-size:13px;color:#bbb;animation:bar 7s infinite cubic-bezier(.2,.8,.2,1)}
+.bar .uu{flex:1;background:#3a2f55;border-radius:8px;padding:7px 10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bar .d3{font-size:20px;color:#fff;letter-spacing:1px;width:34px;text-align:center}
+.ring{position:absolute;top:13px;right:13px;width:50px;height:50px;border-radius:50%;border:3px solid var(--acc2);opacity:0;animation:ring 7s infinite}
+.tap{position:absolute;width:56px;height:56px;border-radius:50%;background:rgba(255,255,255,.3);border:2px solid rgba(255,255,255,.7);opacity:0;animation:tap 7s infinite cubic-bezier(.3,.7,.3,1)}
+.sheet{position:absolute;left:14px;right:14px;bottom:0;background:#2a2140;border-radius:16px 16px 0 0;padding:6px 0;transform:translateY(110%);animation:sheet 7s infinite cubic-bezier(.2,.8,.2,1)}
+.sheet div{display:flex;gap:12px;align-items:center;padding:13px 16px;font-size:14.5px;color:#cfc6e6;border-top:1px solid #3a2f55}.sheet div:first-child{border-top:0}
+.sheet .hl{animation:hl 7s infinite}
+.lock{font-size:12px;color:var(--mut);text-align:center;line-height:1.45}
+@keyframes bar{0%{transform:translateX(110%);opacity:0}10%{transform:translateX(0);opacity:1}88%{transform:translateX(0);opacity:1}100%{transform:translateX(0);opacity:0}}
+@keyframes ring{0%,14%{opacity:0;transform:scale(.6)}20%{opacity:1;transform:scale(1)}26%{opacity:.4;transform:scale(1.25)}32%{opacity:1;transform:scale(1)}38%{opacity:0;transform:scale(1.3)}100%{opacity:0}}
+@keyframes tap{0%,18%{opacity:0;top:120px;left:60%}26%{opacity:1;top:10px;left:calc(100% - 66px);transform:scale(1)}30%{transform:scale(.75)}34%{transform:scale(1);opacity:1}40%{opacity:0;top:10px;left:calc(100% - 66px)}
+  58%{opacity:0;top:120px;left:40%}64%{opacity:1;top:calc(100% - 118px);left:34%;transform:scale(1)}68%{transform:scale(.75)}72%{transform:scale(1);opacity:1}80%{opacity:0;top:calc(100% - 118px);left:34%}100%{opacity:0}}
+@keyframes sheet{0%,40%{transform:translateY(110%)}50%{transform:translateY(0)}88%{transform:translateY(0)}100%{transform:translateY(110%)}}
+@keyframes hl{0%,62%{background:transparent;color:#cfc6e6}68%,86%{background:rgba(155,92,255,.35);color:#fff;font-weight:800}100%{background:transparent}}
+</style></head><body>
+<div class="lg"><div class="logo"><img alt="" src="/img/logo-128.webp">Hunter AI</div><div class="sw"><button type="button" data-l="ru" class="on">RU</button><button type="button" data-l="en">EN</button></div></div>
+<h1 data-t="h">Откройте ссылку в браузере</h1><p class="p" data-t="p"></p>
+<div class="st"><b>1</b><span data-t="s1"></span></div>
+<div class="st"><b>2</b><span data-t="s2"></span></div>
+<div class="demo" aria-hidden="true">
+ <div class="bar"><span>‹</span><span class="uu" id="u">hunterai.space</span><span class="d3">⋯</span></div>
+ <div class="ring"></div>
+ <div class="sheet"><div>🏳 <span data-t="m0"></span></div><div class="hl">🧭 <span data-t="m1"></span></div><div>🔗 <span data-t="m2"></span></div></div>
+ <div class="tap"></div>
+</div>
+<div class="lock">🔒 <span data-t="l"></span></div>
+<script>
+var T={ru:{h:'Откройте ссылку в браузере',p:'Во встроенном браузере TikTok бот может не открыться. Это займёт 5 секунд:',s1:'Нажмите «⋯» справа сверху',s2:'Выберите «Открыть в браузере»',m0:'Пожаловаться',m1:'Открыть в браузере',m2:'Копировать ссылку',l:'Экран пропадёт сам, когда ссылка откроется в Safari или Chrome'},
+ en:{h:'Open the link in your browser',p:'The bot may not open inside the TikTok browser. It takes 5 seconds:',s1:'Tap «⋯» in the top right',s2:'Choose «Open in browser»',m0:'Report',m1:'Open in browser',m2:'Copy link',l:'This screen disappears once the link opens in Safari or Chrome'}};
+function set(l){document.documentElement.lang=l;var a=document.querySelectorAll('[data-t]');for(var i=0;i<a.length;i++)a[i].textContent=T[l][a[i].getAttribute('data-t')];
+ var b=document.querySelectorAll('.sw button');for(var j=0;j<b.length;j++)b[j].className=b[j].getAttribute('data-l')===l?'on':'';try{localStorage.setItem('tt_lang',l)}catch(e){}}
+var bs=document.querySelectorAll('.sw button');for(var k=0;k<bs.length;k++)bs[k].onclick=function(){set(this.getAttribute('data-l'))};
+try{document.getElementById('u').textContent=location.host+location.pathname}catch(e){}
+var saved=null;try{saved=localStorage.getItem('tt_lang')}catch(e){}
+var nl=(navigator.language||'').slice(0,2);set(saved||(/^(ru|uk|be|kk)$/.test(nl)?'ru':'en'));
+</script>
+</body></html>

@@ -134,24 +134,36 @@ app.get('/health', async () => {
 
 // Ссылки: hunterai.space/liza и hunterai.space/liza/<код>. Считаем клик и отправляем в бота с параметром.
 // Прежние формы (/s/liza, /b/liza, go.hunterai.space) больше не работают. Неизвестный адрес ведёт на заглушку сайта
+const ttOpenHtml = readFileSync(resolve(process.cwd(), 'public/tt-open.html'), 'utf8');
 async function goLink(req: FastifyRequest, reply: FastifyReply, slug: string, token?: string) {
   if (/^(go|api|crm|app)\./i.test(req.hostname)) return reply.redirect(302, SITE_URL + '/');
   const key = token ? `${slug}/${token}` : slug;
-  const r = await db.query(
-    `UPDATE links l SET clicks = clicks + 1 FROM staff o WHERE l.slug = $1 AND o.id = l.owner_id RETURNING l.id, l.token, o.role AS owner_role`,
-    [key],
-  );
-  if (!r.rowCount) return reply.redirect(302, SITE_URL + '/');
-  const row = r.rows[0];
-  // Журнал кликов для дашборда по периодам. Ошибка журнала не должна ломать переход
+  const link = (await db.query(`SELECT l.id, l.token, o.role AS owner_role FROM links l JOIN staff o ON o.id = l.owner_id WHERE l.slug = $1`, [key])).rows[0];
+  if (!link) return reply.redirect(302, SITE_URL + '/');
+  // Встроенный браузер TikTok: бот оттуда часто не открывается. Показываем подсказку «Откройте в браузере» (закрыть нельзя),
+  // а в Safari / Chrome та же ссылка сразу ведёт в бота
+  const ua = String(req.headers['user-agent'] ?? '');
+  const inTikTok = /musical_ly|bytedancewebview|trill_|tiktok/i.test(ua);
   const ci = parseClick(req.headers);
-  void db.query('INSERT INTO link_clicks (link_id, country, city, device, os, browser, referrer, ip_hash) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)', [row.id, ci.country, ci.city, ci.device, ci.os, ci.browser, ci.referrer, ci.device === 'Бот' ? null : ipHash(req.ip)]).catch(() => {});
-  const kind = row.owner_role === 'buyer' ? 'b' : 's';
+  const ih = ci.device === 'Бот' ? null : ipHash(req.ip);
+  // Клик считаем один раз: если этот же человек (тот же IP) только что видел подсказку в TikTok и открыл ссылку в браузере — второй раз не считаем
+  const again = !inTikTok && ih
+    ? ((await db.query(`SELECT 1 FROM link_clicks WHERE link_id = $1 AND ip_hash = $2 AND inapp = 'tiktok' AND at > now() - interval '30 minutes'`, [link.id, ih])).rowCount ?? 0) > 0
+    : false;
+  if (!again) {
+    await db.query('UPDATE links SET clicks = clicks + 1 WHERE id = $1', [link.id]);
+    // Журнал кликов для дашборда по периодам. Ошибка журнала не должна ломать переход
+    void db.query('INSERT INTO link_clicks (link_id, country, city, device, os, browser, referrer, ip_hash, inapp) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)',
+      [link.id, ci.country, ci.city, ci.device, ci.os, ci.browser, ci.referrer, ih, inTikTok ? 'tiktok' : null]).catch(() => {});
+  }
+  if (inTikTok) return reply.type('text/html; charset=utf-8').header('Cache-Control', 'no-store').send(ttOpenHtml);
+  const kind = link.owner_role === 'buyer' ? 'b' : 's';
   // Пробный режим ?app=1: ссылка сразу открывает Mini App (основное приложение бота), метка ссылки приходит в приложение
   const toApp = String((req.query as Record<string, unknown>)?.app ?? '') === '1';
   // В параметре старта у случайной ссылки её код: слэш Telegram не допускает
-  return reply.redirect(302, `https://t.me/${config.botUsername}?${toApp ? 'startapp' : 'start'}=${kind}_${encodeURIComponent(row.token ?? slug)}`);
+  return reply.redirect(302, `https://t.me/${config.botUsername}?${toApp ? 'startapp' : 'start'}=${kind}_${encodeURIComponent(link.token ?? slug)}`);
 }
+
 const SEG = '^[a-z0-9][a-z0-9_-]{1,39}$';
 const TOK = '^[a-z0-9_-]{2,40}$';
 app.get<{ Params: { a: string } }>(`/:a(${SEG})`, async (req, reply) => {
