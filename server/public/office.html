@@ -1757,7 +1757,8 @@ function dxStatusCard(d){
   const blS=k=>bl[k]?el('span',{class:'st-bl',title:'Из них заблокировали бота до первого депозита'},'⛔ '+bl[k]):null;
   return el('div',{class:'card st-card'},donut,el('div',{class:'st-leg'},el('div',{class:'st-hd'},el('span',{class:'dx-lbl'},me.role==='teamlead'?'Статусы лидов команды':'Статусы лидов'),
       tot&&blTot?el('span',{class:'st-blt',title:'Заблокировали бота: до первого депозита (цифры у этапов) и после него («Отвал»)'},'⛔ '+blTot+' · '+Math.round(blTot/tot*100)+'%'):null),
-    ...(tot?Object.keys(DXS).map(k=>el('div',{class:'st-r'},el('i',{style:'background:'+DXS[k][1]}),el('span',{},DXS[k][0]),el('b',{},n0(b[k]||0),el('span',{class:'mut'},' ('+Math.round((b[k]||0)/tot*100)+'%)'),blS(k)))):[el('div',{class:'mut sm'},'Лидов за период нет')])));
+    // У этапа — без заблокировавших бота (их число рядом ⛔), процент тоже от оставшихся; вместе = все лиды этапа
+    ...(tot?Object.keys(DXS).map(k=>{const v=Math.max(0,(b[k]||0)-(k==='churned'?0:(bl[k]||0)));return el('div',{class:'st-r',title:bl[k]&&k!=='churned'?'Всего на этапе '+(b[k]||0)+': '+v+' + '+bl[k]+' заблокировали бота':null},el('i',{style:'background:'+DXS[k][1]}),el('span',{},DXS[k][0]),el('b',{},n0(v),el('span',{class:'mut'},' ('+Math.round(v/tot*100)+'%)'),k==='churned'?null:blS(k)))}):[el('div',{class:'mut sm'},'Лидов за период нет')])));
 }
 function dxRingGrid(d){
   const g=d.goals,t=d.totals,pace=d.pace,showMark=g&&pace<0.995;
