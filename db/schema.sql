@@ -1158,3 +1158,6 @@ ALTER TABLE shift_reports ADD COLUMN IF NOT EXISTS stream_url2 TEXT;
 
 -- Клик из встроенного браузера TikTok (показали подсказку «Откройте в браузере»): по нему не считаем повторный клик из Safari / Chrome
 ALTER TABLE link_clicks ADD COLUMN IF NOT EXISTS inapp TEXT;
+
+-- Полная блокировка: лид не может даже написать в поддержку — бот молчит, сообщения не попадают в Office, Mini App закрыт без кнопки поддержки
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS ban_full BOOLEAN NOT NULL DEFAULT FALSE;

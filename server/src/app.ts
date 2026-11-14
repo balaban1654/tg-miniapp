@@ -194,8 +194,8 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
     await attachLead(user.id, user.username, user.first_name, appSlug, null, null, appSlug ? 'applink' : 'app', req.ip);
     if (appSlug) void giveMenu(user.id);
     // Заблокированный админом лид в Mini App не попадает: показываем причину и поддержку
-    const ban = (await db.query('SELECT ban_reason FROM leads WHERE tg_id = $1 AND banned_at IS NOT NULL', [user.id])).rows[0];
-    if (ban) return reply.code(403).send({ error: 'Доступ заблокирован', banned: true, reason: ban.ban_reason ?? null, botUsername: config.botUsername });
+    const ban = (await db.query('SELECT ban_reason, ban_full FROM leads WHERE tg_id = $1 AND banned_at IS NOT NULL', [user.id])).rows[0];
+    if (ban) return reply.code(403).send({ error: 'Доступ заблокирован', banned: true, reason: ban.ban_reason ?? null, full: !!ban.ban_full, botUsername: ban.ban_full ? null : config.botUsername });
     // Часовой пояс устройства клиента: по нему показываем время сигналов в пушах
     const tzHeader = String(req.headers['x-tz'] ?? '');
     if (tzHeader && tzHeader.length < 60) {

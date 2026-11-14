@@ -21,6 +21,15 @@ const banned = async (tgId: number) => ((await leadLang(tgId)) === 'en' ? BANNED
 // Выбор языка при первом /start. Дальше воронка, пуши и Mini App на выбранном языке
 const LANG_ASK = '🌐 Выберите язык / Choose your language';
 const langKeyboard = () => new InlineKeyboard().text('🇷🇺 Русский', 'lang:ru').text('🇬🇧 English', 'lang:en');
+// Полная блокировка: бот не отвечает ни на что и не сохраняет сообщения (стоит первым, до всех обработчиков)
+bot.use(async (ctx, next) => {
+  const id = ctx.from?.id;
+  if (id && ctx.chat?.type === 'private' && (await db.query('SELECT 1 FROM leads WHERE tg_id = $1 AND banned_at IS NOT NULL AND ban_full', [id])).rowCount) {
+    if (ctx.callbackQuery) await ctx.answerCallbackQuery().catch(() => {});
+    return;
+  }
+  await next();
+});
 async function isBanned(tgId: number): Promise<boolean> {
   return ((await db.query('SELECT 1 FROM leads WHERE tg_id = $1 AND banned_at IS NOT NULL', [tgId])).rowCount ?? 0) > 0;
 }

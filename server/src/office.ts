@@ -2708,9 +2708,10 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     const reason = str((req.body as any)?.reason, 300);
     if (!reason) return reply.code(400).send({ error: 'Укажите причину блокировки' });
     if (!(await banAllowed(req.staff!, Number(req.params.tgId)))) return reply.code(403).send({ error: 'Это лид не вашей команды' });
-    const r = await db.query('UPDATE leads SET banned_at = now(), ban_reason = $2, banned_by = $3 WHERE tg_id = $1 RETURNING tg_id', [Number(req.params.tgId), reason, req.staff!.id]);
+    const full = (req.body as any)?.full === true;
+    const r = await db.query('UPDATE leads SET banned_at = now(), ban_reason = $2, banned_by = $3, ban_full = $4 WHERE tg_id = $1 RETURNING tg_id', [Number(req.params.tgId), reason, req.staff!.id, full]);
     if (!r.rowCount) return reply.code(404).send({ error: 'Лид не найден' });
-    await leadLog(req.params.tgId, 'ban', `${req.staff!.name} заблокировал лида. Причина: ${reason}`, req.staff!.id);
+    await leadLog(req.params.tgId, 'ban', `${req.staff!.name} заблокировал лида${full ? ' полностью (не может писать боту)' : ''}. Причина: ${reason}`, req.staff!.id);
     return { ok: true };
   });
   // Лид забыл доступ к аккаунту Pocket Option: старая регистрация остаётся в базе (Pocket ID в lead_pockets, события на месте),
@@ -2748,7 +2749,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
   });
   app.delete<{ Params: { tgId: string } }>('/leads/:tgId/ban', { preHandler: need('admin', 'teamlead') }, async (req, reply) => {
     if (!(await banAllowed(req.staff!, Number(req.params.tgId)))) return reply.code(403).send({ error: 'Это лид не вашей команды' });
-    const ub = await db.query('UPDATE leads SET banned_at = NULL, ban_reason = NULL, banned_by = NULL WHERE tg_id = $1 AND banned_at IS NOT NULL', [Number(req.params.tgId)]);
+    const ub = await db.query('UPDATE leads SET banned_at = NULL, ban_reason = NULL, banned_by = NULL, ban_full = FALSE WHERE tg_id = $1 AND banned_at IS NOT NULL', [Number(req.params.tgId)]);
     if (ub.rowCount) await leadLog(req.params.tgId, 'ban', `${req.staff!.name} разблокировал лида`, req.staff!.id);
     return { ok: true };
   });
@@ -2892,7 +2893,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     const r = await db.query(
       `SELECT d.tg_id, d.username, d.first_name, d.status, d.access, d.trader_id, d.is_tester, d.lead_role, d.region, d.tz, d.referrer_id,
               (SELECT coalesce(nullif(r.first_name, ''), '@' || r.username) FROM leads r WHERE r.tg_id = d.referrer_id) AS referrer_name,
-              d.created_at, d.last_seen_at, d.bot_started, d.bot_blocked, d.owner_id, d.banned_at, d.ban_reason, d.rereg_at,
+              d.created_at, d.last_seen_at, d.bot_started, d.bot_blocked, d.owner_id, d.banned_at, d.ban_reason, d.ban_full, d.rereg_at,
               (d.widget_key IS NOT NULL) AS widget_has, d.widget_used_at, d.widget_blocked,
               (SELECT name FROM staff WHERE id = d.banned_by) AS banned_by_name,
               o.name AS owner_name, l.slug AS link_slug, l.source AS link_source, l.campaign AS link_campaign, d.origin

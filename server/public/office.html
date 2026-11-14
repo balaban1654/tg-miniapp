@@ -220,7 +220,8 @@ th.n{text-align:right}
 .lc-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:4px}
 .lc-widget{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px;padding-top:10px;border-top:1px solid var(--line)}.lc-widget .btn{padding:4px 10px;font-size:12px}
 
-.ctr .pb-blk{color:var(--live);font-weight:700;font-size:13px;margin-left:2px;white-space:nowrap}tr.blk-band td{color:var(--live)!important;font-size:12px!important;padding:12px 14px!important;border-top:2px solid var(--line)}tr.band td{text-align:left;font:600 11px var(--fm);letter-spacing:.06em;text-transform:uppercase;color:var(--acc2);background:var(--bg2);border-bottom:1px solid var(--line);padding:8px 14px}
+.ctr .ban-ks{display:grid;gap:8px}.ban-k{display:grid;gap:3px;text-align:left;background:var(--card2);border:1.5px solid var(--line);border-radius:12px;padding:10px 12px;color:var(--fg);font:inherit;cursor:pointer}.ban-k.on{border-color:var(--live);background:rgba(242,70,122,.1)}.ban-k b{font-size:14px}
+.pb-blk{color:var(--live);font-weight:700;font-size:13px;margin-left:2px;white-space:nowrap}tr.blk-band td{color:var(--live)!important;font-size:12px!important;padding:12px 14px!important;border-top:2px solid var(--line)}tr.band td{text-align:left;font:600 11px var(--fm);letter-spacing:.06em;text-transform:uppercase;color:var(--acc2);background:var(--bg2);border-bottom:1px solid var(--line);padding:8px 14px}
 .cp-btn{background:none;border:0;padding:2px;color:var(--mut);cursor:pointer;display:grid;place-items:center;border-radius:6px}.cp-btn:hover{color:var(--fg);background:var(--card2)}
 .cp{display:inline-flex;align-items:center;gap:8px}.cp button{background:none;border:0;padding:2px;color:var(--mut);cursor:pointer;display:grid;place-items:center;border-radius:6px}.cp button:hover{color:var(--fg);background:var(--card2)}
 .pill{display:inline-block;border-radius:99px;padding:2px 10px;font:600 11px var(--fm)}
@@ -3183,7 +3184,7 @@ async function openLeadCard(tgId){
       return el('div',{},el('button',{class:'btn',type:'button',disabled:!act&&C.liveUntil?'':null,title:!act&&C.liveUntil?'Акция ещё действует до '+fmtDT(C.liveUntil):act?'Применить скидку к уже внесённому депозиту и открыть доступ':'',onclick:()=>connectDialog(L,C,()=>{close();openLeadCard(tgId)},act)},act?'Активировать скидку':'Предложить скидку'))})()):null;
   box.replaceChildren(...[
     el('div',{class:'lc-head'},el('div',{style:'min-width:0'},el('h3',{style:'font-size:21px;line-height:1.2;overflow:hidden;text-overflow:ellipsis'},fname),L.first_name&&L.username?el('div',{class:'mut',style:'font-size:13px;margin-top:2px'},'@'+L.username):null),
-      el('div',{class:'lc-hr'},el('div',{class:'lc-pills'},pill(L.status),L.rereg_at?el('span',{class:'pill p-pur',title:'Новая регистрация разрешена '+fmtDT(L.rereg_at)+'. Старый Pocket ID в карточке вторым'},'ждёт новой регистрации'):null,L.banned_at?el('span',{class:'pill p-bad'},'заблокирован'):L.access?el('span',{class:'pill p-ok'},'доступ открыт'):el('span',{class:'pill p-pur'},'доступ закрыт')),
+      el('div',{class:'lc-hr'},el('div',{class:'lc-pills'},pill(L.status),L.rereg_at?el('span',{class:'pill p-pur',title:'Новая регистрация разрешена '+fmtDT(L.rereg_at)+'. Старый Pocket ID в карточке вторым'},'ждёт новой регистрации'):null,L.banned_at?el('span',{class:'pill p-bad',title:L.ban_full?'Полная блокировка: не может писать боту':'Обычная блокировка: может написать в поддержку'},L.ban_full?'заблокирован полностью':'заблокирован'):L.access?el('span',{class:'pill p-ok'},'доступ открыт'):el('span',{class:'pill p-pur'},'доступ закрыт')),
         el('button',{class:'btn o s',type:'button','aria-label':'Закрыть',onclick:close},'✕'))),
     el('div',{class:'lc-grid'},
       kvc('Telegram ID',L.tg_id),pocketKv(L,cpI,close),(me.role==='admin'||me.role==='teamlead')?el('div',{class:'lc-kv'},el('span',{class:'mut sm'},'Откуда пришёл'),el('b',{style:'display:flex;gap:6px;align-items:center'},origin||'—',
@@ -5538,10 +5539,14 @@ function banDialog(L,done){
   const reason=el('textarea',{class:'big',rows:'3',maxlength:'300',placeholder:'Причина блокировки (её увидит лид)'});
   const quick=['Второй аккаунт','Неадекватное поведение','Мошенничество / фрод'].map(t=>el('button',{type:'button',class:'btn o s',onclick:()=>{reason.value=t;reason.focus()}},t));
   const err=el('div',{class:'err',role:'alert'});
-  const go=el('button',{class:'btn',type:'button',style:'background:var(--bad)',onclick:async()=>{err.textContent='';go.disabled=true;try{await api('/leads/'+L.tg_id+'/ban',{method:'POST',body:{reason:reason.value}});toast('Лид заблокирован');close();done()}catch(x){err.textContent=x.message;go.disabled=false}}},'Заблокировать');
+  // Два вида: обычная (написать в поддержку может) и полная (бот молчит, сообщения не доходят)
+  let full=false;
+  const kindBtn=(f,t,d)=>{const b=el('button',{type:'button',class:'ban-k'+(f===full?' on':''),onclick:()=>{full=f;kinds.querySelectorAll('.ban-k').forEach((x,i)=>x.classList.toggle('on',(i===1)===full))}},el('b',{},t),el('span',{class:'mut sm'},d));return b};
+  const kinds=el('div',{class:'ban-ks'},kindBtn(false,'Обычная','Нет Mini App, пушей, сигналов и воронки. Написать в поддержку может.'),kindBtn(true,'Полная','То же, и написать боту не может: бот не отвечает, сообщения не доходят до Office.'));
+  const go=el('button',{class:'btn',type:'button',style:'background:var(--bad)',onclick:async()=>{err.textContent='';go.disabled=true;try{await api('/leads/'+L.tg_id+'/ban',{method:'POST',body:{reason:reason.value,full}});toast('Лид заблокирован');close();done()}catch(x){err.textContent=x.message;go.disabled=false}}},'Заблокировать');
   ov.append(el('div',{class:'lc',style:'width:min(460px,100%);display:grid;gap:12px'},
     el('div',{class:'lc-head'},el('h3',{style:'font-size:17px'},'Заблокировать лида'),el('button',{class:'btn o s',type:'button','aria-label':'Закрыть',onclick:close},'✕')),
-    el('div',{class:'mut sm'},(L.first_name||L.username||L.tg_id)+': не сможет открыть Mini App, не будет получать пуши, сигналы и акции, бот не поведёт его по воронке. Написать в поддержку он сможет.'),
+    kinds,
     el('div',{style:'display:flex;gap:6px;flex-wrap:wrap'},...quick),reason,err,
     el('div',{style:'display:flex;gap:8px'},go,el('button',{class:'btn o',type:'button',onclick:close},'Отмена'))));
   document.body.append(ov);reason.focus();

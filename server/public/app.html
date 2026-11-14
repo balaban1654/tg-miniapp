@@ -541,7 +541,7 @@ function showBanned(d){
   root.replaceChildren(el('main',{id:'banned',style:'padding:48px 20px;text-align:center;display:grid;gap:14px;max-width:420px;margin:auto'},
     el('div',{style:'font-size:44px'},'⛔'),el('h2',{style:'margin:0'},'Доступ заблокирован'),
     d.reason?el('div',{class:'sm',style:'opacity:.85'},'Причина: '+d.reason):null,
-    el('div',{class:'sm',style:'opacity:.7'},'Если это ошибка, напишите в поддержку.'),
+    d.full?null:el('div',{class:'sm',style:'opacity:.7'},'Если это ошибка, напишите в поддержку.'),
     d.botUsername?el('button',{class:'btn',type:'button',onclick:sup},'Написать в поддержку'):null));
 }
 function toast(t){document.querySelectorAll('.toast').forEach(x=>x.remove());const n=el('div',{class:'toast',role:'status'},t);document.body.append(n);setTimeout(()=>n.remove(),2050)}
