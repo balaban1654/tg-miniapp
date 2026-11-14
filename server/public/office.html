@@ -220,7 +220,7 @@ th.n{text-align:right}
 .lc-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:4px}
 .lc-widget{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px;padding-top:10px;border-top:1px solid var(--line)}.lc-widget .btn{padding:4px 10px;font-size:12px}
 
-.ctr tr.blk-band td{color:var(--live)!important;font-size:12px!important;padding:12px 14px!important;border-top:2px solid var(--line)}tr.band td{text-align:left;font:600 11px var(--fm);letter-spacing:.06em;text-transform:uppercase;color:var(--acc2);background:var(--bg2);border-bottom:1px solid var(--line);padding:8px 14px}
+.ctr .pb-blk{color:var(--live);font-weight:700;font-size:13px;margin-left:2px;white-space:nowrap}tr.blk-band td{color:var(--live)!important;font-size:12px!important;padding:12px 14px!important;border-top:2px solid var(--line)}tr.band td{text-align:left;font:600 11px var(--fm);letter-spacing:.06em;text-transform:uppercase;color:var(--acc2);background:var(--bg2);border-bottom:1px solid var(--line);padding:8px 14px}
 .cp-btn{background:none;border:0;padding:2px;color:var(--mut);cursor:pointer;display:grid;place-items:center;border-radius:6px}.cp-btn:hover{color:var(--fg);background:var(--card2)}
 .cp{display:inline-flex;align-items:center;gap:8px}.cp button{background:none;border:0;padding:2px;color:var(--mut);cursor:pointer;display:grid;place-items:center;border-radius:6px}.cp button:hover{color:var(--fg);background:var(--card2)}
 .pill{display:inline-block;border-radius:99px;padding:2px 10px;font:600 11px var(--fm)}
@@ -2593,7 +2593,10 @@ async function viewLeads(){
     // Сводка по статусам: те же фильтры, кроме самого статуса, админ состав не считаем
     const base=src().filter(r=>!isStaff(r)&&r.lead_role!=='test'&&(!F.link||r.link_slug===F.link)&&(!F.owner||(F.owner==='none'?!r.owner_id:String(r.owner_id)===F.owner))
       &&(!qq||[r.username,r.first_name,r.tg_id,r.trader_id].some(v=>v!=null&&String(v).toLowerCase().includes(qq))));
-    tots.replaceChildren(...Object.entries(STATUS).map(([k,v])=>[k,v,base.filter(r=>(r.stage||r.status)===k).length]).filter(x=>x[2]).map(([k,v,n])=>el('span',{class:'pb-tot'},el('span',{class:'pill '+v[1]},v[0]),el('b',{},n+' шт'))));
+    // Число у этапа — без заблокировавших бота; сколько из этого этапа заблокировали — рядом малиновым (⛔). Вместе = все лиды этапа.
+    // У «Отвала» ⛔ не пишем: там и так только заблокировавшие после первого депозита
+    tots.replaceChildren(...Object.entries(STATUS).map(([k,v])=>{const all=base.filter(r=>(r.stage||r.status)===k);const blk=k==='churned'?0:all.filter(r=>r.status==='churned').length;return[k,v,all.length-blk,blk]}).filter(x=>x[2]||x[3])
+      .map(([k,v,n,b])=>el('span',{class:'pb-tot',title:b?'Всего на этапе '+(n+b)+': '+n+' + '+b+' заблокировали бота':null},el('span',{class:'pill '+v[1]},v[0]),el('b',{},n+' шт'),b?el('span',{class:'pb-blk'},'· ⛔ '+b):null)));
   };
   leadsRows=rows;leadsRedraw=draw;draw();if(F.q.trim())onSearch();
   // Блок «Пользователи из старого бота» убран: перенос закончен
