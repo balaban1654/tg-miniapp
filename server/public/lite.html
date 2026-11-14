@@ -691,7 +691,7 @@ function liveRows() {
     var s = list[i], mo = s.month || {}, hrs = mo.hoursMin || 0, f = mo.ftd || 0, lv = lvl(hrs, pl.paceMin), col = lv === 'pos' ? '#3ddc97' : lv === 'warn' ? '#ffb84d' : '#f2467a';
     var note = s.live ? hm(s.live.elapsed) + ' в эфире' : offText(s, d.today);
     o += '<div class="lr' + (s.noCard ? '' : ' cl') + '" data-sc="' + i + '"><span class="rk' + (i < 3 ? ' m' + i : '') + '">' + (i + 1) + '</span><span class="lt"><span class="lt1"><b>' + esc(s.name) +
-      (s.live ? ' <span class="liv">LIVE</span>' + (s.live.stream_url ? ' <a class="lo" href="' + esc(s.live.stream_url) + '" target="_blank" rel="noopener">(открыть)</a>' : '') : '') + '</b><span><b>' + f + '</b> <span class="mut">FTD</span></span></span>' +
+      (s.live ? ' <span class="liv">LIVE</span>' + (s.live.stream_url ? (s.live.stream_url2 ? ' <a class="lo" href="' + esc(s.live.stream_url) + '" target="_blank" rel="noopener">LIVE 1</a> <a class="lo" href="' + esc(s.live.stream_url2) + '" target="_blank" rel="noopener">LIVE 2</a>' : ' <a class="lo" href="' + esc(s.live.stream_url) + '" target="_blank" rel="noopener">(открыть)</a>') : '') : '') + '</b><span><b>' + f + '</b> <span class="mut">FTD</span></span></span>' +
       (s.role === 'streamer' ? '<span class="lt2"><span class="bar"><i style="width:' + Math.min(100, hrs / (pl.planMin || 1) * 100) + '%;background:' + col + '"></i><u style="left:' + Math.min(100, pl.paceMin / (pl.planMin || 1) * 100) + '%"></u></span><span class="mut">' + hw(hrs) + ' / ' + pl.hours + ' ч</span></span>' : '') +
       '<span class="' + (s.live ? 'lon' : 'mut') + '" style="font-size:13px">' + esc(note) + '</span></span>' + (s.noCard ? '' : '<span class="chv">›</span>') + '</div>';
   }

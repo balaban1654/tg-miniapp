@@ -1587,7 +1587,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
 
     const nowIso = new Date().toISOString();
     const live = new Map(
-      ((await db.query(`SELECT DISTINCT ON (staff_id) staff_id, id, started_at, stream_url FROM shift_reports WHERE status = 'live' AND NOT team ORDER BY staff_id, id DESC`)).rows as { staff_id: number; id: number; started_at: string; stream_url: string }[]).map((r) => [r.staff_id, r]),
+      ((await db.query(`SELECT DISTINCT ON (staff_id) staff_id, id, started_at, stream_url, stream_url2 FROM shift_reports WHERE status = 'live' AND NOT team ORDER BY staff_id, id DESC`)).rows as { staff_id: number; id: number; started_at: string; stream_url: string; stream_url2: string | null }[]).map((r) => [r.staff_id, r]),
     );
     const lastEnd = new Map(
       ((await db.query(`SELECT staff_id, max(ended_at) AS t FROM shift_reports WHERE status <> 'live' AND NOT team AND ended_at IS NOT NULL GROUP BY staff_id`)).rows as { staff_id: number; t: string }[]).map((r) => [r.staff_id, r.t]),
@@ -1647,7 +1647,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
         tg: s.tg_username,
         role: s.role,
         active: s.active,
-        live: lv ? { id: lv.id, started_at: lv.started_at, stream_url: lv.stream_url, elapsed } : null,
+        live: lv ? { id: lv.id, started_at: lv.started_at, stream_url: lv.stream_url, stream_url2: lv.stream_url2 ?? null, elapsed } : null,
         lastEnd: lastEnd.get(s.id) ?? null,
         lastMin: lastLen.get(s.id) ?? null,
         minLeft: lv ? Math.max(0, plan.shiftH * 60 - doneToday) : null,
@@ -1692,7 +1692,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
             role: s.role,
             active: true,
             noCard: true,
-            live: lv ? { id: lv.id, started_at: lv.started_at, stream_url: lv.stream_url, elapsed: Math.max(0, Math.floor((Date.now() - Date.parse(lv.started_at)) / 60000)) } : null,
+            live: lv ? { id: lv.id, started_at: lv.started_at, stream_url: lv.stream_url, stream_url2: lv.stream_url2 ?? null, elapsed: Math.max(0, Math.floor((Date.now() - Date.parse(lv.started_at)) / 60000)) } : null,
             lastEnd: lastEnd.get(s.id) ?? null,
             lastMin: lastLen.get(s.id) ?? null,
             month: { ftd: (evMonth.get(s.id) ?? emptyAgg()).ftd, hoursMin: 0 },
@@ -1957,7 +1957,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
 
     // Коллеги: имена, часы за месяц и эфир, без денег и без карточек
     const colRows = (await db.query(`SELECT id, name, role, parent_id FROM staff WHERE (role = 'streamer' OR streams) AND active AND id <> $1 ORDER BY id`, [me.id])).rows as { id: number; name: string; role: string; parent_id: number | null }[];
-    const liveBy = new Map(((await db.query(`SELECT DISTINCT ON (staff_id) staff_id, started_at, stream_url FROM shift_reports WHERE status = 'live' AND NOT team ORDER BY staff_id, id DESC`)).rows as any[]).map((r) => [r.staff_id, r]));
+    const liveBy = new Map(((await db.query(`SELECT DISTINCT ON (staff_id) staff_id, started_at, stream_url, stream_url2 FROM shift_reports WHERE status = 'live' AND NOT team ORDER BY staff_id, id DESC`)).rows as any[]).map((r) => [r.staff_id, r]));
     const lastBy = new Map(((await db.query(`SELECT DISTINCT ON (staff_id) staff_id, ended_at, coalesce(approved_min, declared_min) AS m FROM shift_reports WHERE status <> 'live' AND NOT team AND ended_at IS NOT NULL ORDER BY staff_id, ended_at DESC`)).rows as any[]).map((r) => [r.staff_id, r]));
     const hoursBy = new Map(((await db.query(`SELECT staff_id, coalesce(sum(approved_min), 0)::int AS m FROM shift_reports WHERE status = 'approved' AND NOT team AND to_char(day, 'YYYY-MM') = $1 GROUP BY staff_id`, [refMonth])).rows as any[]).map((r) => [r.staff_id, r.m]));
     // FTD за месяц по стримерам (только количество, без денег)
@@ -1974,7 +1974,7 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
       .map((c) => {
         const lv = liveBy.get(c.id) ?? null;
         const ls = lastBy.get(c.id) ?? null;
-        return { id: c.id, name: c.name, role: c.role, hoursMin: hoursBy.get(c.id) ?? 0, ftd: ftdBy.get(c.id) ?? 0, live: lv ? { started_at: lv.started_at, stream_url: lv.stream_url } : null, lastEnd: ls?.ended_at ?? null, lastMin: ls?.m ?? null };
+        return { id: c.id, name: c.name, role: c.role, hoursMin: hoursBy.get(c.id) ?? 0, ftd: ftdBy.get(c.id) ?? 0, live: lv ? { started_at: lv.started_at, stream_url: lv.stream_url, stream_url2: lv.stream_url2 ?? null } : null, lastEnd: ls?.ended_at ?? null, lastMin: ls?.m ?? null };
       })
       .sort((a, b) => (b.live ? Date.now() - Date.parse(b.live.started_at) + 1e12 : 0) - (a.live ? Date.now() - Date.parse(a.live.started_at) + 1e12 : 0) || (Date.parse(b.lastEnd ?? '0') || 0) - (Date.parse(a.lastEnd ?? '0') || 0));
 

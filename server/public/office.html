@@ -1322,7 +1322,7 @@ function openLiveList(){
       const row=el(s.noCard?'div':'button',{type:s.noCard?null:'button',class:'dx-tk lv-r'+(s.noCard?' nc':''),title:s.noCard?'':'Открыть карточку'},
         el('span',{class:'lv-rk'+(i<3?' m'+i:'')},String(i+1)),
         el('span',{class:'lv-tx'},
-          el('span',{class:'lv-top'},el('b',{},s.name,s.live?el('span',{class:'pf-live'},el('i'),'LIVE'):null,s.live&&s.live.stream_url?el('a',{class:'lv-open',href:s.live.stream_url,target:'_blank',rel:'noopener',title:'Открыть эфир',onclick:e=>e.stopPropagation()},'(открыть)'):null),el('span',{class:'lv-f'},el('b',{class:f>=pl.leads*d.pace?'ok':f>=pl.leads*d.pace*.7?'warn':'bad'},String(f)),' FTD')),
+          el('span',{class:'lv-top'},el('b',{},s.name,s.live?el('span',{class:'pf-live'},el('i'),'LIVE'):null,...(s.live&&s.live.stream_url?(s.live.stream_url2?[['LIVE 1',s.live.stream_url],['LIVE 2',s.live.stream_url2]]:[['(открыть)',s.live.stream_url]]).map(([t,u])=>el('a',{class:'lv-open',href:u,target:'_blank',rel:'noopener',title:'Открыть эфир',onclick:e=>e.stopPropagation()},t)):[])),el('span',{class:'lv-f'},el('b',{class:f>=pl.leads*d.pace?'ok':f>=pl.leads*d.pace*.7?'warn':'bad'},String(f)),' FTD')),
           s.role==='streamer'?el('span',{class:'lv-h'},el('span',{class:'dx-bar'},el('i',{style:'width:'+Math.min(100,hrs/pl.planMin*100)+'%;background:var(--'+lvl+')'}),el('u',{style:'left:'+Math.min(100,pace/pl.planMin*100)+'%'})),el('span',{class:'mut'},hw(hrs)+' / '+pl.hours+' ч')):null,
           el('span',{class:'ts'+(s.live?' lv-on':'')},note)),
         s.noCard?null:svgIcon(IC_CHEV,16));
