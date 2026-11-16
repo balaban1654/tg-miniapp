@@ -1167,3 +1167,6 @@ ALTER TABLE leads ADD COLUMN IF NOT EXISTS profile_tour_at TIMESTAMPTZ;
 
 -- Админ один раз пересмотрел подсказки профиля (кнопка «Показать подсказки ещё раз» исчезает)
 ALTER TABLE leads ADD COLUMN IF NOT EXISTS tour_replay_at TIMESTAMPTZ;
+
+-- Подсказка «Это ваш профиль» на главной показана (нажал ✕, «Открыть» или аватарку) — больше не показываем
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS profile_hint_at TIMESTAMPTZ;

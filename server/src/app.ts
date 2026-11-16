@@ -276,7 +276,7 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
   app.get('/me', { preHandler: auth }, async (req) => {
     const u = req.tg!;
     const r = await db.query(
-      `SELECT coalesce(d.status_before_block, d.status) AS status, d.access, d.is_tester, d.lead_role, d.region, d.lang, d.theme, d.created_at, d.trader_id, d.profile_tour_at, d.tour_replay_at, o.name AS manager,
+      `SELECT coalesce(d.status_before_block, d.status) AS status, d.access, d.is_tester, d.lead_role, d.region, d.lang, d.theme, d.created_at, d.trader_id, d.profile_tour_at, d.tour_replay_at, d.profile_hint_at, o.name AS manager,
               o.po_promo, o.po_link, o.po_link_ru, o.tg_username AS manager_tg, o.tg_link AS manager_link, d.owner_id, o.live_channel AS manager_channel
          FROM leads d LEFT JOIN staff o ON o.id = d.owner_id WHERE d.tg_id = $1`,
       [u.id],
@@ -311,6 +311,7 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
       leadRole: l.lead_role || 'lead',
       lang: l.lang ?? null,
       profileTour: !!l.profile_tour_at,
+      profileHint: !!l.profile_hint_at,
       // Админ может один раз заново посмотреть подсказки профиля
       tourReplay: l.lead_role === 'admin' && !l.tour_replay_at,
       theme: l.theme ?? null,
@@ -362,6 +363,10 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // Подсказки в профиле просмотрены (нажал «Далее» или «Пропустить»): больше не показываем
+  app.post('/profile-hint', { preHandler: auth }, async (req) => {
+    await db.query('UPDATE leads SET profile_hint_at = coalesce(profile_hint_at, now()) WHERE tg_id = $1', [req.tg!.id]);
+    return { ok: true };
+  });
   app.post('/profile-tour', { preHandler: auth }, async (req) => {
     await db.query('UPDATE leads SET profile_tour_at = coalesce(profile_tour_at, now()) WHERE tg_id = $1', [req.tg!.id]);
     return { ok: true };
