@@ -1807,7 +1807,12 @@ async function reviewsBlock(){
 function newsBlock(items){
   if(!items.length)return el('div',{class:'card',style:'display:grid;gap:6px'},el('b',{style:'font-size:14px'},'Скоро здесь появятся новости'),el('div',{class:'sm',style:'line-height:1.5'},'Обновления тренажёра, итоги недели, новые трейдеры и важные объявления команды. Заглядывайте сюда почаще, чтобы ничего не пропустить.'));
   const dt=v=>new Date(v).toLocaleDateString('ru-RU',{day:'numeric',month:'long',year:'numeric'}).replace(/\s*г\.?$/,'');
-  return el('div',{style:'display:grid;gap:10px'},items.map(n=>el('div',{class:'card',style:'display:grid;gap:6px'},el('div',{class:'sm'},dt(n.created_at)),el('b',{style:'font-size:14.5px','data-raw':''},isEn()&&n.title_en?n.title_en:n.title),clampBody(isEn()&&(n.body_en||n.title_en)?(n.body_en||n.body):n.body,'','white-space:pre-wrap;line-height:1.5;font-size:13.5px;word-break:break-word',n.url||null))));
+  const card=n=>el('div',{class:'card',style:'display:grid;gap:6px'},el('div',{class:'sm'},dt(n.created_at)),el('b',{style:'font-size:14.5px','data-raw':''},isEn()&&n.title_en?n.title_en:n.title),clampBody(isEn()&&(n.body_en||n.title_en)?(n.body_en||n.body):n.body,'','white-space:pre-wrap;line-height:1.5;font-size:13.5px;word-break:break-word',n.url||null));
+  // Видны три свежие, остальные свёрнуты под кнопкой
+  const rest=items.slice(3),more=el('div',{style:'display:grid;gap:10px',hidden:''},...rest.map(card));
+  const lbl=(isEn()?'More news (':'Ещё новости (')+rest.length+')';
+  const btn=rest.length?el('button',{class:'rv-all',type:'button',onclick:()=>{more.hidden=!more.hidden;btn.textContent=more.hidden?lbl:(isEn()?'Collapse':'Свернуть')}},lbl):null;
+  return el('div',{style:'display:grid;gap:10px'},...items.slice(0,3).map(card),more,btn);
 }
 async function viewMedia(){
   if(!me)await refreshMe();
