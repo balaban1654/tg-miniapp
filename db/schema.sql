@@ -1161,3 +1161,6 @@ ALTER TABLE link_clicks ADD COLUMN IF NOT EXISTS inapp TEXT;
 
 -- Полная блокировка: лид не может даже написать в поддержку — бот молчит, сообщения не попадают в Office, Mini App закрыт без кнопки поддержки
 ALTER TABLE leads ADD COLUMN IF NOT EXISTS ban_full BOOLEAN NOT NULL DEFAULT FALSE;
+
+-- Подсказки в профиле Mini App показаны (нажал «Далее» или «Пропустить») — больше не показываем
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS profile_tour_at TIMESTAMPTZ;
