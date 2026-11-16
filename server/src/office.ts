@@ -2690,12 +2690,13 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     const def = from || to ? [from, to] : [null, null];
     const range = from || to ? def : (await db.query(`SELECT to_char(date_trunc('month', now() AT TIME ZONE ${KY}), 'YYYY-MM-DD') AS a, to_char((date_trunc('month', now() AT TIME ZONE ${KY}) + interval '1 month - 1 day'), 'YYYY-MM-DD') AS b`)).rows.map((x) => [x.a, x.b])[0];
     const r = await db.query(
-      `SELECT count(*) FILTER (WHERE ${inR('d.created_at')})::int AS total,
+      // Общее число — новые за период без заблокировавших бота (= «Новый N шт» в шапке «Лидов»); мигающее — такие же новые за сегодня
+      `SELECT count(*) FILTER (WHERE d.status <> 'churned' AND ${shownStage('d')} = 'new' AND ${inR(funnelStageDate('d'))})::int AS total,
               -- В скобках — кого можно дожать: сейчас на этапе «Регистрация» и бота не заблокировали (как «Регистрация N шт» в шапке «Лидов»)
               (SELECT count(*)::int FROM leads d2
                 WHERE d2.removed_at IS NULL AND coalesce(d2.lead_role, 'lead') = 'lead' AND d2.status <> 'churned' AND ${shownStage('d2')} = 'registered'
                   AND ${inR(funnelStageDate('d2'))} AND ${ownerScope(me, 'd2.owner_id')}) AS reg,
-              count(*) FILTER (WHERE (d.created_at AT TIME ZONE ${KY})::date = (now() AT TIME ZONE ${KY})::date)::int AS fresh
+              count(*) FILTER (WHERE d.status <> 'churned' AND ${shownStage('d')} = 'new' AND (d.created_at AT TIME ZONE ${KY})::date = (now() AT TIME ZONE ${KY})::date)::int AS fresh
          FROM leads d
         WHERE d.removed_at IS NULL AND coalesce(d.lead_role, 'lead') = 'lead' AND ${ownerScope(me, 'd.owner_id')}`,
       range,
