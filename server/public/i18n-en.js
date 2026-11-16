@@ -430,6 +430,8 @@ window.HUNTER_EN = {
   'Профессионал': 'Professional',
   'Клиент': 'Client',
   'Ваш трейдер': 'Your trader',
+  '✉ Написать': '✉ Message',
+  '📣 Канал': '📣 Channel',
   'не назначен': 'not assigned',
   'Роль': 'Role',
   'Ваш статус': 'Your status',
