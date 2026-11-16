@@ -1164,3 +1164,6 @@ ALTER TABLE leads ADD COLUMN IF NOT EXISTS ban_full BOOLEAN NOT NULL DEFAULT FAL
 
 -- Подсказки в профиле Mini App показаны (нажал «Далее» или «Пропустить») — больше не показываем
 ALTER TABLE leads ADD COLUMN IF NOT EXISTS profile_tour_at TIMESTAMPTZ;
+
+-- Админ один раз пересмотрел подсказки профиля (кнопка «Показать подсказки ещё раз» исчезает)
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS tour_replay_at TIMESTAMPTZ;

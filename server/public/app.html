@@ -2113,8 +2113,8 @@ function traderBlock(){
 }
 /** Подсказки в профиле: один раз. Затемнение, подсветка элемента, короткое описание, «Далее» / «Пропустить».
  *  Первое же нажатие любой кнопки отмечает на сервере, что подсказки показаны — больше не появятся */
-function profileTour(){
-  if(me.profileTour||VIEW_AS||document.querySelector('.tr-hole'))return;
+function profileTour(force){
+  if((me.profileTour&&!force)||VIEW_AS||document.querySelector('.tr-hole'))return;
   const en=prefGet('pref_lang','ru')==='en';
   const lbl=t=>[...document.querySelectorAll('main span,main div,main label')].find(e=>!e.children.length&&e.textContent.trim()===t);
   const pair=t=>{const l=lbl(t)||lbl(en?(t==='Язык:'?'Language:':'Theme:'):t);return l&&l.nextElementSibling?[l,l.nextElementSibling]:null};
@@ -2157,6 +2157,8 @@ function viewProfile(){
     refTile(),
     widgetTile(),
     (setTimeout(()=>{if(tab==='profile')profileTour()},700),null),
+    me.tourReplay&&!VIEW_AS?el('button',{class:'back',type:'button',onclick:async e=>{const b=e.currentTarget;b.disabled=true;
+      try{await api('/profile-tour/replay',{method:'POST'});me.tourReplay=false;b.remove();scrollTo({top:0});setTimeout(()=>profileTour(true),300)}catch(x){toast(x.message);b.remove()}}},'💡 Показать подсказки ещё раз'):null,
     me.leadRole==='admin'?el('button',{class:'btn gw-open',type:'button',onclick:()=>viewGiveaway()},'🎁 Провести розыгрыш'):null,
     el('button',{class:'back',type:'button',onclick:()=>go('home')},'‹ На главную')]);
 }
