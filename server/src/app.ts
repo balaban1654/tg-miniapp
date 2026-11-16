@@ -141,6 +141,36 @@ export async function freshChannelInfo(url: string): Promise<{ handle: string | 
   return { handle, title: i.title, members: i.members };
 }
 /** Фото профиля, если бот его не видит (личные аккаунты): берём картинку со страницы t.me/имя */
+/** Фото по @имени: сначала через бота (каналы, боты, публичные чаты), иначе со страницы t.me/имя (там фото людей, если не скрыто). Кеш 30 минут */
+async function photoByHandle(handle: string): Promise<{ data: Buffer | null; type: string; ver?: string }> {
+  const key = 'h:' + handle.toLowerCase();
+  let hit = photoCache.get(key);
+  if (hit && hit.until > Date.now()) return hit;
+  hit = { until: Date.now() + 30 * 60_000, data: null, type: 'image/jpeg' };
+  try {
+    if (!config.disableBot) {
+      const chat = await bot.api.getChat('@' + handle).catch(() => null);
+      const fid = chat && 'photo' in chat ? chat.photo?.small_file_id : undefined;
+      if (fid) {
+        const f = await bot.api.getFile(fid);
+        const resp = await fetch(`https://api.telegram.org/file/bot${config.botToken}/${f.file_path}`);
+        if (resp.ok) {
+          hit.data = Buffer.from(await resp.arrayBuffer());
+          if (f.file_path?.endsWith('.png')) hit.type = 'image/png';
+        }
+      }
+    }
+    if (!hit.data) {
+      const s = await scrapeTgPhoto(handle);
+      if (s) { hit.data = s.data; hit.type = s.type; }
+    }
+  } catch {
+    /* нет фото — останется буква */
+  }
+  if (hit.data) hit.ver = createHash('md5').update(hit.data).digest('hex').slice(0, 10);
+  photoCache.set(key, hit);
+  return hit;
+}
 async function scrapeTgPhoto(handle: string): Promise<{ data: Buffer; type: string } | null> {
   const page = await fetch(`https://t.me/${handle}`, { signal: AbortSignal.timeout(5000) });
   if (!page.ok) return null;
@@ -247,7 +277,7 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
     const u = req.tg!;
     const r = await db.query(
       `SELECT coalesce(d.status_before_block, d.status) AS status, d.access, d.is_tester, d.lead_role, d.region, d.lang, d.theme, d.created_at, d.trader_id, o.name AS manager,
-              o.po_promo, o.po_link, o.po_link_ru, o.tg_username AS manager_tg, o.tg_link AS manager_link, o.live_channel AS manager_channel
+              o.po_promo, o.po_link, o.po_link_ru, o.tg_username AS manager_tg, o.tg_link AS manager_link, d.owner_id, o.live_channel AS manager_channel
          FROM leads d LEFT JOIN staff o ON o.id = d.owner_id WHERE d.tg_id = $1`,
       [u.id],
     );
@@ -286,6 +316,8 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
       manager: l.manager,
       managerTg: l.manager_tg ?? null,
       managerLink: l.manager_link ?? (l.manager_tg ? 'https://t.me/' + l.manager_tg : null),
+      // Фото трейдера из Telegram (по его @нику); если фото скрыто — в профиле остаётся буква
+      managerPhoto: l.manager_tg && l.owner_id ? `/api/app/trader/${l.owner_id}/photo` : null,
       // Канал трейдера (из карточки сотрудника): кнопка «Канал» в профиле. Только публичный @канал — по числовому ID ссылку не построить
       managerChannel: /^@[A-Za-z0-9_]{4,}$/.test(String(l.manager_channel ?? '').trim()) ? 'https://t.me/' + String(l.manager_channel).trim().slice(1) : null,
       deposited: Number(dep.rows[0].s),
@@ -856,6 +888,16 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
     return { state: drawState(d), leftMs: d.deadline ? Math.max(0, +new Date(d.deadline) - Date.now()) : null };
   });
 
+  // Фото трейдера для блока «Ваш трейдер» в профиле (публичная картинка, как аватарки каналов)
+  app.get<{ Params: { id: string } }>('/trader/:id/photo', async (req, reply) => {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) return reply.code(404).send();
+    const u = String((await db.query('SELECT tg_username FROM staff WHERE id = $1', [id])).rows[0]?.tg_username ?? '').replace(/^@/, '').trim();
+    if (!/^[A-Za-z][A-Za-z0-9_]{3,31}$/.test(u)) return reply.code(404).send();
+    const hit = await photoByHandle(u);
+    if (!hit.data) return reply.code(404).send();
+    return reply.header('Cache-Control', 'public, max-age=1800').header('X-Content-Type-Options', 'nosniff').type(hit.type).send(hit.data);
+  });
   // Аватарки каналов и трейдеров берём из Telegram. Картинка публичная, отдаём без авторизации, чтобы работал <img>
   app.get<{ Params: { id: string } }>('/media/:id/photo', async (req, reply) => {
     const id = Number(req.params.id);
