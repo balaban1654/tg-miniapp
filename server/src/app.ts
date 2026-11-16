@@ -207,7 +207,32 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
       }
     }
     await db.query(`UPDATE leads SET last_seen_at = now() WHERE tg_id = $1 AND (last_seen_at IS NULL OR last_seen_at < now() - interval '10 minutes')`, [user.id]);
+    // Админ смотрит приложение глазами другого пользователя (заголовок X-View-As): только просмотр, менять ничего нельзя
+    const asId = Number(req.headers['x-view-as'] ?? 0);
+    if (asId && !req.url.includes('/view-as/')) {
+      const adm = (await db.query(`SELECT 1 FROM leads WHERE tg_id = $1 AND lead_role = 'admin'`, [user.id])).rowCount;
+      if (!adm) return reply.code(403).send({ error: 'Просмотр доступен только админу' });
+      if (req.method !== 'GET') {
+        if (req.url.endsWith('/ping')) return reply.send({ ok: true });
+        return reply.code(403).send({ error: 'Режим просмотра: менять ничего нельзя', viewOnly: true });
+      }
+      const v = (await db.query('SELECT tg_id, username, first_name FROM leads WHERE tg_id = $1', [asId])).rows[0];
+      if (!v) return reply.code(404).send({ error: 'Пользователь не найден' });
+      req.tg = { id: Number(v.tg_id), username: v.username ?? undefined, first_name: v.first_name ?? '' } as TgUser;
+    }
   };
+
+  // Случайный пользователь для просмотра (только админ): обычный лид, не удалён, нажимал «Старт»
+  app.get<{ Querystring: { not?: string } }>('/view-as/random', { preHandler: auth }, async (req, reply) => {
+    const adm = (await db.query(`SELECT 1 FROM leads WHERE tg_id = $1 AND lead_role = 'admin'`, [req.tg!.id])).rowCount;
+    if (!adm) return reply.code(403).send({ error: 'Только для админа' });
+    const r = (await db.query(
+      `SELECT tg_id::text AS id, first_name, username, coalesce(status_before_block, status) AS status, access FROM leads
+        WHERE coalesce(lead_role, 'lead') = 'lead' AND removed_at IS NULL AND bot_started AND tg_id <> $1 ORDER BY random() LIMIT 1`,
+      [Number(req.query.not) || 0])).rows[0];
+    if (!r) return reply.code(404).send({ error: 'Пользователей пока нет' });
+    return r;
+  });
 
   // Онлайн: Mini App открыт на экране (отметка раз в 30 с). Храним в памяти: tg_id → время и сотрудник ли это
   await referralAppRoutes(app, auth);
