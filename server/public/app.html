@@ -2106,14 +2106,15 @@ function traderBlock(){
         me.managerChannel?el('button',{class:'btn o',type:'button',onclick:()=>openLink(me.managerChannel)},svgEl(IC_CHANNEL),el('span',{},'Канал')):null):null));
 }
 function viewProfile(){
-  // Карточка клиента: фото, имя, язык и тема + его Telegram ID, Pocket ID и статус. Трейдер — отдельной плиткой ниже
+  // Одна плитка: фото, имя, язык и тема, затем Telegram ID, Pocket ID и статус, под линией — трейдер
   const rows=[['Telegram ID',me.tgId,true],['Pocket ID',me.pocketId||null,true],...(me.leadRole&&me.leadRole!=='lead'&&me.leadRole!=='test'?[['Роль',ROLE_NAME[me.leadRole]||me.leadRole]]:[['Ваш статус',tierInline()]])];
   const copyBtn=v=>el('button',{type:'button','aria-label':'Копировать',title:'Копировать',style:'background:none;border:0;padding:2px;color:var(--mut);cursor:pointer;display:grid;place-items:center',onclick:()=>copyText(v)},svgEl(COPY_ICON));
   shell('Профиль',[el('div',{class:'card',style:'display:grid;grid-template-columns:minmax(0,1fr);gap:10px'},
       el('div',{class:'row',style:'justify-content:flex-start;gap:12px;padding-bottom:12px;border-bottom:1px solid var(--line)'},withPhoto(el('div',{class:'ava'},(me.name||'?').trim().slice(0,1).toUpperCase())),el('div',{style:'min-width:0'},el('b',{style:'font:700 16px var(--fd)'},me.name),el('div',{class:'sm'},me.username?'@'+me.username:'')),prefBox()),
       ...rows.filter(([k,v])=>!(k==='Pocket ID'&&!v)).map(([k,v,cp])=>el('div',{class:'row'},el('span',{class:'sm'},k),
-        el('span',{style:'display:inline-flex;align-items:center;gap:8px'},cp?hiddenId(v):el('b',{class:'mono'},v instanceof Node?v:String(v)),cp?copyBtn(v):null)))),
-    el('div',{class:'card'},me.manager?traderBlock():el('div',{class:'row'},el('span',{class:'sm'},'Ваш трейдер'),el('b',{},'не назначен'))),
+        el('span',{style:'display:inline-flex;align-items:center;gap:8px'},cp?hiddenId(v):el('b',{class:'mono'},v instanceof Node?v:String(v)),cp?copyBtn(v):null))),
+      // Трейдер — в той же плитке, после статуса, отделён линией
+      el('div',{style:'border-top:1px solid var(--line);padding-top:12px;margin-top:2px'},me.manager?traderBlock():el('div',{class:'row'},el('span',{class:'sm'},'Ваш трейдер'),el('b',{},'не назначен')))),
     refTile(),
     widgetTile(),
     me.leadRole==='admin'?el('button',{class:'btn gw-open',type:'button',onclick:()=>viewGiveaway()},'🎁 Провести розыгрыш'):null,
