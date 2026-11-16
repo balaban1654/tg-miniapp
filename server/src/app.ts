@@ -750,7 +750,10 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
     if (ids.length) for (const a of (await db.query(`SELECT tg_id, key FROM tg_avatars WHERE tg_id = ANY($1::bigint[]) AND photo IS NOT NULL`, [ids])).rows) av.set(String(a.tg_id), a.key);
     const rows = r.rows.map((x) => ({ ...x, tg_id: undefined, photo_key: undefined, avatar: x.tg_id && av.has(String(x.tg_id)) ? `/api/app/avatar/${av.get(String(x.tg_id))}` : null, photo: x.photo_key ? `/api/app/reviews/photo/${x.photo_key}` : null }));
     const stats = (await db.query(`SELECT count(*)::int AS n, coalesce(round(avg(rating)::numeric, 1), 0)::float AS avg FROM reviews WHERE status = 'published' AND team_id = $1`, [team])).rows[0];
-    return { items: rows, count: stats.n, avg: stats.avg };
+    // Сколько отзывов на каждую оценку (для полосок 5…1 в «Медиа»)
+    const dist: Record<string, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+    for (const x of (await db.query(`SELECT rating, count(*)::int AS n FROM reviews WHERE status = 'published' AND team_id = $1 GROUP BY 1`, [team])).rows) dist[x.rating] = x.n;
+    return { items: rows, count: stats.n, avg: stats.avg, dist };
   });
   app.get<{ Params: { key: string } }>('/avatar/:key', async (req, reply) => {
     if (!/^[0-9a-f]{24}$/.test(req.params.key)) return reply.code(404).send();
