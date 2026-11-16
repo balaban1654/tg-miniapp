@@ -1809,7 +1809,7 @@ function reviewsAll(d){
   document.addEventListener('keydown',onKey);document.body.append(v);
 }
 /** Лента отзывов: сама листается каждые 4 сек по кругу, точки снизу.
- *  Палец — пауза, листаешь сам; через 8 сек без касаний снова сама. На ПК (мышь): колесо листает вбок, стрелки при наведении, наведение — пауза */
+ *  Палец — пауза, листаешь сам; через 8 сек без касаний снова сама. На ПК (мышь): стрелки при наведении, наведение — пауза */
 function rvCarousel(items){
   const chips=items.map(r=>{const c=reviewCard(r);c.classList.add('rv-chip');return c});
   const strip=el('div',{class:'rv-strip'},chips);
@@ -1825,9 +1825,6 @@ function rvCarousel(items){
   ['touchstart','pointerdown'].forEach(e=>strip.addEventListener(e,pause,{passive:true}));
   const wrap=el('div',{class:'rv-car'+(pc?' pc':'')},strip);
   if(pc){
-    let wt=0;
-    strip.addEventListener('wheel',e=>{const dl=Math.abs(e.deltaX)>Math.abs(e.deltaY)?e.deltaX:e.deltaY;if(!dl)return;e.preventDefault();pause();
-      const t=Date.now();if(t-wt<350)return;wt=t;goTo(dl>0?(last()?0:cur+1):cur-1,true)},{passive:false});
     wrap.addEventListener('mouseenter',()=>{hover=true});wrap.addEventListener('mouseleave',()=>{hover=false;pause()});
     wrap.append(el('button',{type:'button',class:'rv-arr l','aria-label':'Назад',onclick:()=>goTo(cur-1,true)},'‹'),
       el('button',{type:'button',class:'rv-arr r','aria-label':'Вперёд',onclick:()=>goTo(last()?0:cur+1,true)},'›'));
