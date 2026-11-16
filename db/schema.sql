@@ -1170,3 +1170,12 @@ ALTER TABLE leads ADD COLUMN IF NOT EXISTS tour_replay_at TIMESTAMPTZ;
 
 -- Подсказка «Это ваш профиль» на главной показана (нажал ✕, «Открыть» или аватарку) — больше не показываем
 ALTER TABLE leads ADD COLUMN IF NOT EXISTS profile_hint_at TIMESTAMPTZ;
+
+-- Подсказка «Это ваш профиль» показывалась поверх заставки загрузки — один раз сбрасываем, чтобы все увидели её уже после загрузки
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM app_settings WHERE key = 'profile_hint_reset_1') THEN
+    UPDATE leads SET profile_hint_at = NULL WHERE profile_hint_at IS NOT NULL;
+    INSERT INTO app_settings (key, value) VALUES ('profile_hint_reset_1', '1') ON CONFLICT (key) DO NOTHING;
+  END IF;
+END $$;

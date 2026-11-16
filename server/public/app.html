@@ -2200,6 +2200,8 @@ function traderBlock(){
 /** Подсказка «Это ваш профиль» у аватарки: один раз всем. Экран затемнён, пока не нажмут ✕, «Открыть» или саму аватарку */
 function profileHint(){
   if(me.profileHint||VIEW_AS||tab==='profile'||document.querySelector('.ph-hole,.tr-hole'))return;
+  // Пока идёт заставка загрузки — ждём, подсказка появляется только после неё
+  if(document.getElementById('splash')){clearTimeout(phTimer);phTimer=setTimeout(profileHint,700);return}
   const av=document.querySelector('.hd .avb');if(!av)return;
   const en=prefGet('pref_lang','ru')==='en';
   let done=false;
