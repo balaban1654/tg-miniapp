@@ -2099,7 +2099,7 @@ function traderBlock(){
     el('div',{class:'trd-h'},(()=>{const a=el('div',{class:'trd-av'},String(me.manager).trim().slice(0,1).toUpperCase());
       // Фото трейдера из Telegram: показываем, когда загрузилось; нет фото — остаётся буква
       if(me.managerPhoto){const i=new Image();i.alt='';i.onload=()=>a.replaceChildren(i);i.src=me.managerPhoto}return a})(),
-      el('div',{style:'min-width:0'},el('b',{class:'trd-n'},me.manager),el('div',{class:'sm'},el('span',{},'Ваш трейдер'),me.managerTg?el('span',{},' · @'+me.managerTg):null))),
+      el('div',{style:'min-width:0'},el('b',{class:'trd-n'},me.manager),el('div',{class:'sm'},'Ваш трейдер'))),
     (msg||me.managerChannel)?el('div',{class:'trd-b'+(msg&&me.managerChannel?'':' one')},
       msg?el('button',{class:'btn o',type:'button',onclick:msg},svgEl(IC_MAIL),el('span',{},'Написать')):null,
       me.managerChannel?el('button',{class:'btn o',type:'button',onclick:()=>openLink(me.managerChannel)},svgEl(IC_CHANNEL),el('span',{},'Канал')):null):null);
