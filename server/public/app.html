@@ -163,7 +163,7 @@ main{flex:1;padding:6px 16px 96px;display:grid;gap:12px;align-content:start}
 .btn:active{transform:scale(.98)}.btn.o{background:none;border:1px solid var(--acc);color:var(--acc2)}
 .vab{position:sticky;top:0;z-index:30;display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 12px 8px;padding:8px 10px;border-radius:12px;background:rgba(242,70,122,.14);border:1px solid rgba(242,70,122,.55);font-size:12.5px}
 .vab-t{flex:1 1 180px;min-width:0}.vab button{background:none;border:1px solid rgba(255,255,255,.35);color:inherit;border-radius:9px;padding:5px 10px;font:inherit;font-weight:700;cursor:pointer}
-.trd{display:grid;gap:12px}.trd-h{display:flex;align-items:center;gap:12px}.trd-av img{width:100%;height:100%;border-radius:50%;object-fit:cover;display:block}.trd-av{flex:none;width:46px;height:46px;border-radius:50%;overflow:hidden;display:grid;place-items:center;font:800 18px var(--fd);color:#fff;background:linear-gradient(135deg,#6a2fe0,#9b5cff);box-shadow:0 0 0 2px var(--acc)}.trd-n{font:700 16px var(--fd)}.trd-b{display:grid;grid-template-columns:1fr 1fr;gap:8px}.trd-b.one{grid-template-columns:1fr}.trd-b .btn{width:100%;padding:11px;display:flex;align-items:center;justify-content:center;gap:8px}.btn:disabled{opacity:.45}
+.trd{display:grid;gap:12px}.trd-h{display:flex;align-items:center;gap:12px}.trd-av img{width:100%;height:100%;border-radius:50%;object-fit:cover;display:block}.trd-av{flex:none;width:46px;height:46px;border-radius:50%;overflow:hidden;display:grid;place-items:center;font:800 18px var(--fd);color:#fff;background:linear-gradient(135deg,#6a2fe0,#9b5cff);box-shadow:0 0 0 2px var(--acc)}.trd-n{font:700 16px var(--fd)}.trd-h>div:nth-child(2) .sm,.trd-n{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.trd-b{display:flex;gap:8px;flex:none}.trd-b .btn{width:auto;height:42px;padding:0 11px;font-size:13px;display:flex;align-items:center;justify-content:center;gap:6px}.trd-h{gap:10px!important}.trd-h .sm{font-size:12.5px}.trd-av{width:42px!important;height:42px!important}.trd-b .btn.trd-ic{width:42px;padding:0}.btn:disabled{opacity:.45}
 .btn.g{background:var(--ok);color:#06210f}.btn.r{background:var(--bad);color:#2b0610}
 .btn.sm2{padding:8px;font-size:12px;border-radius:10px}
 .tl{display:flex;gap:8px;align-items:center;min-width:0}
@@ -2099,10 +2099,11 @@ function traderBlock(){
     el('div',{class:'trd-h'},(()=>{const a=el('div',{class:'trd-av'},String(me.manager).trim().slice(0,1).toUpperCase());
       // Фото трейдера из Telegram: показываем, когда загрузилось; нет фото — остаётся буква
       if(me.managerPhoto){const i=new Image();i.alt='';i.onload=()=>a.replaceChildren(i);i.src=me.managerPhoto}return a})(),
-      el('div',{style:'min-width:0'},el('b',{class:'trd-n'},me.manager),el('div',{class:'sm'},'Ваш трейдер'))),
-    (msg||me.managerChannel)?el('div',{class:'trd-b'+(msg&&me.managerChannel?'':' one')},
-      msg?el('button',{class:'btn o',type:'button',onclick:msg},svgEl(IC_MAIL),el('span',{},'Написать')):null,
-      me.managerChannel?el('button',{class:'btn o',type:'button',onclick:()=>openLink(me.managerChannel)},svgEl(IC_CHANNEL),el('span',{},'Канал')):null):null);
+      el('div',{style:'min-width:0;flex:1'},el('b',{class:'trd-n'},me.manager),el('div',{class:'sm'},'Ваш трейдер')),
+      // Справа от фото: личка — только значок конверта, канал — значок и слово
+      (msg||me.managerChannel)?el('div',{class:'trd-b'},
+        msg?el('button',{class:'btn o trd-ic',type:'button','aria-label':'Написать трейдеру',title:'Написать трейдеру',onclick:msg},svgEl(IC_MAIL)):null,
+        me.managerChannel?el('button',{class:'btn o',type:'button',onclick:()=>openLink(me.managerChannel)},svgEl(IC_CHANNEL),el('span',{},'Канал')):null):null));
 }
 function viewProfile(){
   // Карточка клиента: фото, имя, язык и тема + его Telegram ID, Pocket ID и статус. Трейдер — отдельной плиткой ниже
