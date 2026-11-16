@@ -176,7 +176,7 @@ main{flex:1;padding:6px 16px 96px;display:grid;gap:12px;align-content:start}
 .rv-strip{display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x mandatory;margin:0 -16px;padding:0 16px 4px;scroll-padding:0 16px;scrollbar-width:none}.rv-strip::-webkit-scrollbar{display:none}
 .rv-strip .rv-chip{flex:none;width:min(78vw,300px);scroll-snap-align:start}
 .rv-car{position:relative;width:0;min-width:100%}
-.rv-dots{display:flex;gap:5px;justify-content:center}.rv-dots i{width:6px;height:6px;border-radius:3px;background:var(--line);cursor:pointer;transition:width .25s,background .25s}.rv-dots i.on{width:18px;background:var(--acc2)}
+.rv-dots{display:flex;gap:5px;justify-content:center}.rv-dots i{width:6px;height:6px;border-radius:3px;background:var(--line);cursor:pointer;transition:width .25s,background .25s}.rv-dots i.on{width:18px;background:var(--acc2)}.rv-dots.n{font-size:12px;font-weight:700;color:var(--mut)}
 .rv-arr{display:none;position:absolute;top:50%;transform:translateY(-50%);z-index:2;width:36px;height:36px;border-radius:50%;background:rgba(28,18,51,.92);border:1px solid var(--acc);color:var(--acc2);font:800 20px/1 var(--fd);cursor:pointer;place-items:center;padding:0 0 3px}
 .rv-arr.l{left:-4px}.rv-arr.r{right:-4px}.rv-car.pc:hover .rv-arr{display:grid}
 .tr-block{position:fixed;inset:0;z-index:9997}
@@ -1813,14 +1813,15 @@ function reviewsAll(d){
 function rvCarousel(items){
   const chips=items.map(r=>{const c=reviewCard(r);c.classList.add('rv-chip');return c});
   const strip=el('div',{class:'rv-strip'},chips);
-  const dots=el('div',{class:'rv-dots'},chips.map((_,i)=>el('i',{onclick:()=>goTo(i,true)})));
+  // До 10 отзывов — точки, больше — счётчик «3 / 15»
+  const many=chips.length>10,dots=el('div',{class:'rv-dots'+(many?' n':'')},many?null:chips.map((_,i)=>el('i',{onclick:()=>goTo(i,true)})));
   const pc=matchMedia('(hover:hover) and (pointer:fine)').matches;
   let idle=0,hover=false,cur=0;
   const pause=()=>{idle=Date.now()+8000};
   const last=()=>strip.scrollLeft>=strip.scrollWidth-strip.clientWidth-4;
   const near=()=>{const x=strip.scrollLeft;let b=0;chips.forEach((c,i)=>{if(Math.abs(c.offsetLeft-chips[0].offsetLeft-x)<Math.abs(chips[b].offsetLeft-chips[0].offsetLeft-x))b=i});return last()?chips.length-1:b};
   function goTo(i,user){if(user)pause();const n=chips.length;i=(i%n+n)%n;strip.scrollTo({left:chips[i].offsetLeft-chips[0].offsetLeft,behavior:'smooth'})}
-  const mark=()=>{cur=near();[...dots.children].forEach((x,i)=>x.classList.toggle('on',i===cur))};
+  const mark=()=>{cur=near();if(many)dots.textContent=(cur+1)+' / '+chips.length;else [...dots.children].forEach((x,i)=>x.classList.toggle('on',i===cur))};
   let raf=0;strip.addEventListener('scroll',()=>{cancelAnimationFrame(raf);raf=requestAnimationFrame(mark)},{passive:true});
   ['touchstart','pointerdown'].forEach(e=>strip.addEventListener(e,pause,{passive:true}));
   const wrap=el('div',{class:'rv-car'+(pc?' pc':'')},strip);
@@ -1846,7 +1847,7 @@ async function reviewsBlock(){
     el('div',{class:'rv-avg'},el('b',{},String(d.avg).replace('.',',')),starsEl(Math.round(d.avg)),el('span',{class:'sm'},d.count+' '+(en?'reviews':plural(d.count,'отзыв','отзыва','отзывов')))),
     el('div',{class:'rv-bars'},...[5,4,3,2,1].map(k=>el('div',{class:'rv-bar'},el('span',{},String(k)),el('i',{},el('u',{style:'width:'+Math.round((dist[k]||0)/mx*100)+'%'})))))):null;
   // Лента свежих отзывов вбок; нажатие — все отзывы
-  const strip=total?rvCarousel(d.items.slice(0,8)):el('div',{class:'card sm',style:'text-align:center;line-height:1.5'},'Отзывов пока нет. Станьте первым, кто поделится опытом.');
+  const strip=total?rvCarousel(d.items):el('div',{class:'card sm',style:'text-align:center;line-height:1.5'},'Отзывов пока нет. Станьте первым, кто поделится опытом.');
   box.append(...[
     el('div',{class:'md-h'},el('b',{},'Отзывы'),total?allLink(()=>reviewsAll(d)):null),
     sum,strip,
