@@ -2900,7 +2900,7 @@ function navLblNodes(k){
   if(!c)return[base];
   const out=[base];
   if(c.total!==null&&c.total!==undefined)out.push(' ',el('span',{class:'nb-t',title:k==='chats'?'':'Пришли в бота за выбранный период (по умолчанию текущий месяц)'},String(c.total)));
-  if(c.reg||(k==='leads'&&c.reg===0))out.push(' (',el('span',{class:'nb-r',title:k==='chats'?'':'Зарегистрировались за выбранный период, когда бы ни пришли в бота (как кольцо «Регистрации» на дашборде)'},String(c.reg)),')');
+  if(c.reg||(k==='leads'&&c.reg===0))out.push(' (',el('span',{class:'nb-r',title:k==='chats'?'':'Кого можно дожать: сейчас на этапе «Регистрация» (без депозита) и бота не заблокировали — как «Регистрация N шт» в шапке «Лидов»'},String(c.reg)),')');
   if(c.fresh)out.push(' ',el('span',{class:'nb-n',title:k==='chats'?'Ждут ответа':'Новые лиды за сегодня (сбрасывается в 00:00 по Киеву)'},String(c.fresh)));
   return out;
 }
