@@ -238,6 +238,10 @@ main{flex:1;padding:6px 16px 96px;display:grid;gap:12px;align-content:start}
 .fd-prog{height:5px;border-radius:3px;background:var(--line);overflow:hidden}.fd-prog u{display:block;height:100%;width:35%;background:var(--acc2);border-radius:3px;animation:fdP 1.4s ease-in-out infinite}
 @keyframes fdP{0%{transform:translateX(-100%)}100%{transform:translateX(300%)}}
 .fd-lock{position:relative;overflow:hidden}.fd-siglock{border-radius:20px}.fd-siglock .fd-blur{filter:blur(7px) saturate(.7);opacity:.85}.fd-spoil{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;border-radius:20px}.fd-siglock .r{padding:7px 0;font-size:13px}.fd-siglock h3{margin:0 0 4px}
+.fd-tip{justify-self:center;background:var(--acc);color:#fff;font-weight:800;font-size:14px;padding:9px 14px;border-radius:12px;box-shadow:0 8px 24px rgba(155,92,255,.45);animation:fdTip .5s ease-out both,fdBob 1.6s ease-in-out .5s infinite}
+@keyframes fdTip{0%{opacity:0;transform:translateY(8px)}100%{opacity:1;transform:none}}@keyframes fdBob{50%{transform:translateY(-4px)}}
+.fd-pulse .rbtn{animation:fdPulse 1.6s ease-in-out infinite}@keyframes fdPulse{50%{box-shadow:0 0 0 4px rgba(155,92,255,.35),0 0 22px rgba(155,92,255,.45)}}
+@media (prefers-reduced-motion:reduce){.fd-tip,.fd-pulse .rbtn{animation:none}}
 .fd-lkb{display:grid;justify-items:center;gap:6px;padding:14px 18px;border-radius:16px;background:rgba(13,8,23,.82);border:1px solid var(--line);font-size:13.5px}.fd-blur{filter:blur(7px);user-select:none;pointer-events:none;display:grid;gap:8px}.fd-lk{position:absolute;inset:0;display:grid;place-items:center;font-size:30px}
 .fd-dir{text-align:center;padding:12px;border-radius:12px;background:rgba(61,220,151,.12);color:var(--ok);font-weight:800;font-size:18px}
 .fd-pf{background:#1b2030;border-radius:12px;padding:10px;font-family:system-ui,-apple-system,sans-serif}
@@ -1145,9 +1149,13 @@ function funnelGate(pair,sec){
       el('h2',{style:'font-size:17px'},'Анализ '+pair+' готов'),
       el('p',{class:'sm',style:'margin:0'},'Чтобы его открыть, зарегистрируйте аккаунт Pocket Option по нашей ссылке. Сразу после регистрации откроется ',el('b',{},'доступ к сигналам Hunter AI'),'.'),
       el('div',{class:'rq'},'Где вы находитесь?'),
-      el('div',{class:'rrow'},[['ww','EU, Мир','если вы в Европе'],['ru','RU, СНГ','если вы в России']].map(([k,a,b])=>el('button',{class:'rbtn',type:'button',onclick:()=>reg(k)},el('span',{style:'display:block'},a),el('span',{class:'rsub'},b)))),
+      el('div',{class:'rrow fd-reg'},[['ww','EU, Мир','если вы в Европе'],['ru','RU, СНГ','если вы в России']].map(([k,a,b])=>el('button',{class:'rbtn',type:'button',onclick:()=>reg(k)},el('span',{style:'display:block'},a),el('span',{class:'rsub'},b)))),
       el('p',{class:'sm',style:'margin:0'},'Нажимая, вы подтверждаете, что вам 18+ и вы понимаете: торговля связана с риском потери денег.'))]);
   scrollTo({top:0});
+  // Через секунду сами плавно листаем к кнопкам региона и показываем подсказку над ними
+  timers.push(setTimeout(()=>{const row=document.querySelector('.fd-reg');if(!row)return;
+    const tip=el('div',{class:'fd-tip',role:'status'},'👇 Выберите регион для регистрации');row.before(tip);row.classList.add('fd-pulse');
+    try{row.scrollIntoView({behavior:'smooth',block:'center'})}catch{scrollTo(0,document.body.scrollHeight)}},1200));
 }
 /** Учебный сигнал для демонстрации: направление случайное, вход как у настоящих, на сервер ничего не пишется */
 async function fdSignal(pair,sec){
