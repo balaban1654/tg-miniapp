@@ -1182,7 +1182,7 @@ async function funnelHome(){
       el('div',{class:'fd-row'},el('h2',{style:'font-size:17px'},waitDep?'Ожидаем пополнение':'Учебные анализы закончились'),el('span',{class:'sm'},el('b',{},'3 из 3'))),
       fdCnt(3),
       waitDep?el('p',{class:'sm',style:'margin:0'},'Как только пополнение придёт к нам, сигналы откроются — экран обновится сам.')
-        :el('p',{class:'sm',style:'margin:0'},'Результат на демо говорит сам за себя. Чтобы получать сигналы и дальше, пополните счёт Pocket Option от ',el('b',{},minDep+' $'),' — доступ подключится автоматически. Команда рекомендует начинать ',el('b',{},'со 100 $'),' — так проще соблюдать мани- и риск-менеджмент.'),
+        :el('p',{class:'sm',style:'margin:0'},'Результат на демо говорит сам за себя. Чтобы получать сигналы и дальше, пополните счёт Pocket Option от ',el('b',{},minDep+' $'),' — доступ подключится автоматически. Hunter Team рекомендует начинать ',el('b',{},'со 100 $'),' — так проще управлять рисками и спокойнее наращивать баланс.'),
       !f.demo&&me.offer?offerBanner():null,
       got>0?el('p',{class:'sm',style:'margin:0;color:var(--acc2);font-weight:700'},'Пополнено: '+usd(got).replace(',00 $',' $')+' из '+minDep+' $'):null,
       waitDep?el('div',{class:'fd-prog'},el('u')):el('button',{class:'btn g',type:'button',onclick:async e=>{
