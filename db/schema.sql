@@ -1184,3 +1184,12 @@ END $$;
 -- Регистрация и пополнение «приходят» сами через 5 секунд, настоящих постбеков и денег нет
 ALTER TABLE leads ADD COLUMN IF NOT EXISTS funnel_demo JSONB;
 ALTER TABLE leads ADD COLUMN IF NOT EXISTS funnel_demo_done_at TIMESTAMPTZ;
+
+-- Демонстрация воронки: добавили «Оценить сигнал» / «Пропустить» и ускорили анализ — один раз даём пройти заново
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM app_settings WHERE key = 'funnel_demo_reset_1') THEN
+    UPDATE leads SET funnel_demo = NULL, funnel_demo_done_at = NULL WHERE lead_role IN ('admin', 'streamer');
+    INSERT INTO app_settings (key, value) VALUES ('funnel_demo_reset_1', '1') ON CONFLICT (key) DO NOTHING;
+  END IF;
+END $$;

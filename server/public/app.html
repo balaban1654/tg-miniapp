@@ -894,7 +894,7 @@ const ANALYSIS=[
 async function signalPrep(pair,sec){
   clearTimers();
   const buzzL=()=>{try{if(tg&&tg.HapticFeedback)tg.HapticFeedback.impactOccurred('light');else if(navigator.vibrate)navigator.vibrate(12)}catch{}};
-  const durs=ANALYSIS.map(()=>3000+Math.floor(Math.random()*2001));   // 3–5 секунд на шаг
+  const durs=ANALYSIS.map(()=>me.funnelDemo?600+Math.floor(Math.random()*401):3000+Math.floor(Math.random()*2001));   // 3–5 секунд на шаг (в демонстрации воронки — меньше секунды)
   const total=durs.reduce((a,b)=>a+b,0);
   const rows=ANALYSIS.map(([l,cap])=>{
     const ic=el('span',{class:'wait'}),st2=el('span',{class:'sm'},'ожидание');
@@ -942,11 +942,12 @@ function signalLive(sg,skew,cfg){
   const set=(node,txt)=>{if(node.textContent!==txt)node.textContent=txt};
   // Оценка: «Оценить сигнал» → Плюс/Минус → при плюсе номер шага 1–4 (1 = со входа, 2–4 = с перекрытий)
   const rateBox=el('div',{style:'display:grid;gap:10px;margin-top:4px'});
-  const send=async(result,step)=>{try{await api('/signals/'+sg.id+'/rate',{method:'POST',body:{result,step}});await refreshMe().catch(()=>{});signalRated(sg,result,step)}catch(e){toast(e.message)}};
+  const send=async(result,step)=>{if(sg.demo){await fdAct('used');signalRated(sg,result,step);return}try{await api('/signals/'+sg.id+'/rate',{method:'POST',body:{result,step}});await refreshMe().catch(()=>{});signalRated(sg,result,step)}catch(e){toast(e.message)}};
   const rate=el('button',{class:'btn o',type:'button',onclick:()=>pm()},'Оценить сигнал');
   // Пропустить сигнал (доступно всем): он закроется и можно запросить новый
   const skipBtn=el('button',{class:'btn o',type:'button',onclick:async()=>{
     skipBtn.disabled=true;
+    if(sg.demo){toast('Сигнал пропущен');tab='home';render();return}
     try{await api('/signals/'+sg.id+'/skip',{method:'POST'});toast('Сигнал пропущен');tab='home';render()}
     catch(e){toast(e.message);skipBtn.disabled=false}}},'Пропустить');
   const idle=el('div',{class:'two'},rate,skipBtn);
@@ -957,7 +958,7 @@ function signalLive(sg,skew,cfg){
     el('div',{class:'sm'},'1 — со входа, 2–'+max+' — с перекрытий'),
     el('div',{style:'display:grid;grid-template-columns:repeat('+max+',minmax(0,1fr));gap:8px'},Array.from({length:max},(_,i)=>el('button',{class:'btn g',type:'button',onclick:()=>send('win',i+1)},String(i+1)))),
     el('button',{class:'back',type:'button',onclick:()=>pm()},'‹ Назад'))};
-  rateBox.append(sg.demo?el('button',{class:'btn',type:'button',onclick:async e=>{e.currentTarget.disabled=true;await fdAct('used');tab='home';render()}},'Сделка открыта — на главную'):idle);
+  rateBox.append(idle);
   function paint(){
     const now=nowMs();
     let n=0;while(n<max&&at(n)<=now)n++;   // n = первое событие, которое ещё впереди
@@ -975,7 +976,7 @@ function signalLive(sg,skew,cfg){
       r.mk.style.color=cur?'var(--acc2)':'var(--mut)';
       r.node.style.color=cur?'var(--fg)':'var(--mut)';
     });
-    const lock=now<entry+5000; // оценка открывается через 5 секунд после входа, чтобы не упереться в расхождение часов
+    const lock=now<entry+(sg.demo?1000:5000); // оценка открывается через 5 секунд после входа, чтобы не упереться в расхождение часов
     if(rate.disabled!==lock)rate.disabled=lock;
   }
   paint();timers.push(setInterval(paint,200));
@@ -993,15 +994,17 @@ function signalLive(sg,skew,cfg){
 function signalRated(sg,result,step){
   clearTimers();
   const win=result==='win';
+  const more=!sg.demo||(me.funnelDemo&&me.funnelDemo.stage==='trial');   // в демонстрации после 3-го учебного — только «На главную»
   shell('Анализ',[
-    el('div',{class:'sighint',role:'status'},svgEl('<svg viewBox="0 0 24 24"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>'),el('div',{class:'sm'},'Хотите ещё сигнал по этой же паре?',el('br'),'Нажмите «Повторить анализ».',el('br'),'Чтобы выбрать другую пару,',el('br'),'нажмите «Запросить новый анализ».')),
+    !more?null:el('div',{class:'sighint',role:'status'},svgEl('<svg viewBox="0 0 24 24"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>'),el('div',{class:'sm'},'Хотите ещё сигнал по этой же паре?',el('br'),'Нажмите «Повторить анализ».',el('br'),'Чтобы выбрать другую пару,',el('br'),'нажмите «Запросить новый анализ».')),
     el('div',{class:'card',style:'display:grid;gap:6px;text-align:center'},
       el('b',{style:'font-size:20px;color:var(--'+(win?'ok':'bad')+')'},win?'Плюс':'Минус'),
       el('div',{class:'sm'},sg.pair+(win?' · '+(step===1?'со входа':'с перекрытия '+(step-1)):'')),
-      el('div',{class:'sm'},'Оценка записана в статистику.')),
+      el('div',{class:'sm'},sg.demo?'Демонстрация: в статистику не записано.':'Оценка записана в статистику.')),
+    ...(sg.demo&&!(me.funnelDemo&&me.funnelDemo.stage==='trial')?[el('button',{class:'btn',type:'button',onclick:()=>{tab='home';render()}},'На главную')]:[
     el('button',{class:'btn o',type:'button',onclick:()=>signalPrep(sg.pair,sg.expiry_sec||sg.expiry_min*60)},'Повторить анализ · '+sg.pair),
     el('button',{class:'btn',type:'button',onclick:()=>signalPairs()},'Запросить новый анализ'),
-    el('button',{class:'btn o',type:'button',onclick:()=>{toast('Торговля завершена');tab='home';render()}},'Завершить торговлю'),
+    el('button',{class:'btn o',type:'button',onclick:()=>{toast('Торговля завершена');tab='home';render()}},'Завершить торговлю')]),
     el('p',{class:'sm',style:'margin:0'},'Не пытайтесь отыграться и торгуйте только той суммой, которую готовы потерять.')]);
 }
 function signalResult(r){
@@ -1105,7 +1108,7 @@ function funnelGate(pair){
 /** Учебный сигнал для демонстрации: направление случайное, вход как у настоящих, на сервер ничего не пишется */
 async function fdSignal(pair,sec){
   let o={};try{o=await api('/signals/request')}catch{}
-  const now=nowMs(),enter=(o.enterInSec||30)*1000;
+  const now=nowMs(),enter=5000;   // в демонстрации вход через 5 секунд, чтобы не ждать
   return{r:{signal:{id:0,demo:me.funnelDemo.used+1,pair,direction:Math.random()<.5?'up':'down',entry_at:new Date(now+enter).toISOString(),expiry_sec:sec},cfg:o.cfg||{gapSec:60,maxEvents:4,entryLabel:'',stakeLabel:''},now:new Date(now).toISOString(),skew:0}};
 }
 async function funnelHome(){
