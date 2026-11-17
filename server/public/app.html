@@ -1827,10 +1827,11 @@ function lesson1(n=1){
 }
 async function viewTrainer(sel){
   if(!me)await refreshMe();
-  const [ls,demo]=await Promise.all([api('/trainer'),sel?Promise.resolve(null):api('/trainer/demo').catch(()=>null)]);
+  const ls=await api('/trainer');
   lessons=ls;
   // Кнопка «Попробовать демо»: ссылку задаёт админ в кабинете («Медиа»), без ссылки кнопки нет
-  const demoBtn=demo&&demo.url?el('button',{class:'btn o',type:'button',onclick:()=>openLink(demo.url)},'Попробовать демо'):null;
+  // «Попробовать демо» — только у ещё не зарегистрированных: ведёт на главную, к регистрации (ссылка из Office больше не используется)
+  const demoBtn=FN()&&FN().stage==='new'?el('button',{class:'btn o',type:'button',onclick:()=>go('home')},'Попробовать демо'):null;
   if(sel===1||sel===2||sel===3)return lesson1(sel);
   if(sel){return lessonView(lessons.find(l=>l.id===sel))}
   const next=lessons.find(l=>!l.done)||lessons[0];
