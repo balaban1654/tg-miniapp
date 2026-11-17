@@ -1202,3 +1202,12 @@ BEGIN
     INSERT INTO app_settings (key, value) VALUES ('funnel_demo_reset_2', '1') ON CONFLICT (key) DO NOTHING;
   END IF;
 END $$;
+
+-- Тест новой воронки: админы и стримеры проходят демонстрацию заново (последняя версия: загрузка анализа, карточка сигнала под замком)
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM app_settings WHERE key = 'funnel_demo_reset_3') THEN
+    UPDATE leads SET funnel_demo = NULL, funnel_demo_done_at = NULL WHERE lead_role IN ('admin', 'streamer');
+    INSERT INTO app_settings (key, value) VALUES ('funnel_demo_reset_3', '1') ON CONFLICT (key) DO NOTHING;
+  END IF;
+END $$;
