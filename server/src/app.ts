@@ -290,7 +290,8 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
   // ---- Новая воронка у настоящих клиентов (без доступа): этап считается из статуса, выбора региона и учебных сигналов ----
   const TRIAL_MAX = 3;
   async function funnelOf(tgId: number): Promise<{ stage: 'new' | 'wait' | 'trial' | 'done3'; used: number; region: string | null } | null> {
-    const l = (await db.query(`SELECT status, access, is_tester, lead_role, region, funnel_reg_at, banned_at FROM leads WHERE tg_id = $1`, [tgId])).rows[0];
+    // Статус как на экране: у заблокировавшего и вернувшегося в бота — статус до блокировки
+    const l = (await db.query(`SELECT coalesce(status_before_block, status) AS status, access, is_tester, lead_role, region, funnel_reg_at, banned_at FROM leads WHERE tg_id = $1`, [tgId])).rows[0];
     if (!l || l.banned_at || !['lead', 'test'].includes(l.lead_role ?? 'lead')) return null;
     if (l.access || (l.is_tester && l.lead_role !== 'test')) return null;
     if (l.status === 'registered') {
