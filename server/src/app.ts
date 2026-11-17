@@ -267,6 +267,41 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
   // Онлайн: Mini App открыт на экране (отметка раз в 30 с). Храним в памяти: tg_id → время и сотрудник ли это
   await referralAppRoutes(app, auth);
 
+  // ---- Демонстрация новой воронки: админ и стримеры проходят её один раз, регистрация и пополнение «приходят» через 5 секунд ----
+  const DEMO_ROLES = ['admin', 'streamer'];
+  const DEMO_WAIT_MS = 5000;
+  type FunnelDemo = { stage: 'new' | 'wait' | 'trial' | 'done3' | 'depwait'; used: number; region?: string; due?: string };
+  /** Текущее состояние демонстрации или null (не положена, уже пройдена). Просроченное ожидание сразу переводит дальше */
+  async function funnelDemoOf(tgId: number): Promise<(FunnelDemo & { lesson1: boolean; finished?: boolean }) | null> {
+    const l = (await db.query('SELECT lead_role, funnel_demo, funnel_demo_done_at FROM leads WHERE tg_id = $1', [tgId])).rows[0];
+    if (!l || !DEMO_ROLES.includes(l.lead_role) || l.funnel_demo_done_at) return null;
+    let st: FunnelDemo = l.funnel_demo ?? { stage: 'new', used: 0 };
+    const due = st.due ? Date.parse(st.due) : 0;
+    if (st.stage === 'wait' && due && Date.now() >= due) { st = { stage: 'trial', used: 0, region: st.region }; await db.query('UPDATE leads SET funnel_demo = $2 WHERE tg_id = $1', [tgId, st]); }
+    if (st.stage === 'depwait' && due && Date.now() >= due) {
+      // «Пополнение пришло» — демонстрация закончена, дальше обычное приложение
+      await db.query('UPDATE leads SET funnel_demo_done_at = now() WHERE tg_id = $1', [tgId]);
+      return null;
+    }
+    const lesson1 = Boolean((await db.query('SELECT 1 FROM lesson_progress WHERE tg_id = $1 AND lesson = 1', [tgId])).rowCount);
+    return { ...st, lesson1 };
+  }
+  app.post<{ Body: { action?: string; region?: string } }>('/funnel-demo', { preHandler: auth }, async (req, reply) => {
+    const cur = await funnelDemoOf(req.tg!.id);
+    if (!cur) return reply.code(409).send({ error: 'Демонстрация уже пройдена' });
+    const a = String(req.body?.action ?? '');
+    const due = () => new Date(Date.now() + DEMO_WAIT_MS).toISOString();
+    let next: FunnelDemo | null = null;
+    if (a === 'region' && cur.stage === 'new') next = { stage: 'wait', used: 0, region: req.body?.region === 'ru' ? 'ru' : 'ww', due: due() };
+    else if (a === 'back' && cur.stage === 'wait') next = { stage: 'new', used: 0 };
+    else if (a === 'used' && cur.stage === 'trial') { const used = Math.min(3, cur.used + 1); next = { stage: used >= 3 ? 'done3' : 'trial', used, region: cur.region }; }
+    else if (a === 'deposit' && cur.stage === 'done3') next = { stage: 'depwait', used: 3, region: cur.region, due: due() };
+    else if (a === 'exit') { await db.query('UPDATE leads SET funnel_demo_done_at = now() WHERE tg_id = $1', [req.tg!.id]); return { ok: true, demo: null }; }
+    if (!next) return reply.code(400).send({ error: 'Сейчас это действие недоступно' });
+    await db.query('UPDATE leads SET funnel_demo = $2 WHERE tg_id = $1', [req.tg!.id, next]);
+    return { ok: true, demo: await funnelDemoOf(req.tg!.id) };
+  });
+
   app.post('/ping', { preHandler: auth }, async (req) => {
     const r = (await db.query(`SELECT coalesce(lead_role, 'lead') NOT IN ('lead','test') AS staff FROM leads WHERE tg_id = $1`, [req.tg!.id])).rows[0];
     appOnline.set(req.tg!.id, { at: Date.now(), staff: Boolean(r?.staff) });
@@ -312,6 +347,8 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
       lang: l.lang ?? null,
       profileTour: !!l.profile_tour_at,
       profileHint: !!l.profile_hint_at,
+      // Демонстрация новой воронки (админ и стримеры, один раз). В «смотреть как» тут обычный лид — её нет
+      funnelDemo: await funnelDemoOf(u.id),
       // Админ может один раз заново посмотреть подсказки профиля
       tourReplay: l.lead_role === 'admin' && !l.tour_replay_at,
       theme: l.theme ?? null,
@@ -570,7 +607,10 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
   };
 
   app.get('/signals/request', { preHandler: auth }, async (req) => {
-    const { set, lead, allowed, cooldownLeft } = await requestRules(req.tg!.id);
+    const { set, lead, allowed: realAllowed, cooldownLeft: realCd } = await requestRules(req.tg!.id);
+    // В демонстрации воронки пары нужны и тем, у кого нет доступа (сигнал там учебный, на сервер не пишется)
+    const demo = !realAllowed && set.enabled ? await funnelDemoOf(req.tg!.id) : null;
+    const allowed = realAllowed || Boolean(demo), cooldownLeft = realAllowed ? realCd : 0;
     if (!allowed) return { enabled: false, pairs: [], cooldownLeft: 0, enterInSec: set.enter_in_sec, expiryMin: set.expiry_min, cfg: cfgOf(set) };
     const pairs = (
       await db.query(

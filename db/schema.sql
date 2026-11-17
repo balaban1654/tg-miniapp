@@ -1179,3 +1179,8 @@ BEGIN
     INSERT INTO app_settings (key, value) VALUES ('profile_hint_reset_1', '1') ON CONFLICT (key) DO NOTHING;
   END IF;
 END $$;
+
+-- Демонстрация новой воронки (анализ → регистрация → 3 учебных анализа на демо → пополнение) для админа и стримеров, один раз.
+-- Регистрация и пополнение «приходят» сами через 5 секунд, настоящих постбеков и денег нет
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS funnel_demo JSONB;
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS funnel_demo_done_at TIMESTAMPTZ;

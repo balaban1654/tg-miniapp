@@ -216,6 +216,26 @@ main{flex:1;padding:6px 16px 96px;display:grid;gap:12px;align-content:start}
 .chip{border:1px solid var(--line);background:none;border-radius:99px;padding:6px 14px;font-size:12px;color:var(--mut);cursor:pointer}
 .chip.on{background:var(--acc);border-color:var(--acc);color:#fff}
 .rq{color:var(--fg);font-weight:600;font-size:14px}
+.fd-bar{display:flex;gap:10px;align-items:center;justify-content:space-between;margin:0 14px 4px;padding:8px 12px;border-radius:12px;border:1px dashed var(--warn);color:var(--warn);font-size:12px;line-height:1.4}
+.fd-bar button{flex:none;background:none;border:1px solid var(--warn);color:var(--warn);border-radius:9px;padding:5px 10px;font:inherit;font-weight:700;cursor:pointer}
+.fd-row{display:flex;justify-content:space-between;align-items:center;gap:8px}.fd-row>span{flex:none;white-space:nowrap}
+.fd-pill{display:inline-block;font-size:11px;font-weight:800;border-radius:8px;padding:3px 8px;white-space:nowrap}.fd-pill.ok{background:rgba(61,220,151,.15);color:var(--ok)}.fd-pill.warn{background:rgba(255,184,77,.15);color:var(--warn)}
+.fd-cnt{display:flex;gap:6px}.fd-cnt i{flex:1;height:6px;border-radius:3px;background:var(--line)}.fd-cnt i.on{background:var(--acc2)}
+.fd-check{display:flex;gap:10px;align-items:flex-start;padding:10px;border-radius:12px;background:rgba(255,255,255,.04)}
+.fd-check>.n{flex:none;width:22px;height:22px;border-radius:50%;background:var(--acc);color:#fff;display:grid;place-items:center;font-weight:800;font-size:11px}.fd-check>.n.done{background:var(--ok);color:#06120c}
+.fd-check>div{flex:1;min-width:0;display:grid;gap:5px}.fd-check b{font-size:13px}
+.fd-lnk{background:none;border:0;padding:0;color:var(--acc2);font:inherit;font-weight:700;font-size:12.5px;text-align:left;cursor:pointer}
+.fd-badge{display:flex;gap:8px;align-items:center;padding:9px 12px;border-radius:12px;background:rgba(255,194,77,.1);border:1px solid rgba(255,194,77,.35);font-size:12.5px;line-height:1.45}
+.fd-prog{height:5px;border-radius:3px;background:var(--line);overflow:hidden}.fd-prog u{display:block;height:100%;width:35%;background:var(--acc2);border-radius:3px;animation:fdP 1.4s ease-in-out infinite}
+@keyframes fdP{0%{transform:translateX(-100%)}100%{transform:translateX(300%)}}
+.fd-lock{position:relative;overflow:hidden}.fd-blur{filter:blur(7px);user-select:none;pointer-events:none;display:grid;gap:8px}.fd-lk{position:absolute;inset:0;display:grid;place-items:center;font-size:30px}
+.fd-dir{text-align:center;padding:12px;border-radius:12px;background:rgba(61,220,151,.12);color:var(--ok);font-weight:800;font-size:18px}
+.fd-pf{background:#1b2030;border-radius:12px;padding:10px;font-family:system-ui,-apple-system,sans-serif}
+.fd-pf .bal{position:relative;display:inline-flex;flex-direction:column;border:1px solid #3a4258;border-radius:8px;padding:3px 10px;font-size:15px;font-weight:700;color:#fff}.fd-pf .bal small{font-size:9px;color:#8a93a8;font-weight:500}
+.fd-pf .dd{margin-top:10px;background:#232a3d;border:1px solid #333b52;border-radius:10px;padding:8px 8px 8px 30px;display:grid;gap:6px}
+.fd-pf .acc{position:relative;background:#2a3247;border-radius:8px;padding:8px 10px;font-size:12px;color:#fff}.fd-pf .acc small{display:block;color:#8a93a8;font-size:11px}
+.fd-pf .hl{outline:2.5px solid #ffc24d;outline-offset:2px;box-shadow:0 0 14px rgba(255,194,77,.4)}
+.fd-pf .num{position:absolute;left:-33px;top:50%;margin-top:-11px;width:22px;height:22px;border-radius:50%;background:#ffc24d;color:#1a1000;font:800 12px/22px var(--fd);text-align:center}
 .rrow{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .rbtn{border:1.5px solid var(--acc);background:transparent;color:var(--acc2);border-radius:14px;padding:14px 6px;font-weight:700;font-size:14px;cursor:pointer;transition:background .15s,color .15s,transform .1s,box-shadow .15s}
 @media(hover:hover){.rbtn:hover{background:var(--acc);color:#fff;box-shadow:0 0 0 3px #9b5cff33}}
@@ -632,6 +652,7 @@ function shell(title,body){
       el('div',{class:'hr'},el('button',{class:'pillb',type:'button','aria-label':'Поддержка',title:'Поддержка',onclick:support},svgEl(CHAT_ICON),isSig?null:'Поддержка'),
         withPhoto(el('button',{class:'avb',type:'button','aria-label':'Профиль',onclick:()=>go('profile')},init)))),
     viewAsBar(),
+    fdBar(),
     (me.profileHint||VIEW_AS||title==='Профиль'?null:(clearTimeout(phTimer),phTimer=setTimeout(profileHint,1000),null)),
     el('main',{},body),
     el('nav',{class:'tabs'},el('div',{},TABS.map(([k,t])=>el('button',{type:'button',class:k===tab?'on':'',onclick:()=>go(k)},svgEl('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">'+ICON[k]+'</svg>'),t)))));
@@ -826,7 +847,7 @@ async function signalPairs(){
   const SHOWN=[3,5,15,30],opts=[...new Set([...SHOWN,...o.expiries])].sort((a,b)=>a-b);
   let pair=null,sec=o.expiries.includes(5)?5:(o.expiries[0]||null),open=false,query='';
   const box=el('div',{style:'display:grid;gap:14px'});
-  const go=el('button',{class:'btn',type:'button',onclick:()=>{if(pair&&sec)signalPrep(pair,sec)}},'Получить анализ');
+  const go=el('button',{class:'btn',type:'button',onclick:()=>{if(!(pair&&sec))return;if(me.funnelDemo&&me.funnelDemo.stage==='new')funnelGate(pair);else signalPrep(pair,sec)}},'Получить анализ');
   const paint=()=>{
     go.disabled=!(pair&&sec);
     const item=p=>el('button',{type:'button',class:'prow',style:p===pair?'border-color:var(--acc)':'',onclick:()=>{pair=p;open=false;query='';paint()}},el('span',{},p),p===pair?el('span',{class:'pay'},'✓'):null);
@@ -856,7 +877,8 @@ async function signalPairs(){
     if(open){const inp=head.querySelector('input');if(inp)setTimeout(()=>inp.focus(),0)}
   };
   paint();
-  shell('Анализ',[el('button',{class:'back',type:'button',onclick:()=>{tab='home';render()}},'‹ Назад'),box,go,
+  shell('Анализ',[el('button',{class:'back',type:'button',onclick:()=>{tab='home';render()}},'‹ Назад'),box,
+    me.funnelDemo&&me.funnelDemo.stage==='trial'?fdBadge('Учебный анализ ',el('b',{},(me.funnelDemo.used+1)+' из 3'),' — открывайте сделку на ',el('b',{},'демо-счёте'),'.'):null,go,
     el('div',{class:'note'},'Перед началом торговли проверяйте процент выплаты на платформе Pocket Option: он может меняться.')]);
 }
 /** Шаги «анализа»: каждый длится 3–5 секунд, по очереди; сигнал запрашивается в самом конце, чтобы время входа считалось от момента показа */
@@ -890,7 +912,7 @@ async function signalPrep(pair,sec){
     timers.push(setTimeout(()=>{r.ic.className='tick';r.ic.textContent='✓';r.st2.textContent='готово';r.st2.style.color='var(--ok)';bar.style.width=Math.round((i+1)/rows.length*100)+'%';buzzL()},at));
   });
   // Сигнал создаём в самом конце: время входа отсчитывается от запроса, а анализ идёт заметно дольше прежних 6 секунд
-  timers.push(setTimeout(()=>{req=api('/signals/request',{method:'POST',body:{pair,expiry_sec:sec}}).then(r=>({r:{...r,skew:Date.parse(r.now)-Date.now()}}),e=>({e}))},Math.max(0,total-400)));
+  timers.push(setTimeout(()=>{req=me.funnelDemo?fdSignal(pair,sec):api('/signals/request',{method:'POST',body:{pair,expiry_sec:sec}}).then(r=>({r:{...r,skew:Date.parse(r.now)-Date.now()}}),e=>({e}))},Math.max(0,total-400)));
   timers.push(setTimeout(async()=>{
     while(!req)await new Promise(r=>setTimeout(r,50));
     const res=await req;
@@ -935,7 +957,7 @@ function signalLive(sg,skew,cfg){
     el('div',{class:'sm'},'1 — со входа, 2–'+max+' — с перекрытий'),
     el('div',{style:'display:grid;grid-template-columns:repeat('+max+',minmax(0,1fr));gap:8px'},Array.from({length:max},(_,i)=>el('button',{class:'btn g',type:'button',onclick:()=>send('win',i+1)},String(i+1)))),
     el('button',{class:'back',type:'button',onclick:()=>pm()},'‹ Назад'))};
-  rateBox.append(idle);
+  rateBox.append(sg.demo?el('button',{class:'btn',type:'button',onclick:async e=>{e.currentTarget.disabled=true;await fdAct('used');tab='home';render()}},'Сделка открыта — на главную'):idle);
   function paint(){
     const now=nowMs();
     let n=0;while(n<max&&at(n)<=now)n++;   // n = первое событие, которое ещё впереди
@@ -959,7 +981,8 @@ function signalLive(sg,skew,cfg){
   paint();timers.push(setInterval(paint,200));
   const pocket=()=>{const u=cfg.pocketUrl||'https://pocketoption.com/';openLink(u)};
   return el('div',{style:'display:grid;gap:12px'},
-    el('div',{class:'sig'},el('h3',{},'Сигнал готов'),
+    el('div',{class:'sig'},el('h3',{style:'display:flex;justify-content:space-between;align-items:center;gap:8px'},'Сигнал готов',sg.demo?el('span',{class:'fd-pill warn'},'ДЕМО · '+sg.demo+' из 3'):null),
+      sg.demo?fdBadge('Откройте сделку на ',el('b',{},'демо-счёте'),' (QT Demo). ',el('button',{class:'fd-lnk',type:'button',onclick:()=>fdDemoSheet(false)},'Как включить?')):null,
       row('Время',hms(entry)),row('Точка входа',cfg.entryLabel),row('Пара',sg.pair),
       el('div',{class:'r'},el('span',{},'Направление'),el('b',{style:'color:var(--'+(up?'ok':'bad')+')'},up?'ВВЕРХ (BUY)':'ВНИЗ (SELL)')),
       row('Время сделки',sg.expiry_sec?fmtDur(sg.expiry_sec):sg.expiry_min+' мин'),row('Ставка',cfg.stakeLabel),
@@ -1017,8 +1040,117 @@ function offerBanner(){
   const until=new Date(me.offer.until).toLocaleDateString('ru-RU',{day:'numeric',month:'long'});
   return el('div',{class:'sighint',style:'background:rgba(61,220,151,.12);border-color:rgba(61,220,151,.55)',role:'status'},el('div',{class:'sm',style:'line-height:1.5'},el('b',{style:'color:var(--ok)'},'🔥 Для вас скидка '+me.offer.pct+'%'),el('br'),'Достаточно пополнить счёт на '+(me.minDeposit||10)+' $. Скидка действует до '+until+'.'));
 }
+/* ---------- Новая воронка: «Получить анализ» → регистрация (EU / СНГ) → 3 учебных анализа на демо → пополнение ----------
+ * Пока включена только демонстрация (me.funnelDemo): админ и стримеры проходят её один раз,
+ * регистрация и пополнение «приходят» сами через 5 секунд, ссылки не открываются, сигналы учебные и на сервер не пишутся */
+async function fdAct(action,extra){
+  try{const r=await api('/funnel-demo',{method:'POST',body:{action,...(extra||{})}});me.funnelDemo=r.demo;return r}
+  catch(e){toast(e.message);await refreshMe().catch(()=>{});return null}
+}
+function fdBar(){
+  if(!me||!me.funnelDemo)return null;
+  return el('div',{class:'fd-bar',role:'status'},el('span',{},'🧪 Демонстрация новой воронки: регистрация и пополнение придут сами через 5 сек'),
+    el('button',{type:'button',onclick:async()=>{await fdAct('exit');toast('Демонстрация завершена');tab='home';render()}},'Выйти'));
+}
+const fdBadge=(...k)=>el('div',{class:'fd-badge'},el('span',{'aria-hidden':'true'},'🧪'),el('span',{},...k));
+const fdCnt=n=>el('div',{class:'fd-cnt'},[1,2,3].map(i=>el('i',{class:i<=n?'on':''})));
+const fdCheck=(done,n,title,sub,link,fn)=>el('div',{class:'fd-check'},el('span',{class:'n'+(done?' done':'')},done?'✓':String(n)),
+  el('div',{},el('b',{},title),el('div',{class:'sm'},sub),el('button',{class:'fd-lnk',type:'button',onclick:fn},link)));
+/** Картинка платформы Pocket Option: баланс со стрелкой (1) и счёт в списке (2); обводка по краю самого элемента */
+function fdPlat(back){
+  const n=t=>el('span',{class:'num'},t);
+  const acc=(name,sum,hl)=>el('div',{class:'acc'+(hl?' hl':'')},name,el('small',{},sum),hl?n('2'):null);
+  return el('div',{class:'fd-pf','aria-hidden':'true'},
+    el('div',{style:'display:flex;justify-content:flex-end'},el('div',{class:'bal hl'},el('small',{},(back?'QT Demo':'QT Real')+' · USD'),(back?'50 000.00':'4 627.46')+' ▾',n('1'))),
+    el('div',{class:'dd'},acc('QT Real','$4 627.46',back),acc('QT Demo','$50 000.00',!back)));
+}
+/** Окно «Включите демо-счёт» / «Вернитесь на реальный счёт» */
+function fdDemoSheet(back){
+  if(!back){try{localStorage.setItem('fd_demo_seen','1')}catch{}}
+  const close=()=>{v.remove();if(tab==='home')render()};
+  const v=el('div',{class:'rv-sheet',role:'dialog','aria-modal':'true',onclick:e=>{if(e.target===v)close()}},
+    el('div',{class:'rv-form',style:'display:grid;gap:12px'},
+      el('div',{class:'rv-head'},el('h3',{},back?'Вернитесь на реальный счёт':'Включите демо-счёт'),el('button',{class:'rv-x',type:'button','aria-label':'Закрыть',onclick:close},'×')),
+      el('div',{class:'fd-check'},el('span',{class:'n'},'1'),el('div',{},el('div',{class:'sm',style:'color:var(--fg)'},'Откройте платформу Pocket Option и нажмите там на баланс со стрелкой ▾ — он сверху справа, рядом с кнопкой «Пополнить счёт»'))),
+      el('div',{class:'fd-check'},el('span',{class:'n'},'2'),el('div',{},el('div',{class:'sm',style:'color:var(--fg)'},back?'Выберите QT Real — ваш счёт с деньгами':'Выберите QT Demo — там 50 000 $ виртуальных'),fdPlat(back))),
+      el('button',{class:'btn',type:'button',onclick:close},'Понятно')));
+  document.body.append(v);
+}
+let fdDemoSeen=false;try{fdDemoSeen=localStorage.getItem('fd_demo_seen')==='1'}catch{}
+/** Ждём «регистрацию» или «пополнение»: перерисовать, когда подойдёт срок */
+function fdWait(){
+  const due=me.funnelDemo&&me.funnelDemo.due?Date.parse(me.funnelDemo.due):0;
+  timers.push(setTimeout(async()=>{const was=me.funnelDemo&&me.funnelDemo.stage;await refreshMe().catch(()=>{});
+    if(tab!=='home')return;
+    if(!me.funnelDemo&&was==='depwait')toast('Пополнение получено — сигналы открыты. Демонстрация завершена');
+    else if(me.funnelDemo&&me.funnelDemo.stage==='trial'&&was==='wait')toast('Регистрация подтверждена');
+    render()},Math.max(600,due-Date.now()+400)));
+}
+/** Анализ выбранной пары готов, но закрыт: просим зарегистрироваться по ссылке, регион EU или СНГ */
+function funnelGate(pair){
+  clearTimers();
+  const reg=async r=>{
+    const res=await fdAct('region',{region:r});if(!res)return;
+    toast('Демонстрация: ссылка не открывается, регистрация придёт через 5 сек');tab='home';render();
+  };
+  shell('Анализ',[el('button',{class:'back',type:'button',onclick:()=>signalPairs()},'‹ Назад'),
+    el('div',{class:'card fd-lock'},el('div',{class:'fd-blur','aria-hidden':'true'},el('b',{},pair),el('div',{class:'fd-dir'},'▲ ВВЕРХ (BUY)'),el('div',{class:'sm'},'Вход через 0:32 · время сделки 5 сек')),el('div',{class:'fd-lk','aria-hidden':'true'},'🔒')),
+    el('div',{class:'card hero'},heroArt(),
+      el('h2',{style:'font-size:17px'},'Анализ '+pair+' готов'),
+      el('p',{class:'sm',style:'margin:0'},'Чтобы его открыть, зарегистрируйте аккаунт Pocket Option по нашей ссылке. Сразу после регистрации откроется ',el('b',{},'доступ к сигналам Hunter AI'),' — начнёте с учебных сделок на демо-счёте.'),
+      el('div',{class:'rq'},'Где вы находитесь?'),
+      el('div',{class:'rrow'},[['ww','EU, Мир','если вы в Европе'],['ru','RU, СНГ','если вы в России']].map(([k,a,b])=>el('button',{class:'rbtn',type:'button',onclick:()=>reg(k)},el('span',{style:'display:block'},a),el('span',{class:'rsub'},b)))),
+      el('p',{class:'sm',style:'margin:0'},'Нажимая, вы подтверждаете, что вам 18+ и вы понимаете: торговля связана с риском потери денег.'))]);
+}
+/** Учебный сигнал для демонстрации: направление случайное, вход как у настоящих, на сервер ничего не пишется */
+async function fdSignal(pair,sec){
+  let o={};try{o=await api('/signals/request')}catch{}
+  const now=nowMs(),enter=(o.enterInSec||30)*1000;
+  return{r:{signal:{id:0,demo:me.funnelDemo.used+1,pair,direction:Math.random()<.5?'up':'down',entry_at:new Date(now+enter).toISOString(),expiry_sec:sec},cfg:o.cfg||{gapSec:60,maxEvents:4,entryLabel:'',stakeLabel:''},now:new Date(now).toISOString(),skew:0}};
+}
+async function funnelHome(){
+  const f=me.funnelDemo;
+  const past=await pastSignals().catch(()=>[]);
+  const zero=stats4({deals:0,wins:0,losses:0,rate:null});
+  let main;
+  if(f.stage==='new'){
+    main=el('div',{class:'card hero'},heroArt(),el('h2',{style:'font-size:17px'},'Точный вход по вашей паре'),
+      el('p',{class:'sm',style:'margin:0'},'Выберите пару и экспирацию. Hunter AI разберёт структуру рынка, импульс и ликвидность и назовёт направление и точку входа.'),
+      el('button',{class:'btn',type:'button',onclick:()=>signalPairs()},'Получить анализ'));
+  }else if(f.stage==='wait'){
+    fdWait();
+    main=el('div',{class:'card hero'},heroArt(),el('h2',{style:'font-size:17px'},'Ожидаем регистрацию'),
+      el('p',{class:'sm',style:'margin:0'},'Завершите регистрацию в Pocket Option. Как только она придёт к нам, здесь откроется ',el('b',{},'доступ к сигналам'),' — экран обновится сам.'),
+      el('div',{class:'fd-prog'},el('u')),
+      el('button',{class:'btn o',type:'button',onclick:()=>toast('Демонстрация: здесь откроется та же ссылка регистрации ('+(f.region==='ru'?'RU, СНГ':'EU, Мир')+')')},'Открыть ссылку ещё раз'),
+      el('button',{class:'back',type:'button',onclick:async()=>{await fdAct('back');render()}},'‹ Выбрать другой регион'));
+  }else if(f.stage==='trial'){
+    const last=f.used===2;
+    main=el('div',{class:'card hero'},heroArt(),
+      el('div',{class:'fd-row'},el('h2',{style:'font-size:17px'},'🎁 Доступ открыт'),el('span',{class:'fd-pill ok'},'Регистрация ✓')),
+      el('div',{class:'fd-row'},el('b',{style:'font-size:14px'},'Учебные анализы'),el('span',{class:'sm'},el('b',{},f.used+' из 3'))),
+      fdCnt(f.used),
+      el('p',{class:'sm',style:'margin:0'},last?'Остался последний учебный анализ. Отработайте его на демо-счёте.':'Вам доступно 3 анализа. Отрабатывайте их на демо-счёте — там 50 000 $ виртуальных, свои деньги не нужны.'),
+      fdCheck(f.lesson1,1,'Настройте платформу как в Уроке 1','Пара, время экспирации и сумма сделки — урок займёт 2 минуты.','Открыть Урок 1 →',()=>{tab='trainer';viewTrainer(1)}),
+      fdCheck(fdDemoSeen,2,'Включите демо-счёт','Стрелка ▾ у баланса сверху → QT Demo.','Как включить демо? →',()=>{fdDemoSeen=true;fdDemoSheet(false)}),
+      el('button',{class:'btn',type:'button',onclick:()=>signalPairs()},'Получить анализ · '+(f.used+1)+' из 3'));
+  }else{
+    // done3 и depwait: учебные закончились — пополнение
+    const waitDep=f.stage==='depwait';if(waitDep)fdWait();
+    main=el('div',{class:'card hero'},heroArt(),
+      el('div',{class:'fd-row'},el('h2',{style:'font-size:17px'},waitDep?'Ожидаем пополнение':'Учебные анализы закончились'),el('span',{class:'sm'},el('b',{},'3 из 3'))),
+      fdCnt(3),
+      waitDep?el('p',{class:'sm',style:'margin:0'},'Как только пополнение придёт к нам, сигналы откроются — экран обновится сам.')
+        :el('p',{class:'sm',style:'margin:0'},'Результат на демо говорит сам за себя. Чтобы получать сигналы и дальше, пополните счёт Pocket Option от ',el('b',{},'50 $'),' — доступ подключится автоматически. Команда рекомендует начинать ',el('b',{},'со 100 $'),' — так проще соблюдать мани- и риск-менеджмент.'),
+      waitDep?el('div',{class:'fd-prog'},el('u')):el('button',{class:'btn g',type:'button',onclick:async e=>{e.currentTarget.disabled=true;if(await fdAct('deposit'))toast('Демонстрация: Pocket Option не открывается, пополнение придёт через 5 сек');render()}},'Пополнить счёт'),
+      fdBadge('Перед пополнением вернитесь на реальный счёт. ',el('button',{class:'fd-lnk',type:'button',onclick:()=>fdDemoSheet(true)},'Как это сделать?')));
+    main=[main,el('div',{class:'card fd-lock'},el('div',{class:'fd-blur','aria-hidden':'true'},el('b',{},'Точный вход по вашей паре'),el('div',{class:'btn'},'Получить анализ')),el('div',{class:'fd-lk','aria-hidden':'true'},'🔒'))];
+  }
+  shell('Hunter AI',[profileCard(),zero,...[].concat(main),...past].filter(Boolean));
+}
 async function viewHome(){
   if(!me)await refreshMe();
+  if(me.funnelDemo)return funnelHome();
   if(!me.access&&me.status==='registered'){
     // Шаг 2: регистрация уже пришла постбеком, ждём пополнения
     const min=me.minDeposit||10,got=Number(me.deposited||0);
