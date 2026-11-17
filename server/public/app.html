@@ -1100,7 +1100,7 @@ function funnelGate(pair){
     el('div',{class:'card fd-lock'},el('div',{class:'fd-blur','aria-hidden':'true'},el('b',{},pair),el('div',{class:'fd-dir'},'▲ ВВЕРХ (BUY)'),el('div',{class:'sm'},'Вход через 0:32 · время сделки 5 сек')),el('div',{class:'fd-lk','aria-hidden':'true'},'🔒')),
     el('div',{class:'card hero'},heroArt(),
       el('h2',{style:'font-size:17px'},'Анализ '+pair+' готов'),
-      el('p',{class:'sm',style:'margin:0'},'Чтобы его открыть, зарегистрируйте аккаунт Pocket Option по нашей ссылке. Сразу после регистрации откроется ',el('b',{},'доступ к сигналам Hunter AI'),' — начнёте с учебных сделок на демо-счёте.'),
+      el('p',{class:'sm',style:'margin:0'},'Чтобы его открыть, зарегистрируйте аккаунт Pocket Option по нашей ссылке. Сразу после регистрации откроется ',el('b',{},'доступ к сигналам Hunter AI'),'.'),
       el('div',{class:'rq'},'Где вы находитесь?'),
       el('div',{class:'rrow'},[['ww','EU, Мир','если вы в Европе'],['ru','RU, СНГ','если вы в России']].map(([k,a,b])=>el('button',{class:'rbtn',type:'button',onclick:()=>reg(k)},el('span',{style:'display:block'},a),el('span',{class:'rsub'},b)))),
       el('p',{class:'sm',style:'margin:0'},'Нажимая, вы подтверждаете, что вам 18+ и вы понимаете: торговля связана с риском потери денег.'))]);
