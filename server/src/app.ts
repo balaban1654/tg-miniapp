@@ -268,8 +268,8 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
   await referralAppRoutes(app, auth);
 
   // ---- Демонстрация новой воронки: админ и стримеры проходят её один раз, регистрация и пополнение «приходят» через 5 секунд ----
-  // Демонстрация выключена: новая воронка работает у клиентов по-настоящему. Чтобы включить снова — вернуть ['admin', 'streamer']
-  const DEMO_ROLES: string[] = [];
+  // Демонстрация для сотрудников (один раз): у клиентов воронка работает по-настоящему. Выключить — пустой массив
+  const DEMO_ROLES: string[] = ['admin', 'streamer'];
   const DEMO_WAIT_MS = 5000;
   type FunnelDemo = { stage: 'new' | 'wait' | 'trial' | 'done3' | 'depwait'; used: number; region?: string; due?: string };
   /** Текущее состояние демонстрации или null (не положена, уже пройдена). Просроченное ожидание сразу переводит дальше */

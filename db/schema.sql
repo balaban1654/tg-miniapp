@@ -1216,3 +1216,12 @@ END $$;
 -- funnel_reg_at — клиент выбрал регион и ушёл регистрироваться (экран «Ожидаем регистрацию»); signals.trial — учебный анализ до пополнения
 ALTER TABLE leads ADD COLUMN IF NOT EXISTS funnel_reg_at TIMESTAMPTZ;
 ALTER TABLE signals ADD COLUMN IF NOT EXISTS trial BOOLEAN NOT NULL DEFAULT false;
+
+-- Проверка готовой воронки: админы и стримеры ещё раз проходят демонстрацию (один раз)
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM app_settings WHERE key = 'funnel_demo_reset_4') THEN
+    UPDATE leads SET funnel_demo = NULL, funnel_demo_done_at = NULL WHERE lead_role IN ('admin', 'streamer');
+    INSERT INTO app_settings (key, value) VALUES ('funnel_demo_reset_4', '1') ON CONFLICT (key) DO NOTHING;
+  END IF;
+END $$;
