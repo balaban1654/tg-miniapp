@@ -228,7 +228,7 @@ main{flex:1;padding:6px 16px 96px;display:grid;gap:12px;align-content:start}
 .fd-badge{display:flex;gap:8px;align-items:center;padding:9px 12px;border-radius:12px;background:rgba(255,194,77,.1);border:1px solid rgba(255,194,77,.35);font-size:12.5px;line-height:1.45}
 .fd-prog{height:5px;border-radius:3px;background:var(--line);overflow:hidden}.fd-prog u{display:block;height:100%;width:35%;background:var(--acc2);border-radius:3px;animation:fdP 1.4s ease-in-out infinite}
 @keyframes fdP{0%{transform:translateX(-100%)}100%{transform:translateX(300%)}}
-.fd-lock{position:relative;overflow:hidden}.fd-siglock{border-radius:20px}.fd-siglock .fd-blur{filter:blur(5px)}.fd-siglock .r{padding:7px 0;font-size:13px}.fd-siglock h3{margin:0 0 4px}
+.fd-lock{position:relative;overflow:hidden}.fd-siglock{border-radius:20px}.fd-siglock .fd-blur{filter:blur(7px) saturate(.7);opacity:.85}.fd-spoil{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;border-radius:20px}.fd-siglock .r{padding:7px 0;font-size:13px}.fd-siglock h3{margin:0 0 4px}
 .fd-lkb{display:grid;justify-items:center;gap:6px;padding:14px 18px;border-radius:16px;background:rgba(13,8,23,.82);border:1px solid var(--line);font-size:13.5px}.fd-blur{filter:blur(7px);user-select:none;pointer-events:none;display:grid;gap:8px}.fd-lk{position:absolute;inset:0;display:grid;place-items:center;font-size:30px}
 .fd-dir{text-align:center;padding:12px;border-radius:12px;background:rgba(61,220,151,.12);color:var(--ok);font-weight:800;font-size:18px}
 .fd-pf{background:#1b2030;border-radius:12px;padding:10px;font-family:system-ui,-apple-system,sans-serif}
@@ -1097,6 +1097,21 @@ function fdWait(){
     else if(me.funnelDemo&&me.funnelDemo.stage==='trial'&&was==='wait')toast('Регистрация подтверждена');
     render()},Math.max(600,due-Date.now()+400)));
 }
+/** «Спойлер» как в Telegram: поверх размытой карточки мерцают и медленно плывут мелкие точки */
+function fdSpoiler(){
+  const cv=el('canvas',{class:'fd-spoil','aria-hidden':'true'});
+  const still=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let dots=[],w=0,h=0,dpr=Math.min(2,devicePixelRatio||1),ctx=null;
+  const size=()=>{const r=cv.getBoundingClientRect();if(!r.width)return false;w=r.width;h=r.height;cv.width=w*dpr;cv.height=h*dpr;ctx=cv.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);
+    const n=Math.round(w*h/55);dots=Array.from({length:n},()=>({x:Math.random()*w,y:Math.random()*h,vx:(Math.random()-.5)*.35,vy:(Math.random()-.5)*.35,r:Math.random()*.9+.4,a:Math.random(),va:(Math.random()*.02+.006)*(Math.random()<.5?-1:1)}));return true};
+  const draw=()=>{if(!cv.isConnected)return;if(!ctx&&!size()){requestAnimationFrame(draw);return}
+    ctx.clearRect(0,0,w,h);
+    for(const d of dots){if(!still){d.x+=d.vx;d.y+=d.vy;d.a+=d.va;if(d.a>1||d.a<.1)d.va=-d.va;if(d.x<0)d.x+=w;if(d.x>w)d.x-=w;if(d.y<0)d.y+=h;if(d.y>h)d.y-=h}
+      ctx.globalAlpha=Math.max(0,Math.min(1,d.a))*.85;ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(d.x,d.y,d.r,0,6.283);ctx.fill()}
+    if(!still)requestAnimationFrame(draw)};
+  requestAnimationFrame(draw);
+  return cv;
+}
 /** Анализ выбранной пары готов, но закрыт: просим зарегистрироваться по ссылке, регион EU или СНГ */
 function funnelGate(pair,sec){
   clearTimers();
@@ -1115,6 +1130,7 @@ function funnelGate(pair,sec){
           row('Время',p2(t.getHours())+':'+p2(t.getMinutes())+':'+p2(t.getSeconds())),row('Точка входа','M5 · 0:45'),row('Пара',pair),
           row('Направление','ВВЕРХ (BUY)','color:var(--ok)'),row('Время сделки',fmtDur(sec||5)),row('Ставка','1–3% от депозита'),
           el('div',{class:'btn',style:'margin-top:8px'},'Открыть Pocket Option')),
+        fdSpoiler(),
         el('div',{class:'fd-lk'},el('div',{class:'fd-lkb'},el('span',{style:'font-size:26px'},'🔒'),el('b',{},'Откроется после регистрации'))))})(),
     el('div',{class:'card hero'},
       el('h2',{style:'font-size:17px'},'Анализ '+pair+' готов'),
