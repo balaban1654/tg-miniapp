@@ -1193,3 +1193,12 @@ BEGIN
     INSERT INTO app_settings (key, value) VALUES ('funnel_demo_reset_1', '1') ON CONFLICT (key) DO NOTHING;
   END IF;
 END $$;
+
+-- Владелец просил пройти демонстрацию воронки ещё раз (с новой загрузкой и карточкой сигнала) — сброс админам
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM app_settings WHERE key = 'funnel_demo_reset_2') THEN
+    UPDATE leads SET funnel_demo = NULL, funnel_demo_done_at = NULL WHERE lead_role = 'admin';
+    INSERT INTO app_settings (key, value) VALUES ('funnel_demo_reset_2', '1') ON CONFLICT (key) DO NOTHING;
+  END IF;
+END $$;

