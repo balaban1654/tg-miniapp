@@ -1225,3 +1225,14 @@ BEGIN
     INSERT INTO app_settings (key, value) VALUES ('funnel_demo_reset_4', '1') ON CONFLICT (key) DO NOTHING;
   END IF;
 END $$;
+
+-- «Вы в команде Hunter Team!» — праздничное окно один раз после пополнения (закрыл «Получить первый сигнал» — больше не показываем).
+-- Кто уже с доступом на момент запуска — окно не увидит (разовая отметка)
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS welcome_at TIMESTAMPTZ;
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM app_settings WHERE key = 'welcome_init_1') THEN
+    UPDATE leads SET welcome_at = now() WHERE access AND welcome_at IS NULL;
+    INSERT INTO app_settings (key, value) VALUES ('welcome_init_1', '1') ON CONFLICT (key) DO NOTHING;
+  END IF;
+END $$;

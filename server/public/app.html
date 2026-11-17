@@ -216,6 +216,15 @@ main{flex:1;padding:6px 16px 96px;display:grid;gap:12px;align-content:start}
 .chip{border:1px solid var(--line);background:none;border-radius:99px;padding:6px 14px;font-size:12px;color:var(--mut);cursor:pointer}
 .chip.on{background:var(--acc);border-color:var(--acc);color:#fff}
 .rq{color:var(--fg);font-weight:600;font-size:14px}
+.wt-ov{position:fixed;inset:0;z-index:9990;background:rgba(5,2,12,.8);display:grid;place-items:center;padding:12px;overflow:hidden}
+.wt-card{position:relative;width:min(380px,100%);background:var(--card);border:1px solid var(--acc);border-radius:22px;padding:22px 12px 16px;display:grid;gap:12px;justify-items:center;box-shadow:0 20px 60px rgba(0,0,0,.7);animation:wtIn .45s cubic-bezier(.2,.9,.3,1.2)}
+.wt-card>.btn{width:100%}.wt-t{font:800 20px var(--fd);text-align:center}
+.wt-badge{width:64px;height:64px;border-radius:50%;background:rgba(61,220,151,.18);border:2px solid var(--ok);display:grid;place-items:center;font-size:30px}
+.wt-trd{width:100%;background:var(--card2,#251847);border-radius:14px;padding:8px}.wt-trd .trd-b .btn{padding:0 9px}
+.wt-conf{position:absolute;inset:0;pointer-events:none}.wt-conf i{position:absolute;top:-20px;width:8px;height:13px;border-radius:2px;animation:wtFall linear infinite}
+@keyframes wtFall{0%{transform:translateY(-20px) rotate(0)}100%{transform:translateY(110vh) rotate(540deg)}}
+@keyframes wtIn{0%{transform:scale(.85);opacity:0}100%{transform:scale(1);opacity:1}}
+@media (prefers-reduced-motion:reduce){.wt-conf{display:none}.wt-card{animation:none}}
 .fd-bar{display:flex;gap:10px;align-items:center;justify-content:space-between;margin:0 14px 4px;padding:8px 12px;border-radius:12px;border:1px dashed var(--warn);color:var(--warn);font-size:12px;line-height:1.4}
 .fd-bar button{flex:none;background:none;border:1px solid var(--warn);color:var(--warn);border-radius:9px;padding:5px 10px;font:inherit;font-weight:700;cursor:pointer}
 .fd-row{display:flex;justify-content:space-between;align-items:center;gap:8px}.fd-row>span{flex:none;white-space:nowrap}
@@ -1093,7 +1102,7 @@ function fdWait(){
   const due=me.funnelDemo&&me.funnelDemo.due?Date.parse(me.funnelDemo.due):0;
   timers.push(setTimeout(async()=>{const was=me.funnelDemo&&me.funnelDemo.stage;await refreshMe().catch(()=>{});
     if(tab!=='home')return;
-    if(!me.funnelDemo&&was==='depwait')toast('Пополнение получено — сигналы открыты. Демонстрация завершена');
+    if(!me.funnelDemo&&was==='depwait'){toast('Демонстрация завершена');setTimeout(()=>welcomeTeam(true),300)}
     else if(me.funnelDemo&&me.funnelDemo.stage==='trial'&&was==='wait')toast('Регистрация подтверждена');
     render()},Math.max(600,due-Date.now()+400)));
 }
@@ -1197,6 +1206,7 @@ async function funnelHome(){
 async function viewHome(){
   if(!me)await refreshMe();
   if(FN())return funnelHome();
+  if(me.welcome&&!VIEW_AS)setTimeout(()=>welcomeTeam(false),300);
   if(!me.access&&me.status==='registered'){
     // Шаг 2: регистрация уже пришла постбеком, ждём пополнения
     const min=me.minDeposit||10,got=Number(me.deposited||0);
@@ -2375,9 +2385,24 @@ function traderBlock(){
 }
 /** Подсказки в профиле: один раз. Затемнение, подсветка элемента, короткое описание, «Далее» / «Пропустить».
  *  Первое же нажатие любой кнопки отмечает на сервере, что подсказки показаны — больше не появятся */
+/** «Вы в команде Hunter Team!» — один раз после пополнения: затемнение, конфетти, трейдер (как в профиле), закрывается только «Получить первый сигнал» */
+function welcomeTeam(demo){
+  if(VIEW_AS||document.querySelector('.wt-ov'))return;
+  if(document.getElementById('splash')){setTimeout(()=>welcomeTeam(demo),700);return}
+  me.welcome=false;
+  const conf=el('div',{class:'wt-conf','aria-hidden':'true'},Array.from({length:40},(_,i)=>el('i',{style:'left:'+Math.random()*100+'%;background:'+['#3ddc97','#c9a6ff','#ffc24d','#9b5cff','#f2467a'][i%5]+';animation-delay:'+(Math.random()*2.5).toFixed(2)+'s;animation-duration:'+(2.6+Math.random()*2).toFixed(2)+'s'})));
+  const v=el('div',{class:'wt-ov',role:'dialog','aria-modal':'true'},conf,
+    el('div',{class:'wt-card'},
+      el('div',{class:'wt-badge','aria-hidden':'true'},'🎉'),
+      el('b',{class:'wt-t'},'Вы в команде Hunter Team!'),
+      el('div',{class:'sm',style:'text-align:center'},'Пополнение получено, доступ открыт навсегда. Сигналы и анализ — без ограничений.'),
+      me.manager?el('div',{class:'wt-trd'},traderBlock()):null,
+      el('button',{class:'btn',type:'button',onclick:()=>{v.remove();if(!demo)api('/welcome',{method:'POST'}).catch(()=>{});tab='home';render()}},'Получить первый сигнал')));
+  document.body.append(v);
+}
 /** Подсказка «Это ваш профиль» у аватарки: один раз всем. Экран затемнён, пока не нажмут ✕, «Открыть» или саму аватарку */
 function profileHint(){
-  if(me.profileHint||VIEW_AS||tab==='profile'||document.querySelector('.ph-hole,.tr-hole'))return;
+  if(me.profileHint||VIEW_AS||tab==='profile'||document.querySelector('.ph-hole,.tr-hole,.wt-ov'))return;
   // Пока идёт заставка загрузки — ждём, подсказка появляется только после неё
   if(document.getElementById('splash')){clearTimeout(phTimer);phTimer=setTimeout(profileHint,700);return}
   const av=document.querySelector('.hd .avb');if(!av)return;

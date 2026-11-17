@@ -629,5 +629,8 @@ window.HUNTER_EN = {
   'Откройте платформу Pocket Option и нажмите там на баланс со стрелкой ▾ — он сверху справа, рядом с кнопкой «Пополнить счёт»': 'Open the Pocket Option platform and tap the balance with the ▾ arrow — it is at the top right, next to the “Top up” button',
   'Выберите QT Real — ваш счёт с деньгами': 'Choose QT Real — your account with real money',
   'Выберите QT Demo — там 50 000 $ виртуальных': 'Choose QT Demo — it has $50,000 of virtual money',
-  'Понятно': 'Got it'
+  'Понятно': 'Got it',
+  'Вы в команде Hunter Team!': 'You are on the Hunter Team!',
+  'Пополнение получено, доступ открыт навсегда. Сигналы и анализ — без ограничений.': 'Top-up received, access is open for good. Signals and analysis — no limits.',
+  'Получить первый сигнал': 'Get your first signal'
 };

@@ -341,7 +341,7 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
   app.get('/me', { preHandler: auth }, async (req) => {
     const u = req.tg!;
     const r = await db.query(
-      `SELECT coalesce(d.status_before_block, d.status) AS status, d.access, d.is_tester, d.lead_role, d.region, d.lang, d.theme, d.created_at, d.trader_id, d.profile_tour_at, d.tour_replay_at, d.profile_hint_at, o.name AS manager,
+      `SELECT coalesce(d.status_before_block, d.status) AS status, d.access, d.is_tester, d.lead_role, d.region, d.lang, d.theme, d.created_at, d.trader_id, d.profile_tour_at, d.tour_replay_at, d.profile_hint_at, d.welcome_at, o.name AS manager,
               o.po_promo, o.po_link, o.po_link_ru, o.tg_username AS manager_tg, o.tg_link AS manager_link, d.owner_id, o.live_channel AS manager_channel
          FROM leads d LEFT JOIN staff o ON o.id = d.owner_id WHERE d.tg_id = $1`,
       [u.id],
@@ -377,6 +377,8 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
       lang: l.lang ?? null,
       profileTour: !!l.profile_tour_at,
       profileHint: !!l.profile_hint_at,
+      // Праздничное окно «Вы в команде» — один раз, когда клиент получил доступ пополнением
+      welcome: Boolean(l.access && !l.welcome_at && ['lead', 'test'].includes(l.lead_role || 'lead')),
       // Демонстрация новой воронки (админ и стримеры, один раз). В «смотреть как» тут обычный лид — её нет
       funnelDemo: await funnelDemoOf(u.id),
       // Новая воронка у клиента без доступа: new | wait | trial | done3 (null — доступ открыт или сотрудник)
@@ -432,6 +434,10 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // Подсказки в профиле просмотрены (нажал «Далее» или «Пропустить»): больше не показываем
+  app.post('/welcome', { preHandler: auth }, async (req) => {
+    await db.query('UPDATE leads SET welcome_at = coalesce(welcome_at, now()) WHERE tg_id = $1', [req.tg!.id]);
+    return { ok: true };
+  });
   app.post('/profile-hint', { preHandler: auth }, async (req) => {
     await db.query('UPDATE leads SET profile_hint_at = coalesce(profile_hint_at, now()) WHERE tg_id = $1', [req.tg!.id]);
     return { ok: true };
