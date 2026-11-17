@@ -1236,3 +1236,12 @@ BEGIN
     INSERT INTO app_settings (key, value) VALUES ('welcome_init_1', '1') ON CONFLICT (key) DO NOTHING;
   END IF;
 END $$;
+
+-- Ещё одна проверка воронки (с окном «Вы в команде»): админы и стримеры проходят демонстрацию заново, один раз
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM app_settings WHERE key = 'funnel_demo_reset_5') THEN
+    UPDATE leads SET funnel_demo = NULL, funnel_demo_done_at = NULL WHERE lead_role IN ('admin', 'streamer');
+    INSERT INTO app_settings (key, value) VALUES ('funnel_demo_reset_5', '1') ON CONFLICT (key) DO NOTHING;
+  END IF;
+END $$;
