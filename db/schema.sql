@@ -1211,3 +1211,8 @@ BEGIN
     INSERT INTO app_settings (key, value) VALUES ('funnel_demo_reset_3', '1') ON CONFLICT (key) DO NOTHING;
   END IF;
 END $$;
+
+-- Новая воронка для всех клиентов: «Получить анализ» → регистрация → 3 учебных анализа (до пополнения) → пополнение.
+-- funnel_reg_at — клиент выбрал регион и ушёл регистрироваться (экран «Ожидаем регистрацию»); signals.trial — учебный анализ до пополнения
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS funnel_reg_at TIMESTAMPTZ;
+ALTER TABLE signals ADD COLUMN IF NOT EXISTS trial BOOLEAN NOT NULL DEFAULT false;

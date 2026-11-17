@@ -879,7 +879,7 @@ async function signalPairs(){
   };
   paint();
   shell('Анализ',[el('button',{class:'back',type:'button',onclick:()=>{tab='home';render()}},'‹ Назад'),box,
-    me.funnelDemo&&me.funnelDemo.stage==='trial'?fdBadge('Учебный анализ ',el('b',{},(me.funnelDemo.used+1)+' из 3'),' — открывайте сделку на ',el('b',{},'демо-счёте'),'.'):null,go,
+    FN()&&FN().stage==='trial'?fdBadge('Учебный анализ ',el('b',{},(FN().used+1)+' из 3'),' — открывайте сделку на ',el('b',{},'демо-счёте'),'.'):null,go,
     el('div',{class:'note'},'Перед началом торговли проверяйте процент выплаты на платформе Pocket Option: он может меняться.')]);
 }
 /** Шаги «анализа»: каждый длится 3–5 секунд, по очереди; сигнал запрашивается в самом конце, чтобы время входа считалось от момента показа */
@@ -895,7 +895,7 @@ const ANALYSIS=[
 async function signalPrep(pair,sec){
   clearTimers();
   const buzzL=()=>{try{if(tg&&tg.HapticFeedback)tg.HapticFeedback.impactOccurred('light');else if(navigator.vibrate)navigator.vibrate(12)}catch{}};
-  const gate=me.funnelDemo&&me.funnelDemo.stage==='new';   // ещё не зарегистрирован: короткий анализ, потом «Анализ готов» под замком
+  const gate=!!(FN()&&FN().stage==='new');   // ещё не зарегистрирован: короткий анализ, потом «Анализ готов» под замком
   const durs=ANALYSIS.map(()=>gate?350+Math.floor(Math.random()*201):me.funnelDemo?600+Math.floor(Math.random()*401):3000+Math.floor(Math.random()*2001));   // 3–5 секунд на шаг (в демонстрации воронки — меньше секунды)
   const total=durs.reduce((a,b)=>a+b,0);
   const rows=ANALYSIS.map(([l,cap])=>{
@@ -920,6 +920,7 @@ async function signalPrep(pair,sec){
     while(!req)await new Promise(r=>setTimeout(r,50));
     const res=await req;
     if(res.e){toast(res.e.message);signalPairs();return}
+    if(res.r.signal&&res.r.signal.trial&&me.funnel)res.r.signal.trialNo=me.funnel.used+1;
     buzzL();signalResult(res.r);
   },total+300));
 }
@@ -985,8 +986,8 @@ function signalLive(sg,skew,cfg){
   paint();timers.push(setInterval(paint,200));
   const pocket=()=>{const u=cfg.pocketUrl||'https://pocketoption.com/';openLink(u)};
   return el('div',{style:'display:grid;gap:12px'},
-    el('div',{class:'sig'},el('h3',{style:'display:flex;justify-content:space-between;align-items:center;gap:8px'},'Сигнал готов',sg.demo?el('span',{class:'fd-pill warn'},'ДЕМО · '+sg.demo+' из 3'):null),
-      sg.demo?fdBadge('Откройте сделку на ',el('b',{},'демо-счёте'),' (QT Demo). ',el('button',{class:'fd-lnk',type:'button',onclick:()=>fdDemoSheet(false)},'Как включить?')):null,
+    el('div',{class:'sig'},el('h3',{style:'display:flex;justify-content:space-between;align-items:center;gap:8px'},'Сигнал готов',(sg.demo||sg.trialNo)?el('span',{class:'fd-pill warn'},'ДЕМО · '+(sg.demo||sg.trialNo)+' из 3'):null),
+      (sg.demo||sg.trialNo)?fdBadge('Откройте сделку на ',el('b',{},'демо-счёте'),' (QT Demo). ',el('button',{class:'fd-lnk',type:'button',onclick:()=>fdDemoSheet(false)},'Как включить?')):null,
       row('Время',hms(entry)),row('Точка входа',cfg.entryLabel),row('Пара',sg.pair),
       el('div',{class:'r'},el('span',{},'Направление'),el('b',{style:'color:var(--'+(up?'ok':'bad')+')'},up?'ВВЕРХ (BUY)':'ВНИЗ (SELL)')),
       row('Время сделки',sg.expiry_sec?fmtDur(sg.expiry_sec):sg.expiry_min+' мин'),row('Ставка',cfg.stakeLabel),
@@ -997,14 +998,14 @@ function signalLive(sg,skew,cfg){
 function signalRated(sg,result,step){
   clearTimers();
   const win=result==='win';
-  const more=!sg.demo||(me.funnelDemo&&me.funnelDemo.stage==='trial');   // в демонстрации после 3-го учебного — только «На главную»
+  const fnow=FN(),more=!fnow||fnow.stage==='trial';   // в демонстрации после 3-го учебного — только «На главную»
   shell('Анализ',[
     !more?null:el('div',{class:'sighint',role:'status'},svgEl('<svg viewBox="0 0 24 24"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>'),el('div',{class:'sm'},'Хотите ещё сигнал по этой же паре?',el('br'),'Нажмите «Повторить анализ».',el('br'),'Чтобы выбрать другую пару,',el('br'),'нажмите «Запросить новый анализ».')),
     el('div',{class:'card',style:'display:grid;gap:6px;text-align:center'},
       el('b',{style:'font-size:20px;color:var(--'+(win?'ok':'bad')+')'},win?'Плюс':'Минус'),
       el('div',{class:'sm'},sg.pair+(win?' · '+(step===1?'со входа':'с перекрытия '+(step-1)):'')),
       el('div',{class:'sm'},sg.demo?'Демонстрация: в статистику не записано.':'Оценка записана в статистику.')),
-    ...(sg.demo&&!(me.funnelDemo&&me.funnelDemo.stage==='trial')?[el('button',{class:'btn',type:'button',onclick:()=>{tab='home';render()}},'На главную')]:[
+    ...(!more?[el('button',{class:'btn',type:'button',onclick:()=>{tab='home';render()}},'На главную')]:[
     el('button',{class:'btn o',type:'button',onclick:()=>signalPrep(sg.pair,sg.expiry_sec||sg.expiry_min*60)},'Повторить анализ · '+sg.pair),
     el('button',{class:'btn',type:'button',onclick:()=>signalPairs()},'Запросить новый анализ'),
     el('button',{class:'btn o',type:'button',onclick:()=>{toast('Торговля завершена');tab='home';render()}},'Завершить торговлю')]),
@@ -1049,6 +1050,8 @@ function offerBanner(){
 /* ---------- Новая воронка: «Получить анализ» → регистрация (EU / СНГ) → 3 учебных анализа на демо → пополнение ----------
  * Пока включена только демонстрация (me.funnelDemo): админ и стримеры проходят её один раз,
  * регистрация и пополнение «приходят» сами через 5 секунд, ссылки не открываются, сигналы учебные и на сервер не пишутся */
+/** Текущий этап новой воронки: демонстрация у сотрудника или настоящий клиент без доступа (null — обычное приложение) */
+const FN=()=>!me?null:me.funnelDemo?{...me.funnelDemo,demo:true}:(!me.access&&me.funnel?me.funnel:null);
 async function fdAct(action,extra){
   try{const r=await api('/funnel-demo',{method:'POST',body:{action,...(extra||{})}});me.funnelDemo=r.demo;return r}
   catch(e){toast(e.message);await refreshMe().catch(()=>{});return null}
@@ -1096,8 +1099,12 @@ function fdWait(){
 function funnelGate(pair,sec){
   clearTimers();
   const reg=async r=>{
-    const res=await fdAct('region',{region:r});if(!res)return;
-    toast('Демонстрация: ссылка не открывается, регистрация придёт через 5 сек');tab='home';render();
+    if(me.funnelDemo){const res=await fdAct('region',{region:r});if(!res)return;
+      toast('Демонстрация: ссылка не открывается, регистрация придёт через 5 сек');tab='home';render();return}
+    const url=me.registerUrl&&me.registerUrl[r];
+    if(!url){toast('Ссылка регистрации для этого региона пока не настроена. Напишите нам через «Поддержка».');return}
+    try{const x=await api('/funnel',{method:'POST',body:{action:'region',region:r}});me.funnel=x.funnel;me.region=r}catch(e){toast(e.message);return}
+    openLink(url);tab='home';render();
   };
   shell('Анализ',[el('button',{class:'back',type:'button',onclick:()=>signalPairs()},'‹ Назад'),
     (()=>{const t=new Date(nowMs()+32000),p2=n=>String(n).padStart(2,'0'),row=(k,v,st)=>el('div',{class:'r'},el('span',{},k),el('b',{style:st||''},v));
@@ -1122,8 +1129,9 @@ async function fdSignal(pair,sec){
   return{r:{signal:{id:0,demo:me.funnelDemo.used+1,pair,direction:Math.random()<.5?'up':'down',entry_at:new Date(now+enter).toISOString(),expiry_sec:sec},cfg:o.cfg||{gapSec:60,maxEvents:4,entryLabel:'',stakeLabel:''},now:new Date(now).toISOString(),skew:0}};
 }
 async function funnelHome(){
-  const f=me.funnelDemo;
+  const f=FN();
   const past=await pastSignals().catch(()=>[]);
+  if(!f.demo&&f.stage!=='trial')watchAccess();   // регистрация и пополнение приходят постбеком — экран обновится сам
   const zero=stats4({deals:0,wins:0,losses:0,rate:null});
   let main;
   if(f.stage==='new'){
@@ -1131,12 +1139,13 @@ async function funnelHome(){
       el('p',{class:'sm',style:'margin:0'},'Выберите пару и экспирацию. Hunter AI разберёт структуру рынка, импульс и ликвидность и назовёт направление и точку входа.'),
       el('button',{class:'btn',type:'button',onclick:()=>signalPairs()},'Получить анализ'));
   }else if(f.stage==='wait'){
-    fdWait();
+    if(f.demo)fdWait();
     main=el('div',{class:'card hero'},heroArt(),el('h2',{style:'font-size:17px'},'Ожидаем регистрацию'),
       el('p',{class:'sm',style:'margin:0'},'Завершите регистрацию в Pocket Option. Как только она придёт к нам, здесь откроется ',el('b',{},'доступ к сигналам'),' — экран обновится сам.'),
       el('div',{class:'fd-prog'},el('u')),
-      el('button',{class:'btn o',type:'button',onclick:()=>toast('Демонстрация: здесь откроется та же ссылка регистрации ('+(f.region==='ru'?'RU, СНГ':'EU, Мир')+')')},'Открыть ссылку ещё раз'),
-      el('button',{class:'back',type:'button',onclick:async()=>{await fdAct('back');render()}},'‹ Выбрать другой регион'));
+      el('button',{class:'btn o',type:'button',onclick:()=>{if(f.demo){toast('Демонстрация: здесь откроется та же ссылка регистрации ('+(f.region==='ru'?'RU, СНГ':'EU, Мир')+')');return}
+        const url=me.registerUrl&&me.registerUrl[f.region];if(url)openLink(url);else toast('Ссылка регистрации не настроена. Напишите нам через «Поддержка».')}},'Открыть ссылку ещё раз'),
+      el('button',{class:'back',type:'button',onclick:async()=>{if(f.demo)await fdAct('back');else{try{const x=await api('/funnel',{method:'POST',body:{action:'back'}});me.funnel=x.funnel}catch(e){toast(e.message)}}render()}},'‹ Выбрать другой регион'));
   }else if(f.stage==='trial'){
     const last=f.used===2;
     main=el('div',{class:'card hero'},heroArt(),
@@ -1150,20 +1159,26 @@ async function funnelHome(){
   }else{
     // done3 и depwait: учебные закончились — пополнение
     const waitDep=f.stage==='depwait';if(waitDep)fdWait();
+    const minDep=f.demo?50:(me.minDeposit||50),got=f.demo?0:Number(me.deposited||0);
     main=el('div',{class:'card hero'},heroArt(),
       el('div',{class:'fd-row'},el('h2',{style:'font-size:17px'},waitDep?'Ожидаем пополнение':'Учебные анализы закончились'),el('span',{class:'sm'},el('b',{},'3 из 3'))),
       fdCnt(3),
       waitDep?el('p',{class:'sm',style:'margin:0'},'Как только пополнение придёт к нам, сигналы откроются — экран обновится сам.')
-        :el('p',{class:'sm',style:'margin:0'},'Результат на демо говорит сам за себя. Чтобы получать сигналы и дальше, пополните счёт Pocket Option от ',el('b',{},'50 $'),' — доступ подключится автоматически. Команда рекомендует начинать ',el('b',{},'со 100 $'),' — так проще соблюдать мани- и риск-менеджмент.'),
-      waitDep?el('div',{class:'fd-prog'},el('u')):el('button',{class:'btn g',type:'button',onclick:async e=>{e.currentTarget.disabled=true;if(await fdAct('deposit'))toast('Демонстрация: Pocket Option не открывается, пополнение придёт через 5 сек');render()}},'Пополнить счёт'),
+        :el('p',{class:'sm',style:'margin:0'},'Результат на демо говорит сам за себя. Чтобы получать сигналы и дальше, пополните счёт Pocket Option от ',el('b',{},minDep+' $'),' — доступ подключится автоматически. Команда рекомендует начинать ',el('b',{},'со 100 $'),' — так проще соблюдать мани- и риск-менеджмент.'),
+      !f.demo&&me.offer?offerBanner():null,
+      got>0?el('p',{class:'sm',style:'margin:0;color:var(--acc2);font-weight:700'},'Пополнено: '+usd(got).replace(',00 $',' $')+' из '+minDep+' $'):null,
+      waitDep?el('div',{class:'fd-prog'},el('u')):el('button',{class:'btn g',type:'button',onclick:async e=>{
+        if(!f.demo){openLink(cfgPocketUrl());return}
+        e.currentTarget.disabled=true;if(await fdAct('deposit'))toast('Демонстрация: Pocket Option не открывается, пополнение придёт через 5 сек');render()}},'Пополнить счёт'),
       fdBadge('Перед пополнением вернитесь на реальный счёт. ',el('button',{class:'fd-lnk',type:'button',onclick:()=>fdDemoSheet(true)},'Как это сделать?')));
     main=[main,el('div',{class:'card fd-lock'},el('div',{class:'fd-blur','aria-hidden':'true'},el('b',{},'Точный вход по вашей паре'),el('div',{class:'btn'},'Получить анализ')),el('div',{class:'fd-lk','aria-hidden':'true'},'🔒'))];
   }
-  shell('Hunter AI',[profileCard(),zero,...[].concat(main),...past].filter(Boolean));
+  const live=!f.demo&&f.stage==='trial'?await signalCard().catch(()=>[]):[];
+  shell('Hunter AI',[profileCard(),zero,...live,...[].concat(main),...past].filter(Boolean));
 }
 async function viewHome(){
   if(!me)await refreshMe();
-  if(me.funnelDemo)return funnelHome();
+  if(FN())return funnelHome();
   if(!me.access&&me.status==='registered'){
     // Шаг 2: регистрация уже пришла постбеком, ждём пополнения
     const min=me.minDeposit||10,got=Number(me.deposited||0);

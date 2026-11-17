@@ -286,6 +286,34 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
     const lesson1 = Boolean((await db.query('SELECT 1 FROM lesson_progress WHERE tg_id = $1 AND lesson = 1', [tgId])).rowCount);
     return { ...st, lesson1 };
   }
+  // ---- Новая воронка у настоящих клиентов (без доступа): этап считается из статуса, выбора региона и учебных сигналов ----
+  const TRIAL_MAX = 3;
+  async function funnelOf(tgId: number): Promise<{ stage: 'new' | 'wait' | 'trial' | 'done3'; used: number; region: string | null } | null> {
+    const l = (await db.query(`SELECT status, access, is_tester, lead_role, region, funnel_reg_at, banned_at FROM leads WHERE tg_id = $1`, [tgId])).rows[0];
+    if (!l || l.banned_at || !['lead', 'test'].includes(l.lead_role ?? 'lead')) return null;
+    if (l.access || (l.is_tester && l.lead_role !== 'test')) return null;
+    if (l.status === 'registered') {
+      const used = Number((await db.query(
+        `SELECT count(*)::int AS n FROM signals s WHERE s.requested_by = $1 AND s.trial
+            AND NOT EXISTS (SELECT 1 FROM signal_steps t WHERE t.signal_id = s.id AND t.tg_id = $1 AND t.result = 'skip')`, [tgId])).rows[0].n);
+      return { stage: used >= TRIAL_MAX ? 'done3' : 'trial', used: Math.min(used, TRIAL_MAX), region: l.region };
+    }
+    if (l.status !== 'new') return null;
+    // Выбрал регион и ушёл регистрироваться: трое суток показываем «Ожидаем регистрацию»
+    const wait = l.funnel_reg_at && Date.now() - new Date(l.funnel_reg_at).getTime() < 3 * 86400_000;
+    return { stage: wait ? 'wait' : 'new', used: 0, region: l.region };
+  }
+  app.post<{ Body: { action?: string; region?: string } }>('/funnel', { preHandler: auth }, async (req, reply) => {
+    const a = String(req.body?.action ?? '');
+    if (a === 'region') {
+      const region = String(req.body?.region ?? '');
+      if (!['ru', 'ww'].includes(region)) return reply.code(400).send({ error: 'Неверный регион' });
+      await db.query(`UPDATE leads SET region = $2, funnel_reg_at = now() WHERE tg_id = $1 AND status = 'new'`, [req.tg!.id, region]);
+    } else if (a === 'back') await db.query('UPDATE leads SET funnel_reg_at = NULL WHERE tg_id = $1', [req.tg!.id]);
+    else return reply.code(400).send({ error: 'Неизвестное действие' });
+    return { ok: true, funnel: await funnelOf(req.tg!.id) };
+  });
+
   app.post<{ Body: { action?: string; region?: string } }>('/funnel-demo', { preHandler: auth }, async (req, reply) => {
     const cur = await funnelDemoOf(req.tg!.id);
     if (!cur) return reply.code(409).send({ error: 'Демонстрация уже пройдена' });
@@ -349,6 +377,8 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
       profileHint: !!l.profile_hint_at,
       // Демонстрация новой воронки (админ и стримеры, один раз). В «смотреть как» тут обычный лид — её нет
       funnelDemo: await funnelDemoOf(u.id),
+      // Новая воронка у клиента без доступа: new | wait | trial | done3 (null — доступ открыт или сотрудник)
+      funnel: await funnelOf(u.id),
       // Админ может один раз заново посмотреть подсказки профиля
       tourReplay: l.lead_role === 'admin' && !l.tour_replay_at,
       theme: l.theme ?? null,
@@ -598,19 +628,25 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
   const requestRules = async (tgId: number) => {
     const set = (await db.query('SELECT * FROM signal_settings WHERE id = 1')).rows[0];
     const lead = (await db.query('SELECT access, is_tester, lead_role FROM leads WHERE tg_id = $1', [tgId])).rows[0];
-    const allowed = Boolean(lead && (lead.access || (lead.is_tester && lead.lead_role !== 'test')) && set.enabled);
+    const full = Boolean(lead && (lead.access || (lead.is_tester && lead.lead_role !== 'test')) && set.enabled);
+    // Новая воронка: зарегистрированный клиент без пополнения получает TRIAL_MAX учебных анализов (пропущенные не считаются)
+    const fn = !full && set.enabled ? await funnelOf(tgId) : null;
+    const trial = Boolean(fn && fn.stage === 'trial');
+    const allowed = full || trial;
     // Пропущенный сигнал паузу не включает: можно сразу запросить новый
     const last = (await db.query(`SELECT extract(epoch FROM now() - created_at)::int AS ago FROM signals s WHERE requested_by = $1 AND NOT EXISTS (SELECT 1 FROM signal_steps t WHERE t.signal_id = s.id AND t.tg_id = $1 AND t.result = 'skip') ORDER BY id DESC LIMIT 1`, [tgId])).rows[0];
     const cooldownLeft = last ? Math.max(0, set.cooldown_sec - last.ago) : 0;
     const open = (await db.query('SELECT 1 FROM signals s WHERE s.requested_by = $1 AND NOT EXISTS (SELECT 1 FROM signal_steps t WHERE t.signal_id = s.id AND t.tg_id = $1) LIMIT 1', [tgId])).rowCount;
-    return { set, lead, allowed, cooldownLeft, open: Boolean(open) };
+    return { set, lead, allowed, trial, cooldownLeft, open: Boolean(open) };
   };
 
   app.get('/signals/request', { preHandler: auth }, async (req) => {
     const { set, lead, allowed: realAllowed, cooldownLeft: realCd } = await requestRules(req.tg!.id);
     // В демонстрации воронки пары нужны и тем, у кого нет доступа (сигнал там учебный, на сервер не пишется)
     const demo = !realAllowed && set.enabled ? await funnelDemoOf(req.tg!.id) : null;
-    const allowed = realAllowed || Boolean(demo), cooldownLeft = realAllowed ? realCd : 0;
+    // До регистрации клиент тоже выбирает пару: анализ покажется «под замком» с просьбой зарегистрироваться
+    const fnNew = !realAllowed && !demo && set.enabled ? await funnelOf(req.tg!.id) : null;
+    const allowed = realAllowed || Boolean(demo) || Boolean(fnNew && ['new', 'wait'].includes(fnNew.stage)), cooldownLeft = realAllowed ? realCd : 0;
     if (!allowed) return { enabled: false, pairs: [], cooldownLeft: 0, enterInSec: set.enter_in_sec, expiryMin: set.expiry_min, cfg: cfgOf(set) };
     const pairs = (
       await db.query(
@@ -626,7 +662,7 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
   });
 
   app.post<{ Body: { pair?: string; expiry_sec?: number } }>('/signals/request', { preHandler: auth }, async (req, reply) => {
-    const { set, lead, allowed, cooldownLeft, open } = await requestRules(req.tg!.id);
+    const { set, lead, allowed, trial, cooldownLeft, open } = await requestRules(req.tg!.id);
     if (!allowed) return reply.code(403).send({ error: 'Сигналы по запросу пока недоступны' });
     if (open) return reply.code(409).send({ error: 'Сначала оцените предыдущий сигнал' });
     if (cooldownLeft > 0) return reply.code(429).send({ error: `Следующий сигнал можно получить через ${cooldownLeft} сек.`, cooldownLeft });
@@ -650,9 +686,9 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
       p.direction = createHash('sha256').update(`${p.pair}:${Math.floor(entryMs / 60_000)}`).digest()[0] % 2 ? 'up' : 'down';
     }
     const ins = await db.query(
-      `INSERT INTO signals (pair, direction, expiry_min, expiry_sec, entry_at, note, source, is_test, created_by, requested_by)
-       VALUES ($1,$2,$3,$4,$5,NULL,CASE WHEN $6 THEN 'test' ELSE 'analyst' END,$6,$7,$8) RETURNING id, pair, direction, expiry_min, expiry_sec, entry_at, is_test, source, requested_by`,
-      [p.pair, p.direction, Math.max(1, Math.ceil(expirySec / 60)), expirySec, new Date(entryMs), Boolean(p.auto), p.direction_by, req.tg!.id],
+      `INSERT INTO signals (pair, direction, expiry_min, expiry_sec, entry_at, note, source, is_test, created_by, requested_by, trial)
+       VALUES ($1,$2,$3,$4,$5,NULL,CASE WHEN $6 THEN 'test' ELSE 'analyst' END,$6,$7,$8,$9) RETURNING id, pair, direction, expiry_min, expiry_sec, entry_at, is_test, source, requested_by, trial`,
+      [p.pair, p.direction, Math.max(1, Math.ceil(expirySec / 60)), expirySec, new Date(entryMs), Boolean(p.auto), p.direction_by, req.tg!.id, trial],
     );
     return { signal: { ...ins.rows[0], taken: false }, steps: [], cfg: cfgOf(set), now: new Date().toISOString() };
   });
