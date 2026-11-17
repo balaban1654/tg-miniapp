@@ -895,7 +895,9 @@ const ANALYSIS=[
 async function signalPrep(pair,sec){
   clearTimers();
   const buzzL=()=>{try{if(tg&&tg.HapticFeedback)tg.HapticFeedback.impactOccurred('light');else if(navigator.vibrate)navigator.vibrate(12)}catch{}};
-  const gate=!!(FN()&&FN().stage==='new');   // ещё не зарегистрирован: короткий анализ, потом «Анализ готов» под замком
+  // Ещё не зарегистрирован: без загрузки анализа сразу «Анализ готов» под замком
+  if(FN()&&FN().stage==='new')return funnelGate(pair,sec);
+  const gate=false;
   const durs=ANALYSIS.map(()=>gate?350+Math.floor(Math.random()*201):me.funnelDemo?600+Math.floor(Math.random()*401):3000+Math.floor(Math.random()*2001));   // 3–5 секунд на шаг (в демонстрации воронки — меньше секунды)
   const total=durs.reduce((a,b)=>a+b,0);
   const rows=ANALYSIS.map(([l,cap])=>{
