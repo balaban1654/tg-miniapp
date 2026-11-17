@@ -1189,7 +1189,7 @@ async function funnelHome(){
         if(!f.demo){openLink(cfgPocketUrl());return}
         e.currentTarget.disabled=true;if(await fdAct('deposit'))toast('Демонстрация: Pocket Option не открывается, пополнение придёт через 5 сек');render()}},'Пополнить счёт'),
       fdBadge('Перед пополнением вернитесь на реальный счёт. ',el('button',{class:'fd-lnk',type:'button',onclick:()=>fdDemoSheet(true)},'Как это сделать?')));
-    main=[main,el('div',{class:'card fd-lock'},el('div',{class:'fd-blur','aria-hidden':'true'},el('b',{},'Точный вход по вашей паре'),el('div',{class:'btn'},'Получить анализ')),el('div',{class:'fd-lk','aria-hidden':'true'},'🔒'))];
+    // Закрытую карточку «Получить анализ» под замком тут не показываем — только пополнение
   }
   const live=!f.demo&&f.stage==='trial'?await signalCard().catch(()=>[]):[];
   shell('Hunter AI',[profileCard(),zero,...live,...[].concat(main),...past].filter(Boolean));
