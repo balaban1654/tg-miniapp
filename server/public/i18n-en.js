@@ -632,5 +632,6 @@ window.HUNTER_EN = {
   'Понятно': 'Got it',
   'Вы в команде Hunter Team!': 'You are on the Hunter Team!',
   'Пополнение получено, доступ открыт навсегда. Сигналы и анализ — без ограничений.': 'Top-up received, access is open for good. Signals and analysis — no limits.',
-  'Получить первый сигнал': 'Get your first signal'
+  'Получить первый сигнал': 'Get your first signal',
+  '👇 Выберите регион для регистрации': '👇 Choose your region to sign up'
 };
