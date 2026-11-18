@@ -1148,7 +1148,6 @@ function funnelGate(pair,sec){
     el('div',{class:'card hero'},
       el('h2',{style:'font-size:17px'},'Анализ '+pair+' готов'),
       el('p',{class:'sm',style:'margin:0'},'Чтобы его открыть, зарегистрируйте аккаунт Pocket Option по нашей ссылке. Сразу после регистрации откроется ',el('b',{},'доступ к сигналам Hunter AI'),'.'),
-      el('div',{class:'rq'},'Где вы находитесь?'),
       el('div',{class:'rrow fd-reg'},[['ww','EU, Мир','если вы в Европе'],['ru','RU, СНГ','если вы в России']].map(([k,a,b])=>el('button',{class:'rbtn',type:'button',onclick:()=>reg(k)},el('span',{style:'display:block'},a),el('span',{class:'rsub'},b)))),
       el('p',{class:'sm',style:'margin:0'},'Нажимая, вы подтверждаете, что вам 18+ и вы понимаете: торговля связана с риском потери денег.'))]);
   scrollTo({top:0});
