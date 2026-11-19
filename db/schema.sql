@@ -1245,3 +1245,17 @@ BEGIN
     INSERT INTO app_settings (key, value) VALUES ('funnel_demo_reset_5', '1') ON CONFLICT (key) DO NOTHING;
   END IF;
 END $$;
+
+-- Каждое событие (рег, FTD, додеп, вывод, комиссия) знает свой Pocket ID: карточка лида и доступ считаются по основному Pocket ID,
+-- у старого аккаунта своя история. Разово заполняем из постбека, а где Pocket ID не пришёл — основным/первым Pocket ID лида
+ALTER TABLE events ADD COLUMN IF NOT EXISTS pocket TEXT;
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM app_settings WHERE key = 'events_pocket_1') THEN
+    UPDATE events SET pocket = nullif(raw->>'trader_id', '') WHERE pocket IS NULL AND type <> 'start';
+    UPDATE events e SET pocket = coalesce(d.trader_id, (SELECT lp.trader_id FROM lead_pockets lp WHERE lp.tg_id = e.tg_id ORDER BY lp.created_at LIMIT 1))
+      FROM leads d WHERE d.tg_id = e.tg_id AND e.pocket IS NULL AND e.type <> 'start';
+    INSERT INTO app_settings (key, value) VALUES ('events_pocket_1', '1') ON CONFLICT (key) DO NOTHING;
+  END IF;
+END $$;
+CREATE INDEX IF NOT EXISTS events_tg_pocket ON events (tg_id, pocket);

@@ -347,7 +347,8 @@ export async function appRoutes(app: FastifyInstance): Promise<void> {
       [u.id],
     );
     const l = r.rows[0];
-    const dep = await db.query(`SELECT coalesce(sum(amount), 0) AS s, count(*)::int AS c FROM events WHERE tg_id = $1 AND type IN ('ftd','dep')`, [u.id]);
+    // Внесено — по основному Pocket ID (старый аккаунт не в счёт)
+    const dep = await db.query(`SELECT coalesce(sum(amount), 0) AS s, count(*)::int AS c FROM events WHERE tg_id = $1 AND type IN ('ftd','dep') AND pocket IS NOT DISTINCT FROM (SELECT trader_id FROM leads WHERE tg_id = $1)`, [u.id]);
     const rq = await requiredFor(u.id);
     const st = await db.query(
       `SELECT count(*) FILTER (WHERE result IS NOT NULL AND result <> 'skip')::int AS deals,

@@ -99,8 +99,8 @@ export async function postbackRoutes(app: FastifyInstance): Promise<void> {
     if (event === 'reg' && lead.rows[0].rereg_at && !oldPocket) {
       await db.query(`UPDATE leads SET rereg_at = NULL, status = CASE WHEN status = 'new' THEN 'registered' ELSE status END WHERE tg_id = $1`, [tgId]);
       const { secret: _x, ...raw } = q;
-      const ev = await db.query(`INSERT INTO events (tg_id, type, amount, external_id, raw) VALUES ($1,'reg',NULL,$2,$3) ON CONFLICT (external_id) DO NOTHING RETURNING id`,
-        [tgId, `reg:${tgId}:${traderId || Date.now()}`, JSON.stringify(raw)]);
+      const ev = await db.query(`INSERT INTO events (tg_id, type, amount, external_id, raw, pocket) VALUES ($1,'reg',NULL,$2,$3,$4) ON CONFLICT (external_id) DO NOTHING RETURNING id`,
+        [tgId, `reg:${tgId}:${traderId || Date.now()}`, JSON.stringify(raw), traderId || null]);
       await log(event, q, tgId, 'ok: новая регистрация (повторная)', ev.rows[0]?.id ?? null);
       return { ok: true, rereg: true };
     }
@@ -120,16 +120,23 @@ export async function postbackRoutes(app: FastifyInstance): Promise<void> {
     // Повторы одного и того же постбека не должны задваивать деньги
     const tx = pick(q, TX_KEYS);
     const { secret: _s, ...forHash } = q;
+    // Рег и FTD — по одному на Pocket ID: у старого аккаунта свои, новый аккаунт получает свои (прежняя метка без Pocket ID — у первого)
+    let once = `${event}:${tgId}`;
+    if (!tx && (event === 'reg' || event === 'ftd') && traderId) {
+      const was = (await db.query(`SELECT pocket FROM events WHERE external_id = $1`, [once])).rows[0];
+      if (was && was.pocket && was.pocket !== traderId) once = `${event}:${tgId}:${traderId}`;
+    }
+    const pocketOf = traderId || (await db.query('SELECT trader_id FROM leads WHERE tg_id = $1', [tgId])).rows[0]?.trader_id || null;
     const fingerprint = tx
       ? `${event}:${tx}`
       : event === 'reg' || event === 'ftd'
-        ? `${event}:${tgId}`
+        ? once
         : `${event}:${createHash('sha1').update(JSON.stringify(Object.entries(forHash).sort())).digest('hex')}`;
 
     const ins = await db.query(
-      `INSERT INTO events (tg_id, type, amount, external_id, raw)
-       VALUES ($1,$2,$3,$4,$5) ON CONFLICT (external_id) DO NOTHING RETURNING id`,
-      [tgId, event, amount, fingerprint, JSON.stringify(forHash)],
+      `INSERT INTO events (tg_id, type, amount, external_id, raw, pocket)
+       VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT (external_id) DO NOTHING RETURNING id`,
+      [tgId, event, amount, fingerprint, JSON.stringify(forHash), pocketOf],
     );
     if (!ins.rowCount) {
       await log(event, q, tgId, newPocket ? 'ok: ещё один Pocket ID лида, добавлен в карточку' : 'дубль, пропущен');
@@ -160,7 +167,8 @@ export async function postbackRoutes(app: FastifyInstance): Promise<void> {
     }
     if (event === 'ftd' || event === 'dep') {
       // Доступ открывается, когда сумма пополнений достигла минимума. Если партнёрка не прислала сумму, проверить нечем, открываем
-      const tot = Number((await db.query(`SELECT coalesce(sum(amount), 0) AS s FROM events WHERE tg_id = $1 AND type IN ('ftd','dep')`, [tgId])).rows[0].s);
+      // Доступ — по депозитам основного Pocket ID (старый аккаунт не в счёт)
+      const tot = Number((await db.query(`SELECT coalesce(sum(amount), 0) AS s FROM events WHERE tg_id = $1 AND type IN ('ftd','dep') AND pocket IS NOT DISTINCT FROM (SELECT trader_id FROM leads WHERE tg_id = $1)`, [tgId])).rows[0].s);
       // 10% запас: сумма в постбеке может быть чуть меньше из-за курса в Pocket Option
       // Без суммы доверяем только FTD (партнёрка иногда не присылает сумму первого депозита); додеп без суммы доступ не открывает
       const enough = (amount === null && event === 'ftd') || tot >= (await requiredFor(tgId)).required * TOL;
@@ -171,7 +179,7 @@ export async function postbackRoutes(app: FastifyInstance): Promise<void> {
           // Первый достаточный депозит: открываем анализ. Лид из старого бота приходит сразу с додепом без FTD:
           // он «активный» (его первый депозит был раньше), а не FTD
           // FTD, пришедший позже додепа (события приходят не по порядку), не должен понижать «Активного» до FTD
-          const hasDep = event === 'ftd' && (await db.query(`SELECT 1 FROM events WHERE tg_id = $1 AND type = 'dep' AND coalesce(amount, 0) > 0 LIMIT 1`, [tgId])).rowCount;
+          const hasDep = event === 'ftd' && (await db.query(`SELECT 1 FROM events WHERE tg_id = $1 AND type = 'dep' AND coalesce(amount, 0) > 0 AND pocket IS NOT DISTINCT FROM (SELECT trader_id FROM leads WHERE tg_id = $1) LIMIT 1`, [tgId])).rowCount;
           await db.query(`UPDATE leads SET status = $2, access = (removed_at IS NULL) WHERE tg_id = $1`, [tgId, (event === 'ftd' && hasDep) || depPaid ? 'active' : 'ftd']);
         } else if (depPaid) {
           await db.query(`UPDATE leads SET status = 'active' WHERE tg_id = $1 AND status = 'ftd'`, [tgId]);
@@ -196,6 +204,21 @@ export async function postbackRoutes(app: FastifyInstance): Promise<void> {
 
   app.get('/postback/:event', handler);
   app.post('/postback/:event', handler);
+}
+
+/** Сменили основной Pocket ID: статус и доступ клиента — по событиям этого Pocket ID (рег → «Регистрация», депозит от нужной суммы → FTD/«Активный» и доступ).
+ *  Сотрудников, тестеров с доступом, удалённых и заблокированных не трогаем */
+export async function recalcByMainPocket(tgId: number): Promise<string | null> {
+  const L = (await db.query(`SELECT status, access, lead_role, is_tester, removed_at, banned_at FROM leads WHERE tg_id = $1`, [tgId])).rows[0];
+  if (!L || L.removed_at || L.banned_at || !['lead', 'test'].includes(L.lead_role ?? 'lead') || (L.is_tester && L.lead_role !== 'test') || L.status === 'churned') return null;
+  const e = (await db.query(
+    `SELECT bool_or(type = 'reg') AS reg, bool_or(type = 'ftd') AS ftd, bool_or(type = 'ftd' AND amount IS NULL) AS ftd0,
+            bool_or(type = 'dep' AND coalesce(amount, 0) > 0) AS dep, coalesce(sum(amount) FILTER (WHERE type IN ('ftd','dep')), 0)::float AS tot
+       FROM events WHERE tg_id = $1 AND type IN ('reg','ftd','dep') AND pocket IS NOT DISTINCT FROM (SELECT trader_id FROM leads WHERE tg_id = $1)`, [tgId])).rows[0];
+  const enough = (e.ftd || e.dep) && (e.ftd0 || Number(e.tot) >= (await requiredFor(tgId)).required * TOL);
+  const status = enough ? (e.dep ? 'active' : 'ftd') : e.reg || e.ftd || e.dep ? 'registered' : 'new';
+  await db.query(`UPDATE leads SET status = $2, access = $3, rereg_at = CASE WHEN $2 = 'new' THEN rereg_at ELSE NULL END WHERE tg_id = $1`, [tgId, status, Boolean(enough)]);
+  return status;
 }
 
 /** Разовый пересчёт после исправления правил (ноябрь 2026): лиды, ставшие «Активными» и получившие доступ

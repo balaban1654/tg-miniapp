@@ -115,7 +115,7 @@ const GAP = `NOT EXISTS (SELECT 1 FROM connect_sends s WHERE s.tg_id = d.tg_id A
 /** Данные для карточки лида: сколько нужно, что внесено, действующая акция, прошлые отправки */
 export async function connectInfo(tgId: number, hideDeposit = false) {
   const rq = await requiredFor(tgId);
-  const dep = Number((await db.query(`SELECT coalesce(sum(amount),0) AS s FROM events WHERE tg_id = $1 AND type IN ('ftd','dep')`, [tgId])).rows[0].s);
+  const dep = Number((await db.query(`SELECT coalesce(sum(amount),0) AS s FROM events WHERE tg_id = $1 AND type IN ('ftd','dep') AND pocket IS NOT DISTINCT FROM (SELECT trader_id FROM leads WHERE tg_id = $1)`, [tgId])).rows[0].s);
   const offers = (await db.query(`SELECT id, name, discount_pct, days, text FROM connect_offers WHERE active ORDER BY id`)).rows as Offer[];
   const sends = (
     await db.query(
@@ -287,7 +287,7 @@ export async function connectRoutes(app: FastifyInstance, h: { need: Need; str: 
     if (!o) return reply.code(404).send({ error: 'Акция не найдена' });
     const d = (await db.query(`SELECT d.tg_id FROM leads d WHERE d.tg_id = $1 AND ${NOT_CONNECTED} AND ${teamOf(me)}`, [tgId])).rows[0];
     if (!d) return reply.code(409).send({ error: 'Лид не найден в вашей команде или уже подключён' });
-    const ev = (await db.query(`SELECT coalesce(sum(amount), 0)::float AS tot, bool_or(type = 'dep') AS dep, count(*)::int AS n FROM events WHERE tg_id = $1 AND type IN ('ftd','dep')`, [tgId])).rows[0];
+    const ev = (await db.query(`SELECT coalesce(sum(amount), 0)::float AS tot, bool_or(type = 'dep') AS dep, count(*)::int AS n FROM events WHERE tg_id = $1 AND type IN ('ftd','dep') AND pocket IS NOT DISTINCT FROM (SELECT trader_id FROM leads WHERE tg_id = $1)`, [tgId])).rows[0];
     if (!ev.n) return reply.code(409).send({ error: 'Постбека о депозите ещё нет: активировать нечего. Отправьте акцию лиду' });
     const required = r2((await getMinDeposit()) * (1 - o.discount_pct / 100));
     if (Number(ev.tot) < required * TOL) return reply.code(409).send({ error: `Внесено ${usd(ev.tot)}, а по акции «${o.name}» нужно от ${usd(required * TOL)}. Выберите акцию с большей скидкой` });

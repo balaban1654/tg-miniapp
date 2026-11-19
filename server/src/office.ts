@@ -1,3 +1,4 @@
+import { recalcByMainPocket } from './postback.js';
 import { clearTgCaches, onlineNow, freshChannelInfo } from './app.js';
 import QRCode from 'qrcode';
 import { newSecret, otpUri, verifyTotp, newRecoveryCodes } from './totp.js';
@@ -2755,7 +2756,10 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     await leadLog(tgId, 'pocket', `${req.staff!.name} сделал основным Pocket ID ${trader}` + (L.trader_id ? ` (был ${L.trader_id})` : ''), req.staff!.id);
     // Постбеки этого Pocket ID, пропущенные пока он не был основным, теперь засчитываются (на их дату)
     const rp = config.postbackSecret && config.postbackSecret.length >= 16 ? await replaySkipped(trader, tgId, 'пропущен: не основной%') : { applied: 0, left: 0 };
-    return { ok: true, applied: rp.applied };
+    // Статус и доступ — по событиям нового основного Pocket ID
+    const st = await recalcByMainPocket(tgId);
+    if (st) await leadLog(tgId, 'pocket', `Статус по Pocket ID ${trader}: ${st}`, req.staff!.id);
+    return { ok: true, applied: rp.applied, status: st };
   });
   app.delete<{ Params: { tgId: string } }>('/leads/:tgId/ban', { preHandler: need('admin', 'teamlead') }, async (req, reply) => {
     if (!(await banAllowed(req.staff!, Number(req.params.tgId)))) return reply.code(403).send({ error: 'Это лид не вашей команды' });
@@ -2915,7 +2919,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     (r.rows[0] as any).pockets = (await db.query('SELECT trader_id FROM lead_pockets WHERE tg_id = $1 ORDER BY created_at', [tgId])).rows.map((x: any) => x.trader_id);
     const ev = await db.query(
       `SELECT type, amount, created_at, raw->>'country' AS country, raw->>'promo' AS promo, raw->>'ac' AS ac
-         FROM events WHERE tg_id = $1 AND type IN ('start','reg','ftd','dep','wd') ORDER BY created_at, id`,
+         FROM events WHERE tg_id = $1 AND type IN ('start','reg','ftd','dep','wd') AND (type = 'start' OR pocket IS NOT DISTINCT FROM (SELECT trader_id FROM leads WHERE tg_id = $1)) ORDER BY created_at, id`,
       [tgId],
     );
     // Стример не видит додепы и выводы
@@ -2925,7 +2929,8 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     const sum = (rows: any[]) => rows.reduce((t, e) => t + Number(e.amount || 0), 0);
     const last = (k: 'country' | 'promo' | 'ac') => [...ev.rows].reverse().find((e) => e[k])?.[k] ?? null;
     // Финансовая плитка: по типам постбеков сумма, количество и даты. Стример видит только сумму FTD, у остальных количество и даты без сумм
-    const fe = (await db.query(`SELECT type, amount::float AS amount, created_at FROM events WHERE tg_id = $1 AND type IN ('ftd','dep','wd','comm') ORDER BY created_at, id`, [tgId])).rows as { type: string; amount: number | null; created_at: string }[];
+    // Путь клиента и финансы — по основному Pocket ID; у прежних Pocket ID своя история (видна, если сделать его основным)
+    const fe = (await db.query(`SELECT type, amount::float AS amount, created_at FROM events WHERE tg_id = $1 AND type IN ('ftd','dep','wd','comm') AND pocket IS NOT DISTINCT FROM (SELECT trader_id FROM leads WHERE tg_id = $1) ORDER BY created_at, id`, [tgId])).rows as { type: string; amount: number | null; created_at: string }[];
     // Суммы по постбекам видит только админ, остальные роли видят сумму FTD, у других типов только количество и даты
     const hide = me.role !== 'admin';
     const fin: Record<string, { sum: number | null; count: number; dates: { at: string; amount: number | null }[] }> = {};
