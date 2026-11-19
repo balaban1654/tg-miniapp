@@ -3055,6 +3055,46 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
         [config.adminLogin ?? ''],
       )
     ).rows[0];
+    // Прежние Pocket ID лида — отдельными строками: старый аккаунт остаётся на своей дате (рег/FTD), новый — основной строкой.
+    // Строка только для показа: доступ и удаление — у основной строки
+    const pv: unknown[] = [];
+    let pw = '';
+    if (qs) {
+      pv.push('%' + qs.replace(/[\\%_]/g, (c) => '\\' + c) + '%');
+      pw = ` AND (lower(coalesce(d.username,'')) LIKE $1 OR lower(coalesce(d.first_name,'')) LIKE $1 OR d.tg_id::text LIKE $1 OR p.pocket LIKE $1 OR coalesce(d.trader_id,'') LIKE $1)`;
+    } else if (D.test(String(req.query.from)) && D.test(String(req.query.to))) {
+      const [a, b] = String(req.query.from) <= String(req.query.to) ? [req.query.from, req.query.to] : [req.query.to, req.query.from];
+      pv.push(a, b);
+      pw = ` AND (coalesce(p.ftd_at, p.reg_at) AT TIME ZONE 'Europe/Kyiv')::date BETWEEN $1::date AND $2::date`;
+    }
+    if (status) { pv.push(status); pw += ` AND (CASE WHEN p.ftd_at IS NOT NULL THEN (CASE WHEN p.dep THEN 'active' ELSE 'ftd' END) ELSE 'registered' END) = $${pv.length}`; }
+    const old = (await db.query(
+      `WITH p AS (
+         SELECT e.tg_id, e.pocket,
+                min(e.created_at) FILTER (WHERE e.type = 'ftd') AS ftd_at, max(e.created_at) FILTER (WHERE e.type = 'reg') AS reg_at,
+                (array_agg(e.amount ORDER BY e.created_at, e.id) FILTER (WHERE e.type = 'ftd'))[1] AS ftd_amount,
+                coalesce(sum(e.amount) FILTER (WHERE e.type IN ${DT}), 0) AS deposits,
+                coalesce(sum(e.amount) FILTER (WHERE e.type = 'comm'), 0) AS commission,
+                coalesce(bool_or(e.type = 'dep' AND coalesce(e.amount, 0) > 0), false) AS dep
+           FROM events e JOIN leads d0 ON d0.tg_id = e.tg_id
+          WHERE e.pocket IS NOT NULL AND e.pocket IS DISTINCT FROM d0.trader_id AND e.type IN ('reg','ftd','dep','wd','comm')
+          GROUP BY 1, 2)
+       SELECT d.tg_id, p.pocket AS trader_id, d.is_tester, d.lead_role, d.origin, d.username, d.first_name, d.status, false AS access, d.created_at, d.owner_id,
+              (d.banned_at IS NOT NULL) AS banned, coalesce(p.ftd_at, p.reg_at) AS status_at,
+              CASE WHEN p.ftd_at IS NOT NULL THEN (CASE WHEN p.dep THEN 'active' ELSE 'ftd' END) ELSE 'registered' END AS stage,
+              s.name AS owner_name, l.slug AS link_slug, p.ftd_amount, p.deposits,
+              ${me.role === 'streamer' || me.role === 'teamlead' ? '0' : 'p.commission'} AS commission, true AS old_pocket
+         FROM p JOIN leads d ON d.tg_id = p.tg_id LEFT JOIN staff s ON s.id = d.owner_id LEFT JOIN links l ON l.id = d.link_id
+        WHERE coalesce(p.ftd_at, p.reg_at) IS NOT NULL AND d.removed_at IS NULL AND coalesce(d.lead_role, 'lead') IN ('lead','test') AND ${ownerScope(me, 'd.owner_id')}${pw}
+        LIMIT 500`,
+      pv,
+    )).rows;
+    if (old.length) {
+      r.rows.push(...old);
+      // Порядок как у основного списка: сотрудники первыми, дальше по дате этапа, свежие сверху
+      const staffFirst = (x: any) => (x.lead_role && x.lead_role !== 'lead' && x.lead_role !== 'test' ? 1 : 0);
+      r.rows.sort((x: any, y: any) => staffFirst(y) - staffFirst(x) || new Date(y.status_at ?? y.created_at).getTime() - new Date(x.status_at ?? x.created_at).getTime());
+    }
     // Лид без ссылки пришёл сам: с кнопки на сайте — метка site, иначе (поиск по нику в Telegram) органика miniapp-org
     return r.rows.map((x) =>
       x.lead_role && x.lead_role !== 'lead' && x.lead_role !== 'test' ? { ...x, deposits: 0, commission: 0, owner_id: x.owner_id ?? main?.id ?? null, owner_name: x.owner_id ? x.owner_name : main?.name ?? null, link_slug: x.link_slug ?? main?.slug ?? null } : x.link_slug ? x : { ...x, link_slug: x.origin === 'ref' ? 'ref' : x.po_ac || x.origin || 'miniapp-org' }, // po_ac только код демо-ссылки
