@@ -3036,9 +3036,9 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
               (SELECT e.raw->>'ac' FROM events e WHERE e.tg_id = d.tg_id AND ${demoP} IS NOT NULL AND lower(e.raw->>'ac') = lower(${demoP}) LIMIT 1) AS po_ac, d.lead_role, d.origin, d.username, d.first_name, d.status, d.access, d.created_at, d.owner_id, (d.banned_at IS NOT NULL) AS banned, ${funnelStageDate('d')} AS status_at,
               ${shownStage('d')} AS stage,
               s.name AS owner_name, l.slug AS link_slug,
-              (SELECT amount FROM events e WHERE e.tg_id = d.tg_id AND e.type = 'ftd' ORDER BY e.created_at, e.id LIMIT 1) AS ftd_amount,
-              coalesce((SELECT sum(amount) FROM events e WHERE e.tg_id = d.tg_id AND e.type IN ${DT}),0) AS deposits,
-              coalesce((SELECT sum(amount) FROM events e WHERE e.tg_id = d.tg_id AND e.type = 'comm' AND ${me.role === 'streamer' || me.role === 'teamlead' ? 'false' : 'true'}),0) AS commission
+              (SELECT amount FROM events e WHERE e.tg_id = d.tg_id AND e.type = 'ftd' AND e.pocket IS NOT DISTINCT FROM d.trader_id ORDER BY e.created_at, e.id LIMIT 1) AS ftd_amount,
+              coalesce((SELECT sum(amount) FROM events e WHERE e.tg_id = d.tg_id AND e.type IN ${DT} AND e.pocket IS NOT DISTINCT FROM d.trader_id),0) AS deposits,
+              coalesce((SELECT sum(amount) FROM events e WHERE e.tg_id = d.tg_id AND e.type = 'comm' AND e.pocket IS NOT DISTINCT FROM d.trader_id AND ${me.role === 'streamer' || me.role === 'teamlead' ? 'false' : 'true'}),0) AS commission
          FROM leads d
          LEFT JOIN staff s ON s.id = d.owner_id
          LEFT JOIN links l ON l.id = d.link_id

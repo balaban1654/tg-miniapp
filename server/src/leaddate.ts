@@ -17,27 +17,27 @@ export const leadStatusDate = (a: string, strict = false): string =>
  *  Так свежая регистрация или свежий FTD всегда сверху. */
 export const leadListDate = (a: string): string =>
   `(CASE WHEN coalesce(${a}.status_before_block, ${a}.status) IN ('ftd','active')
-         THEN coalesce((SELECT min(e.created_at) FROM events e WHERE e.tg_id = ${a}.tg_id AND e.type IN ('ftd','dep')), ${a}.created_at)
+         THEN coalesce((SELECT min(e.created_at) FROM events e WHERE e.tg_id = ${a}.tg_id AND e.type IN ('ftd','dep') AND e.pocket IS NOT DISTINCT FROM ${a}.trader_id), ${a}.created_at)
          WHEN coalesce(${a}.status_before_block, ${a}.status) = 'registered'
-         THEN coalesce((SELECT max(e.created_at) FROM events e WHERE e.tg_id = ${a}.tg_id AND e.type = 'reg'), ${a}.created_at)
-         ELSE ${a}.created_at END)`;
+         THEN coalesce((SELECT max(e.created_at) FROM events e WHERE e.tg_id = ${a}.tg_id AND e.type = 'reg' AND e.pocket IS NOT DISTINCT FROM ${a}.trader_id), ${a}.created_at)
+         ELSE coalesce(${a}.rereg_at, ${a}.created_at) END)`;
 
 /** Этап лида для полосы «Лиды по статусам»: лид с событием FTD (первым депозитом) считается FTD, даже если его статус остался
  *  «Регистрация» (депозит меньше минимума для доступа) или он в «Отвале» из-за блокировки бота. Так полоса сходится со счётчиком FTD */
 export const funnelStage = (a: string): string =>
   `(CASE WHEN coalesce(${a}.status_before_block, ${a}.status) = 'active' THEN 'active'
-         WHEN coalesce(${a}.status_before_block, ${a}.status) = 'ftd' OR EXISTS (SELECT 1 FROM events e WHERE e.tg_id = ${a}.tg_id AND e.type = 'ftd') THEN 'ftd'
+         WHEN coalesce(${a}.status_before_block, ${a}.status) = 'ftd' OR EXISTS (SELECT 1 FROM events e WHERE e.tg_id = ${a}.tg_id AND e.type = 'ftd' AND e.pocket IS NOT DISTINCT FROM ${a}.trader_id) THEN 'ftd'
          ELSE coalesce(${a}.status_before_block, ${a}.status) END)`;
 /** Дата этапа - одна для дашборда («Статусы лидов») и списка «Лиды»: FTD и активный по первому FTD (как в KPI; без события FTD -
  *  по первому депозиту), регистрация по дате регистрации (последней, после «Разрешить новую регистрацию» - новой), новый по дате прихода.
  *  Лид, зарегистрировавшийся в октябре и сделавший FTD в ноябре, в октябре больше не виден: он в ноябре как FTD */
 export const funnelStageDate = (a: string): string =>
   `(CASE WHEN ${funnelStage(a)} IN ('ftd','active')
-         THEN coalesce((SELECT min(e.created_at) FROM events e WHERE e.tg_id = ${a}.tg_id AND e.type = 'ftd'),
-                       (SELECT min(e.created_at) FROM events e WHERE e.tg_id = ${a}.tg_id AND e.type = 'dep'), ${a}.created_at)
+         THEN coalesce((SELECT min(e.created_at) FROM events e WHERE e.tg_id = ${a}.tg_id AND e.type = 'ftd' AND e.pocket IS NOT DISTINCT FROM ${a}.trader_id),
+                       (SELECT min(e.created_at) FROM events e WHERE e.tg_id = ${a}.tg_id AND e.type = 'dep' AND e.pocket IS NOT DISTINCT FROM ${a}.trader_id), ${a}.created_at)
          WHEN ${funnelStage(a)} = 'registered'
-         THEN coalesce((SELECT max(e.created_at) FROM events e WHERE e.tg_id = ${a}.tg_id AND e.type = 'reg'), ${a}.created_at)
-         ELSE ${a}.created_at END)`;
+         THEN coalesce((SELECT max(e.created_at) FROM events e WHERE e.tg_id = ${a}.tg_id AND e.type = 'reg' AND e.pocket IS NOT DISTINCT FROM ${a}.trader_id), ${a}.created_at)
+         ELSE coalesce(${a}.rereg_at, ${a}.created_at) END)`;
 /** Этап для показа (дашборд и список «Лиды»): «Отвал» только после первого депозита, ушедшие раньше остаются в своём этапе */
 export const shownStage = (a: string): string => `(CASE WHEN ${churnedAfterFtd(a)} THEN 'churned' ELSE ${funnelStage(a)} END)`;
 /** «Отвал» в статистике: заблокировал бота (статус «Отвал») после первого депозита, то есть был FTD или активным.
