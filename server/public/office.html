@@ -1064,7 +1064,13 @@ $('#lRec').onclick=()=>otpMode(!$('#otp').hidden);
 })();
 $('#lBack').onclick=()=>{loginChallenge=null;loginStep(false);$('#lErr').textContent=''};
 $('#lSwitch').onclick=async()=>{try{await api('/login/device/forget',{method:'POST'})}catch{}$('#lLogin').value='';devStep(false);$('#lLogin').focus()};
-{const hb=$('#homeBrand'),goHome=()=>{const h=me&&me.role==='analyst'?'signals':'home';if(tab===h){const r=render({soft:true});if(r&&r.then)r.then(()=>window.scrollTo({top:0,behavior:'smooth'}));else window.scrollTo({top:0,behavior:'smooth'});return}window.scrollTo(0,0);tab=h;showApp();render()};hb.addEventListener('click',goHome);hb.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();goHome()}})}
+// Логотип и «Hunter Office»: полная перезагрузка без кеша (как Ctrl+Shift+R) — чистим кеш приложения, обновляем сервис-воркер
+// и открываем ту же страницу с меткой времени, чтобы браузер взял свежие файлы. Раздел (#…) сохраняется
+{const hb=$('#homeBrand'),goHome=async()=>{hb.style.opacity='.5';
+  try{if(window.caches){const ks=await caches.keys();await Promise.all(ks.map(k=>caches.delete(k)))}}catch{}
+  try{if(navigator.serviceWorker){const rs=await navigator.serviceWorker.getRegistrations();await Promise.all(rs.map(r=>r.update().catch(()=>{})))}}catch{}
+  const u=new URL(location.href);u.searchParams.set('r',Date.now().toString(36));location.replace(u.toString())};
+ hb.title='Обновить Office (как Ctrl+Shift+R)';hb.addEventListener('click',goHome);hb.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();goHome()}})}
 $('#logout').addEventListener('click',async()=>{try{await api('/logout',{method:'POST'})}catch{}showLogin()});
 
 /** render({soft:true}) обновляет страницу на месте: без «Загрузка…» и с сохранением прокрутки, чтобы экран не дёргался */
