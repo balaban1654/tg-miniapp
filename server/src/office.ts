@@ -1628,6 +1628,26 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
 
   // Привязка Telegram ID к Pocket ID прямо из журнала постбеков. Лид заводится (или находится), все пропущенные
   // постбеки этого Pocket ID обрабатываются заново и попадают ему в статистику
+  /** Повторно прогнать пропущенные постбеки этого Pocket ID на лида (после привязки или когда Pocket ID стал основным). Дата — как пришёл */
+  async function replaySkipped(trader: string, tgId: number, only?: string) {
+    const rows = (await db.query(
+      `SELECT id, event, query, created_at FROM postback_log WHERE query->>'trader_id' = $1 AND result LIKE $2 ORDER BY created_at, id`, [trader, only ?? 'пропущен%'],
+    )).rows as { id: string; event: string; query: Record<string, string>; created_at: string }[];
+    let applied = 0, left = 0;
+    for (const r of rows) {
+      const qp = r.query ?? {};
+      const amount = qp.sumdep ?? qp.commission ?? qp.wdr_sum ?? qp.amount ?? '';
+      const tx = qp.txid && String(qp.txid).startsWith('imp-') ? String(qp.txid) : 'imp-' + createHash('sha1').update([r.event, trader, qp.date_time ?? '', amount].join('|')).digest('hex').slice(0, 16);
+      await db.query('DELETE FROM postback_log WHERE id = $1', [r.id]);
+      const q = new URLSearchParams({ secret: config.postbackSecret, txid: tx, click_id: String(tgId) });
+      for (const [k, v] of Object.entries(qp)) if (k !== 'secret' && k !== 'txid' && k !== 'click_id' && v !== '') q.set(k, String(v));
+      const res = await app.inject({ method: 'GET', url: `/postback/${r.event}?${q.toString()}` });
+      const o = res.json() as { ok?: boolean; ignored?: boolean; duplicate?: boolean };
+      await db.query(`UPDATE postback_log SET created_at = $2 WHERE query->>'txid' = $1`, [tx, r.created_at]);
+      if (!o.ignored && !o.duplicate) { await db.query('UPDATE events SET created_at = $2 WHERE external_id = $1', [`${r.event}:${tx}`, r.created_at]); applied++; } else left++;
+    }
+    return { applied, left };
+  }
   app.post('/postbacks/bind', { preHandler: need('admin') }, async (req, reply) => {
     const b = (req.body ?? {}) as Record<string, unknown>;
     const trader = str(b.trader_id, 40);
@@ -1646,22 +1666,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
       second = true;
     } else if (lead) await db.query('UPDATE leads SET trader_id = $2 WHERE tg_id = $1', [tgId, trader]);
     else await db.query(`INSERT INTO leads (tg_id, trader_id, status) VALUES ($1,$2,'new')`, [tgId, trader]);
-    const rows = (await db.query(
-      `SELECT id, event, query, created_at FROM postback_log WHERE query->>'trader_id' = $1 AND result LIKE 'пропущен%' ORDER BY created_at, id`, [trader],
-    )).rows as { id: string; event: string; query: Record<string, string>; created_at: string }[];
-    let applied = 0, left = 0;
-    for (const r of rows) {
-      const qp = r.query ?? {};
-      const amount = qp.sumdep ?? qp.commission ?? qp.wdr_sum ?? qp.amount ?? '';
-      const tx = qp.txid && String(qp.txid).startsWith('imp-') ? String(qp.txid) : 'imp-' + createHash('sha1').update([r.event, trader, qp.date_time ?? '', amount].join('|')).digest('hex').slice(0, 16);
-      await db.query('DELETE FROM postback_log WHERE id = $1', [r.id]);
-      const q = new URLSearchParams({ secret: config.postbackSecret, txid: tx, click_id: String(tgId) });
-      for (const [k, v] of Object.entries(qp)) if (k !== 'secret' && k !== 'txid' && k !== 'click_id' && v !== '') q.set(k, String(v));
-      const res = await app.inject({ method: 'GET', url: `/postback/${r.event}?${q.toString()}` });
-      const o = res.json() as { ok?: boolean; ignored?: boolean; duplicate?: boolean };
-      await db.query(`UPDATE postback_log SET created_at = $2 WHERE query->>'txid' = $1`, [tx, r.created_at]);
-      if (!o.ignored && !o.duplicate) { await db.query('UPDATE events SET created_at = $2 WHERE external_id = $1', [`${r.event}:${tx}`, r.created_at]); applied++; } else left++;
-    }
+    const { applied, left } = await replaySkipped(trader, tgId);
     // Лид, заведённый вручную и ещё не открывавший бота: дата «Пришёл» = первое событие из постбеков
     await db.query(
       `UPDATE leads SET created_at = LEAST(created_at, (SELECT min(created_at) FROM events WHERE tg_id = $1 AND created_at IS NOT NULL)) WHERE tg_id = $1 AND bot_started IS NOT TRUE AND EXISTS (SELECT 1 FROM events WHERE tg_id = $1)`,
@@ -2748,7 +2753,9 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     // Ждал новую регистрацию: выбор основного её завершает, лид снова в «Регистрации»
     await db.query(`UPDATE leads SET trader_id = $2, rereg_at = NULL, status = CASE WHEN rereg_at IS NOT NULL AND status = 'new' THEN 'registered' ELSE status END WHERE tg_id = $1`, [tgId, trader]);
     await leadLog(tgId, 'pocket', `${req.staff!.name} сделал основным Pocket ID ${trader}` + (L.trader_id ? ` (был ${L.trader_id})` : ''), req.staff!.id);
-    return { ok: true };
+    // Постбеки этого Pocket ID, пропущенные пока он не был основным, теперь засчитываются (на их дату)
+    const rp = config.postbackSecret && config.postbackSecret.length >= 16 ? await replaySkipped(trader, tgId, 'пропущен: не основной%') : { applied: 0, left: 0 };
+    return { ok: true, applied: rp.applied };
   });
   app.delete<{ Params: { tgId: string } }>('/leads/:tgId/ban', { preHandler: need('admin', 'teamlead') }, async (req, reply) => {
     if (!(await banAllowed(req.staff!, Number(req.params.tgId)))) return reply.code(403).send({ error: 'Это лид не вашей команды' });

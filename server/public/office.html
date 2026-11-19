@@ -2387,8 +2387,8 @@ function pocketKv(L,cpI,close){
   const menu=el('div',{class:'lc-menu lc-pmenu',hidden:'',role:'menu'},el('div',{class:'mut sm',style:'padding:4px 12px 2px'},main?'Другие Pocket ID':'Прежние Pocket ID'),
     ...other.map(x=>el('div',{class:'lc-mi',style:'display:flex;gap:8px;align-items:center;cursor:default'},el('span',{style:'flex:1'},x),cpI(x),
       me.role==='admin'||me.role==='teamlead'?el('button',{type:'button',class:'btn o s',style:'padding:3px 8px;font-size:11px',onclick:async e=>{e.stopPropagation();
-        if(!await askC('Сделать '+x+' основным Pocket ID? '+(main?'Сейчас основной '+main+', он перейдёт в список.':'Новая регистрация будет считаться завершённой.')))return;
-        try{await api('/leads/'+L.tg_id+'/main-pocket',{method:'PATCH',body:{trader_id:x}});toast('Основной Pocket ID: '+x);close();openLeadCard(L.tg_id)}catch(er){toast(er.message)}}},'Сделать основным'):null)));
+        if(!await askC('Сделать '+x+' основным Pocket ID? '+(main?'Сейчас основной '+main+', он перейдёт в список.':'Новая регистрация будет считаться завершённой.')+' Постбеки засчитываются только по основному Pocket ID; пропущенные постбеки этого Pocket ID будут засчитаны.'))return;
+        try{const r=await api('/leads/'+L.tg_id+'/main-pocket',{method:'PATCH',body:{trader_id:x}});toast('Основной Pocket ID: '+x+(r.applied?' · засчитано постбеков: '+r.applied:''));close();openLeadCard(L.tg_id)}catch(er){toast(er.message)}}},'Сделать основным'):null)));
   const off=e=>{if(!menu.contains(e.target)&&!btn.contains(e.target))hide()};
   const show=()=>{menu.hidden=false;btn.classList.add('on');btn.setAttribute('aria-expanded','true');setTimeout(()=>document.addEventListener('click',off),0)};
   const hide=()=>{menu.hidden=true;btn.classList.remove('on');btn.setAttribute('aria-expanded','false');document.removeEventListener('click',off)};

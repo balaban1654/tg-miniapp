@@ -81,6 +81,19 @@ export async function postbackRoutes(app: FastifyInstance): Promise<void> {
     if (traderId && lead.rows[0].trader_id && lead.rows[0].trader_id !== traderId && !oldPocket) {
       newPocket = !!(await db.query('INSERT INTO lead_pockets (trader_id, tg_id) SELECT $1, $2 WHERE NOT EXISTS (SELECT 1 FROM leads WHERE trader_id = $1) ON CONFLICT DO NOTHING', [traderId, tgId])).rowCount;
     }
+    // Постбеки засчитываются только по основному Pocket ID лида. Другой Pocket ID (вторая регистрация, старый аккаунт)
+    // остаётся в карточке списком, а его события пишутся в журнал как пропущенные: если сделать его основным, они применятся
+    if (traderId) {
+      const main = (await db.query('SELECT trader_id FROM leads WHERE tg_id = $1', [tgId])).rows[0]?.trader_id as string | null;
+      if (main && main !== traderId) {
+        await log(event, q, tgId, `пропущен: не основной Pocket ID ${traderId} (основной ${main})`);
+        return { ok: true, ignored: true, reason: 'not main pocket' };
+      }
+      if (!main && oldPocket) {
+        await log(event, q, tgId, `пропущен: не основной Pocket ID ${traderId} (лид ждёт новой регистрации)`);
+        return { ok: true, ignored: true, reason: 'old pocket' };
+      }
+    }
     // Новая регистрация после «Разрешить новую регистрацию»: Pocket ID уже стал основным (выше), статус снова «Регистрация».
     // Регистрация считается в день, когда пришла (старая остаётся в своём месяце); в списке «Лиды» лид встаёт на эту дату
     if (event === 'reg' && lead.rows[0].rereg_at && !oldPocket) {
