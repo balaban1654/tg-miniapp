@@ -1259,3 +1259,12 @@ BEGIN
   END IF;
 END $$;
 CREATE INDEX IF NOT EXISTS events_tg_pocket ON events (tg_id, pocket);
+
+-- Ещё раз проверка воронки: только админы проходят демонстрацию заново, один раз
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM app_settings WHERE key = 'funnel_demo_reset_6') THEN
+    UPDATE leads SET funnel_demo = NULL, funnel_demo_done_at = NULL WHERE lead_role = 'admin';
+    INSERT INTO app_settings (key, value) VALUES ('funnel_demo_reset_6', '1') ON CONFLICT (key) DO NOTHING;
+  END IF;
+END $$;
