@@ -781,7 +781,7 @@ function showApp(){
   drawContacts();
   const nb=$('#meNav');if(nb){if(!nb.firstChild){nb.append(svgIcon('<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><path d="M14 17.5h7M17.5 14v7"/>',16));nb.onclick=openNavEditor}nb.hidden=me.role!=='admin'}
   const items=navItemsFor(me.role);
-  if(me.role==='analyst'&&!['signals','newsig','tshift'].includes(tab))tab='signals';
+  if(me.role==='analyst'&&!['signals','newsig'].includes(tab))tab='signals';
   if(tab==='links'&&me.role==='admin'){tab='staff';staffState.tab='links'}
   if(tab==='treview'&&me.role==='teamlead'){tab='staff';staffState.tab='review'}
   if(!items.some(x=>x[0]===tab)){tab=items[0][0];history.replaceState(null,'','#'+hashPath())}
@@ -833,7 +833,8 @@ function navItemsFor(role){
   if(role==='admin'||role==='teamlead')items.splice(items.findIndex(x=>x[0]==='leads')+1,0,['connect','Подключение']);
   if(role==='admin')items.splice(items.findIndex(x=>x[0]==='connect')+1,0,['newsig','Новый сигнал']);
   // Смена команды: админ, тимлидер, аналитик, медиабайер начинают смену и в конце пишут, что сделали
-  if(['admin','teamlead','analyst','buyer'].includes(role))items.push(['tshift','Моя смена']);
+  // Аналитику смены не нужны: у него только «Новый сигнал» и «Сигналы»
+  if(['admin','teamlead','buyer'].includes(role))items.push(['tshift','Моя смена']);
   if(role==='teamlead')items.push(['pb','Постбеки']);
   if(role==='admin')items.push(['mono','МоноБанк API']);
   return items;
