@@ -1268,3 +1268,6 @@ BEGIN
     INSERT INTO app_settings (key, value) VALUES ('funnel_demo_reset_6', '1') ON CONFLICT (key) DO NOTHING;
   END IF;
 END $$;
+
+-- Аналитики эфиры не ведут: убрать из списка «Стримеры» (флаг streams мог остаться от роли «Админ»)
+UPDATE staff SET streams = FALSE WHERE role IN ('analyst','buyer') AND streams;

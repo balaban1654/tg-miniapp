@@ -604,6 +604,9 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
         if (admins <= 1) return reply.code(400).send({ error: 'Это последний админ' });
       }
       add('role', role);
+      // Аналитик и медиабайер эфиры не ведут: из списка «Стримеры», смен и KPI убираем; админ снова ведёт эфиры
+      if (role === 'analyst' || role === 'buyer') add('streams', false);
+      else if (role === 'admin' || role === 'streamer') add('streams', true);
     }
     if (b.rate_ftd !== undefined) add('rate_ftd', num(b.rate_ftd));
     if (b.rate_percent !== undefined) add('rate_percent', num(b.rate_percent));
