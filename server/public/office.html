@@ -2423,19 +2423,27 @@ function lcActions(L,fname,close){
   function hide(){menu.hidden=true;btn.setAttribute('aria-expanded','false');btn.classList.remove('on');document.removeEventListener('click',off)}
   return el('span',{class:'lc-act'},btn,menu);
 }
-/** Ячейка «Выдать доступ»: при выдаче спрашиваем роль, при повторном нажатии доступ снимается */
+/** Роль сотрудника в Office: список, смена с подтверждением. Права меняются сразу (следующий запрос уже с новой ролью) */
+function roleSel(r){
+  const sel=el('select',{'aria-label':'Роль в Office',style:'width:auto;padding:4px 8px;font-size:12.5px'},Object.entries(ROLE).map(([k,n])=>el('option',{value:k,...(k===r.role?{selected:''}:{})},n)));
+  sel.addEventListener('change',async()=>{const v=sel.value;
+    if(!await askC('Сменить роль «'+r.name+'» в Office: '+ROLE[r.role]+' → '+ROLE[v]+'? Доступ к разделам поменяется сразу.')){sel.value=r.role;return}
+    try{await api('/staff/'+r.id,{method:'PATCH',body:{role:v}});toast('Роль: '+ROLE[v]);render({soft:true})}catch(x){toast(x.message);sel.value=r.role}});
+  return sel;
+}
+/** Ячейка «Доступ» (роль в Mini App): нажатие открывает выбор роли; «Снять доступ» — отдельным пунктом */
 function accessCell(r){
   const td=el('td',{});
   const set=async(value,role)=>{try{await api('/leads/'+r.tg_id+'/tester',{method:'PATCH',body:{value,role}});render({soft:true})}catch(x){toast(x.message)}};
   const idle=()=>td.replaceChildren(r.is_tester
-    ?el('button',{class:'btn s',type:'button',title:'Нажмите, чтобы снять доступ',onclick:()=>set(false)},'Доступ: '+lroleName(r.lead_role))
+    ?el('button',{class:'btn s',type:'button',title:'Роль в Mini App. Нажмите, чтобы сменить роль или снять доступ',onclick:ask},'Доступ: '+lroleName(r.lead_role))
     :(r.access||r.status==='ftd'||r.status==='active')
       ?el('button',{class:'btn s auto-acc',type:'button',title:'Открыт автоматически после первого депозита. Нажмите, чтобы выдать другую роль (стример, админ и т. д.)',onclick:ask},'Доступ: Лид')
       :el('button',{class:'btn s o',type:'button',onclick:ask},'Выдать доступ'));
   const ask=()=>{
-    const sel=el('select',{'aria-label':'Роль',style:'width:auto'},LROLES.map(([k,n])=>el('option',{value:k},n)));
+    const sel=el('select',{'aria-label':'Роль',style:'width:auto'},LROLES.map(([k,n])=>el('option',{value:k,...(r.is_tester&&k===r.lead_role?{selected:''}:{})},n)),r.is_tester?el('option',{value:'__off'},'Снять доступ'):null);
     td.replaceChildren(el('span',{style:'display:inline-flex;gap:6px;align-items:center'},sel,
-      el('button',{class:'btn s',type:'button',onclick:()=>set(true,sel.value)},'Выдать'),
+      el('button',{class:'btn s',type:'button',onclick:()=>sel.value==='__off'?set(false):set(true,sel.value)},r.is_tester?'Сохранить':'Выдать'),
       el('button',{class:'btn o s',type:'button','aria-label':'Отмена',onclick:idle},'✕')));
   };
   idle();return td;
@@ -2837,7 +2845,7 @@ async function staffTeam(){
     el('label',{style:'grid-column:1/-1'},'Ссылка регистрации (WW)',po.l),el('label',{style:'grid-column:1/-1'},'Ссылка регистрации (RU)',po.r),el('label',{style:'grid-column:1/-1'},'Личный Telegram-канал (куда уходит пуш «в эфире», бот должен быть админом)',po.ch),
     el('button',{class:'btn',type:'submit'},'Сохранить'),perr):el('span');
   return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},isAdmin?'Сотрудники':'Моя команда')),isAdmin?form:null,poForm,
-    ctrT(table(['Имя','Логин',...(isAdmin?['Пароль','2FA']:[]),'Роль','Тимлидер','Кампания PO','Промокод','Статус',''],rows.map(r=>[el('td',{},el('span',{class:'cp'},isAdmin?el('button',{type:'button',class:'own-btn',title:'Изменить имя',onclick:e=>renameStaff(r,e.currentTarget)},r.name):r.name,isAdmin?el('button',{type:'button',title:'Карточка сотрудника','aria-label':'Карточка сотрудника',onclick:()=>openStaffCard(r.id)},svgIcon(PERSON)):null)),td(r.login),...(isAdmin?[pwCell(r),tfaCell(r)]:[]),el('td',{},el('span',{class:'pill p-pur'},ROLE[r.role])),parentCell(r),td(r.po_campaign||'—'),td(r.po_promo||'—'),el('td',{},el('span',{class:'pill '+(r.active?'p-ok':'p-bad')},r.active?'активен':'отключён')),el('td',{style:'white-space:nowrap'},toggle(r),isAdmin&&r.id!==me.id?el('button',{class:'del-ib',type:'button',style:'margin-left:8px',title:'Удалить сотрудника','aria-label':'Удалить сотрудника',onclick:()=>delStaff(r)},svgIcon(TRASH,17)):null)]),'Пока никого нет.'))];
+    ctrT(table(['Имя','Логин',...(isAdmin?['Пароль','2FA']:[]),'Роль','Тимлидер','Кампания PO','Промокод','Статус',''],rows.map(r=>[el('td',{},el('span',{class:'cp'},isAdmin?el('button',{type:'button',class:'own-btn',title:'Изменить имя',onclick:e=>renameStaff(r,e.currentTarget)},r.name):r.name,isAdmin?el('button',{type:'button',title:'Карточка сотрудника','aria-label':'Карточка сотрудника',onclick:()=>openStaffCard(r.id)},svgIcon(PERSON)):null)),td(r.login),...(isAdmin?[pwCell(r),tfaCell(r)]:[]),el('td',{},isAdmin&&r.id!==me.id?roleSel(r):el('span',{class:'pill p-pur'},ROLE[r.role])),parentCell(r),td(r.po_campaign||'—'),td(r.po_promo||'—'),el('td',{},el('span',{class:'pill '+(r.active?'p-ok':'p-bad')},r.active?'активен':'отключён')),el('td',{style:'white-space:nowrap'},toggle(r),isAdmin&&r.id!==me.id?el('button',{class:'del-ib',type:'button',style:'margin-left:8px',title:'Удалить сотрудника','aria-label':'Удалить сотрудника',onclick:()=>delStaff(r)},svgIcon(TRASH,17)):null)]),'Пока никого нет.'))];
 }
 
 const MON_GEN=['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];

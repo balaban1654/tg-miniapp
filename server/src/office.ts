@@ -593,6 +593,18 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
       add('name', nm);
     }
     if (b.active !== undefined) add('active', Boolean(b.active));
+    // Роль в Office (что человек видит и может): себе не меняем, последнего админа не разжалуем
+    if (b.role !== undefined) {
+      const role = String(b.role);
+      if (!['admin', 'teamlead', 'streamer', 'buyer', 'analyst'].includes(role)) return reply.code(400).send({ error: 'Неизвестная роль' });
+      if (id === req.staff!.id) return reply.code(400).send({ error: 'Свою роль поменять нельзя' });
+      const cur = (await db.query('SELECT role FROM staff WHERE id = $1', [id])).rows[0];
+      if (cur?.role === 'admin' && role !== 'admin') {
+        const admins = Number((await db.query(`SELECT count(*)::int AS n FROM staff WHERE role = 'admin' AND active AND deleted_at IS NULL`)).rows[0].n);
+        if (admins <= 1) return reply.code(400).send({ error: 'Это последний админ' });
+      }
+      add('role', role);
+    }
     if (b.rate_ftd !== undefined) add('rate_ftd', num(b.rate_ftd));
     if (b.rate_percent !== undefined) add('rate_percent', num(b.rate_percent));
     if (b.parent_id !== undefined) {
