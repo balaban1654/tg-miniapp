@@ -974,6 +974,7 @@ function openStreamer(s) {
   var vc = 'g', vt = 'Выгоден', vx = 'приносит $' + ratio.toFixed(1).replace('.', ',') + ' комиссии на каждый $1 зарплаты';
   if (ratio < 1) { vc = 'r'; vt = 'Убыточен'; vx = 'зарплата больше комиссии'; } else if (ratio < 2) { vc = 'y'; vt = 'На грани'; vx = 'комиссия лишь в ' + ratio.toFixed(1).replace('.', ',') + ' раза больше зарплаты'; }
   if (hrs < pace * 0.85 && vc === 'g') vx += '. Но сильно отстаёт по часам, ' + hw(hrs) + ' из ' + plan.hours + ' ч';
+  if (m.ftd) vx += '. Средний чек FTD ' + usd(m.ftdSum / m.ftd);
   var row = function (a, b, cls) { return '<div class="sm-row"><span>' + a + '</span><b' + (cls ? ' class="' + cls + '"' : '') + '>' + b + '</b></div>'; };
   var pair = function (a, b, last2) { return '<span class="sm-dm">' + usd(a) + '</span><span class="sm-sl">/</span><span' + (last2 ? ' class="' + last2 + '"' : '') + '>' + usd(b) + '</span>'; };
   var z = function (v) { return v ? sgn(v) : '$0'; };

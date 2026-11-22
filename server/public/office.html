@@ -1460,6 +1460,8 @@ function dxModal(btn,s,d,skew,mode){
   let vcls='g',vt='Выгоден',vx='приносит $'+ratio.toFixed(1).replace('.',',')+' комиссии на каждый $1 зарплаты';
   if(ratio<1){vcls='r';vt='Убыточен';vx='зарплата больше комиссии'}else if(ratio<2){vcls='y';vt='На грани';vx='комиссия лишь в '+ratio.toFixed(1).replace('.',',')+' раза больше зарплаты'}
   if(hrs<pace*.85&&vcls==='g')vx+='. Но сильно отстаёт по часам, '+hw(hrs)+' из '+plan.hours+' ч';
+  // Средний чек FTD: сумма первых депозитов / число FTD за месяц
+  if(m.ftd)vx+='. Средний чек FTD '+usd0(m.ftdSum/m.ftd);
   const hv=(v,cls)=>el('b',{class:cls||''},v);
   const row=(a,b)=>el('div',{class:'dx-row'},el('span',{},a),b);
   let left=null;
