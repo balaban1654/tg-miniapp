@@ -1271,3 +1271,15 @@ END $$;
 
 -- Аналитики эфиры не ведут: убрать из списка «Стримеры» (флаг streams мог остаться от роли «Админ»)
 UPDATE staff SET streams = FALSE WHERE role IN ('analyst','buyer') AND streams;
+
+-- Разовая правка по просьбе владельца: лид 5486051598 (Александр) пришёл по ссылке Дарьи, а записан на ссылку kemran
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM app_settings WHERE key = 'fix_link_5486051598') THEN
+    IF EXISTS (SELECT 1 FROM links WHERE slug = 'daria') THEN
+      UPDATE leads SET link_id = (SELECT id FROM links WHERE slug = 'daria') WHERE tg_id = 5486051598;
+      INSERT INTO lead_log (tg_id, kind, text) SELECT 5486051598, 'owner', 'Ссылка исправлена вручную (по просьбе владельца): kemran → daria' WHERE EXISTS (SELECT 1 FROM leads WHERE tg_id = 5486051598);
+    END IF;
+    INSERT INTO app_settings (key, value) VALUES ('fix_link_5486051598', '1') ON CONFLICT (key) DO NOTHING;
+  END IF;
+END $$;
