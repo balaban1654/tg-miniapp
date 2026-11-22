@@ -958,11 +958,13 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     const money = new Map(
       ((await db.query(
         `SELECT d.owner_id, coalesce(sum(e.amount) FILTER (WHERE e.type = 'comm'), 0)::float AS comm,
-                coalesce(sum(e.amount) FILTER (WHERE e.type IN ('ftd','dep')), 0)::float AS deps
+                coalesce(sum(e.amount) FILTER (WHERE e.type IN ('ftd','dep')), 0)::float AS deps,
+                coalesce(sum(e.amount) FILTER (WHERE e.type = 'ftd'), 0)::float AS ftd_sum,
+                count(*) FILTER (WHERE e.type = 'ftd' AND e.amount IS NOT NULL)::int AS ftd_n
            FROM events e JOIN leads d ON d.tg_id = e.tg_id
           WHERE d.lead_role = 'lead' AND to_char(e.created_at AT TIME ZONE '${TZ}', 'YYYY-MM') = $1 GROUP BY d.owner_id`,
         [period],
-      )).rows as { owner_id: number; comm: number; deps: number }[]).map((r) => [r.owner_id, r]),
+      )).rows as { owner_id: number; comm: number; deps: number; ftd_sum: number; ftd_n: number }[]).map((r) => [r.owner_id, r]),
     );
     const rows = [];
     for (const s of staff) {
@@ -972,7 +974,9 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
       const cost = r2(Math.max(k.total, k.paid));
       if (!s.active && !cost && !comm) continue;
       rows.push({ id: s.id, name: s.name, role: s.role, cost, paid: k.paid, ftd: k.ftdCount, deposits: r2(deps), commission: r2(comm), profit: r2(comm - cost),
-        margin: comm > 0 ? Math.round(((comm - cost) / comm) * 100) : null, ftdCost: k.ftdCount ? r2(cost / k.ftdCount) : null });
+        margin: comm > 0 ? Math.round(((comm - cost) / comm) * 100) : null, ftdCost: k.ftdCount ? r2(cost / k.ftdCount) : null,
+        // Средний чек FTD: сумма первых депозитов клиентов за месяц / их число (FTD без суммы не считаем)
+        ftdSum: r2(m?.ftd_sum ?? 0), ftdN: m?.ftd_n ?? 0, ftdAvg: m?.ftd_n ? r2((m.ftd_sum ?? 0) / m.ftd_n) : null });
     }
     rows.sort((a, b) => b.profit - a.profit);
     // Тимлидеру по решению владельца видна комиссия клиентов его команды (прибыль компании считается с комиссии, а не с депозитов)
