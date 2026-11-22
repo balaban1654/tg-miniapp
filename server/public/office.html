@@ -758,10 +758,10 @@ function drawMeName(){
   const sel=el('select',{class:'me-sel','aria-label':'Смотреть Office как сотрудник',title:'Выберите сотрудника: Office откроется его глазами, действия будут от его имени'},el('option',{value:String(me.id)},me.name));
   box.replaceChildren(sel);
   api('/act-as/staff').then(d=>{
-    const G=[['admin','Админы'],['teamlead','Тимлидеры'],['streamer','Стримеры'],['other','Другие']];
+    const G=[['admin','Админы'],['teamlead','Тимлидеры'],['streamer','Стримеры'],['analyst','Аналитики'],['buyer','Медиабайеры'],['other','Другие']];
     // В узком меню влезает только имя: роль видна по группе списка, команда стримера - во всплывающей подсказке
     const opt=x=>el('option',{value:String(x.id),title:(ROLE[x.role]||x.role)+(x.parent_name?' · команда '+x.parent_name:'')},x.name);
-    sel.replaceChildren(...G.map(([k,t])=>{const l=d.staff.filter(x=>k==='other'?!['admin','teamlead','streamer'].includes(x.role):x.role===k);return l.length?el('optgroup',{label:t},...l.map(opt)):null}).filter(Boolean));
+    sel.replaceChildren(...G.map(([k,t])=>{const l=d.staff.filter(x=>k==='other'?!['admin','teamlead','streamer','analyst','buyer'].includes(x.role):x.role===k);return l.length?el('optgroup',{label:t},...l.map(opt)):null}).filter(Boolean));
     sel.value=String(d.actingAs||d.me);
     sel.onchange=()=>{const v=Number(sel.value);actAs(v===d.me?null:v)};
   }).catch(()=>{});
