@@ -2141,7 +2141,7 @@ async function plansTasks(){
   const [staffAll,tasks]=await Promise.all([api('/staff'),api('/tasks')]);
   const staff=staffAll.filter(s=>s.active&&s.role!=='admin'&&s.id!==me.id);
   const today=kyivToday();
-  const who=el('select',{},el('option',{value:'all'},me.role==='admin'?'Все стримеры':'Вся команда'),...staff.map(s=>el('option',{value:s.id},s.name+' · '+ROLE[s.role])));
+  const who=el('select',{},el('option',{value:'all'},me.role==='admin'?'Все стримеры':'Вся команда'),...staffGroups(staff));
   const title=el('input',{placeholder:'Что нужно сделать',maxlength:'200'});
   const details=el('input',{placeholder:'Подробности (необязательно)',maxlength:'2000'});
   const due=dateWheel({optional:true,placeholder:'Без срока',min:kyivToday().slice(0,4)+'-01-01',max:(+kyivToday().slice(0,4)+2)+'-12-31'});
@@ -2834,7 +2834,7 @@ async function staffTeam(){
     return el('td',{},el('button',{class:'btn o s',type:'button',title:'Сбросить 2FA: сотрудник выйдет из кабинета и настроит её заново',onclick:async()=>{if(!await askC('Сбросить 2FA у '+r.name+'? Он выйдет из кабинета и при входе настроит её заново.'))return;try{await api('/staff/'+r.id+'/2fa/reset',{method:'POST'});toast('2FA сброшена: '+r.name);render()}catch(x){toast(x.message)}}},'Сбросить'));
   };
   const toggle=r=>isAdmin&&r.id!==me.id?el('button',{class:'btn o s',type:'button',onclick:async()=>{await api('/staff/'+r.id,{method:'PATCH',body:{active:!r.active}});render()}},r.active?'Отключить':'Включить'):'';
-  const pickP=el('select',{},...rows.filter(s=>['admin','streamer','teamlead','buyer'].includes(s.role)).map(s=>el('option',{value:s.id},s.name+' · '+ROLE[s.role])));
+  const pickP=el('select',{},...staffGroups(rows.filter(s=>['admin','streamer','teamlead','buyer'].includes(s.role))));
   const po={t:el('input',{placeholder:'https://t.me/daria_manager или ник',maxlength:'200'}),c:el('input',{placeholder:'daria'}),p:el('input',{placeholder:'LIO669'}),l:el('input',{placeholder:'https://…/register?…&ac=daria&cid=…'}),r:el('input',{placeholder:'https://… (необязательно)'}),ch:el('input',{placeholder:'@daria_channel',maxlength:'80'})};
   const fill=()=>{const r=rows.find(x=>String(x.id)===pickP.value)||{};po.t.value=r.tg_link||(r.tg_username?'https://t.me/'+r.tg_username:'');po.c.value=r.po_campaign||'';po.p.value=r.po_promo||'';po.l.value=r.po_link||'';po.r.value=r.po_link_ru||'';po.ch.value=r.live_channel||''};
   pickP.addEventListener('change',fill);fill();
@@ -2890,6 +2890,12 @@ async function delStaff(r){
   try{await api('/staff/'+r.id,{method:'DELETE'});toast('Сотрудник удалён');render({soft:true})}catch(x){toast(x.message)}
 }
 const ctrT=t=>{t.classList.add('ctr');return t};
+/** Список сотрудников по группам, как в меню «Смотреть как»: Админы, Тимлидеры, Стримеры, Аналитики, Медиабайеры (внутри — по имени) */
+const STAFF_GROUPS=[['admin','Админы'],['teamlead','Тимлидеры'],['streamer','Стримеры'],['analyst','Аналитики'],['buyer','Медиабайеры']];
+function staffGroups(list){
+  const by=k=>list.filter(x=>k?x.role===k:!STAFF_GROUPS.some(g=>g[0]===x.role)).sort((a,b)=>String(a.name).localeCompare(String(b.name),'ru'));
+  return [...STAFF_GROUPS.map(([k,t])=>[t,by(k)]),['Другие',by(null)]].filter(g=>g[1].length).map(([t,l])=>el('optgroup',{label:t},...l.map(x=>el('option',{value:x.id},x.name))));
+}
 let poll=null;
 function stopPoll(){if(poll){clearInterval(poll);poll=null}}
 
