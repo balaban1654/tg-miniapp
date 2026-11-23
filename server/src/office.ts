@@ -15,7 +15,7 @@ const sha256 = (v: string) => createHash('sha256').update(v).digest('hex');
 import { accountingRoutes } from './accounting.js';
 import { monoRoutes } from './mono.js';
 import { mainMediaTeam } from './mediaTeams.js';
-import { leadStatusDate, funnelStage, funnelStageDate, churnedAfterFtd, shownStage } from './leaddate.js';
+import { mainPocketEv, funnelStageEv, funnelStageDateEv, shownStageEv } from './leaddate.js';
 import { referralOfficeRoutes, accrueReferral } from './referral.js';
 import { exportTexts } from './i18nFill.js';
 import { syncRefReward } from './referral.js';
@@ -472,14 +472,14 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     }
     const TZ = 'Europe/Kyiv';
     const leads = await db.query(
-      `SELECT ${funnelStage('d')} AS status, count(*)::int AS n FROM leads d WHERE d.lead_role = 'lead' AND ${ownerScope(me, 'd.owner_id')}
-         ${range ? `AND (${funnelStageDate('d')} AT TIME ZONE '${TZ}')::date BETWEEN $1::date AND $2::date` : ''} GROUP BY 1`,
+      `SELECT ${funnelStageEv('d', 'ev')} AS status, count(*)::int AS n FROM leads d ${mainPocketEv('d', 'ev')} WHERE d.lead_role = 'lead' AND ${ownerScope(me, 'd.owner_id')}
+         ${range ? `AND (${funnelStageDateEv('d', 'ev')} AT TIME ZONE '${TZ}')::date BETWEEN $1::date AND $2::date` : ''} GROUP BY 1`,
       (range ?? []) as string[],
     );
     // Отвал отдельным показателем: лиды, пришедшие за период, со статусом «Отвал» сейчас (в том числе заблокировавшие бота)
     const churnedN = Number((await db.query(
-      `SELECT count(*)::int AS n FROM leads d WHERE d.lead_role = 'lead' AND ${churnedAfterFtd('d')} AND ${ownerScope(me, 'd.owner_id')}
-         ${range ? `AND (${funnelStageDate('d')} AT TIME ZONE '${TZ}')::date BETWEEN $1::date AND $2::date` : ''}`,
+      `SELECT count(*)::int AS n FROM leads d ${mainPocketEv('d', 'ev')} WHERE d.lead_role = 'lead' AND d.status = 'churned' AND ${funnelStageEv('d', 'ev')} IN ('ftd','active') AND ${ownerScope(me, 'd.owner_id')}
+         ${range ? `AND (${funnelStageDateEv('d', 'ev')} AT TIME ZONE '${TZ}')::date BETWEEN $1::date AND $2::date` : ''}`,
       (range ?? []) as string[],
     )).rows[0].n);
     const clicks = range
@@ -2712,13 +2712,11 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     const range = from || to ? def : (await db.query(`SELECT to_char(date_trunc('month', now() AT TIME ZONE ${KY}), 'YYYY-MM-DD') AS a, to_char((date_trunc('month', now() AT TIME ZONE ${KY}) + interval '1 month - 1 day'), 'YYYY-MM-DD') AS b`)).rows.map((x) => [x.a, x.b])[0];
     const r = await db.query(
       // Общее число — новые за период без заблокировавших бота (= «Новый N шт» в шапке «Лидов»); мигающее — такие же новые за сегодня
-      `SELECT count(*) FILTER (WHERE d.status <> 'churned' AND ${shownStage('d')} = 'new' AND ${inR(funnelStageDate('d'))})::int AS total,
+      `SELECT count(*) FILTER (WHERE d.status <> 'churned' AND ${funnelStageEv('d', 'ev')} = 'new' AND ${inR(funnelStageDateEv('d', 'ev'))})::int AS total,
               -- В скобках — кого можно дожать: сейчас на этапе «Регистрация» и бота не заблокировали (как «Регистрация N шт» в шапке «Лидов»)
-              (SELECT count(*)::int FROM leads d2
-                WHERE d2.removed_at IS NULL AND coalesce(d2.lead_role, 'lead') = 'lead' AND d2.status <> 'churned' AND ${shownStage('d2')} = 'registered'
-                  AND ${inR(funnelStageDate('d2'))} AND ${ownerScope(me, 'd2.owner_id')}) AS reg,
-              count(*) FILTER (WHERE d.status <> 'churned' AND ${shownStage('d')} = 'new' AND (d.created_at AT TIME ZONE ${KY})::date = (now() AT TIME ZONE ${KY})::date)::int AS fresh
-         FROM leads d
+              count(*) FILTER (WHERE d.status <> 'churned' AND ${funnelStageEv('d', 'ev')} = 'registered' AND ${inR(funnelStageDateEv('d', 'ev'))})::int AS reg,
+              count(*) FILTER (WHERE d.status <> 'churned' AND ${funnelStageEv('d', 'ev')} = 'new' AND (d.created_at AT TIME ZONE ${KY})::date = (now() AT TIME ZONE ${KY})::date)::int AS fresh
+         FROM leads d ${mainPocketEv('d', 'ev')}
         WHERE d.removed_at IS NULL AND coalesce(d.lead_role, 'lead') = 'lead' AND ${ownerScope(me, 'd.owner_id')}`,
       range,
     );
@@ -3037,7 +3035,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     } else if (D.test(String(req.query.from)) && D.test(String(req.query.to))) {
       const [a, b] = String(req.query.from) <= String(req.query.to) ? [req.query.from, req.query.to] : [req.query.to, req.query.from];
       vals.push(a, b);
-      extra += ` AND (coalesce(d.lead_role, 'lead') <> 'lead' OR (${funnelStageDate('d')} AT TIME ZONE 'Europe/Kyiv')::date BETWEEN $${vals.length - 1}::date AND $${vals.length}::date)`;
+      extra += ` AND (coalesce(d.lead_role, 'lead') <> 'lead' OR (${funnelStageDateEv('d', 'ev')} AT TIME ZONE 'Europe/Kyiv')::date BETWEEN $${vals.length - 1}::date AND $${vals.length}::date)`;
     }
     const DT = depTypes(me);
     // Код кампании демо-ссылки из тренажёра (параметр ac): лид без ссылки, зарегистрированный через демо, показывается как этот код (например demo)
@@ -3048,17 +3046,16 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     const demoP = `$${vals.length}::text`;
     const r = await db.query(
       `SELECT d.tg_id, d.trader_id, d.is_tester,
-              (SELECT e.raw->>'ac' FROM events e WHERE e.tg_id = d.tg_id AND ${demoP} IS NOT NULL AND lower(e.raw->>'ac') = lower(${demoP}) LIMIT 1) AS po_ac, d.lead_role, d.origin, d.username, d.first_name, d.status, d.access, d.created_at, d.owner_id, (d.banned_at IS NOT NULL) AS banned, ${funnelStageDate('d')} AS status_at,
-              ${shownStage('d')} AS stage,
+              (SELECT e.raw->>'ac' FROM events e WHERE e.tg_id = d.tg_id AND ${demoP} IS NOT NULL AND lower(e.raw->>'ac') = lower(${demoP}) LIMIT 1) AS po_ac, d.lead_role, d.origin, d.username, d.first_name, d.status, d.access, d.created_at, d.owner_id, (d.banned_at IS NOT NULL) AS banned, ${funnelStageDateEv('d', 'ev')} AS status_at,
+              ${shownStageEv('d', 'ev')} AS stage,
               s.name AS owner_name, l.slug AS link_slug,
-              (SELECT amount FROM events e WHERE e.tg_id = d.tg_id AND e.type = 'ftd' AND e.pocket IS NOT DISTINCT FROM d.trader_id ORDER BY e.created_at, e.id LIMIT 1) AS ftd_amount,
-              coalesce((SELECT sum(amount) FROM events e WHERE e.tg_id = d.tg_id AND e.type IN ${DT} AND e.pocket IS NOT DISTINCT FROM d.trader_id),0) AS deposits,
-              coalesce((SELECT sum(amount) FROM events e WHERE e.tg_id = d.tg_id AND e.type = 'comm' AND e.pocket IS NOT DISTINCT FROM d.trader_id AND ${me.role === 'streamer' || me.role === 'teamlead' ? 'false' : 'true'}),0) AS commission
+              ev.ftd_amount, ev.deposits, ${me.role === 'streamer' || me.role === 'teamlead' ? '0' : 'ev.commission'} AS commission
          FROM leads d
+         ${mainPocketEv('d', 'ev', DT)}
          LEFT JOIN staff s ON s.id = d.owner_id
          LEFT JOIN links l ON l.id = d.link_id
         WHERE d.removed_at IS NULL AND ${ownerScope(me, 'd.owner_id')}${me.role === 'admin' ? '' : " AND coalesce(d.lead_role, 'lead') = 'lead'"}${extra}
-        ORDER BY (coalesce(d.lead_role, 'lead') <> 'lead') DESC, ${funnelStageDate('d')} DESC LIMIT 3000`,
+        ORDER BY (coalesce(d.lead_role, 'lead') <> 'lead') DESC, status_at DESC LIMIT 3000`,
       vals,
     );
     // Сотрудники (админ состав) идут первыми, чтобы предел строк их никогда не отрезал; лидов за период до 3000

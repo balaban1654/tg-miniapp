@@ -1283,3 +1283,6 @@ BEGIN
     INSERT INTO app_settings (key, value) VALUES ('fix_link_5486051598', '1') ON CONFLICT (key) DO NOTHING;
   END IF;
 END $$;
+
+-- Ускорение списка «Лиды» и дашборда: даты этапов ищутся по лиду, типу события и времени
+CREATE INDEX IF NOT EXISTS events_tg_type ON events (tg_id, type, created_at);
