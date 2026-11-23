@@ -1,4 +1,4 @@
-import { leadStatusDate, funnelStage, funnelStageDate, churnedAfterFtd } from './leaddate.js';
+import { leadStatusDate, mainPocketEv, funnelStageEv, funnelStageDateEv, churnedAfterFtdEv } from './leaddate.js';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { db } from './db.js';
 import { refLeadPay } from './referral.js';
@@ -1577,13 +1577,13 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
           )
     ).rows as { owner_id: number; n: number }[];
     const clicks = new Map(clicksRows.map((r) => [r.owner_id, r.n]));
-    const clicksSince = (await db.query(`SELECT to_char(min(at AT TIME ZONE '${TZ}'), 'YYYY-MM-DD') AS d FROM link_clicks`)).rows[0].d as string | null;
+    const clicksSince = (await db.query(`SELECT to_char(min(at) AT TIME ZONE '${TZ}', 'YYYY-MM-DD') AS d FROM link_clicks`)).rows[0].d as string | null;
     // Отвал в воронке: только ушедшие (заблокировали бота) из FTD и активных, по дате их FTD, как и счётчик FTD
     const churned = new Map(
       ((await db.query(
-        `SELECT d.owner_id, count(*)::int AS n FROM leads d
-          WHERE ${churnedAfterFtd('d')} AND d.owner_id IS NOT NULL AND d.removed_at IS NULL AND coalesce(d.lead_role, 'lead') = 'lead'
-            ${allTime ? '' : `AND (${funnelStageDate('d')} AT TIME ZONE '${TZ}')::date BETWEEN $1::date AND $2::date`}
+        `SELECT d.owner_id, count(*)::int AS n FROM leads d ${mainPocketEv('d', 'ev')}
+          WHERE ${churnedAfterFtdEv('d', 'ev')} AND d.owner_id IS NOT NULL AND d.removed_at IS NULL AND coalesce(d.lead_role, 'lead') = 'lead'
+            ${allTime ? '' : `AND (${funnelStageDateEv('d', 'ev')} AT TIME ZONE '${TZ}')::date BETWEEN $1::date AND $2::date`}
           GROUP BY d.owner_id`,
         allTime ? [] : [from, to],
       )).rows as { owner_id: number; n: number }[]).map((r) => [r.owner_id, r.n]),
@@ -1799,17 +1799,17 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
       })(),
       // Статусы лидов за период (как «Мои лиды по статусам» у стримера): админу все лиды, тимлиду - его команды
       byStatus: Object.fromEntries((await db.query(
-        `SELECT CASE WHEN ${churnedAfterFtd('d')} THEN 'churned' ELSE ${funnelStage('d')} END AS status, count(*)::int AS n FROM leads d
+        `SELECT CASE WHEN ${churnedAfterFtdEv('d', 'ev')} THEN 'churned' ELSE ${funnelStageEv('d', 'ev')} END AS status, count(*)::int AS n FROM leads d ${mainPocketEv('d', 'ev')}
           WHERE d.removed_at IS NULL AND coalesce(d.lead_role, 'lead') = 'lead' AND ($1::int[] IS NULL OR d.owner_id = ANY($1::int[]))
-            AND (${funnelStageDate('d')} AT TIME ZONE '${TZ}')::date BETWEEN $2::date AND $3::date GROUP BY 1`,
+            AND (${funnelStageDateEv('d', 'ev')} AT TIME ZONE '${TZ}')::date BETWEEN $2::date AND $3::date GROUP BY 1`,
         [scopeLead ? ids : null, from, to],
       )).rows.map((r: any) => [r.status, r.n])),
       // Из них заблокировали бота до первого депозита (остались в своём этапе); ушедшие после депозита - это «Отвал»
       blockedBy: Object.fromEntries((await db.query(
-        `SELECT ${funnelStage('d')} AS status, count(*)::int AS n FROM leads d
+        `SELECT ${funnelStageEv('d', 'ev')} AS status, count(*)::int AS n FROM leads d ${mainPocketEv('d', 'ev')}
           WHERE d.removed_at IS NULL AND coalesce(d.lead_role, 'lead') = 'lead' AND ($1::int[] IS NULL OR d.owner_id = ANY($1::int[]))
-            AND d.status = 'churned' AND NOT ${churnedAfterFtd('d')} AND ${funnelStage('d')} <> 'churned'
-            AND (${funnelStageDate('d')} AT TIME ZONE '${TZ}')::date BETWEEN $2::date AND $3::date GROUP BY 1`,
+            AND d.status = 'churned' AND NOT ${churnedAfterFtdEv('d', 'ev')} AND ${funnelStageEv('d', 'ev')} <> 'churned'
+            AND (${funnelStageDateEv('d', 'ev')} AT TIME ZONE '${TZ}')::date BETWEEN $2::date AND $3::date GROUP BY 1`,
         [scopeLead ? ids : null, from, to],
       )).rows.map((r: any) => [r.status, r.n])),
       planScope: lead && tgl!.company ? 'company' : lead ? 'team' : 'company',
@@ -1942,16 +1942,16 @@ export async function accountingRoutes(app: FastifyInstance, h: Helpers): Promis
     const clicks = Number(
       (await db.query(`SELECT count(*)::int AS n FROM link_clicks c JOIN links l ON l.id = c.link_id WHERE l.owner_id = $1 AND (c.at AT TIME ZONE '${TZ}')::date BETWEEN $2::date AND $3::date`, [me.id, from, to])).rows[0].n,
     );
-    const clicksSince = (await db.query(`SELECT to_char(min(at AT TIME ZONE '${TZ}'), 'YYYY-MM-DD') AS d FROM link_clicks`)).rows[0].d as string | null;
+    const clicksSince = (await db.query(`SELECT to_char(min(at) AT TIME ZONE '${TZ}', 'YYYY-MM-DD') AS d FROM link_clicks`)).rows[0].d as string | null;
     // Полоса «Мои лиды по статусам»: заблокировавшие бота после FTD отдельным сегментом «Отвал», остальные по этапу (лид с первым депозитом это FTD).
     // Период по дате этапа: у FTD по дате первого депозита. Счётчик FTD и зарплату это не меняет
     const byStatus: Record<string, number> = {};
-    for (const r of (await db.query(`SELECT CASE WHEN ${churnedAfterFtd('d')} THEN 'churned' ELSE ${funnelStage('d')} END AS status, count(*)::int AS n FROM leads d WHERE d.owner_id = $1 AND d.removed_at IS NULL AND coalesce(d.lead_role, 'lead') = 'lead' AND (${funnelStageDate('d')} AT TIME ZONE '${TZ}')::date BETWEEN $2::date AND $3::date GROUP BY 1`, [me.id, from, to])).rows) byStatus[r.status] = r.n;
+    for (const r of (await db.query(`SELECT CASE WHEN ${churnedAfterFtdEv('d', 'ev')} THEN 'churned' ELSE ${funnelStageEv('d', 'ev')} END AS status, count(*)::int AS n FROM leads d ${mainPocketEv('d', 'ev')} WHERE d.owner_id = $1 AND d.removed_at IS NULL AND coalesce(d.lead_role, 'lead') = 'lead' AND (${funnelStageDateEv('d', 'ev')} AT TIME ZONE '${TZ}')::date BETWEEN $2::date AND $3::date GROUP BY 1`, [me.id, from, to])).rows) byStatus[r.status] = r.n;
     // Заблокировали бота до первого депозита, по этапу (ушедшие после депозита - это «Отвал»)
     const blockedBy: Record<string, number> = {};
-    for (const r of (await db.query(`SELECT ${funnelStage('d')} AS status, count(*)::int AS n FROM leads d WHERE d.owner_id = $1 AND d.removed_at IS NULL AND coalesce(d.lead_role, 'lead') = 'lead' AND d.status = 'churned' AND NOT ${churnedAfterFtd('d')} AND ${funnelStage('d')} <> 'churned' AND (${funnelStageDate('d')} AT TIME ZONE '${TZ}')::date BETWEEN $2::date AND $3::date GROUP BY 1`, [me.id, from, to])).rows) blockedBy[r.status] = r.n;
+    for (const r of (await db.query(`SELECT ${funnelStageEv('d', 'ev')} AS status, count(*)::int AS n FROM leads d ${mainPocketEv('d', 'ev')} WHERE d.owner_id = $1 AND d.removed_at IS NULL AND coalesce(d.lead_role, 'lead') = 'lead' AND d.status = 'churned' AND NOT ${churnedAfterFtdEv('d', 'ev')} AND ${funnelStageEv('d', 'ev')} <> 'churned' AND (${funnelStageDateEv('d', 'ev')} AT TIME ZONE '${TZ}')::date BETWEEN $2::date AND $3::date GROUP BY 1`, [me.id, from, to])).rows) blockedBy[r.status] = r.n;
     // Отвал: свои лиды, пришедшие за период, у которых сейчас статус «Отвал» (как в воронке у админа). На FTD и зарплату не влияет
-    const churnedN = Number((await db.query(`SELECT count(*)::int AS n FROM leads d WHERE d.owner_id = $1 AND ${churnedAfterFtd('d')} AND d.removed_at IS NULL AND coalesce(d.lead_role, 'lead') = 'lead' AND (${funnelStageDate('d')} AT TIME ZONE '${TZ}')::date BETWEEN $2::date AND $3::date`, [me.id, from, to])).rows[0].n);
+    const churnedN = Number((await db.query(`SELECT count(*)::int AS n FROM leads d ${mainPocketEv('d', 'ev')} WHERE d.owner_id = $1 AND ${churnedAfterFtdEv('d', 'ev')} AND d.removed_at IS NULL AND coalesce(d.lead_role, 'lead') = 'lead' AND (${funnelStageDateEv('d', 'ev')} AT TIME ZONE '${TZ}')::date BETWEEN $2::date AND $3::date`, [me.id, from, to])).rows[0].n);
 
     const live = (await db.query(`SELECT id, stream_url, stream_url2, started_at FROM shift_reports WHERE staff_id = $1 AND status = 'live' AND NOT team ORDER BY id DESC LIMIT 1`, [me.id])).rows[0] ?? null;
     const t = await todayInfo(me.id);

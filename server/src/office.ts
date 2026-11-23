@@ -687,7 +687,8 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     const from = DATE_RE.test(String(q.from)) ? String(q.from) : null;
     const to = DATE_RE.test(String(q.to)) ? String(q.to) : null;
     const KY = "'Europe/Kyiv'";
-    const inR = (col: string) => `($1::date IS NULL OR (${col} AT TIME ZONE ${KY})::date >= $1::date) AND ($2::date IS NULL OR (${col} AT TIME ZONE ${KY})::date <= $2::date)`;
+    // Те же дни по Киеву, но границами времени: так работает индекс по дате (клики, события)
+    const inR = (col: string) => `($1::date IS NULL OR ${col} >= ($1::date::timestamp AT TIME ZONE ${KY})) AND ($2::date IS NULL OR ${col} < (($2::date + 1)::timestamp AT TIME ZONE ${KY}))`;
     const after = (col: string) => `${col} >= coalesce(l.reset_at, '-infinity')`;
     const lead = `d.link_id = l.id AND d.lead_role = 'lead' AND ${after('d.created_at')}`;
     const ev = (types: string) => `FROM events e JOIN leads d ON d.tg_id = e.tg_id WHERE ${lead} AND ${after('e.created_at')} AND ${inR('e.created_at')} AND e.type IN ${types}`;

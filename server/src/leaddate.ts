@@ -62,6 +62,7 @@ export const funnelStageDate = (a: string): string => stageDateOf(a, subSrc(a));
 /** То же по агрегатам mainPocketEv(a, ev) — без подзапросов на каждую строку */
 export const funnelStageEv = (a: string, ev: string): string => stageOf(a, evSrc(ev));
 export const funnelStageDateEv = (a: string, ev: string): string => stageDateOf(a, evSrc(ev));
+export const churnedAfterFtdEv = (a: string, ev: string): string => `(${a}.status = 'churned' AND ${funnelStageEv(a, ev)} IN ('ftd','active'))`;
 export const shownStageEv = (a: string, ev: string): string =>
   `(CASE WHEN (${a}.status = 'churned' AND ${funnelStageEv(a, ev)} IN ('ftd','active')) THEN 'churned' ELSE ${funnelStageEv(a, ev)} END)`;
 /** Этап для показа (дашборд и список «Лиды»): «Отвал» только после первого депозита, ушедшие раньше остаются в своём этапе */
