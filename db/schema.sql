@@ -1286,3 +1286,20 @@ END $$;
 
 -- Ускорение списка «Лиды» и дашборда: даты этапов ищутся по лиду, типу события и времени
 CREATE INDEX IF NOT EXISTS events_tg_type ON events (tg_id, type, created_at);
+
+-- Разовая правка по просьбе владельца: лид 1524772374 (Алина) у Лизы, а записан на ссылку kemran — ставим ссылку его владельца (Лизы).
+-- Ссылка Лизы: со слагом liza, иначе первая ссылка владельца лида
+DO $$
+DECLARE nl int; ol text; nn text;
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM app_settings WHERE key = 'fix_link_1524772374') THEN
+    SELECT l.id, l.slug INTO nl, nn FROM leads d JOIN links l ON l.owner_id = d.owner_id
+     WHERE d.tg_id = 1524772374 ORDER BY (l.slug = 'liza') DESC, l.parent_id IS NOT NULL, l.id LIMIT 1;
+    SELECT l.slug INTO ol FROM leads d LEFT JOIN links l ON l.id = d.link_id WHERE d.tg_id = 1524772374;
+    IF nl IS NOT NULL AND ol IS DISTINCT FROM nn THEN
+      UPDATE leads SET link_id = nl WHERE tg_id = 1524772374;
+      INSERT INTO lead_log (tg_id, kind, text) VALUES (1524772374, 'owner', 'Ссылка исправлена вручную (по просьбе владельца): ' || coalesce(ol, '—') || ' → ' || nn);
+    END IF;
+    INSERT INTO app_settings (key, value) VALUES ('fix_link_1524772374', '1') ON CONFLICT (key) DO NOTHING;
+  END IF;
+END $$;
