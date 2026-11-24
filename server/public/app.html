@@ -402,6 +402,7 @@ html[data-theme=light] .toast{background:rgba(255,255,255,.97);color:var(--fg);b
 html[data-theme=light] .tl.lk:hover .un,html[data-theme=light] .tl.lk:active .un,html[data-theme=light] .tl.lk:focus-visible .un{color:var(--acc);text-shadow:none}
 html[data-theme=light] .rv-x,html[data-theme=light] .rv-view button{color:var(--fg)}
 html[data-theme=light] .rv-sheet{background:rgba(27,21,48,.35)}
+html[data-theme=light] .fd-lkb{background:rgba(255,255,255,.9);box-shadow:0 6px 20px rgba(80,50,140,.15)}
 html[data-theme=light] .card.hero{background:linear-gradient(180deg,#ece3ff,var(--card) 70%)}
 </style>
 <script>
@@ -1120,7 +1121,7 @@ function fdSpoiler(){
   const draw=()=>{if(!cv.isConnected)return;if(!ctx&&!size()){requestAnimationFrame(draw);return}
     ctx.clearRect(0,0,w,h);
     for(const d of dots){if(!still){d.x+=d.vx;d.y+=d.vy;d.a+=d.va;if(d.a>1||d.a<.1)d.va=-d.va;if(d.x<0)d.x+=w;if(d.x>w)d.x-=w;if(d.y<0)d.y+=h;if(d.y>h)d.y-=h}
-      ctx.globalAlpha=Math.max(0,Math.min(1,d.a))*.85;ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(d.x,d.y,d.r,0,6.283);ctx.fill()}
+      ctx.globalAlpha=Math.max(0,Math.min(1,d.a))*.85;ctx.fillStyle=document.documentElement.dataset.theme==='light'?'#3d2a66':'#fff';ctx.beginPath();ctx.arc(d.x,d.y,d.r,0,6.283);ctx.fill()}
     if(!still)requestAnimationFrame(draw)};
   requestAnimationFrame(draw);
   return cv;
