@@ -3224,10 +3224,21 @@ async function openLeadCard(tgId){
     T.canRequest?el('div',{},el('button',{class:'btn',type:'button',onclick:()=>depBonusDialog(L,T.eligible,()=>{close();openLeadCard(tgId)})},'Запросить бонус за «'+T.eligible.name+'»')):(me.role==='admin'&&T.eligible?el('div',{class:'mut sm'},'Стример может запросить бонус за «'+T.eligible.name+'».'):null)):null;
   // Подключение (только админ): сколько нужно, что внесено, акция
   const C=d.connect;
+  // Строка отправленной акции; у админа и тимлида корзина — убрать акцию (дальше лид подключается по полной сумме)
+  const canDelOffer=me.role==='admin'||me.role==='teamlead';
+  const sendLine=q=>el('div',{class:'mut sm',style:'display:flex;align-items:center;gap:6px'},el('span',{},fmtDT(q.sent_at)+' · '+q.offer_name+' · '+(q.delivery==='failed'?'не доставлено':q.delivery==='manual'&&q.connected_at&&!q.reverted_at?'активирована после депозита':q.reverted_at?'отменено (депозит удалён)':q.connected_at?'подключился':new Date(q.expires_at)<new Date()?'срок вышел':'ждём')),
+    canDelOffer?el('button',{class:'del-ib',type:'button',title:'Удалить акцию у лида','aria-label':'Удалить акцию «'+q.offer_name+'»',onclick:async()=>{
+      const conn=q.connected_at&&!q.reverted_at;
+      if(!await askC('Удалить акцию «'+q.offer_name+'» у '+fname+'? '+(conn?'Лид подключился по этой скидке. Дальше ему нужна полная сумма: если внесено меньше, доступ закроется.':'Дальше лид подключается по полной сумме.')))return;
+      try{const x=await api('/connect/sends/'+q.id,{method:'DELETE'});toast(x.connected?(x.access?'Акция удалена, доступ остался: внесено не меньше полной суммы':'Акция удалена, доступ закрыт до полной суммы'):'Акция удалена');close();openLeadCard(tgId)}catch(x){toast(x.message)}}},svgIcon(TRASH,15)):null);
+  // Лид уже подключён по скидке: показываем эту акцию отдельно, чтобы её можно было убрать
+  const connSend=C&&(C.sends||[]).find(q=>q.connected_at&&!q.reverted_at);
+  const connDoneBox=C&&canDelOffer&&connSend&&!(!L.access&&['new','registered'].includes(L.status))?el('div',{style:'display:grid;gap:6px'},el('h4',{class:'lc-h'},'Подключение по акции'),
+    el('div',{class:'mut sm'},'Нужно было '+cnMoney(connSend.required)+(connSend.connected_amount!=null?', внесено '+cnMoney(connSend.connected_amount):'')),sendLine(connSend)):null;
   const connBox=C&&!L.access&&['new','registered'].includes(L.status)?el('div',{style:'display:grid;gap:8px'},el('h4',{class:'lc-h'},'Подключение'),
     el('div',{class:'lc-grid'},kv('Нужно пополнить',cnMoney(C.required)+' (от '+cnMoney(C.from)+')'),...(C.deposited!==null&&C.deposited!==undefined?[kv('Внесено',cnMoney(C.deposited))]:[]),
       C.offer?kv('Акция',C.offer.name+' до '+new Date(C.offer.until).toLocaleDateString('ru-RU',{day:'2-digit',month:'2-digit',timeZone:'Europe/Kyiv'})):kv('Акция','нет')),
-    ...(C.sends||[]).slice(0,2).map(q=>el('div',{class:'mut sm'},fmtDT(q.sent_at)+' · '+q.offer_name+' · '+(q.delivery==='failed'?'не доставлено':q.delivery==='manual'&&q.connected_at&&!q.reverted_at?'активирована после депозита':q.reverted_at?'отменено (депозит удалён)':q.connected_at?'подключился':new Date(q.expires_at)<new Date()?'срок вышел':'ждём'))),
+    ...(C.sends||[]).slice(0,2).map(sendLine),
     // Депозит уже пришёл (меньше порога): админ и тимлид применяют скидку к внесённому — «Активировать скидку»
     (()=>{const act=C.hasDeposit&&(me.role==='admin'||me.role==='teamlead');
       return el('div',{},el('button',{class:'btn',type:'button',disabled:!act&&C.liveUntil?'':null,title:!act&&C.liveUntil?'Акция ещё действует до '+fmtDT(C.liveUntil):act?'Применить скидку к уже внесённому депозиту и открыть доступ':'',onclick:()=>connectDialog(L,C,()=>{close();openLeadCard(tgId)},act)},act?'Активировать скидку':'Предложить скидку'))})()):null;
@@ -3248,7 +3259,7 @@ async function openLeadCard(tgId){
         el('div',{class:'lc-steps'},step('Нажал «Старт» в боте',START),step('Регистрация',reg&&reg.created_at),step('Первый депозит',ftd&&ftd.created_at,ftd&&ftd.amount!==null?money(ftd.amount):null))),
       el('div',{},el('h4',{class:'lc-h'},'Финансы по постбекам'),finTile)),
     tierBox,
-    connBox,
+    connBox,connDoneBox,
     L.banned_at?el('div',{class:'card',style:'border-color:var(--bad);display:grid;gap:4px;padding:12px 14px'},el('b',{style:'color:var(--bad)'},'Лид заблокирован'),
       el('div',{class:'sm'},'Причина: '+(L.ban_reason||'—')),el('div',{class:'mut sm'},fmtDT(L.banned_at)+(L.banned_by_name?' · '+L.banned_by_name:'')+'. Mini App, пуши и сигналы ему недоступны; написать в поддержку он может.')):null,
     el('div',{class:'lc-actions'},

@@ -120,7 +120,7 @@ export async function connectInfo(tgId: number, hideDeposit = false) {
   const offers = (await db.query(`SELECT id, name, discount_pct, days, text FROM connect_offers WHERE active ORDER BY id`)).rows as Offer[];
   const sends = (
     await db.query(
-      `SELECT offer_name, discount_pct, required, sent_at, expires_at, delivery, connected_at, reverted_at, connected_amount::float AS connected_amount
+      `SELECT id, offer_name, discount_pct, required, sent_at, expires_at, delivery, connected_at, reverted_at, connected_amount::float AS connected_amount
          FROM connect_sends WHERE tg_id = $1 ORDER BY id DESC LIMIT 5`,
       [tgId],
     )
