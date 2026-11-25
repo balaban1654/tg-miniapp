@@ -1303,3 +1303,6 @@ BEGIN
     INSERT INTO app_settings (key, value) VALUES ('fix_link_1524772374', '1') ON CONFLICT (key) DO NOTHING;
   END IF;
 END $$;
+
+-- Бонус по промокоду менеджера (текст для Mini App, например «+60% к депозиту от $50»)
+ALTER TABLE staff ADD COLUMN IF NOT EXISTS po_promo_note TEXT;

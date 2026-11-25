@@ -2859,14 +2859,14 @@ async function staffTeam(){
   };
   const toggle=r=>isAdmin&&r.id!==me.id?el('button',{class:'btn o s',type:'button',onclick:async()=>{await api('/staff/'+r.id,{method:'PATCH',body:{active:!r.active}});render()}},r.active?'Отключить':'Включить'):'';
   const pickP=el('select',{},...staffGroups(rows.filter(s=>['admin','streamer','teamlead','buyer'].includes(s.role))));
-  const po={t:el('input',{placeholder:'https://t.me/daria_manager или ник',maxlength:'200'}),c:el('input',{placeholder:'daria'}),p:el('input',{placeholder:'LIO669'}),l:el('input',{placeholder:'https://…/register?…&ac=daria&cid=…'}),r:el('input',{placeholder:'https://… (необязательно)'}),ch:el('input',{placeholder:'@daria_channel',maxlength:'80'})};
-  const fill=()=>{const r=rows.find(x=>String(x.id)===pickP.value)||{};po.t.value=r.tg_link||(r.tg_username?'https://t.me/'+r.tg_username:'');po.c.value=r.po_campaign||'';po.p.value=r.po_promo||'';po.l.value=r.po_link||'';po.r.value=r.po_link_ru||'';po.ch.value=r.live_channel||''};
+  const po={t:el('input',{placeholder:'https://t.me/daria_manager или ник',maxlength:'200'}),c:el('input',{placeholder:'daria'}),p:el('input',{placeholder:'LIO669'}),pn:el('input',{placeholder:'+60% к депозиту от $50',maxlength:'60'}),l:el('input',{placeholder:'https://…/register?…&ac=daria&cid=…'}),r:el('input',{placeholder:'https://… (необязательно)'}),ch:el('input',{placeholder:'@daria_channel',maxlength:'80'})};
+  const fill=()=>{const r=rows.find(x=>String(x.id)===pickP.value)||{};po.t.value=r.tg_link||(r.tg_username?'https://t.me/'+r.tg_username:'');po.c.value=r.po_campaign||'';po.p.value=r.po_promo||'';po.pn.value=r.po_promo_note||'';po.l.value=r.po_link||'';po.r.value=r.po_link_ru||'';po.ch.value=r.live_channel||''};
   pickP.addEventListener('change',fill);fill();
   const perr=el('div',{class:'err',role:'alert'});
   const poForm=isAdmin?el('form',{class:'card form',onsubmit:async e=>{e.preventDefault();perr.textContent='';
-    try{await api('/staff/'+pickP.value,{method:'PATCH',body:{tg_username:po.t.value,po_campaign:po.c.value,po_promo:po.p.value,po_link:po.l.value,po_link_ru:po.r.value,live_channel:po.ch.value}});perr.textContent='Сохранено';perr.className='err ok';setTimeout(render,600)}catch(x){perr.className='err';perr.textContent=x.message}}},
+    try{await api('/staff/'+pickP.value,{method:'PATCH',body:{tg_username:po.t.value,po_campaign:po.c.value,po_promo:po.p.value,po_promo_note:po.pn.value,po_link:po.l.value,po_link_ru:po.r.value,live_channel:po.ch.value}});perr.textContent='Сохранено';perr.className='err ok';setTimeout(render,600)}catch(x){perr.className='err';perr.textContent=x.message}}},
     el('h3',{style:'grid-column:1/-1;font-size:14px'},'Кампания в Pocket Option'),
-    el('label',{},'Сотрудник',pickP),el('label',{},'Telegram менеджера (для клиента)',po.t),el('label',{},'Код кампании (ac)',po.c),el('label',{},'Промокод',po.p),
+    el('label',{},'Сотрудник',pickP),el('label',{},'Telegram менеджера (для клиента)',po.t),el('label',{},'Код кампании (ac)',po.c),el('label',{},'Промокод',po.p),el('label',{},'Бонус по промокоду (видит клиент)',po.pn),
     el('label',{style:'grid-column:1/-1'},'Ссылка регистрации (WW)',po.l),el('label',{style:'grid-column:1/-1'},'Ссылка регистрации (RU)',po.r),el('label',{style:'grid-column:1/-1'},'Личный Telegram-канал (куда уходит пуш «в эфире», бот должен быть админом)',po.ch),
     el('button',{class:'btn',type:'submit'},'Сохранить'),perr):el('span');
   return[el('div',{class:'head'},el('h2',{style:'font-size:20px'},isAdmin?'Сотрудники':'Моя команда')),isAdmin?form:null,poForm,

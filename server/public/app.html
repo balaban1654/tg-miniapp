@@ -243,6 +243,7 @@ main{flex:1;padding:6px 16px 96px;display:grid;gap:12px;align-content:start}
 .fd-pulse .rbtn{animation:fdPulse 1.6s ease-in-out infinite}@keyframes fdPulse{50%{box-shadow:0 0 0 4px rgba(155,92,255,.35),0 0 22px rgba(155,92,255,.45)}}
 @media (prefers-reduced-motion:reduce){.fd-tip,.fd-pulse .rbtn{animation:none}}
 .fd-lkb{display:grid;justify-items:center;gap:6px;padding:14px 18px;border-radius:16px;background:rgba(13,8,23,.82);border:1px solid var(--line);font-size:13.5px}.fd-blur{filter:blur(7px);user-select:none;pointer-events:none;display:grid;gap:8px}.fd-lk{position:absolute;inset:0;display:grid;place-items:center;font-size:30px}
+.fd-promo{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;border-radius:14px;border:1px dashed var(--line);background:rgba(255,255,255,.03)}.fd-promo .sm{margin:0}.fd-pnote{display:block;color:var(--ok);font-size:14px;margin-top:2px}.fd-pcode{flex:none;display:inline-flex;align-items:center;gap:8px;background:none;border:0;padding:6px 0;color:var(--fg);font:800 15px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.5px;cursor:pointer}.fd-pcode svg{color:var(--mut)}
 .fd-dir{text-align:center;padding:12px;border-radius:12px;background:rgba(61,220,151,.12);color:var(--ok);font-weight:800;font-size:18px}
 .fd-pf{background:#1b2030;border-radius:12px;padding:10px;font-family:system-ui,-apple-system,sans-serif}
 .fd-pf .bal{position:relative;display:inline-flex;flex-direction:column;border:1px solid #3a4258;border-radius:8px;padding:3px 10px;font-size:15px;font-weight:700;color:#fff}.fd-pf .bal small{font-size:9px;color:#8a93a8;font-weight:500}
@@ -1126,6 +1127,13 @@ function fdSpoiler(){
   requestAnimationFrame(draw);
   return cv;
 }
+/** Промокод менеджера при регистрации (из карточки сотрудника), с копированием. Нет промокода — блока нет */
+function fdPromo(){
+  if(!me.promo)return null;
+  return el('div',{class:'fd-promo'},
+    el('div',{style:'min-width:0'},el('div',{class:'sm'},'Промокод при регистрации'),me.promoNote?el('b',{class:'fd-pnote'},me.promoNote):null),
+    el('button',{class:'fd-pcode',type:'button','aria-label':'Скопировать промокод',onclick:()=>copyText(me.promo)},el('span',{},me.promo),svgEl(COPY_ICON)));
+}
 /** Анализ выбранной пары готов, но закрыт: просим зарегистрироваться по ссылке, регион EU или СНГ */
 function funnelGate(pair,sec){
   clearTimers();
@@ -1150,7 +1158,8 @@ function funnelGate(pair,sec){
       el('h2',{style:'font-size:17px'},'Анализ '+pair+' готов'),
       el('p',{class:'sm',style:'margin:0'},'Чтобы его открыть, зарегистрируйте аккаунт Pocket Option по нашей ссылке. Сразу после регистрации откроется ',el('b',{},'доступ к сигналам Hunter AI'),'.'),
       el('div',{class:'rrow fd-reg'},[['ww','EU, Мир','если вы в Европе'],['ru','RU, СНГ','если вы в России']].map(([k,a,b])=>el('button',{class:'rbtn',type:'button',onclick:()=>reg(k)},el('span',{style:'display:block'},a),el('span',{class:'rsub'},b)))),
-      el('p',{class:'sm',style:'margin:0'},'Нажимая, вы подтверждаете, что вам 18+ и вы понимаете: торговля связана с риском потери денег.'))]);
+      el('p',{class:'sm',style:'margin:0'},'Нажимая, вы подтверждаете, что вам 18+ и вы понимаете: торговля связана с риском потери денег.'),
+      fdPromo())]);
   scrollTo({top:0});
   // Через секунду сами плавно листаем к кнопкам региона и показываем подсказку над ними
   timers.push(setTimeout(()=>{const row=document.querySelector('.fd-reg');if(!row)return;

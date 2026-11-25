@@ -594,6 +594,7 @@ window.HUNTER_EN = {
   'Чтобы его открыть, зарегистрируйте аккаунт Pocket Option по нашей ссылке. Сразу после регистрации откроется': 'To unlock it, create a Pocket Option account via our link. Right after sign-up you get',
   'доступ к сигналам Hunter AI': 'access to Hunter AI signals',
   'Где вы находитесь?': 'Where are you located?',
+  'Промокод при регистрации': 'Promo code at sign-up',
   'Нажимая, вы подтверждаете, что вам 18+ и вы понимаете: торговля связана с риском потери денег.': 'By tapping, you confirm you are 18+ and understand that trading involves the risk of losing money.',
   'Ожидаем регистрацию': 'Waiting for sign-up',
   'Завершите регистрацию в Pocket Option. Как только она придёт к нам, здесь откроется': 'Finish signing up on Pocket Option. As soon as we receive it, you will get',

@@ -520,7 +520,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
       me.role === 'admin' ? 'TRUE' : me.role === 'teamlead' ? `(id = ${me.id} OR parent_id = ${me.id})` : `id = ${me.id}`;
     const r = await db.query(
       `SELECT id, login, name, role, parent_id, rate_ftd, rate_percent, active, created_at,
-              po_campaign, po_promo, po_link, po_link_ru, tg_username, tg_link, live_channel, streams, (totp_secret IS NOT NULL) AS totp,
+              po_campaign, po_promo, po_promo_note, po_link, po_link_ru, tg_username, tg_link, live_channel, streams, (totp_secret IS NOT NULL) AS totp,
               to_char(birth_date, 'YYYY-MM-DD') AS birth_date, city
          FROM staff WHERE ${scope} AND deleted_at IS NULL ORDER BY id`,
     );
@@ -654,6 +654,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
       if (c && !/^[a-zA-Z0-9]{1,30}$/.test(c)) return reply.code(400).send({ error: 'Промокод: латиница и цифры' });
       add('po_promo', c || null);
     }
+    if (b.po_promo_note !== undefined) add('po_promo_note', str(b.po_promo_note, 60) || null);
     for (const k of ['po_link', 'po_link_ru'] as const) {
       const v = link(b[k]);
       if (b[k] !== undefined && v === undefined) return reply.code(400).send({ error: 'Ссылка должна начинаться с https://' });
