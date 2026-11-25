@@ -3,6 +3,7 @@ import { markLeadBlocked } from './leadblock.js';
 import { db } from './db.js';
 import { buildKeyboard, deliver, loadTarget, pickText, processLead, renderText, type Button } from './push.js';
 import { accrueReferral } from './referral.js';
+import { leadLog } from './leadlog.js';
 
 import type { Role } from './auth.js';
 type Need = (...roles: Role[]) => (req: FastifyRequest, reply: FastifyReply) => Promise<unknown>;
@@ -301,6 +302,30 @@ export async function connectRoutes(app: FastifyInstance, h: { need: Need; str: 
     await accrueReferral(tgId).catch((e) => console.error('Реферальный бонус: сбой', e));
     await processLead(tgId).catch(() => {}); // пуши по событию, например «Депозит получен, доступ открыт»
     return { ok: true };
+  });
+
+  // Удалить акцию у лида: дальше ему нужно внести полную сумму. Если он уже подключился по этой скидке и внёс меньше полной —
+  // статус и доступ пересчитываются (доступ закроется). Админ — любую, тимлидер — своей команды
+  app.delete<{ Params: { id: string } }>('/connect/sends/:id', { preHandler: lead }, async (req, reply) => {
+    const me = (req as any).staff as { id: number; role: string };
+    const s = (
+      await db.query(
+        `SELECT s.id, s.tg_id, s.offer_name, s.discount_pct, s.connected_at FROM connect_sends s LEFT JOIN leads d ON d.tg_id = s.tg_id
+          WHERE s.id = $1 AND ${teamOf(me)}`,
+        [Number(req.params.id)],
+      )
+    ).rows[0];
+    if (!s) return reply.code(404).send({ error: 'Акция не найдена или это лид не вашей команды' });
+    await db.query('DELETE FROM connect_sends WHERE id = $1', [s.id]);
+    const tgId = Number(s.tg_id);
+    await leadLog(tgId, 'access', `Акция «${s.offer_name}» (−${s.discount_pct}%) удалена${s.connected_at ? ': подключение по скидке отменено, нужна полная сумма' : ''}`, me.id);
+    let access: boolean | null = null;
+    if (s.connected_at) {
+      const { recalcLeadAccess } = await import('./office.js');
+      await recalcLeadAccess(tgId);
+      access = Boolean((await db.query('SELECT access FROM leads WHERE tg_id = $1', [tgId])).rows[0]?.access);
+    }
+    return { ok: true, connected: Boolean(s.connected_at), access };
   });
 
   app.get('/connect/sends', { preHandler: lead }, async (req) => {

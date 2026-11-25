@@ -5570,9 +5570,17 @@ function cnOf(d){
 async function cnSn(d){
   const rows=await api('/connect/sends');
   const ST={reverted:['отменено','p-warn'],connected:['подключился','p-ok'],pending:['ждём','p-pur'],expired:['срок вышел','p-bad'],failed:['не доставлено','p-bad'],queued:['отправляется','p-warn']};
-  return[ctrT(table(['Лид','Акция','Отправил','Отправлено','До','Нужно','Итог'],rows.map(r=>{const st=ST[r.state]||[r.state,''];
+  // Корзина: удалить акцию у лида — дальше он подключается по полной сумме
+  const del=async r=>{
+    const msg=r.state==='connected'
+      ?'Удалить акцию «'+r.offer_name+'» у '+r.lead_name+'? Лид уже подключился по этой скидке. Дальше ему нужна полная сумма: если внесено меньше, доступ закроется.'
+      :'Удалить акцию «'+r.offer_name+'» у '+r.lead_name+'? Дальше лид подключается по полной сумме.';
+    if(!await askC(msg))return;
+    try{const x=await api('/connect/sends/'+r.id,{method:'DELETE'});toast(x.connected?(x.access?'Акция удалена, доступ остался: внесено не меньше полной суммы':'Акция удалена, доступ закрыт до полной суммы'):'Акция удалена');render({soft:true})}catch(x){toast(x.message)}};
+  return[ctrT(table(['Лид','Акция','Отправил','Отправлено','До','Нужно','Итог',''],rows.map(r=>{const st=ST[r.state]||[r.state,''];
     return[el('td',{},el('a',{href:'#',onclick:e=>{e.preventDefault();openLeadCard(r.tg_id)},style:'color:var(--acc2)'},r.lead_name)),td(r.offer_name+' (−'+r.discount_pct+'%)'),td(r.by_name||'—'),td(fmtDT(r.sent_at)),td(fmtDT(r.expires_at)),td(cnMoney(r.required),'n'),
-      el('td',{},el('span',{class:'pill '+st[1],title:r.error||''},st[0]),r.state==='connected'?el('span',{class:'mut sm'},' '+cnMoney(r.connected_amount)):null)]}),'Акции ещё не отправляли'))];
+      el('td',{},el('span',{class:'pill '+st[1],title:r.error||''},st[0]),r.state==='connected'?el('span',{class:'mut sm'},' '+cnMoney(r.connected_amount)):null),
+      el('td',{},el('button',{class:'del-ib',type:'button',title:'Удалить акцию у лида','aria-label':'Удалить акцию у '+r.lead_name,onclick:()=>del(r)},svgIcon(TRASH,17)))]}),'Акции ещё не отправляли'))];
 }
 /** Окно блокировки лида: причина обязательна (быстрый выбор или свой текст) */
 function banDialog(L,done){

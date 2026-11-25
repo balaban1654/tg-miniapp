@@ -3162,6 +3162,11 @@ export async function rollbackLeadAfterEventRemoval(tgId: number, type: string):
     );
   }
   if (!['reg', 'ftd', 'dep'].includes(type)) return;
+  await recalcLeadAccess(tgId);
+}
+
+/** Статус и доступ лида заново по его депозитам и сумме, которую нужно внести (с учётом сработавшей акции) */
+export async function recalcLeadAccess(tgId: number): Promise<void> {
   // У лида в «Отвале» из-за блокировки бота пересчитываем прежний статус (он вернётся, когда лид снова запустит бота)
   const lead = (await db.query('SELECT coalesce(status_before_block, status) AS status, status_before_block IS NOT NULL AS blocked, removed_at, trader_id FROM leads WHERE tg_id = $1', [tgId])).rows[0];
   if (!lead || lead.removed_at || !['registered', 'ftd', 'active'].includes(lead.status)) return;
