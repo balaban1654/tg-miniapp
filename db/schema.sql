@@ -1306,3 +1306,12 @@ END $$;
 
 -- Бонус по промокоду менеджера (текст для Mini App, например «+60% к депозиту от $50»)
 ALTER TABLE staff ADD COLUMN IF NOT EXISTS po_promo_note TEXT;
+
+-- Разово: бонус по промокоду всем сотрудникам (у кого ещё не заполнен)
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM app_settings WHERE key = 'promo_note_all_1') THEN
+    UPDATE staff SET po_promo_note = '+60% к депозиту от $50' WHERE po_promo_note IS NULL OR po_promo_note = '';
+    INSERT INTO app_settings (key, value) VALUES ('promo_note_all_1', '1') ON CONFLICT (key) DO NOTHING;
+  END IF;
+END $$;
