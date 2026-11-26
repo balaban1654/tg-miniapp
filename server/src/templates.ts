@@ -85,12 +85,14 @@ interface Tpl {
   channels: string[];
   toStaffChannel: boolean;
   photo: Photo | null;
+  /** Картинка для сигнала «вниз» (шаблон «Новый сигнал»); нет — берётся photo */
+  photoDown: Photo | null;
 }
 
 async function load(key: TemplateKey): Promise<Tpl | null> {
-  const r = (await db.query('SELECT enabled, text, text_en, buttons, segment, channels, to_staff_channel, photo, photo_type FROM push_templates WHERE key = $1', [key])).rows[0];
+  const r = (await db.query('SELECT enabled, text, text_en, buttons, segment, channels, to_staff_channel, photo, photo_type, photo_down, photo_down_type FROM push_templates WHERE key = $1', [key])).rows[0];
   if (!r) return null;
-  return { enabled: r.enabled, text: r.text, textEn: r.text_en || (r.text === DEFAULTS[key].text ? DEFAULTS_EN[key] : ''), buttons: r.buttons, segment: r.segment, channels: r.channels, toStaffChannel: r.to_staff_channel, photo: r.photo ? { data: r.photo, type: r.photo_type } : null };
+  return { enabled: r.enabled, text: r.text, textEn: r.text_en || (r.text === DEFAULTS[key].text ? DEFAULTS_EN[key] : ''), buttons: r.buttons, segment: r.segment, channels: r.channels, toStaffChannel: r.to_staff_channel, photo: r.photo ? { data: r.photo, type: r.photo_type } : null, photoDown: r.photo_down ? { data: r.photo_down, type: r.photo_down_type } : null };
 }
 
 /** В канал нельзя кнопку Mini App и обратные вызовы: оставляем ссылки, а вход в кабинет превращаем в ссылку на бота */
@@ -126,12 +128,15 @@ export interface Dispatch {
   segment?: string;
   /** Картинка вместо картинки шаблона, например скрин плюса с перекрытия */
   photo?: Photo | null;
+  /** Направление сигнала: для «вниз» берётся вторая картинка шаблона (если есть) */
+  direction?: 'up' | 'down';
 }
 
 /** Рассылает шаблон: клиентам бота по выбранному списку и в Telegram-каналы. Возвращает, сколько получателей поставлено в очередь */
 export async function dispatchTemplate(key: TemplateKey, d: Dispatch): Promise<{ users: number; channels: number; skipped?: string; chErrors?: string[] }> {
   const t = await load(key);
   if (!t || !t.enabled) return { users: 0, channels: 0, skipped: 'выключен' };
+  if (d.direction === 'down' && t.photoDown) t.photo = t.photoDown;
   if (d.photo) t.photo = d.photo;
   let text = t.text;
   for (const [k, v] of Object.entries(d.vars)) text = text.replaceAll(`{${k}}`, v);

@@ -2037,11 +2037,12 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
   // Шаблоны сообщений бота: новый сигнал и «стример в эфире»
   const tplKey = (k: string): TemplateKey | null => ((TEMPLATE_KEYS as readonly string[]).includes(k) ? (k as TemplateKey) : null);
   app.get('/push/templates', { preHandler: need('admin') }, async () => {
-    const rows = (await db.query(`SELECT key, enabled, text, text_en, buttons, segment, channels, to_staff_channel, (photo IS NOT NULL) AS has_photo, updated_at FROM push_templates ORDER BY key DESC`)).rows;
+    const rows = (await db.query(`SELECT key, enabled, text, text_en, buttons, segment, channels, to_staff_channel, (photo IS NOT NULL) AS has_photo, (photo_down IS NOT NULL) AS has_photo_down, updated_at FROM push_templates ORDER BY key DESC`)).rows;
     return rows.map((r) => ({ ...r, text_en: r.text_en || (DEFAULTS[r.key as TemplateKey] && r.text === DEFAULTS[r.key as TemplateKey].text ? DEFAULTS_EN[r.key as TemplateKey] : '') }));
   });
   app.get<{ Params: { key: string } }>('/push/templates/:key/photo', { preHandler: need('admin') }, async (req, reply) => {
-    const r = (await db.query('SELECT photo, photo_type FROM push_templates WHERE key = $1', [req.params.key])).rows[0];
+    const down = (req.query as Record<string, string>).down === '1';
+    const r = (await db.query(down ? 'SELECT photo_down AS photo, photo_down_type AS photo_type FROM push_templates WHERE key = $1' : 'SELECT photo, photo_type FROM push_templates WHERE key = $1', [req.params.key])).rows[0];
     if (!r?.photo) return reply.code(404).send({ error: 'Не найдено' });
     return reply.type(r.photo_type).header('Cache-Control', 'no-cache').send(r.photo);
   });
@@ -2073,6 +2074,13 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
     );
     if (b.remove_photo) await db.query('UPDATE push_templates SET photo = NULL, photo_type = NULL WHERE key = $1', [key]);
     if (ph) await db.query('UPDATE push_templates SET photo = $2, photo_type = $3 WHERE key = $1', [key, ph.data, ph.type]);
+    // Шаблон «Новый сигнал»: вторая картинка — для сигнала «вниз»
+    if (key === 'signal') {
+      const pd = parseReviewPhoto(b.photo_down);
+      if (typeof pd === 'string') return reply.code(400).send({ error: pd.replace('Фото', 'Картинка «Вниз»') });
+      if (b.remove_photo_down) await db.query('UPDATE push_templates SET photo_down = NULL, photo_down_type = NULL WHERE key = $1', [key]);
+      if (pd) await db.query('UPDATE push_templates SET photo_down = $2, photo_down_type = $3 WHERE key = $1', [key, pd.data, pd.type]);
+    }
     return { ok: true };
   });
   app.post<{ Params: { key: string } }>('/push/templates/:key/reset', { preHandler: need('admin') }, async (req, reply) => {
@@ -2148,6 +2156,7 @@ export async function officeRoutes(app: FastifyInstance): Promise<void> {
           'сделка': o.direction === 'up' ? 'BUY (Вверх)' : 'SELL (Вниз)',
           'вход': new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: config.pushTz }).format(entryAt),
         },
+        direction: o.direction,
         varsEn: {
           'направление': o.direction === 'up' ? 'up' : 'down',
           'экспирация': o.expirySec ? `${o.expirySec} sec` : `${o.expiry} min`,

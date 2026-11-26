@@ -4748,25 +4748,30 @@ function templateCard(t){
   const seg=el('select',{'aria-label':'Кому'},segOpts.map(([v,n])=>el('option',{value:v},n)));seg.value=t.segment;
   const ch=el('textarea',{class:'big',rows:'2',placeholder:'@channel_name\n-1001234567890',maxlength:'600','aria-label':'Каналы',style:'min-height:56px;resize:vertical'});ch.value=(t.channels||[]).join('\n');
   const own=el('input',{type:'checkbox',style:'width:auto'});own.checked=t.to_staff_channel!==false;
-  let photo=null,removePhoto=false,hasPhoto=t.has_photo;
-  const file=el('input',{type:'file',accept:'image/jpeg,image/png,image/webp',style:'display:none'});
-  const pv=el('div',{style:'display:flex;align-items:center;gap:10px;flex-wrap:wrap'});
+  // Картинка шаблона. У «Нового сигнала» две: «Вверх» (photo) и «Вниз» (photo_down), уходит та, что по направлению сигнала
+  const photoSlot=(down)=>{
+    const s={photo:null,remove:false,has:down?t.has_photo_down:t.has_photo};
+    const file=el('input',{type:'file',accept:'image/jpeg,image/png,image/webp',style:'display:none'});
+    const pv=el('div',{style:'display:flex;align-items:center;gap:10px;flex-wrap:wrap'});
+    const draw=()=>{
+      const src=s.photo||(s.has&&!s.remove?'/api/office/push/templates/'+t.key+'/photo?'+(down?'down=1&':'')+(t.updated_at||''):null);
+      pv.replaceChildren(el('button',{class:'btn o s',type:'button',onclick:()=>file.click()},src?'Заменить картинку':'Добавить картинку'),
+        src?el('div',{class:'shot-w'},el('img',{src,alt:'',style:'max-height:72px'}),el('button',{class:'shot-del',type:'button',title:'Убрать картинку','aria-label':'Убрать картинку',onclick:()=>{s.photo=null;if(s.has)s.remove=true;draw()}},'×')):null);
+    };
+    file.addEventListener('change',async()=>{const f=file.files[0];file.value='';if(!f)return;
+      if(!/^image\/(jpeg|png|webp)$/.test(f.type)){err.textContent='Нужна картинка JPG, PNG или WebP';return}
+      if(f.size>5*1024*1024){err.textContent='Картинка больше 5 МБ';return}
+      err.textContent='';s.photo=await fileToDataUrl(f);s.remove=false;draw()});
+    draw();s.node=el('div',{style:'display:grid;gap:6px'},pv,file);return s;
+  };
+  const isSig=t.key==='signal',ph1=photoSlot(false),ph2=isSig?photoSlot(true):null;
   const bpv=el('div',{});
   const upd=()=>bpv.replaceChildren(preview(txt.value,be.get()));
-  const drawPv=()=>{
-    const src=photo||(hasPhoto&&!removePhoto?'/api/office/push/templates/'+t.key+'/photo?'+(t.updated_at||''):null);
-    pv.replaceChildren(el('button',{class:'btn o s',type:'button',onclick:()=>file.click()},src?'Заменить картинку':'Добавить картинку'),
-      src?el('div',{class:'shot-w'},el('img',{src,alt:'',style:'max-height:72px'}),el('button',{class:'shot-del',type:'button',title:'Убрать картинку','aria-label':'Убрать картинку',onclick:()=>{photo=null;if(hasPhoto)removePhoto=true;drawPv()}},'×')):null);
-  };
-  file.addEventListener('change',async()=>{const f=file.files[0];file.value='';if(!f)return;
-    if(!/^image\/(jpeg|png|webp)$/.test(f.type)){err.textContent='Нужна картинка JPG, PNG или WebP';return}
-    if(f.size>5*1024*1024){err.textContent='Картинка больше 5 МБ';return}
-    err.textContent='';photo=await fileToDataUrl(f);removePhoto=false;drawPv()});
   txt.addEventListener('input',upd);be.node.addEventListener('input',upd);be.node.addEventListener('click',()=>setTimeout(upd,0));
-  drawPv();upd();
+  upd();
   const save=el('button',{class:'btn',type:'button'},'Сохранить');
   save.addEventListener('click',async()=>{err.className='err';err.textContent='';
-    try{await api('/push/templates/'+t.key,{method:'PUT',body:{enabled:on.checked,text:txt.value,text_en:txtEn.value,buttons:be.get(),segment:seg.value,channels:ch.value,to_staff_channel:own.checked,photo,remove_photo:removePhoto}});
+    try{await api('/push/templates/'+t.key,{method:'PUT',body:{enabled:on.checked,text:txt.value,text_en:txtEn.value,buttons:be.get(),segment:seg.value,channels:ch.value,to_staff_channel:own.checked,photo:ph1.photo,remove_photo:ph1.remove,...(ph2?{photo_down:ph2.photo,remove_photo_down:ph2.remove}:{})}});
       err.className='ok-msg';err.textContent='Сохранено';setTimeout(render,700)}catch(x){err.textContent=x.message}});
   const reset=el('button',{class:'btn o',type:'button',onclick:async()=>{if(!reset.dataset.s){reset.dataset.s='1';reset.textContent='Точно вернуть стандартный текст?';return}
     try{await api('/push/templates/'+t.key+'/reset',{method:'POST'});render({soft:true})}catch(x){err.textContent=x.message}}},'Вернуть стандартный текст');
@@ -4775,7 +4780,9 @@ function templateCard(t){
     el('div',{class:'mut sm'},info.when),
     el('label',{},'Текст. Подстановки: '+info.vars,txt),
     el('label',{},'Текст на английском',txtEn),el('div',{class:'mut sm'},'Клиенты, выбравшие English, получат английский текст. Если оставить пустым, им уйдёт русский.'),
-    el('div',{style:'display:grid;gap:6px'},el('span',{class:'mut sm'},'Картинка (необязательно, можно отправить только её)'),pv,file),
+    isSig?el('div',{style:'display:grid;gap:6px'},el('span',{class:'mut sm'},'Картинки по направлению сигнала: уходит «Вверх» или «Вниз» — как выбрал аналитик (при «Авто» — какое выпало). Если «Вниз» не загружена, для обоих уходит «Вверх».'),
+      el('div',{style:'display:flex;gap:24px;flex-wrap:wrap'},el('div',{style:'display:grid;gap:6px'},el('b',{style:'font-size:13px;color:var(--ok)'},'↗ Вверх'),ph1.node),el('div',{style:'display:grid;gap:6px'},el('b',{style:'font-size:13px;color:var(--bad)'},'↘ Вниз'),ph2.node)))
+      :el('div',{style:'display:grid;gap:6px'},el('span',{class:'mut sm'},'Картинка (необязательно, можно отправить только её)'),ph1.node),
     be.node,
     el('div',{class:'form'},t.key==='live'?el('label',{},'Кому в боте',seg):el('div',{class:'mut sm',style:'align-self:end'},'Кому в боте: всем лидам, кто запускал бота, если при отправке стоит галочка «Отправить пуш»'),el('label',{style:'grid-column:span 2'},t.key==='live'?'Основной канал команды: сюда попадает эфир любого стримера (по одному на строку, бот должен быть админом)':'Telegram-каналы, по одному на строку (бот должен быть админом)',ch)),
     t.key==='live'?el('label',{style:'display:flex;gap:8px;align-items:center;cursor:pointer'},own,'Слать ещё и в личный канал этого стримера (задаётся в Сотрудниках, в карточке «Кампания в Pocket Option»). Эфир Даши не попадёт в канал Лизы.'):null,

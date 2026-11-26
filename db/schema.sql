@@ -1315,3 +1315,7 @@ BEGIN
     INSERT INTO app_settings (key, value) VALUES ('promo_note_all_1', '1') ON CONFLICT (key) DO NOTHING;
   END IF;
 END $$;
+
+-- Шаблон «Новый сигнал»: вторая картинка для сигнала «вниз» (photo — «вверх»; если второй нет, photo для обоих)
+ALTER TABLE push_templates ADD COLUMN IF NOT EXISTS photo_down BYTEA;
+ALTER TABLE push_templates ADD COLUMN IF NOT EXISTS photo_down_type TEXT;
