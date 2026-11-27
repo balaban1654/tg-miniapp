@@ -2183,7 +2183,11 @@ async function plansTasks(){
   const chips=el('div',{class:'inl'},...F.map(([k,t])=>el('button',{type:'button',class:'btn s'+(plansState.filter===k?'':' o'),onclick:()=>{plansState.filter=k;plansRefresh()}},t+(k==='all'?'':' · '+cnt(k)))));
   const list=tasks.filter(t=>plansState.filter==='all'||t.status===plansState.filter);
   const act=(id,action)=>async()=>{try{await api('/tasks/'+id,{method:'PATCH',body:{action}});toast(action==='accept'?'Задача принята':'Задача возвращена в работу');plansRefresh()}catch(x){toast(x.message)}};
-  const rows=list.map(t=>{
+  // По должностям, как в остальном Office (Тимлидеры, Стримеры, Аналитики…), внутри по имени сотрудника
+  const roleOf=Object.fromEntries(staffAll.map(s=>[s.id,s.role])),gOrd=Object.fromEntries(STAFF_GROUPS.map(([k],i)=>[k,i]));
+  const gk=t=>{const r=roleOf[t.staff_id];return gOrd[r]===undefined?'other':r};
+  const sorted=list.map((t,i)=>[t,i]).sort((x,y)=>(gOrd[gk(x[0])]??9)-(gOrd[gk(y[0])]??9)||String(x[0].staff_name).localeCompare(String(y[0].staff_name),'ru')||x[1]-y[1]).map(x=>x[0]);
+  const taskRow=t=>{
     const over=t.status==='open'&&t.due&&t.due<today;
     return[td(t.staff_name),el('td',{style:'white-space:normal;text-align:left;min-width:240px'},el('b',{},t.title),t.details?el('div',{class:'mut sm'},t.details):null,t.created_by&&t.created_by!==me.id&&t.created_by_name?el('div',{class:'mut sm'},'поставил '+t.created_by_name):null),
       el('td',{},t.due?el('span',{class:'pill '+(over?'p-bad':'p-pur')},dmy(t.due).slice(0,5)):'—'),
@@ -2192,8 +2196,12 @@ async function plansTasks(){
         t.status==='done'?el('button',{class:'btn s',type:'button',onclick:act(t.id,'accept')},'Принять'):null,
         t.status==='done'||t.status==='accepted'?el('button',{class:'btn o s',type:'button',onclick:act(t.id,'reopen')},'Вернуть'):null,
         me.role==='admin'||t.created_by===me.id?el('button',{class:'btn o s',type:'button',onclick:async()=>{try{await api('/tasks/'+t.id,{method:'DELETE'});plansRefresh()}catch(x){toast(x.message)}}},'Удалить'):null))];
-  });
-  return[form,el('div',{class:'head'},el('h3',{style:'font-size:15px'},'Задачи'),chips),ctrT(table(['Сотрудник','Задача','Срок','Статус',''],rows,plansState.filter==='done'?'Выполненных задач, которые ждут принятия, нет.':'Задач нет.')),
+  };
+  const rows=[];let prevG=null;
+  for(const t of sorted){const g=gk(t);
+    if(g!==prevG){const n=sorted.filter(x=>gk(x)===g).length;rows.push([el('td',{class:'grp-c',colspan:'5'},((STAFF_GROUPS.find(x=>x[0]===g)||[g,'Другие'])[1])+' · '+n)]);prevG=g}
+    rows.push(taskRow(t))}
+  return[form,el('div',{class:'head'},el('h3',{style:'font-size:15px'},'Задачи'),chips),(()=>{const t=ctrT(table(['Сотрудник','Задача','Срок','Статус',''],rows,plansState.filter==='done'?'Выполненных задач, которые ждут принятия, нет.':'Задач нет.'));t.querySelectorAll('td.grp-c').forEach(c=>{c.parentNode.classList.add('grp');c.removeAttribute('data-l')});return t})(),
     el('div',{class:'mut sm'},me.role==='admin'?'Сотрудник отмечает задачу выполненной, она попадает к вам в «Требует внимания» на дашборде. Принятая задача уходит из его списка.':'Стример отмечает задачу выполненной, она появляется здесь в «Ждут принятия» (цифра на вкладке). Принятая задача уходит из его списка. Задачи от руководителя удалить нельзя, только принять или вернуть.')];
 }
 async function plansGoals(){
