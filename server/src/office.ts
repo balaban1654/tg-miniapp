@@ -100,15 +100,15 @@ function ownerScope(me: Staff, col: string): string {
  *  - владелец в эфире: закрыто;
  *  - клиент написал во время эфира (или незадолго до конца): открыто через 15 минут после конца эфира;
  *  - владелец не стримил (выходной): открыто через 5 минут после первого неотвеченного сообщения (уведомление в группу уже ушло).
- * Отсчёт идёт от первого сообщения клиента после последнего ответа ему.
+ * Отсчёт идёт от первого сообщения клиента после последнего ответа владельца. Ответ админа или тимлида («Одну минуту…») не считается:
+ * клиент ждёт своего менеджера. Нет сообщения клиента после ответа владельца — чат не открывается.
  */
 function takeOpen(d: string, col: string): string {
   return `${d}.status = 'new' AND coalesce(${d}.lead_role, 'lead') = 'lead'
-      AND (SELECT direction FROM messages WHERE tg_id = ${d}.tg_id ORDER BY id DESC LIMIT 1) = 'in'
       AND NOT EXISTS (SELECT 1 FROM shift_reports r WHERE r.staff_id = ${col} AND r.status = 'live')
       AND now() > GREATEST(
-        (SELECT min(m.created_at) FROM messages m WHERE m.tg_id = ${d}.tg_id AND m.direction = 'in'
-            AND m.id > coalesce((SELECT max(o.id) FROM messages o WHERE o.tg_id = ${d}.tg_id AND o.direction = 'out'), 0)) + interval '5 minutes',
+        coalesce((SELECT min(m.created_at) FROM messages m WHERE m.tg_id = ${d}.tg_id AND m.direction = 'in'
+            AND m.id > coalesce((SELECT max(o.id) FROM messages o WHERE o.tg_id = ${d}.tg_id AND o.direction = 'out' AND o.staff_id = ${col}), 0)), 'infinity'::timestamptz) + interval '5 minutes',
         coalesce((SELECT max(r.ended_at) FROM shift_reports r WHERE r.staff_id = ${col}), '-infinity'::timestamptz) + interval '15 minutes')`;
 }
 
