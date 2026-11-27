@@ -152,6 +152,7 @@ main{padding:22px clamp(14px,3vw,32px);display:grid;grid-template-columns:minmax
 .kpi small{color:var(--mut);text-transform:uppercase;letter-spacing:.05em;font-size:10px}
 .kpi b{display:block;font:700 24px var(--fm);margin-top:2px}
 .tbl{overflow-x:auto;border:1px solid var(--line);border-radius:14px}
+.tbl tr.grp td{background:var(--bg2);color:var(--acc2);font:700 11px var(--fm);letter-spacing:.06em;text-transform:uppercase;text-align:left!important;padding:7px 14px}
 @media(min-width:701px){.tbl.sumt table{min-width:0}.tbl.sumt th,.tbl.sumt td{padding:7px 6px;font-size:12px}.tbl.sumt th{font-size:9.5px;letter-spacing:.03em;white-space:normal;line-height:1.25}.tbl.sumt td .sm{font-size:10px}.tbl.sumt td .pill{font-size:9.5px;padding:2px 6px}.tbl.sumt tr.grp td{background:var(--bg2);color:var(--acc2);font:700 10.5px var(--fm);letter-spacing:.06em;text-transform:uppercase;text-align:left!important;padding:6px 12px}}
 @media(max-width:700px){.tbl.sumt tr.grp{display:none!important}}
 table{border-collapse:collapse;width:100%;min-width:560px}
@@ -343,6 +344,7 @@ textarea.big{background:var(--bg2);border:1px solid var(--line);border-radius:10
  .accv .tbl tbody tr{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:8px 12px;margin-bottom:10px}
  .accv .tbl td{display:flex!important;justify-content:space-between;align-items:center;gap:12px;padding:6px 0;border:0!important;text-align:right!important;white-space:normal!important;min-width:0!important;width:100%}
  .accv .tbl td+td{border-top:1px solid var(--line)!important}
+ .accv .tbl tbody tr.grp{background:none;border:0;padding:6px 2px 0;margin-bottom:4px}.accv .tbl tr.grp td{background:none;padding:0 2px;justify-content:flex-start;text-align:left!important}
  .accv .tbl td::before{content:attr(data-l);flex:none;max-width:42%;color:var(--mut);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;text-align:left}
  .accv .tbl td[data-l='']::before{display:none}.accv .tbl td[data-l='']{justify-content:flex-end}
  .accv .tbl td:first-child{font-weight:700;font-size:15px;justify-content:flex-start;text-align:left!important}.accv .tbl td:first-child::before{display:none}
@@ -4168,8 +4170,16 @@ async function accPay(){
   const advBox=advs.length?el('div',{class:'card',style:'display:grid;gap:8px;border-color:var(--acc)'},el('h4',{},'Запросы аванса'),...advs.map(a=>el('div',{class:'inl',style:'justify-content:space-between'},
     el('div',{},el('b',{},a.staff_name+' запросил '+usd2(a.amount)),el('div',{class:'mut sm'},perLabel(a.period))),
     el('div',{class:'inl'},el('button',{class:'btn s',type:'button',onclick:async()=>{try{await api('/advances/'+a.id+'/decide',{method:'POST',body:{action:'pay'}});toast('Аванс записан как выплаченный');accRefresh()}catch(x){toast(x.message)}}},'Выплатил'),el('button',{class:'btn o s',type:'button',onclick:async()=>{try{await api('/advances/'+a.id+'/decide',{method:'POST',body:{action:'reject'}});accRefresh()}catch(x){toast(x.message)}}},'Отклонить'))))):null;
-  const rows=sum.rows.map((r,i)=>{const c=cards[i]||{};return[td(r.staff.name),td((ROLE[r.staff.role]||r.staff.role)),td(usd2(r.kpi.total),'n'),td(r.kpi.paid?usd2(r.kpi.paid):'—','n'),el('td',{class:'n'},el('b',{},usd2(r.kpi.due))),td(c.payout_method||'не указано'),el('td',{class:'mono sm'},c.payout_wallet?[c.payout_wallet,copyIconBtn(c.payout_wallet,'Реквизиты скопированы')]:el('span',{class:'mut'},'нет реквизитов'))]});
-  const who=el('select',{},...st.map(s=>el('option',{value:s.id},s.name)));
+  // По должностям (как в остальном Office: админы, тимлидеры, стримеры, аналитики, медиабайеры), внутри — у кого больше «Итого», тот выше
+  const gOrd=Object.fromEntries(STAFF_GROUPS.map(([k],i)=>[k,i]));
+  const ord=sum.rows.map((r,i)=>i).sort((a,b)=>{const x=sum.rows[a],y=sum.rows[b];return (gOrd[x.staff.role]??9)-(gOrd[y.staff.role]??9)||Number(y.kpi.total||0)-Number(x.kpi.total||0)||String(x.staff.name).localeCompare(String(y.staff.name),'ru')});
+  const payRow=i=>{const r=sum.rows[i],c=cards[i]||{};return[td(r.staff.name),td((ROLE[r.staff.role]||r.staff.role)),td(usd2(r.kpi.total),'n'),td(r.kpi.paid?usd2(r.kpi.paid):'—','n'),el('td',{class:'n'},el('b',{},usd2(r.kpi.due))),td(c.payout_method||'не указано'),el('td',{class:'mono sm'},c.payout_wallet?[c.payout_wallet,copyIconBtn(c.payout_wallet,'Реквизиты скопированы')]:el('span',{class:'mut'},'нет реквизитов'))]};
+  const grpTitle=k=>(STAFF_GROUPS.find(g=>g[0]===k)||[k,'Другие'])[1];
+  const rows=[];let prevG=null;
+  for(const i of ord){const k=sum.rows[i].staff.role;const g=gOrd[k]===undefined?'other':k;
+    if(g!==prevG){const n=ord.filter(j=>{const kk=sum.rows[j].staff.role;return (gOrd[kk]===undefined?'other':kk)===g}).length;rows.push([el('td',{class:'grp-c',colspan:'7'},grpTitle(k)+' · '+n)]);prevG=g}
+    rows.push(payRow(i))}
+  const who=el('select',{},...staffGroups(st));
   const kind=el('select',{},el('option',{value:'final'},'Итоговая выплата'),el('option',{value:'advance'},'Аванс (вручную)'),el('option',{value:'extra'},'Доплата'));
   const amount=el('input',{type:'number',min:'0',step:'0.01',placeholder:'Сумма, $'});
   const note=el('input',{placeholder:'Заметка (необязательно)',maxlength:'300'});
@@ -4183,7 +4193,7 @@ async function accPay(){
     el('div',{class:'lc-two'},el('label',{},'Сотрудник',who),el('label',{},'Тип',kind),el('label',{},'За месяц',forP),el('label',{},'Сумма',amount),el('label',{},'Заметка',note)),err,
     el('div',{},el('button',{class:'btn s',type:'button',onclick:async()=>{err.textContent='';try{await api('/payouts',{method:'POST',body:{staff_id:Number(who.value),kind:kind.value,amount:Number(amount.value),note:note.value,period:forP.value}});toast('Выплата записана');accRefresh()}catch(x){err.textContent=x.message}}},'Записать')));
   return[el('div',{class:'head'},el('h3',{style:'font-size:15px'},'Выплаты за '+perLabel(accState.period)),el('span',{class:'pill p-pur'},'выплаты с 5 по 10 число следующего месяца')),
-    advBox,ctrT(table(['Сотрудник','Должность','Итого','Выплачено','К выплате','Куда','Реквизиты'],rows,'Сотрудников пока нет.')),form,
+    advBox,form,(()=>{const t=ctrT(table(['Сотрудник','Должность','Итого','Выплачено','К выплате','Куда','Реквизиты'],rows,'Сотрудников пока нет.'));t.querySelectorAll('td.grp-c').forEach(c=>{c.parentNode.classList.add('grp');c.removeAttribute('data-l')});return t})(),
     el('div',{class:'mut sm'},'Реквизиты берутся из карточки сотрудника (раздел «Сотрудники»). Запрошенный аванс не больше $'+sum.plan.advance+', вручную можно выплатить больше. Аванс вычитается из итога.')];
 }
 
