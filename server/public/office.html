@@ -2183,10 +2183,10 @@ async function plansTasks(){
   const chips=el('div',{class:'inl'},...F.map(([k,t])=>el('button',{type:'button',class:'btn s'+(plansState.filter===k?'':' o'),onclick:()=>{plansState.filter=k;plansRefresh()}},t+(k==='all'?'':' · '+cnt(k)))));
   const list=tasks.filter(t=>plansState.filter==='all'||t.status===plansState.filter);
   const act=(id,action)=>async()=>{try{await api('/tasks/'+id,{method:'PATCH',body:{action}});toast(action==='accept'?'Задача принята, она в «Выполненных»':'Задача возвращена в работу');plansRefresh()}catch(x){toast(x.message)}};
-  // По должностям, как в остальном Office (Тимлидеры, Стримеры, Аналитики…), внутри по имени сотрудника
+  // По должностям, как в остальном Office (Тимлидеры, Стримеры, Аналитики…), внутри по сроку: поздний сверху, без срока в конце
   const roleOf=Object.fromEntries(staffAll.map(s=>[s.id,s.role])),gOrd=Object.fromEntries(STAFF_GROUPS.map(([k],i)=>[k,i]));
   const gk=t=>{const r=roleOf[t.staff_id];return gOrd[r]===undefined?'other':r};
-  const sorted=list.map((t,i)=>[t,i]).sort((x,y)=>(gOrd[gk(x[0])]??9)-(gOrd[gk(y[0])]??9)||String(x[0].staff_name).localeCompare(String(y[0].staff_name),'ru')||x[1]-y[1]).map(x=>x[0]);
+  const sorted=list.map((t,i)=>[t,i]).sort((x,y)=>(gOrd[gk(x[0])]??9)-(gOrd[gk(y[0])]??9)||(!x[0].due-!y[0].due)||String(y[0].due||'').localeCompare(String(x[0].due||''))||String(x[0].staff_name).localeCompare(String(y[0].staff_name),'ru')||x[1]-y[1]).map(x=>x[0]);
   const taskRow=t=>{
     const over=t.status==='open'&&t.due&&t.due<today;
     return[td(t.staff_name),el('td',{style:'white-space:normal;text-align:left;min-width:240px'},el('b',{},t.title),t.details?el('div',{class:'mut sm'},t.details):null,t.created_by&&t.created_by!==me.id&&t.created_by_name?el('div',{class:'mut sm'},'поставил '+t.created_by_name):null),
